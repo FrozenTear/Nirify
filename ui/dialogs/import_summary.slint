@@ -1,0 +1,193 @@
+// Import summary dialog - shown after first-run import
+import { Button, VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
+import { Theme } from "../styles.slint";
+
+export component ImportSummaryDialog inherits Rectangle {
+    in property <bool> show-dialog: false;
+    in property <int> imported-count: 0;
+    in property <int> defaulted-count: 0;
+    in property <int> includes-processed: 0;
+    in property <[string]> warnings: [];
+    in property <[string]> imported-sections: [];
+
+    callback dismissed();
+
+    // Only render when visible
+    visible: show-dialog;
+
+    // Modal overlay
+    background: #00000080;
+
+    // Consume clicks on overlay to dismiss
+    TouchArea {
+        clicked => { dismissed(); }
+    }
+
+    // Dialog box
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(500px, parent.width - 40px);
+        height: min(dialog-content.preferred-height + 2 * Theme.spacing-lg, parent.height - 80px);
+        background: Theme.card-background;
+        border-radius: Theme.radius-lg;
+        drop-shadow-blur: 20px;
+        drop-shadow-color: #00000040;
+
+        // Prevent overlay click from dismissing
+        TouchArea { }
+
+        dialog-content := VerticalLayout {
+            padding: Theme.spacing-lg;
+            spacing: Theme.spacing-md;
+
+            // Header
+            HorizontalLayout {
+                spacing: Theme.spacing-md;
+                alignment: start;
+
+                // Success icon
+                Rectangle {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 20px;
+                    background: Theme.success;
+
+                    Text {
+                        text: "+";
+                        color: white;
+                        font-size: 24px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Title
+                Text {
+                    text: "Settings Imported";
+                    color: Theme.text-primary;
+                    font-size: Theme.font-size-xl;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Summary message
+            Text {
+                text: "Your existing niri configuration has been imported.";
+                color: Theme.text-secondary;
+                font-size: Theme.font-size-md;
+                wrap: word-wrap;
+            }
+
+            // Stats
+            Rectangle {
+                background: Theme.surface-elevated;
+                border-radius: Theme.radius-md;
+                height: stats-layout.preferred-height + Theme.spacing-md;
+
+                stats-layout := VerticalLayout {
+                    padding: Theme.spacing-sm;
+                    spacing: Theme.spacing-xs;
+
+                    // Imported count
+                    HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+                        Text {
+                            text: "+";
+                            color: Theme.success;
+                            font-size: Theme.font-size-md;
+                            font-weight: 600;
+                            width: 20px;
+                        }
+                        Text {
+                            text: imported-count + " settings categories imported";
+                            color: Theme.text-primary;
+                            font-size: Theme.font-size-md;
+                        }
+                    }
+
+                    // Defaulted count (if any)
+                    if defaulted-count > 0: HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+                        Text {
+                            text: "-";
+                            color: Theme.text-muted;
+                            font-size: Theme.font-size-md;
+                            font-weight: 600;
+                            width: 20px;
+                        }
+                        Text {
+                            text: defaulted-count + " categories using defaults";
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-size-md;
+                        }
+                    }
+
+                    // Includes processed (if any)
+                    if includes-processed > 0: HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+                        Text {
+                            text: ">";
+                            color: Theme.accent;
+                            font-size: Theme.font-size-md;
+                            font-weight: 600;
+                            width: 20px;
+                        }
+                        Text {
+                            text: includes-processed + " include files processed";
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-size-md;
+                        }
+                    }
+                }
+            }
+
+            // Warnings section (if any)
+            if warnings.length > 0: VerticalLayout {
+                spacing: Theme.spacing-xs;
+
+                Text {
+                    text: "Warnings:";
+                    color: Theme.warning;
+                    font-size: Theme.font-size-sm;
+                    font-weight: 600;
+                }
+
+                Rectangle {
+                    background: Theme.warning.with-alpha(0.1);
+                    border-radius: Theme.radius-sm;
+                    height: min(warnings-scroll.preferred-height, 120px);
+
+                    warnings-scroll := ScrollView {
+                        viewport-height: warnings-list.preferred-height;
+
+                        warnings-list := VerticalLayout {
+                            padding: Theme.spacing-xs;
+                            spacing: 2px;
+
+                            for warning in warnings: Text {
+                                text: "- " + warning;
+                                color: Theme.text-secondary;
+                                font-size: Theme.font-size-sm;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Buttons
+            HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: end;
+
+                Button {
+                    text: "Got it";
+                    clicked => { dismissed(); }
+                }
+            }
+        }
+    }
+}

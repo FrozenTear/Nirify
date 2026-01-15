@@ -1,0 +1,68 @@
+// File path input row widget
+// Text input for file paths with browse button
+
+import { Theme } from "../styles.slint";
+import { LineEdit, Button } from "std-widgets.slint";
+
+export component FilePathRow inherits Rectangle {
+    in property <string> label;
+    in property <string> description;
+    in property <string> placeholder: "~/...";
+    in-out property <string> value: "";
+
+    callback changed(string);
+    callback browse-clicked();
+
+    min-height: Theme.row-height-expanded;
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.spacing-xs;
+
+        // Label section
+        VerticalLayout {
+            spacing: 2px;
+
+            Text {
+                text: root.label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-md;
+            }
+
+            if root.description != "": Text {
+                text: root.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-sm;
+                wrap: word-wrap;
+            }
+        }
+
+        // Input with browse button
+        HorizontalLayout {
+            spacing: Theme.spacing-sm;
+
+            LineEdit {
+                horizontal-stretch: 1;
+                text <=> root.value;
+                placeholder-text: root.placeholder;
+                font-size: Theme.font-size-sm;
+
+                accessible-label: root.label;
+                accessible-description: root.description;
+
+                accepted => {
+                    root.changed(root.value);
+                }
+            }
+
+            Button {
+                text: "Browse...";
+                accessible-label: "Browse for " + root.label;
+
+                clicked => {
+                    root.browse-clicked();
+                }
+            }
+        }
+    }
+}

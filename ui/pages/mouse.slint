@@ -1,0 +1,192 @@
+import { Theme } from "../styles.slint";
+import { ScrollView } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+import { ComboBoxRow } from "../widgets/combobox_row.slint";
+import { PercentageSliderRow } from "../widgets/percentage_slider_row.slint";
+import { IntegerInputRow } from "../widgets/integer_input_row.slint";
+
+// Mouse settings page for niri
+export component MousePage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Mouse settings";
+
+    // Device enable/disable
+    in-out property <bool> off: false;
+
+    // Mouse settings
+    in-out property <bool> natural-scroll: false;
+    in-out property <bool> left-handed: false;
+    in-out property <float> accel-speed: 0.0;
+    in-out property <int> accel-profile-index: 0;  // 0=Adaptive, 1=Flat
+    in-out property <float> scroll-factor: 1.0;
+    in-out property <int> scroll-method-index: 3;  // 0=TwoFinger, 1=Edge, 2=OnButtonDown, 3=NoScroll
+    in-out property <bool> middle-emulation: false;
+    in-out property <int> scroll-button: 0;  // Button code for on-button-down scrolling
+    in-out property <bool> scroll-button-lock: false;  // Toggle scroll mode instead of holding
+
+    // Callbacks
+    callback off-toggled(bool);
+    callback natural-scroll-toggled(bool);
+    callback left-handed-toggled(bool);
+    callback accel-speed-changed(float);
+    callback accel-profile-changed(int);
+    callback scroll-factor-changed(float);
+    callback scroll-method-changed(int);
+    callback middle-emulation-toggled(bool);
+    callback scroll-button-changed(int);
+    callback scroll-button-lock-toggled(bool);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Device Control Section
+            SettingsSection {
+                title: "DEVICE CONTROL";
+
+                ToggleRow {
+                    label: "Disable mouse";
+                    description: "Turn off the mouse device entirely";
+                    checked: root.off;
+                    toggled(val) => {
+                        root.off = val;
+                        root.off-toggled(val);
+                    }
+                }
+            }
+
+            // Basic Settings Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "BASIC SETTINGS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Natural scrolling";
+                        description: "Scroll content in the direction of finger movement";
+                        checked: root.natural-scroll;
+                        toggled(val) => {
+                            root.natural-scroll = val;
+                            root.natural-scroll-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Left-handed mode";
+                        description: "Swap left and right mouse buttons";
+                        checked: root.left-handed;
+                        toggled(val) => {
+                            root.left-handed = val;
+                            root.left-handed-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Middle click emulation";
+                        description: "Emulate middle click by pressing left and right buttons together";
+                        checked: root.middle-emulation;
+                        toggled(val) => {
+                            root.middle-emulation = val;
+                            root.middle-emulation-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Acceleration Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "POINTER ACCELERATION";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ComboBoxRow {
+                        label: "Acceleration profile";
+                        description: "How pointer speed changes with movement";
+                        model: ["Adaptive", "Flat"];
+                        current-index: root.accel-profile-index;
+                        selected(idx) => {
+                            root.accel-profile-index = idx;
+                            root.accel-profile-changed(idx);
+                        }
+                    }
+
+                    PercentageSliderRow {
+                        label: "Acceleration speed";
+                        description: "Pointer speed adjustment (-1 to 1)";
+                        suffix: "";
+                        minimum: -100;
+                        maximum: 100;
+                        value: root.accel-speed;
+                        changed(val) => {
+                            root.accel-speed = val;
+                            root.accel-speed-changed(val);
+                        }
+                    }
+                }
+            }
+
+            // Scrolling Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "SCROLLING";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ComboBoxRow {
+                        label: "Scroll method";
+                        description: "How to scroll with the mouse";
+                        model: ["Two finger", "Edge", "On button down", "Disabled"];
+                        current-index: root.scroll-method-index;
+                        selected(idx) => {
+                            root.scroll-method-index = idx;
+                            root.scroll-method-changed(idx);
+                        }
+                    }
+
+                    PercentageSliderRow {
+                        label: "Scroll factor";
+                        description: "Multiplier for scroll speed";
+                        suffix: "x";
+                        minimum: 10;
+                        maximum: 300;
+                        value: root.scroll-factor;
+                        changed(val) => {
+                            root.scroll-factor = val;
+                            root.scroll-factor-changed(val);
+                        }
+                    }
+
+                    // Show scroll button settings when on-button-down scroll method is selected
+                    if scroll-method-index == 2: IntegerInputRow {
+                        label: "Scroll button";
+                        description: "Button code (Middle=274, Side=275)";
+                        minimum: 0;
+                        maximum: 999;
+                        value: root.scroll-button;
+                        changed(val) => { root.scroll-button = val; root.scroll-button-changed(val); }
+                    }
+
+                    if scroll-method-index == 2: ToggleRow {
+                        label: "Lock scroll mode";
+                        description: "Toggle scrolling without holding the button";
+                        checked: root.scroll-button-lock;
+                        toggled(val) => { root.scroll-button-lock = val; root.scroll-button-lock-toggled(val); }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle {
+                height: Theme.spacing-lg;
+            }
+        }
+    }
+}

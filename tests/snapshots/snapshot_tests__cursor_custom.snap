@@ -1,0 +1,12 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Cursor settings - managed by niri-settings-rust
+
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 32
+    hide-when-typing
+    hide-after-inactive-ms 3000
+}

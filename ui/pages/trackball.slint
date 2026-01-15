@@ -1,0 +1,134 @@
+// Trackball settings page
+import { Theme } from "../styles.slint";
+import { ScrollView } from "std-widgets.slint";
+import { SettingsSection } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { ComboBoxRow } from "../widgets/combobox_row.slint";
+import { PercentageSliderRow } from "../widgets/percentage_slider_row.slint";
+import { IntegerInputRow } from "../widgets/integer_input_row.slint";
+
+export component TrackballPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Trackball settings";
+
+    // Settings
+    in-out property <bool> off: false;
+    in-out property <float> accel-speed: 0.0;
+    in-out property <int> accel-profile-index: 0;
+    in-out property <bool> natural-scroll: false;
+    in-out property <bool> left-handed: false;
+    in-out property <int> scroll-method-index: 3;
+    in-out property <int> scroll-button: 0;
+    in-out property <bool> scroll-button-lock: false;
+    in-out property <bool> middle-emulation: false;
+
+    // Callbacks
+    callback off-toggled(bool);
+    callback accel-speed-changed(float);
+    callback accel-profile-changed(int);
+    callback natural-scroll-toggled(bool);
+    callback left-handed-toggled(bool);
+    callback scroll-method-changed(int);
+    callback scroll-button-changed(int);
+    callback scroll-button-lock-toggled(bool);
+    callback middle-emulation-toggled(bool);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            SettingsSection {
+                title: "GENERAL";
+
+                ToggleRow {
+                    label: "Disable trackball";
+                    description: "Turn off the trackball device entirely";
+                    checked: root.off;
+                    toggled(val) => { root.off = val; root.off-toggled(val); }
+                }
+            }
+
+            if !off: SettingsSection {
+                title: "BEHAVIOR";
+
+                ToggleRow {
+                    label: "Natural scrolling";
+                    description: "Scroll content in the direction of movement";
+                    checked: root.natural-scroll;
+                    toggled(val) => { root.natural-scroll = val; root.natural-scroll-toggled(val); }
+                }
+
+                ToggleRow {
+                    label: "Left-handed mode";
+                    description: "Swap left and right buttons";
+                    checked: root.left-handed;
+                    toggled(val) => { root.left-handed = val; root.left-handed-toggled(val); }
+                }
+
+                ToggleRow {
+                    label: "Middle click emulation";
+                    description: "Emulate middle click with left+right click";
+                    checked: root.middle-emulation;
+                    toggled(val) => { root.middle-emulation = val; root.middle-emulation-toggled(val); }
+                }
+            }
+
+            if !off: SettingsSection {
+                title: "ACCELERATION";
+
+                ComboBoxRow {
+                    label: "Acceleration profile";
+                    description: "How pointer speed changes with movement";
+                    model: ["Adaptive", "Flat"];
+                    current-index: root.accel-profile-index;
+                    selected(idx) => { root.accel-profile-index = idx; root.accel-profile-changed(idx); }
+                }
+
+                PercentageSliderRow {
+                    label: "Acceleration speed";
+                    description: "Pointer speed adjustment (-1 to 1)";
+                    suffix: "";
+                    minimum: -100;
+                    maximum: 100;
+                    value: root.accel-speed;
+                    changed(val) => { root.accel-speed = val; root.accel-speed-changed(val); }
+                }
+            }
+
+            if !off: SettingsSection {
+                title: "SCROLLING";
+
+                ComboBoxRow {
+                    label: "Scroll method";
+                    description: "How to scroll with the trackball";
+                    model: ["Two finger", "Edge", "On button down", "Disabled"];
+                    current-index: root.scroll-method-index;
+                    selected(idx) => { root.scroll-method-index = idx; root.scroll-method-changed(idx); }
+                }
+
+                if scroll-method-index == 2: IntegerInputRow {
+                    label: "Scroll button";
+                    description: "Button code for on-button-down scrolling";
+                    minimum: 0;
+                    maximum: 999;
+                    value: root.scroll-button;
+                    changed(val) => { root.scroll-button = val; root.scroll-button-changed(val); }
+                }
+
+                if scroll-method-index == 2: ToggleRow {
+                    label: "Scroll button lock";
+                    description: "Toggle scroll mode instead of holding button";
+                    checked: root.scroll-button-lock;
+                    toggled(val) => { root.scroll-button-lock = val; root.scroll-button-lock-toggled(val); }
+                }
+            }
+
+            // Spacer
+            Rectangle { height: Theme.spacing-lg; }
+        }
+    }
+}

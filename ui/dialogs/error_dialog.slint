@@ -1,0 +1,196 @@
+// Error and notification dialog component
+import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { Theme } from "../styles.slint";
+
+export enum DialogType {
+    Error,
+    Warning,
+    Info,
+    Success,
+}
+
+export component MessageDialog inherits Rectangle {
+    in property <bool> show-dialog: false;
+    in property <string> title: "Error";
+    in property <string> message: "";
+    in property <string> details: "";
+    in property <DialogType> dialog-type: DialogType.Error;
+
+    callback dismissed();
+    callback details-requested();
+
+    property <color> type-color: dialog-type == DialogType.Error ? Theme.error :
+                                 dialog-type == DialogType.Warning ? Theme.warning :
+                                 dialog-type == DialogType.Success ? Theme.success :
+                                 Theme.accent;
+
+    property <string> type-icon: dialog-type == DialogType.Error ? "!" :
+                                 dialog-type == DialogType.Warning ? "!" :
+                                 dialog-type == DialogType.Success ? "+" :
+                                 "i";
+
+    // Only render when visible - prevents blocking clicks
+    visible: show-dialog;
+
+    // Modal overlay
+    background: Theme.overlay-background.with-alpha(0.5);
+
+    // Consume clicks on overlay to dismiss
+    TouchArea {
+        clicked => {
+            dismissed();
+        }
+    }
+
+    // Dialog box
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(450px, parent.width - 40px);
+        height: dialog-content.preferred-height + 2 * Theme.spacing-lg;
+        background: Theme.card-background;
+        border-radius: Theme.radius-lg;
+        drop-shadow-blur: 20px;
+        drop-shadow-color: Theme.panel-shadow-color.with-alpha(0.25);
+        accessible-role: none;
+        accessible-label: "Message dialog";
+
+        // Prevent overlay click from dismissing
+        TouchArea { }
+
+        dialog-content := VerticalLayout {
+            padding: Theme.spacing-lg;
+            spacing: Theme.spacing-md;
+
+            // Header with icon
+            HorizontalLayout {
+                spacing: Theme.spacing-md;
+                alignment: start;
+
+                // Icon circle (decorative, dialog title provides context)
+                Rectangle {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 20px;
+                    background: type-color;
+                    accessible-role: none;
+
+                    Text {
+                        text: type-icon;
+                        color: Theme.error-foreground;
+                        font-size: 24px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                }
+
+                // Title
+                Text {
+                    text: title;
+                    color: Theme.text-primary;
+                    font-size: Theme.font-size-xl;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Message
+            Text {
+                text: message;
+                color: Theme.text-secondary;
+                font-size: Theme.font-size-md;
+                wrap: word-wrap;
+                horizontal-stretch: 1;
+            }
+
+            // Details (if present)
+            if details != "": Rectangle {
+                background: Theme.background;
+                border-radius: Theme.radius-sm;
+                height: details-text.preferred-height + Theme.spacing-md;
+
+                details-text := Text {
+                    x: Theme.spacing-sm;
+                    y: Theme.spacing-xs;
+                    width: parent.width - 2 * Theme.spacing-sm;
+                    text: details;
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-sm;
+                    wrap: word-wrap;
+                    font-family: "monospace";
+                }
+            }
+
+            // Buttons
+            HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: end;
+
+                Button {
+                    text: "OK";
+                    clicked => { dismissed(); }
+                }
+            }
+        }
+    }
+}
+
+// Status notification (non-blocking toast)
+export component StatusNotification inherits Rectangle {
+    in property <bool> show-notification: false;
+    in property <string> message: "";
+    in property <DialogType> notification-type: DialogType.Info;
+
+    callback dismissed();
+
+    property <color> type-color: notification-type == DialogType.Error ? Theme.error :
+                                 notification-type == DialogType.Warning ? Theme.warning :
+                                 notification-type == DialogType.Success ? Theme.success :
+                                 Theme.accent;
+
+    // Position at bottom
+    if show-notification: Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height - Theme.spacing-lg;
+        width: min(400px, parent.width - 40px);
+        height: 48px;
+        background: type-color;
+        border-radius: Theme.radius-md;
+        drop-shadow-blur: 10px;
+        drop-shadow-color: Theme.panel-shadow-color.with-alpha(0.25);
+
+        HorizontalLayout {
+            padding-left: Theme.spacing-md;
+            padding-right: Theme.spacing-sm;
+            spacing: Theme.spacing-sm;
+
+            Text {
+                text: message;
+                color: Theme.success-foreground;
+                font-size: Theme.font-size-md;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+
+            TouchArea {
+                width: 32px;
+                height: 32px;
+                clicked => { dismissed(); }
+
+                accessible-role: button;
+                accessible-label: "Dismiss notification";
+
+                Text {
+                    text: "x";
+                    color: Theme.success-foreground;
+                    font-size: Theme.font-size-lg;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    accessible-role: none;
+                }
+            }
+        }
+    }
+}

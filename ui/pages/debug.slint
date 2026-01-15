@@ -1,0 +1,539 @@
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, Button } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { ConfirmDialog } from "../dialogs/confirm_dialog.slint";
+
+// Debug settings page for niri
+// WARNING: These are advanced debugging options that may affect performance or stability
+export component DebugPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Debug settings";
+
+    // Niri info
+    in-out property <string> niri-version: "";
+    in-out property <bool> niri-running: false;
+
+    // Validation
+    callback validate-requested();
+
+    // Expert mode - gates dangerous settings across app
+    in-out property <bool> expert-mode: false;
+    callback expert-mode-toggled(bool);
+
+    // Settings
+    in-out property <bool> preview-render: false;
+    in-out property <bool> enable-overlay-planes: false;
+    in-out property <bool> disable-cursor-plane: false;
+    in-out property <bool> disable-direct-scanout: false;
+    in-out property <bool> restrict-primary-scanout-to-matching-format: false;
+    in-out property <string> render-drm-device: "";
+    in-out property <string> ignore-drm-devices: "";  // Comma-separated list
+    in-out property <bool> wait-for-frame-completion: false;
+    in-out property <bool> disable-resize-throttling: false;
+    in-out property <bool> disable-transactions: false;
+    in-out property <bool> emulate-zero-presentation-time: false;
+    in-out property <bool> skip-cursor-only-updates-during-vrr: false;
+    in-out property <bool> dbus-interfaces-in-non-session: false;
+    in-out property <bool> keep-laptop-panel-on-lid-closed: false;
+    in-out property <bool> disable-monitor-names: false;
+    in-out property <bool> force-disable-connectors-on-resume: false;
+    in-out property <bool> strict-new-window-focus: false;
+    in-out property <bool> honor-xdg-activation-with-invalid-serial: false;
+    in-out property <bool> deactivate-unfocused-windows: false;
+    in-out property <bool> force-pipewire-invalid-modifier: false;
+
+    // Callbacks
+    callback preview-render-toggled(bool);
+    callback enable-overlay-planes-toggled(bool);
+    callback disable-cursor-plane-toggled(bool);
+    callback disable-direct-scanout-toggled(bool);
+    callback restrict-primary-scanout-to-matching-format-toggled(bool);
+    callback render-drm-device-changed(string);
+    callback ignore-drm-devices-changed(string);
+    callback wait-for-frame-completion-toggled(bool);
+    callback disable-resize-throttling-toggled(bool);
+    callback disable-transactions-toggled(bool);
+    callback emulate-zero-presentation-time-toggled(bool);
+    callback skip-cursor-only-updates-during-vrr-toggled(bool);
+    callback dbus-interfaces-in-non-session-toggled(bool);
+    callback keep-laptop-panel-on-lid-closed-toggled(bool);
+    callback disable-monitor-names-toggled(bool);
+    callback force-disable-connectors-on-resume-toggled(bool);
+    callback strict-new-window-focus-toggled(bool);
+    callback honor-xdg-activation-with-invalid-serial-toggled(bool);
+    callback deactivate-unfocused-windows-toggled(bool);
+    callback force-pipewire-invalid-modifier-toggled(bool);
+
+    // Internal state for confirmation dialog
+    property <bool> show-expert-mode-confirm: false;
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Niri Status Section
+            SettingsSection {
+                title: "NIRI STATUS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-md;
+
+                    HorizontalLayout {
+                        spacing: Theme.spacing-lg;
+                        alignment: start;
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-xs;
+
+                            Text {
+                                text: "Niri Version";
+                                color: Theme.text-secondary;
+                                font-size: Theme.font-size-sm;
+                            }
+
+                            Text {
+                                text: root.niri-version != "" ? root.niri-version : "unknown";
+                                color: root.niri-running ? Theme.text-primary : Theme.text-muted;
+                                font-size: Theme.font-size-md;
+                                font-weight: 500;
+                            }
+                        }
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-xs;
+
+                            Text {
+                                text: "Status";
+                                color: Theme.text-secondary;
+                                font-size: Theme.font-size-sm;
+                            }
+
+                            HorizontalLayout {
+                                spacing: Theme.spacing-xs;
+
+                                Rectangle {
+                                    width: 8px;
+                                    height: 8px;
+                                    border-radius: 4px;
+                                    background: root.niri-running ? Theme.success : Theme.error;
+                                    y: (parent.height - self.height) / 2;
+                                }
+
+                                Text {
+                                    text: root.niri-running ? "Running" : "Not running";
+                                    color: root.niri-running ? Theme.success : Theme.error;
+                                    font-size: Theme.font-size-md;
+                                    font-weight: 500;
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.spacing-md;
+                        alignment: start;
+
+                        Button {
+                            text: "Validate Configuration";
+                            enabled: root.niri-running;
+                            clicked => { root.validate-requested(); }
+                        }
+
+                        Text {
+                            text: !root.niri-running ? "Start niri to validate config" : "";
+                            color: Theme.text-muted;
+                            font-size: Theme.font-size-sm;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            // Expert Mode Section
+            SettingsSection {
+                title: "EXPERT MODE";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Enable Expert Mode";
+                        description: "Show dangerous advanced settings that can break your display or system. Use with extreme caution.";
+                        checked <=> root.expert-mode;  // Two-way binding for proper sync
+                        toggled(val) => {
+                            if val {
+                                // Reset toggle immediately, will enable only on confirm
+                                root.expert-mode = false;
+                                root.show-expert-mode-confirm = true;
+                            } else {
+                                // Disable immediately without confirmation
+                                root.expert-mode-toggled(false);
+                            }
+                        }
+                    }
+
+                    if root.expert-mode: Rectangle {
+                        background: Theme.warning.with-alpha(0.15);
+                        border-radius: Theme.radius-sm;
+                        border-width: 1px;
+                        border-color: Theme.warning.with-alpha(0.3);
+                        height: expert-warn.preferred-height + Theme.spacing-sm * 2;
+
+                        expert-warn := Text {
+                            x: Theme.spacing-sm;
+                            y: Theme.spacing-sm;
+                            width: parent.width - Theme.spacing-sm * 2;
+                            text: "Expert Mode is ON. Dangerous settings like custom monitor modes are now visible in Display settings.";
+                            color: Theme.warning;
+                            font-size: Theme.font-size-sm;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+
+            // Warning banner
+            Rectangle {
+                background: Theme.error.with-alpha(0.15);
+                border-radius: Theme.radius-md;
+                border-width: 1px;
+                border-color: Theme.error.with-alpha(0.3);
+                height: warn-layout.preferred-height + Theme.spacing-md * 2;
+
+                warn-layout := VerticalLayout {
+                    padding: Theme.spacing-md;
+                    spacing: Theme.spacing-xs;
+
+                    Text {
+                        text: "Advanced Debug Options";
+                        color: Theme.error;
+                        font-size: Theme.font-size-lg;
+                        font-weight: 600;
+                    }
+
+                    Text {
+                        text: "These options are intended for developers and troubleshooting. They may cause visual glitches, performance issues, or unexpected behavior. Use with caution.";
+                        color: Theme.error.with-alpha(0.8);
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Rendering Section
+            SettingsSection {
+                title: "RENDERING";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Preview render";
+                        description: "Enable render preview mode for debugging";
+                        checked: root.preview-render;
+                        toggled(val) => {
+                            root.preview-render = val;
+                            root.preview-render-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Enable overlay planes";
+                        description: "Use hardware overlay planes (may improve or degrade performance)";
+                        checked: root.enable-overlay-planes;
+                        toggled(val) => {
+                            root.enable-overlay-planes = val;
+                            root.enable-overlay-planes-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Disable cursor plane";
+                        description: "Render cursor in software instead of using hardware plane";
+                        checked: root.disable-cursor-plane;
+                        toggled(val) => {
+                            root.disable-cursor-plane = val;
+                            root.disable-cursor-plane-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Disable direct scanout";
+                        description: "Prevent bypassing the compositor for fullscreen surfaces";
+                        checked: root.disable-direct-scanout;
+                        toggled(val) => {
+                            root.disable-direct-scanout = val;
+                            root.disable-direct-scanout-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Restrict primary scanout to matching format";
+                        description: "Only scanout when buffer format matches composition format";
+                        checked: root.restrict-primary-scanout-to-matching-format;
+                        toggled(val) => {
+                            root.restrict-primary-scanout-to-matching-format = val;
+                            root.restrict-primary-scanout-to-matching-format-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // GPU Section
+            SettingsSection {
+                title: "GPU";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    VerticalLayout {
+                        spacing: Theme.spacing-xs;
+
+                        Text {
+                            text: "Render DRM device";
+                            color: Theme.text-primary;
+                            font-size: Theme.font-size-md;
+                        }
+
+                        Text {
+                            text: "Override the GPU used for rendering (leave empty for default)";
+                            color: Theme.text-muted;
+                            font-size: Theme.font-size-sm;
+                        }
+
+                        LineEdit {
+                            text: root.render-drm-device;
+                            placeholder-text: "/dev/dri/renderD128";
+
+                            edited(value) => {
+                                root.render-drm-device = value;
+                                root.render-drm-device-changed(value);
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        spacing: Theme.spacing-xs;
+
+                        Text {
+                            text: "Ignore DRM devices";
+                            color: Theme.text-primary;
+                            font-size: Theme.font-size-md;
+                        }
+
+                        Text {
+                            text: "DRM devices to exclude, comma-separated (useful for GPU passthrough)";
+                            color: Theme.text-muted;
+                            font-size: Theme.font-size-sm;
+                        }
+
+                        LineEdit {
+                            text: root.ignore-drm-devices;
+                            placeholder-text: "/dev/dri/card1, /dev/dri/renderD129";
+
+                            edited(value) => {
+                                root.ignore-drm-devices = value;
+                                root.ignore-drm-devices-changed(value);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Frame Timing Section
+            SettingsSection {
+                title: "FRAME TIMING";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Wait for frame completion before queueing";
+                        description: "May fix tearing issues but can reduce performance";
+                        checked: root.wait-for-frame-completion;
+                        toggled(val) => {
+                            root.wait-for-frame-completion = val;
+                            root.wait-for-frame-completion-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Emulate zero presentation time";
+                        description: "Report zero presentation time to clients for testing";
+                        checked: root.emulate-zero-presentation-time;
+                        toggled(val) => {
+                            root.emulate-zero-presentation-time = val;
+                            root.emulate-zero-presentation-time-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Skip cursor-only updates during VRR";
+                        description: "Skip redraws from cursor movement during variable refresh rate";
+                        checked: root.skip-cursor-only-updates-during-vrr;
+                        toggled(val) => {
+                            root.skip-cursor-only-updates-during-vrr = val;
+                            root.skip-cursor-only-updates-during-vrr-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Window Management Section
+            SettingsSection {
+                title: "WINDOW MANAGEMENT";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Disable resize throttling";
+                        description: "Don't throttle window resize events";
+                        checked: root.disable-resize-throttling;
+                        toggled(val) => {
+                            root.disable-resize-throttling = val;
+                            root.disable-resize-throttling-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Disable transactions";
+                        description: "Disable synchronized window updates";
+                        checked: root.disable-transactions;
+                        toggled(val) => {
+                            root.disable-transactions = val;
+                            root.disable-transactions-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Strict new window focus policy";
+                        description: "Use stricter rules for focusing newly opened windows";
+                        checked: root.strict-new-window-focus;
+                        toggled(val) => {
+                            root.strict-new-window-focus = val;
+                            root.strict-new-window-focus-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Honor XDG activation with invalid serial";
+                        description: "Allow focus via invalid xdg-activation serial";
+                        checked: root.honor-xdg-activation-with-invalid-serial;
+                        toggled(val) => {
+                            root.honor-xdg-activation-with-invalid-serial = val;
+                            root.honor-xdg-activation-with-invalid-serial-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Deactivate unfocused windows";
+                        description: "Drop activated state for windows that lose focus";
+                        checked: root.deactivate-unfocused-windows;
+                        toggled(val) => {
+                            root.deactivate-unfocused-windows = val;
+                            root.deactivate-unfocused-windows-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // System Section
+            SettingsSection {
+                title: "SYSTEM";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "D-Bus interfaces in non-session instances";
+                        description: "Expose D-Bus interfaces when running outside a user session";
+                        checked: root.dbus-interfaces-in-non-session;
+                        toggled(val) => {
+                            root.dbus-interfaces-in-non-session = val;
+                            root.dbus-interfaces-in-non-session-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Keep laptop panel on when lid closed";
+                        description: "Don't turn off the built-in display when closing the lid";
+                        checked: root.keep-laptop-panel-on-lid-closed;
+                        toggled(val) => {
+                            root.keep-laptop-panel-on-lid-closed = val;
+                            root.keep-laptop-panel-on-lid-closed-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Disable monitor names";
+                        description: "Don't show monitor names in configuration";
+                        checked: root.disable-monitor-names;
+                        toggled(val) => {
+                            root.disable-monitor-names = val;
+                            root.disable-monitor-names-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Force disable connectors on resume";
+                        description: "Force blank all outputs on TTY switch or resume";
+                        checked: root.force-disable-connectors-on-resume;
+                        toggled(val) => {
+                            root.force-disable-connectors-on-resume = val;
+                            root.force-disable-connectors-on-resume-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Screencasting Section
+            SettingsSection {
+                title: "SCREENCASTING";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Force PipeWire invalid modifier";
+                        description: "Force invalid DRM modifier for PipeWire screencasting";
+                        checked: root.force-pipewire-invalid-modifier;
+                        toggled(val) => {
+                            root.force-pipewire-invalid-modifier = val;
+                            root.force-pipewire-invalid-modifier-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle { height: Theme.spacing-lg; }
+        }
+    }
+
+    // Confirmation dialog for Expert Mode
+    ConfirmDialog {
+        show-dialog: root.show-expert-mode-confirm;
+        title: "Enable Expert Mode?";
+        message: "Expert Mode reveals dangerous advanced settings that can break your display or system.";
+        warning: "Incorrect settings can cause your monitor to turn off, display incorrectly, or require manual config file editing to recover. Only enable if you understand the risks.";
+        confirm-text: "Enable Expert Mode";
+        cancel-text: "Cancel";
+
+        confirmed => {
+            root.show-expert-mode-confirm = false;
+            root.expert-mode = true;
+            root.expert-mode-toggled(true);
+        }
+
+        cancelled => {
+            root.show-expert-mode-confirm = false;
+            // Toggle stays off since we didn't confirm
+        }
+    }
+}

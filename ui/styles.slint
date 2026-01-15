@@ -1,0 +1,395 @@
+// Shared styles for niri-settings
+// Design System: "Control Deck" - Deep space dark with category-coded accents
+
+// ============================================================================
+// SETTINGS STRUCTS - For organized property grouping
+// ============================================================================
+
+/// Focus ring appearance settings
+export struct FocusRingProps {
+    enabled: bool,
+    width: float,
+    active-color: color,
+    inactive-color: color,
+    active-hex: string,
+    inactive-hex: string,
+}
+
+/// Window border appearance settings
+export struct BorderProps {
+    enabled: bool,
+    thickness: float,
+    active-color: color,
+    inactive-color: color,
+    active-hex: string,
+    inactive-hex: string,
+}
+
+/// Animation settings
+export struct AnimationProps {
+    enabled: bool,
+    slowdown: float,
+}
+
+/// Individual animation configuration (one per animation type)
+/// Used as model entries for the 11 animations
+export struct AnimationConfig {
+    // Animation identifier (0-10)
+    id: int,
+    // Display name (e.g., "Workspace Switch")
+    name: string,
+    // Description
+    description: string,
+    // Type: 0=Default, 1=Off, 2=Spring, 3=Easing
+    anim-type: int,
+    // Spring parameters
+    damping: float,
+    stiffness: int,
+    epsilon: float,
+    // Easing parameters
+    duration: int,
+    // Curve type: 0=EaseOutQuad, 1=EaseOutCubic, 2=EaseOutExpo, 3=Linear, 4=CubicBezier
+    curve: int,
+    // Cubic-bezier control points (used when curve=4)
+    bezier-x1: float,
+    bezier-y1: float,
+    bezier-x2: float,
+    bezier-y2: float,
+}
+
+/// Input device configuration - unified model for all pointer input devices
+/// Device types: 0=Mouse, 1=Touchpad, 2=Trackpoint, 3=Trackball, 4=Tablet, 5=Touch
+export struct InputDeviceConfig {
+    // Device identifier and type
+    id: int,
+    name: string,
+
+    // Common toggles
+    off: bool,              // Disable device (all except mouse/touchpad)
+    left-handed: bool,      // Swap buttons
+
+    // Pointer behavior (mouse, touchpad, trackpoint, trackball)
+    natural-scroll: bool,
+    accel-speed: float,     // -1.0 to 1.0 (shown as -100 to 100)
+    accel-profile-index: int, // 0=Adaptive, 1=Flat
+    scroll-method-index: int, // 0=TwoFinger, 1=Edge, 2=OnButtonDown, 3=Disabled
+    middle-emulation: bool,
+
+    // Scroll factor (mouse, touchpad)
+    scroll-factor: float,   // 0.1 to 10.0
+
+    // Touchpad-only
+    tap: bool,
+    tap-button-map-index: int, // 0=LeftRightMiddle, 1=LeftMiddleRight
+    click-method-index: int,   // 0=ButtonAreas, 1=Clickfinger
+    dwt: bool,                 // Disable while typing
+    dwtp: bool,                // Disable while trackpoint
+    drag: bool,
+    drag-lock: bool,
+    disabled-on-external-mouse: bool,
+
+    // Trackpoint/Trackball-only
+    scroll-button: int,     // Button code (0=disabled)
+    scroll-button-lock: bool,
+
+    // Tablet/Touch-only
+    map-to-output: string,
+    calibration-enabled: bool,
+    // 2x3 calibration matrix for libinput
+    calibration-m0: float,
+    calibration-m1: float,
+    calibration-m2: float,
+    calibration-m3: float,
+    calibration-m4: float,
+    calibration-m5: float,
+
+    // Feature flags (for conditional UI rendering)
+    has-off: bool,          // Show off toggle
+    has-pointer: bool,      // Show pointer settings (accel, scroll-method)
+    has-scroll-factor: bool, // Show scroll factor slider
+    has-tap: bool,          // Show touchpad tap settings
+    has-click-method: bool, // Show touchpad click method
+    has-dwt: bool,          // Show disable-while-typing options
+    has-scroll-button: bool, // Show scroll button settings
+    has-map-output: bool,   // Show map-to-output (tablet/touch)
+    has-calibration: bool,  // Show calibration matrix
+}
+
+/// Overview settings
+export struct OverviewProps {
+    zoom: float,
+    backdrop-enabled: bool,
+    backdrop-color: color,
+    backdrop-hex: string,
+}
+
+/// Hot corner settings
+export struct HotCornersProps {
+    enabled: bool,
+    top-left: bool,
+    top-right: bool,
+    bottom-left: bool,
+    bottom-right: bool,
+}
+
+/// Shadow settings (for windows and layer rules)
+export struct ShadowProps {
+    enabled: bool,
+    softness: int,
+    spread: int,
+    offset-x: int,
+    offset-y: int,
+    draw-behind: bool,
+    color: color,
+    inactive-color: color,
+    color-hex: string,
+    inactive-color-hex: string,
+}
+
+/// Tab indicator settings
+export struct TabIndicatorProps {
+    enabled: bool,
+    hide-single: bool,
+    within-column: bool,
+    gap: int,
+    width: int,
+    position-index: int,
+    corner-radius: int,
+    gaps-between: int,
+    active-color: color,
+    inactive-color: color,
+    active-hex: string,
+    inactive-hex: string,
+}
+
+/// Gaps settings
+export struct GapsProps {
+    inner: float,
+    outer: float,
+}
+
+/// Search result item for dropdown panel
+export struct SearchResultItem {
+    category: int,
+    label: string,
+    description: string,
+    score: int,
+}
+
+/// Key combination part for visual badge display
+/// Used to render "Mod+Shift+Q" as styled [Mod] [Shift] [Q] badges
+export struct KeyPart {
+    text: string,
+    is-modifier: bool,
+}
+
+/// Single line in a config diff
+/// line-type: 0=unchanged, 1=added, 2=removed
+export struct DiffLineItem {
+    line-type: int,
+    old-text: string,
+    new-text: string,
+    line-num: int,
+}
+
+/// Category diff summary for config diff view
+export struct CategoryDiffItem {
+    name: string,
+    file-path: string,
+    has-changes: bool,
+    additions: int,
+    deletions: int,
+    lines: [DiffLineItem],
+}
+
+// ============================================================================
+// THEME GLOBAL - Control Deck Design System
+// ============================================================================
+
+export global Theme {
+    // ========================================================================
+    // CORE COLORS - Deep space dark palette
+    // ========================================================================
+
+    // Background layers - true dark with subtle depth
+    out property <brush> background: #0a0a0f;           // Deep space base
+    out property <brush> sidebar-background: #08080c;   // Darker sidebar
+    out property <brush> card-background: #12121a;      // Floating panels
+    out property <brush> surface-elevated: #1a1a24;     // Hover/elevated
+
+    // Text hierarchy - high contrast on dark
+    out property <brush> text-primary: #e8e8ed;         // Primary text
+    out property <brush> text-secondary: #9898a8;       // Secondary text
+    out property <brush> text-muted: #58586a;           // Muted/hints
+    out property <brush> text-disabled: #38384a;        // Disabled state
+
+    // Primary accent - clean white/blue tint
+    out property <brush> accent: #c0c8ff;               // Lavender-white accent
+    out property <brush> accent-foreground: #0a0a0f;    // Text on accent
+
+    // ========================================================================
+    // CATEGORY ACCENTS - Color-coded sections
+    // ========================================================================
+
+    // Visual settings (Appearance, Animations, Cursor, Overview)
+    out property <color> accent-visual: #b490ff;        // Purple/violet
+
+    // Input devices (Keyboard, Mouse, Touchpad, etc.)
+    out property <color> accent-input: #70d4ff;         // Cyan/blue
+
+    // Layout & behavior (Behavior, Layout Extras, Workspaces)
+    out property <color> accent-layout: #ffc870;        // Golden/amber
+
+    // Rules & automation (Window Rules, Layer Rules, Gestures)
+    out property <color> accent-rules: #ff90b0;         // Rose/pink
+
+    // System (Startup, Environment, Debug, Misc)
+    out property <color> accent-system: #90ffb0;        // Mint/green
+
+    // Selection colors
+    out property <brush> selection-background: #2a2a3a; // Selection bg
+    out property <brush> selection-foreground: #e8e8ed; // Selection text
+
+    // Border colors
+    out property <brush> border: #28283a;               // Subtle border
+    out property <brush> border-focus: #c0c8ff;         // Focus ring
+
+    // Control colors
+    out property <brush> control-background: #18182a;   // Control bg
+    out property <brush> control-foreground: #e8e8ed;   // Control text
+
+    // Status colors
+    out property <color> success: #90ffb0;  // Mint green
+    out property <color> warning: #ffc870;  // Golden amber
+    out property <color> error: #ff7090;    // Coral red
+    out property <color> info: #70d4ff;     // Cyan blue
+
+    // ========================================================================
+    // SPACING - 8px Base Unit
+    // ========================================================================
+
+    out property <length> spacing-xs: 4px;           // Half unit
+    out property <length> spacing-sm: 8px;           // Base unit
+    out property <length> spacing-md: 16px;          // 2x base
+    out property <length> spacing-lg: 24px;          // 3x base
+    out property <length> spacing-xl: 32px;          // 4x base
+    out property <length> spacing-2xl: 48px;         // 6x base
+
+    // ========================================================================
+    // BORDER RADIUS
+    // ========================================================================
+
+    out property <length> radius-sm: 4px;
+    out property <length> radius-md: 8px;
+    out property <length> radius-lg: 12px;
+    out property <length> radius-xl: 16px;           // For cards
+
+    // ========================================================================
+    // TYPOGRAPHY
+    // ========================================================================
+
+    out property <length> font-size-xs: 11px;        // Caption
+    out property <length> font-size-sm: 12px;        // Helper text
+    out property <length> font-size-md: 14px;        // Body (default)
+    out property <length> font-size-lg: 16px;        // Subsection headers
+    out property <length> font-size-xl: 20px;        // Section headers
+    out property <length> font-size-2xl: 24px;       // Page titles
+
+    // ========================================================================
+    // LAYOUT
+    // ========================================================================
+
+    // Sidebar
+    out property <length> sidebar-width: 200px;
+
+    // Control heights
+    out property <length> control-height: 40px;
+    out property <length> control-height-compact: 32px;
+    out property <length> control-height-large: 48px; // Touch-friendly
+
+    // Row heights
+    out property <length> row-height-compact: 48px;
+    out property <length> row-height-expanded: 72px;
+
+    // ========================================================================
+    // COMPONENT DIMENSIONS
+    // ========================================================================
+
+    // Value displays
+    out property <length> value-display-width: 48px;
+
+    // Color picker
+    out property <length> color-input-width: 80px;
+    out property <length> color-swatch-size: 28px;
+    out property <length> color-swatch-small: 24px;
+
+    // Icons
+    out property <length> icon-size: 24px;
+    out property <length> icon-size-sm: 16px;
+    out property <length> icon-size-lg: 32px;
+
+    // Switch/toggle controls
+    out property <length> switch-container-width: 52px;
+
+    // Section headers
+    out property <length> section-header-height: 36px;
+
+    // ========================================================================
+    // LAYOUT HEIGHTS
+    // ========================================================================
+
+    out property <length> header-height: 56px;
+    out property <length> footer-height: 48px;
+    out property <length> search-height: 40px;
+
+    // ========================================================================
+    // CONTROL WIDTHS
+    // ========================================================================
+
+    out property <length> combobox-width: 140px;
+    out property <length> input-width: 100px;
+    out property <length> input-width-wide: 140px;
+    out property <length> input-width-xl: 200px;     // For regex/identifiers
+    out property <length> input-width-xxl: 350px;    // For file paths
+    out property <length> control-column-width: 160px;
+
+    // ========================================================================
+    // PANEL DIMENSIONS
+    // ========================================================================
+
+    out property <length> panel-width-narrow: 250px;  // Side panels (rules list)
+    out property <length> panel-width-standard: 400px;
+    out property <length> list-max-height: 200px;     // Dropdown/picker max height
+
+    // ========================================================================
+    // ANIMATION
+    // ========================================================================
+
+    out property <duration> duration-fast: 100ms;
+    out property <duration> duration-normal: 150ms;
+    out property <duration> duration-slow: 200ms;
+
+    // ========================================================================
+    // FLOATING PANEL DESIGN
+    // ========================================================================
+
+    // Panel shadows (simulated with borders due to Slint limitations)
+    out property <length> panel-shadow-offset: 4px;
+    out property <brush> panel-shadow-color: #000000;
+
+    // Overlay and status colors
+    out property <color> overlay-background: #000000;
+    out property <color> success-foreground: #ffffff;
+    out property <color> error-foreground: #ffffff;
+
+    // Tree-line connectors for nested settings
+    out property <length> tree-line-width: 1px;
+    out property <brush> tree-line-color: #28283a;
+    out property <length> tree-indent: 24px;
+
+    // Panel accent line (left border highlight)
+    out property <length> accent-line-width: 3px;
+
+    // Panel inner padding
+    out property <length> panel-padding: 20px;
+}

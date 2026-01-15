@@ -1,0 +1,41 @@
+import { Theme } from "../styles.slint";
+import { ComboBox } from "std-widgets.slint";
+import { BaseSettingRow } from "base_setting_row.slint";
+
+// A labeled combobox row following KDE HIG patterns
+export component ComboBoxRow inherits BaseSettingRow {
+    in property <[string]> model: [];
+    in-out property <int> current-index: 0;
+
+    callback selected(int);
+
+    // Note: Container has no accessible-role; the ComboBox inside handles accessibility
+    accessible-role: none;
+
+    Rectangle {
+        width: Theme.control-column-width;
+        background: transparent;
+
+        VerticalLayout {
+            alignment: center;
+
+            HorizontalLayout {
+                alignment: end;
+
+                ComboBox {
+                    width: Theme.combobox-width;
+                    model: root.model;
+                    current-index <=> root.current-index;
+
+                    // Accessibility: associate label with combobox
+                    accessible-label: root.label;
+                    accessible-description: root.description;
+
+                    selected(text) => {
+                        root.selected(root.current-index);
+                    }
+                }
+            }
+        }
+    }
+}

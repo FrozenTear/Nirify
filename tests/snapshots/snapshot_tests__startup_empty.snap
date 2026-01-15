@@ -1,0 +1,13 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Startup commands - managed by niri-settings-rust
+
+// These commands run when niri starts.
+
+// No startup commands configured.
+// Example:
+// spawn-at-startup "waybar"
+// spawn-at-startup "swww-daemon"
+// spawn-at-startup "bash" "-c" "command with args"

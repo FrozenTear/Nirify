@@ -1,0 +1,18 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Keyboard settings - managed by niri-settings-rust
+
+input {
+    keyboard {
+        xkb {
+            layout "de"
+            variant "nodeadkeys"
+            options "ctrl:nocaps"
+        }
+        repeat-delay 400
+        repeat-rate 30
+        track-layout "global"
+    }
+}

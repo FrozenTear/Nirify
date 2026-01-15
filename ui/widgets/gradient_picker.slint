@@ -1,0 +1,442 @@
+// Gradient picker widget for niri focus ring, border, tab indicator, insert hint
+// Supports color-or-gradient with full niri gradient options
+
+import { Theme } from "../styles.slint";
+import { LineEdit, ComboBox, Slider, CheckBox } from "std-widgets.slint";
+
+// Gradient preview component showing from->to with angle
+component GradientPreview inherits Rectangle {
+    in property <color> from-color: #ffffff;
+    in property <color> to-color: #000000;
+    in property <int> angle: 180;
+
+    width: 80px;
+    height: 28px;
+    border-radius: Theme.radius-sm;
+    border-width: 1px;
+    border-color: Theme.border;
+
+    // Simulate gradient with two rectangles
+    HorizontalLayout {
+        Rectangle {
+            horizontal-stretch: 1;
+            background: from-color;
+            border-radius: Theme.radius-sm;
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+            background: to-color;
+            border-radius: Theme.radius-sm;
+        }
+    }
+
+    // Angle indicator
+    Text {
+        text: angle + "°";
+        color: Theme.text-primary;
+        font-size: Theme.font-size-xs;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// Main gradient picker component
+export component GradientPicker inherits Rectangle {
+    in property <string> label;
+    in property <string> description;
+
+    // Mode: false = solid color, true = gradient
+    in-out property <bool> use-gradient: false;
+
+    // Solid color mode
+    in-out property <color> solid-color: #ffffff;
+    in-out property <string> solid-hex: "#ffffff";
+
+    // Gradient mode
+    in-out property <color> from-color: #ffffff;
+    in-out property <string> from-hex: "#ffffff";
+    in-out property <color> to-color: #000000;
+    in-out property <string> to-hex: "#000000";
+    in-out property <int> angle: 180;
+
+    // Color space: 0=srgb, 1=srgb-linear, 2=oklab, 3=oklch
+    in-out property <int> color-space-index: 0;
+
+    // Hue interpolation (only for oklch): 0=shorter, 1=longer, 2=increasing, 3=decreasing
+    in-out property <int> hue-interpolation-index: 0;
+
+    // Relative to: 0=window, 1=workspace-view
+    in-out property <int> relative-to-index: 0;
+
+    // Callbacks
+    callback solid-color-changed(color);
+    callback gradient-changed();
+    callback mode-changed(bool);
+
+    accessible-role: group;
+    accessible-label: label;
+    accessible-description: description;
+
+    min-height: use-gradient ? 200px : Theme.row-height-compact;
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.spacing-sm;
+
+        // Header row with label, mode toggle, and preview/input
+        HorizontalLayout {
+            spacing: Theme.spacing-md;
+
+            // Label section
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+
+                Text {
+                    text: root.label;
+                    color: Theme.text-primary;
+                    font-size: Theme.font-size-md;
+                }
+
+                if root.description != "": Text {
+                    text: root.description;
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-sm;
+                    wrap: word-wrap;
+                }
+            }
+
+            // Control section
+            Rectangle {
+                width: Theme.control-column-width + 80px;
+                background: transparent;
+
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: Theme.spacing-sm;
+
+                    // Mode toggle
+                    Text {
+                        text: "Gradient";
+                        color: Theme.text-secondary;
+                        font-size: Theme.font-size-sm;
+                        vertical-alignment: center;
+                    }
+
+                    CheckBox {
+                        checked <=> root.use-gradient;
+                        toggled => {
+                            root.mode-changed(root.use-gradient);
+                        }
+                    }
+
+                    // Color preview/input (solid mode)
+                    if !root.use-gradient: Rectangle {
+                        width: Theme.color-swatch-size;
+                        height: Theme.color-swatch-size;
+                        background: root.solid-color;
+                        border-radius: Theme.radius-sm;
+                        border-width: 1px;
+                        border-color: Theme.border;
+                    }
+
+                    if !root.use-gradient: LineEdit {
+                        width: Theme.color-input-width;
+                        text <=> root.solid-hex;
+                        font-size: Theme.font-size-sm;
+                        horizontal-alignment: center;
+
+                        accessible-label: root.label + " color";
+
+                        accepted => {
+                            root.solid-color-changed(root.solid-color);
+                        }
+                    }
+
+                    // Gradient preview (gradient mode)
+                    if root.use-gradient: GradientPreview {
+                        from-color: root.from-color;
+                        to-color: root.to-color;
+                        angle: root.angle;
+                    }
+                }
+            }
+        }
+
+        // Gradient options (only shown when use-gradient is true)
+        if root.use-gradient: Rectangle {
+            background: Theme.surface-elevated;
+            border-radius: Theme.radius-md;
+
+            VerticalLayout {
+                padding: Theme.spacing-md;
+                spacing: Theme.spacing-sm;
+
+                // From/To colors
+                HorizontalLayout {
+                    spacing: Theme.spacing-lg;
+
+                    // From color
+                    HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        Text {
+                            text: "From";
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-size-sm;
+                            vertical-alignment: center;
+                            width: 40px;
+                        }
+
+                        Rectangle {
+                            width: Theme.color-swatch-size;
+                            height: Theme.color-swatch-size;
+                            background: root.from-color;
+                            border-radius: Theme.radius-sm;
+                            border-width: 1px;
+                            border-color: Theme.border;
+                        }
+
+                        LineEdit {
+                            width: Theme.color-input-width;
+                            text <=> root.from-hex;
+                            font-size: Theme.font-size-sm;
+                            horizontal-alignment: center;
+
+                            accessible-label: "From color";
+
+                            accepted => {
+                                root.gradient-changed();
+                            }
+                        }
+                    }
+
+                    // To color
+                    HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        Text {
+                            text: "To";
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-size-sm;
+                            vertical-alignment: center;
+                            width: 40px;
+                        }
+
+                        Rectangle {
+                            width: Theme.color-swatch-size;
+                            height: Theme.color-swatch-size;
+                            background: root.to-color;
+                            border-radius: Theme.radius-sm;
+                            border-width: 1px;
+                            border-color: Theme.border;
+                        }
+
+                        LineEdit {
+                            width: Theme.color-input-width;
+                            text <=> root.to-hex;
+                            font-size: Theme.font-size-sm;
+                            horizontal-alignment: center;
+
+                            accessible-label: "To color";
+
+                            accepted => {
+                                root.gradient-changed();
+                            }
+                        }
+                    }
+                }
+
+                // Angle slider
+                HorizontalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Angle";
+                        color: Theme.text-secondary;
+                        font-size: Theme.font-size-sm;
+                        vertical-alignment: center;
+                        width: 60px;
+                    }
+
+                    Slider {
+                        horizontal-stretch: 1;
+                        minimum: 0;
+                        maximum: 360;
+                        value <=> root.angle;
+
+                        changed(val) => {
+                            root.gradient-changed();
+                        }
+                    }
+
+                    Text {
+                        text: root.angle + "°";
+                        color: Theme.text-primary;
+                        font-size: Theme.font-size-sm;
+                        vertical-alignment: center;
+                        width: 40px;
+                        horizontal-alignment: right;
+                    }
+                }
+
+                // Color space and relative-to dropdowns
+                HorizontalLayout {
+                    spacing: Theme.spacing-lg;
+
+                    // Color space
+                    HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        Text {
+                            text: "Color space";
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-size-sm;
+                            vertical-alignment: center;
+                        }
+
+                        ComboBox {
+                            width: 100px;
+                            model: ["srgb", "srgb-linear", "oklab", "oklch"];
+                            current-index <=> root.color-space-index;
+
+                            selected(idx) => {
+                                root.gradient-changed();
+                            }
+                        }
+                    }
+
+                    // Relative to
+                    HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        Text {
+                            text: "Relative to";
+                            color: Theme.text-secondary;
+                            font-size: Theme.font-size-sm;
+                            vertical-alignment: center;
+                        }
+
+                        ComboBox {
+                            width: 120px;
+                            model: ["window", "workspace-view"];
+                            current-index <=> root.relative-to-index;
+
+                            selected(idx) => {
+                                root.gradient-changed();
+                            }
+                        }
+                    }
+                }
+
+                // Hue interpolation (only for oklch)
+                if root.color-space-index == 3: HorizontalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Hue interpolation";
+                        color: Theme.text-secondary;
+                        font-size: Theme.font-size-sm;
+                        vertical-alignment: center;
+                    }
+
+                    ComboBox {
+                        width: 100px;
+                        model: ["shorter", "longer", "increasing", "decreasing"];
+                        current-index <=> root.hue-interpolation-index;
+
+                        selected(idx) => {
+                            root.gradient-changed();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Compact inline gradient picker for use in lists/rows
+export component GradientPickerCompact inherits Rectangle {
+    in property <string> label;
+
+    // Mode: false = solid color, true = gradient
+    in-out property <bool> use-gradient: false;
+
+    // Solid color
+    in-out property <color> solid-color: #ffffff;
+    in-out property <string> solid-hex: "#ffffff";
+
+    // Gradient colors
+    in-out property <color> from-color: #ffffff;
+    in-out property <string> from-hex: "#ffffff";
+    in-out property <color> to-color: #000000;
+    in-out property <string> to-hex: "#000000";
+
+    callback color-changed();
+    callback expand-clicked();
+
+    min-height: Theme.control-height;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-sm;
+
+        Text {
+            text: root.label;
+            color: Theme.text-primary;
+            font-size: Theme.font-size-sm;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+
+        // Preview
+        if !root.use-gradient: Rectangle {
+            width: Theme.color-swatch-size;
+            height: Theme.color-swatch-size;
+            background: root.solid-color;
+            border-radius: Theme.radius-sm;
+            border-width: 1px;
+            border-color: Theme.border;
+        }
+
+        if root.use-gradient: GradientPreview {
+            from-color: root.from-color;
+            to-color: root.to-color;
+            angle: 180;
+        }
+
+        // Hex input (solid only)
+        if !root.use-gradient: LineEdit {
+            width: 70px;
+            text <=> root.solid-hex;
+            font-size: Theme.font-size-sm;
+            horizontal-alignment: center;
+
+            accepted => {
+                root.color-changed();
+            }
+        }
+
+        // Expand button for gradient options
+        Rectangle {
+            width: 24px;
+            height: 24px;
+            background: touch.has-hover ? Theme.surface-elevated : transparent;
+            border-radius: Theme.radius-sm;
+
+            touch := TouchArea {
+                clicked => {
+                    root.expand-clicked();
+                }
+            }
+
+            Text {
+                text: "⚙";
+                color: Theme.text-secondary;
+                font-size: Theme.font-size-md;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

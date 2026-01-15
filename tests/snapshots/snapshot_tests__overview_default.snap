@@ -1,0 +1,9 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Overview settings - managed by niri-settings-rust
+
+overview {
+    zoom 0.50
+}

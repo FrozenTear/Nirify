@@ -1,0 +1,9 @@
+/target
+/ui-backup-fluent
+
+# Backup folders
+/backup-pre-refactor/
+
+# Review files (internal only)
+*review*.md
+*REVIEW*.md

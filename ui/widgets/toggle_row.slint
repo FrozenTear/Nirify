@@ -1,0 +1,46 @@
+import { Theme } from "../styles.slint";
+import { Switch } from "std-widgets.slint";
+import { BaseSettingRow } from "base_setting_row.slint";
+
+// A labeled toggle switch for boolean settings
+export component ToggleRow inherits BaseSettingRow {
+    in-out property <bool> checked: false;
+
+    callback toggled(bool);
+
+    // Accessibility - delegate to the Switch component which handles checkbox role
+    // Container uses 'none' to avoid redundant checkbox announcements
+    accessible-role: none;
+
+    // Configure base row for full-row clicking
+    full-row-clickable: true;
+    hover-cursor: pointer;
+
+    clicked => {
+        root.checked = !root.checked;
+        root.toggled(root.checked);
+    }
+
+    // Switch in fixed-width container for consistent alignment
+    Rectangle {
+        width: Theme.switch-container-width;
+        background: transparent;
+
+        VerticalLayout {
+            alignment: center;
+
+            HorizontalLayout {
+                alignment: end;
+
+                Switch {
+                    checked <=> root.checked;
+                    accessible-label: root.label;
+                    accessible-description: root.description;
+                    toggled => {
+                        root.toggled(root.checked);
+                    }
+                }
+            }
+        }
+    }
+}

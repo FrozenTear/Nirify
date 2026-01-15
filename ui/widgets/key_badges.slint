@@ -1,0 +1,62 @@
+import { Theme, KeyPart } from "../styles.slint";
+
+// A single key badge displaying a key name in a pill-shaped container
+export component KeyBadge inherits Rectangle {
+    in property <string> key-text;
+    in property <bool> is-modifier: false;
+
+    // Accessibility
+    accessible-role: text;
+    accessible-label: key-text;
+
+    // Prevent stretching
+    vertical-stretch: 0;
+    horizontal-stretch: 0;
+
+    // Pill shape with dynamic width based on content
+    height: 24px;
+    min-width: label.preferred-width + Theme.spacing-md * 2;
+    border-radius: 4px;
+
+    // Modifiers get accent color, regular keys get subtle background
+    background: is-modifier ? Theme.accent-input.with-alpha(0.2) : Theme.control-background;
+    border-width: 1px;
+    border-color: is-modifier ? Theme.accent-input.with-alpha(0.4) : Theme.border;
+
+    label := Text {
+        text: key-text;
+        color: is-modifier ? Theme.accent-input : Theme.text-primary;
+        font-size: Theme.font-size-sm;
+        font-weight: is-modifier ? 600 : 400;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// A row of key badges displaying a key combination like "Mod+Shift+Q"
+export component KeyBadges inherits HorizontalLayout {
+    in property <[KeyPart]> parts;
+
+    // Accessibility - announce the full combo
+    accessible-role: text;
+
+    spacing: 4px;
+    alignment: start;
+    vertical-stretch: 0;
+
+    for part in parts: KeyBadge {
+        key-text: part.text;
+        is-modifier: part.is-modifier;
+    }
+}
+
+// Inline version that displays the combo as plain text with styled spans
+// Used where badges would be too bulky
+export component KeyComboText inherits Text {
+    in property <string> combo;
+
+    text: combo;
+    color: Theme.text-secondary;
+    font-size: Theme.font-size-sm;
+    font-family: "monospace";
+}

@@ -1,0 +1,13 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Window rules - managed by niri-settings-rust
+
+// No window rules configured yet.
+// Add rules through the UI or manually here.
+// Example:
+// window-rule {
+//     match app-id="firefox"
+//     open-maximized true
+// }

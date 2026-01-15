@@ -1,0 +1,316 @@
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { ComboBoxRow } from "../widgets/combobox_row.slint";
+
+// Miscellaneous settings page for niri
+export component MiscellaneousPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Miscellaneous settings";
+
+    // Settings
+    in-out property <bool> prefer-no-csd: false;
+    in-out property <string> screenshot-path: "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png";
+    in-out property <bool> disable-primary-clipboard: false;
+    in-out property <bool> hotkey-overlay-skip: false;
+
+    // Phase 8: New settings
+    in-out property <bool> hotkey-overlay-hide-not-bound: false;
+    in-out property <bool> config-notification-disable-failed: false;
+
+    // New misc settings (v25.08+)
+    in-out property <bool> spawn-sh-at-startup: false;
+    in-out property <int> xwayland-satellite-index: 0;  // 0=Default, 1=Off, 2=Custom
+    in-out property <string> xwayland-satellite-path: "";
+
+    // Developer options
+    in-out property <bool> show-debug-options: false;
+
+    // Callbacks
+    callback prefer-no-csd-toggled(bool);
+    callback screenshot-path-changed(string);
+    callback disable-primary-clipboard-toggled(bool);
+    callback hotkey-overlay-skip-toggled(bool);
+
+    // Phase 8 callbacks
+    callback hotkey-overlay-hide-not-bound-toggled(bool);
+    callback config-notification-disable-failed-toggled(bool);
+
+    // New callbacks
+    callback spawn-sh-at-startup-toggled(bool);
+    callback xwayland-satellite-mode-changed(int);
+    callback xwayland-satellite-path-changed(string);
+
+    // Developer callbacks
+    callback show-debug-options-toggled(bool);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Window Decorations Section
+            SettingsSection {
+                title: "WINDOW DECORATIONS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Prefer server-side decorations";
+                        description: "Niri draws window borders instead of letting apps draw their own title bars";
+                        checked: root.prefer-no-csd;
+                        toggled(val) => {
+                            root.prefer-no-csd = val;
+                            root.prefer-no-csd-toggled(val);
+                        }
+                    }
+
+                    Text {
+                        text: "Some applications ignore this preference. Server-side decorations may be used instead.";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Screenshots Section
+            SettingsSection {
+                title: "SCREENSHOTS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    // Full-width layout for path input
+                    VerticalLayout {
+                        spacing: Theme.spacing-xs;
+
+                        Text {
+                            text: "Save path";
+                            color: Theme.text-primary;
+                            font-size: Theme.font-size-md;
+                        }
+
+                        Text {
+                            text: "Where to save screenshots (supports strftime format)";
+                            color: Theme.text-muted;
+                            font-size: Theme.font-size-sm;
+                        }
+
+                        LineEdit {
+                            text: root.screenshot-path;
+                            placeholder-text: "~/Pictures/Screenshots/...";
+
+                            edited(value) => {
+                                root.screenshot-path = value;
+                                root.screenshot-path-changed(value);
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "Use strftime codes: %Y (year), %m (month), %d (day), %H (hour), %M (minute), %S (second)";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Clipboard Section
+            SettingsSection {
+                title: "CLIPBOARD";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Disable primary clipboard";
+                        description: "Disable middle-click paste functionality";
+                        checked: root.disable-primary-clipboard;
+                        toggled(val) => {
+                            root.disable-primary-clipboard = val;
+                            root.disable-primary-clipboard-toggled(val);
+                        }
+                    }
+
+                    Text {
+                        text: "Primary clipboard is the selection-based clipboard used by middle-click paste. Regular Ctrl+C/V clipboard is not affected.";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Hotkey Overlay Section
+            SettingsSection {
+                title: "HOTKEY OVERLAY";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Skip at startup";
+                        description: "Don't show hotkey help when niri starts";
+                        checked: root.hotkey-overlay-skip;
+                        toggled(val) => {
+                            root.hotkey-overlay-skip = val;
+                            root.hotkey-overlay-skip-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Hide unbound actions";
+                        description: "Only show actions that have keybindings assigned";
+                        checked: root.hotkey-overlay-hide-not-bound;
+                        toggled(val) => {
+                            root.hotkey-overlay-hide-not-bound = val;
+                            root.hotkey-overlay-hide-not-bound-toggled(val);
+                        }
+                    }
+
+                    Text {
+                        text: "The hotkey overlay shows available keyboard shortcuts. You can still access it with the configured keybinding.";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Config Notification Section (Phase 8)
+            SettingsSection {
+                title: "CONFIG NOTIFICATIONS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Disable failed config notifications";
+                        description: "Suppress notifications when config reload fails";
+                        checked: root.config-notification-disable-failed;
+                        toggled(val) => {
+                            root.config-notification-disable-failed = val;
+                            root.config-notification-disable-failed-toggled(val);
+                        }
+                    }
+
+                    Text {
+                        text: "When enabled, niri won't show a notification if a configuration reload fails due to errors.";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Startup Section (v25.08+)
+            SettingsSection {
+                title: "STARTUP";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Use shell for spawn commands";
+                        description: "Execute spawn-at-startup commands through a shell";
+                        checked: root.spawn-sh-at-startup;
+                        toggled(val) => {
+                            root.spawn-sh-at-startup = val;
+                            root.spawn-sh-at-startup-toggled(val);
+                        }
+                    }
+
+                    Text {
+                        text: "When enabled, startup commands run through sh -c allowing shell features like pipes and redirects.";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // XWayland Section (v25.08+)
+            SettingsSection {
+                title: "XWAYLAND";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ComboBoxRow {
+                        label: "XWayland satellite";
+                        description: "XWayland compatibility layer for X11 apps";
+                        model: ["Default", "Disabled", "Custom path"];
+                        current-index: root.xwayland-satellite-index;
+                        selected(idx) => {
+                            root.xwayland-satellite-index = idx;
+                            root.xwayland-satellite-mode-changed(idx);
+                        }
+                    }
+
+                    if root.xwayland-satellite-index == 2: VerticalLayout {
+                        spacing: Theme.spacing-xs;
+
+                        Text {
+                            text: "Custom binary path";
+                            color: Theme.text-primary;
+                            font-size: Theme.font-size-md;
+                        }
+
+                        LineEdit {
+                            text: root.xwayland-satellite-path;
+                            placeholder-text: "/usr/bin/xwayland-satellite";
+
+                            edited(value) => {
+                                root.xwayland-satellite-path = value;
+                                root.xwayland-satellite-path-changed(value);
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "XWayland satellite provides compatibility for X11 applications. Disable if you don't use X11 apps.";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Developer Options Section
+            SettingsSection {
+                title: "DEVELOPER OPTIONS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Show debug options";
+                        description: "Show the Debug page in the System navigation";
+                        checked: root.show-debug-options;
+                        toggled(val) => {
+                            root.show-debug-options = val;
+                            root.show-debug-options-toggled(val);
+                        }
+                    }
+
+                    Text {
+                        text: "Debug options are advanced settings for developers and troubleshooting. Most users don't need these.";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle { height: Theme.spacing-lg; }
+        }
+    }
+}

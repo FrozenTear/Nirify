@@ -1,0 +1,13 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Debug settings - managed by niri-settings-rust
+
+// WARNING: These are advanced options. Use with caution.
+
+// No debug options enabled.
+// debug {
+//     preview-render
+//     disable-cursor-plane
+// }

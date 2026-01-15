@@ -1,0 +1,441 @@
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, ComboBox, Button, CheckBox } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+
+// Named Workspaces settings page for niri
+export component WorkspacesPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Workspaces settings";
+
+    // Workspace list (as model array of names)
+    in-out property <[string]> workspace-list: [];
+    in-out property <int> selected-workspace-index: -1;
+
+    // Current workspace properties (when a workspace is selected)
+    in-out property <string> current-workspace-name: "";
+    in-out property <string> current-open-on-output: "";
+
+    // Layout override settings
+    in-out property <bool> current-has-layout-override: false;
+    in-out property <bool> current-has-gaps-override: false;
+    in-out property <float> current-gaps-inner: 16;
+    in-out property <float> current-gaps-outer: 8;
+    in-out property <bool> current-has-struts-override: false;
+    in-out property <float> current-strut-left: 0;
+    in-out property <float> current-strut-right: 0;
+    in-out property <float> current-strut-top: 0;
+    in-out property <float> current-strut-bottom: 0;
+    in-out property <bool> current-has-center-override: false;
+    in-out property <int> current-center-focused-column-index: 0;
+    in-out property <bool> current-always-center-single-column: false;
+
+    // Callbacks
+    callback add-workspace();
+    callback remove-workspace(int);
+    callback select-workspace(int);
+    callback workspace-name-changed(string);
+    callback open-on-output-changed(string);
+
+    // Layout override callbacks
+    callback layout-override-toggled(bool);
+    callback gaps-override-toggled(bool);
+    callback gaps-inner-changed(float);
+    callback gaps-outer-changed(float);
+    callback struts-override-toggled(bool);
+    callback strut-left-changed(float);
+    callback strut-right-changed(float);
+    callback strut-top-changed(float);
+    callback strut-bottom-changed(float);
+    callback center-override-toggled(bool);
+    callback center-focused-column-changed(int);
+    callback always-center-single-column-toggled(bool);
+
+    background: transparent;
+
+    // Keyboard focus index for workspaces list
+    property <int> focused-workspace-index: -1;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+
+        // Workspaces list panel
+        Rectangle {
+            width: Theme.panel-width-narrow;
+            background: Theme.card-background;
+            border-radius: Theme.radius-md;
+
+            VerticalLayout {
+                padding: Theme.spacing-sm;
+                spacing: Theme.spacing-sm;
+
+                // Header
+                HorizontalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Named Workspaces";
+                        color: Theme.text-primary;
+                        font-size: Theme.font-size-md;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+
+                    Button {
+                        text: "+";
+                        accessible-label: "Add new named workspace";
+                        clicked => { root.add-workspace(); }
+                    }
+                }
+
+                // Workspaces list with keyboard navigation
+                workspaces-focus := FocusScope {
+                    vertical-stretch: 1;
+
+                    accessible-role: list;
+                    accessible-label: "Named workspaces list";
+
+                    key-pressed(event) => {
+                        if (event.text == Key.DownArrow) {
+                            if (root.focused-workspace-index < root.workspace-list.length - 1) {
+                                root.focused-workspace-index = root.focused-workspace-index + 1;
+                            }
+                            accept
+                        } else if (event.text == Key.UpArrow) {
+                            if (root.focused-workspace-index > 0) {
+                                root.focused-workspace-index = root.focused-workspace-index - 1;
+                            } else if (root.focused-workspace-index == -1 && root.workspace-list.length > 0) {
+                                root.focused-workspace-index = 0;
+                            }
+                            accept
+                        } else if (event.text == Key.Return || event.text == " ") {
+                            if (root.focused-workspace-index >= 0) {
+                                root.selected-workspace-index = root.focused-workspace-index;
+                                root.select-workspace(root.focused-workspace-index);
+                            }
+                            accept
+                        } else if (event.text == Key.Delete) {
+                            if (root.focused-workspace-index >= 0 && root.focused-workspace-index == root.selected-workspace-index) {
+                                root.remove-workspace(root.focused-workspace-index);
+                            }
+                            accept
+                        }
+                        reject
+                    }
+
+                    focus-changed-event => {
+                        if (self.has-focus && root.focused-workspace-index == -1 && root.workspace-list.length > 0) {
+                            root.focused-workspace-index = root.selected-workspace-index >= 0 ? root.selected-workspace-index : 0;
+                        }
+                    }
+
+                    ScrollView {
+                        VerticalLayout {
+                            spacing: Theme.spacing-xs;
+
+                            for workspace[index] in root.workspace-list : Rectangle {
+                                height: 40px;
+                                background: index == root.selected-workspace-index ? Theme.accent.with-alpha(0.2) : transparent;
+                                border-radius: Theme.radius-sm;
+                                border-width: index == root.focused-workspace-index && workspaces-focus.has-focus ? 2px : 0px;
+                                border-color: Theme.accent;
+
+                                accessible-role: list-item;
+                                accessible-label: workspace;
+
+                                TouchArea {
+                                    clicked => {
+                                        root.focused-workspace-index = index;
+                                        root.selected-workspace-index = index;
+                                        root.select-workspace(index);
+                                        workspaces-focus.focus();
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: Theme.spacing-sm;
+                                    padding-right: Theme.spacing-sm;
+
+                                    Text {
+                                        text: workspace;
+                                        color: index == root.selected-workspace-index ? Theme.accent : Theme.text-primary;
+                                        font-size: Theme.font-size-sm;
+                                        vertical-alignment: center;
+                                        horizontal-stretch: 1;
+                                        overflow: elide;
+                                    }
+
+                                    Button {
+                                        visible: index == root.selected-workspace-index;
+                                        text: "x";
+                                        accessible-label: "Remove workspace";
+                                        clicked => { root.remove-workspace(index); }
+                                    }
+                                }
+                            }
+
+                            if root.workspace-list.length == 0: Text {
+                                text: "No named workspaces.\nClick + to add one.";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Workspace editor panel
+        if root.selected-workspace-index >= 0: Rectangle {
+            horizontal-stretch: 1;
+
+            ScrollView {
+                VerticalLayout {
+                    alignment: start;
+            spacing: Theme.spacing-lg;
+                    padding-right: Theme.spacing-md;
+
+                    // Workspace identity
+                    SettingsSection {
+                        title: "WORKSPACE SETTINGS";
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            SettingRow {
+                                label: "Workspace name";
+                                description: "Display name for this workspace";
+
+                                LineEdit {
+                                    width: 200px;
+                                    text: root.current-workspace-name;
+                                    edited(value) => {
+                                        root.current-workspace-name = value;
+                                        root.workspace-name-changed(value);
+                                    }
+                                }
+                            }
+
+                            SettingRow {
+                                label: "Open on output";
+                                description: "Force this workspace to open on a specific monitor";
+
+                                LineEdit {
+                                    width: 150px;
+                                    text: root.current-open-on-output;
+                                    placeholder-text: "e.g., eDP-1";
+                                    edited(value) => {
+                                        root.current-open-on-output = value;
+                                        root.open-on-output-changed(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Layout override section
+                    SettingsSection {
+                        title: "LAYOUT OVERRIDE";
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            ToggleRow {
+                                label: "Custom layout for this workspace";
+                                description: "Override global layout settings for this workspace only";
+                                checked: root.current-has-layout-override;
+                                toggled(val) => {
+                                    root.current-has-layout-override = val;
+                                    root.layout-override-toggled(val);
+                                }
+                            }
+
+                            if root.current-has-layout-override: VerticalLayout {
+                                spacing: Theme.spacing-sm;
+
+                                // Gaps override
+                                ToggleRow {
+                                    label: "Custom gaps";
+                                    description: "Override window spacing";
+                                    checked: root.current-has-gaps-override;
+                                    toggled(val) => {
+                                        root.current-has-gaps-override = val;
+                                        root.gaps-override-toggled(val);
+                                    }
+                                }
+
+                                if root.current-has-gaps-override: VerticalLayout {
+                                    spacing: Theme.spacing-sm;
+
+                                    SliderRow {
+                                        label: "Inner gaps";
+                                        description: "Space between windows";
+                                        suffix: "px";
+                                        minimum: 0;
+                                        maximum: 64;
+                                        value: root.current-gaps-inner;
+                                        changed(val) => {
+                                            root.current-gaps-inner = val;
+                                            root.gaps-inner-changed(val);
+                                        }
+                                    }
+
+                                    SliderRow {
+                                        label: "Outer gaps";
+                                        description: "Space around workspace edges";
+                                        suffix: "px";
+                                        minimum: 0;
+                                        maximum: 64;
+                                        value: root.current-gaps-outer;
+                                        changed(val) => {
+                                            root.current-gaps-outer = val;
+                                            root.gaps-outer-changed(val);
+                                        }
+                                    }
+                                }
+
+                                // Struts override
+                                ToggleRow {
+                                    label: "Custom struts";
+                                    description: "Reserved screen edges";
+                                    checked: root.current-has-struts-override;
+                                    toggled(val) => {
+                                        root.current-has-struts-override = val;
+                                        root.struts-override-toggled(val);
+                                    }
+                                }
+
+                                if root.current-has-struts-override: VerticalLayout {
+                                    spacing: Theme.spacing-sm;
+
+                                    SliderRow {
+                                        label: "Left strut";
+                                        description: "Reserved space on left edge";
+                                        suffix: "px";
+                                        minimum: 0;
+                                        maximum: 200;
+                                        value: root.current-strut-left;
+                                        changed(val) => {
+                                            root.current-strut-left = val;
+                                            root.strut-left-changed(val);
+                                        }
+                                    }
+
+                                    SliderRow {
+                                        label: "Right strut";
+                                        description: "Reserved space on right edge";
+                                        suffix: "px";
+                                        minimum: 0;
+                                        maximum: 200;
+                                        value: root.current-strut-right;
+                                        changed(val) => {
+                                            root.current-strut-right = val;
+                                            root.strut-right-changed(val);
+                                        }
+                                    }
+
+                                    SliderRow {
+                                        label: "Top strut";
+                                        description: "Reserved space on top edge";
+                                        suffix: "px";
+                                        minimum: 0;
+                                        maximum: 200;
+                                        value: root.current-strut-top;
+                                        changed(val) => {
+                                            root.current-strut-top = val;
+                                            root.strut-top-changed(val);
+                                        }
+                                    }
+
+                                    SliderRow {
+                                        label: "Bottom strut";
+                                        description: "Reserved space on bottom edge";
+                                        suffix: "px";
+                                        minimum: 0;
+                                        maximum: 200;
+                                        value: root.current-strut-bottom;
+                                        changed(val) => {
+                                            root.current-strut-bottom = val;
+                                            root.strut-bottom-changed(val);
+                                        }
+                                    }
+                                }
+
+                                // Center focus override
+                                ToggleRow {
+                                    label: "Custom centering behavior";
+                                    description: "Override column centering";
+                                    checked: root.current-has-center-override;
+                                    toggled(val) => {
+                                        root.current-has-center-override = val;
+                                        root.center-override-toggled(val);
+                                    }
+                                }
+
+                                if root.current-has-center-override: VerticalLayout {
+                                    spacing: Theme.spacing-sm;
+
+                                    SettingRow {
+                                        label: "Center focused column";
+                                        description: "When to center the active column";
+
+                                        ComboBox {
+                                            width: Theme.combobox-width;
+                                            model: ["Never", "Always", "On Overflow"];
+                                            current-index: root.current-center-focused-column-index;
+                                            selected(text) => {
+                                                root.current-center-focused-column-index = self.current-index;
+                                                root.center-focused-column-changed(self.current-index);
+                                            }
+                                        }
+                                    }
+
+                                    ToggleRow {
+                                        label: "Always center single column";
+                                        description: "Center even when there's only one column";
+                                        checked: root.current-always-center-single-column;
+                                        toggled(val) => {
+                                            root.current-always-center-single-column = val;
+                                            root.always-center-single-column-toggled(val);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Spacer at bottom
+                    Rectangle { height: Theme.spacing-lg; }
+                }
+            }
+        }
+
+        // No selection message
+        if root.selected-workspace-index < 0: Rectangle {
+            horizontal-stretch: 1;
+            background: Theme.card-background;
+            border-radius: Theme.radius-md;
+
+            VerticalLayout {
+                alignment: center;
+
+                Text {
+                    text: "Select a workspace to edit";
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-md;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: "Or click + to create a new workspace";
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+}

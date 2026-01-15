@@ -1,0 +1,14 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Environment variables - managed by niri-settings-rust
+
+// These are set for all processes spawned by niri.
+
+// No environment variables configured.
+// Example:
+// environment {
+//     QT_QPA_PLATFORM "wayland"
+//     ELECTRON_OZONE_PLATFORM_HINT "wayland"
+// }

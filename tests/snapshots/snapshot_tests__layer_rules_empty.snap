@@ -1,0 +1,14 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Layer rules - managed by niri-settings-rust
+// Rules for layer-shell surfaces (panels, notifications, etc.)
+
+// No layer rules configured yet.
+// Add rules through the UI or manually here.
+// Example:
+// layer-rule {
+//     match namespace="^waybar$"
+//     opacity 0.95
+// }

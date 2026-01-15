@@ -1,0 +1,15 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Named workspaces - managed by niri-settings-rust
+
+// Workspaces declared here will always exist.
+
+workspace "main"
+workspace "dev" {
+    open-on-output "DP-1"
+}
+workspace "chat" {
+    open-on-output "HDMI-A-1"
+}

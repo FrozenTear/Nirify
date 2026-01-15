@@ -1,0 +1,29 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Appearance settings - managed by niri-settings-rust
+
+layout {
+    gaps 16
+
+    focus-ring {
+        width 4
+        active-color "#7fc8ff"
+        inactive-color "#505050"
+        urgent-color "#eb6f92"
+    }
+
+    struts {
+        left 50
+        right 50
+        top 30
+        bottom 0
+    }
+
+    default-column-width { proportion 0.50; }
+}
+
+window-rule {
+    geometry-corner-radius 12
+}

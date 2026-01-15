@@ -1,0 +1,15 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Appearance settings - managed by niri-settings-rust
+
+layout {
+    gaps 16
+
+    default-column-width { proportion 0.50; }
+}
+
+window-rule {
+    geometry-corner-radius 12
+}

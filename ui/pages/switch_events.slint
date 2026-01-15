@@ -1,0 +1,455 @@
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, Button } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+
+// Switch Events settings page for niri
+// Configure actions triggered by hardware switch events (lid, tablet mode)
+export component SwitchEventsPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Switch events settings";
+
+    // Lid close commands
+    in-out property <[string]> lid-close-commands: [];
+    in-out property <int> lid-close-selected: -1;
+    in-out property <string> lid-close-current: "";
+
+    // Lid open commands
+    in-out property <[string]> lid-open-commands: [];
+    in-out property <int> lid-open-selected: -1;
+    in-out property <string> lid-open-current: "";
+
+    // Tablet mode on commands
+    in-out property <[string]> tablet-mode-on-commands: [];
+    in-out property <int> tablet-mode-on-selected: -1;
+    in-out property <string> tablet-mode-on-current: "";
+
+    // Tablet mode off commands
+    in-out property <[string]> tablet-mode-off-commands: [];
+    in-out property <int> tablet-mode-off-selected: -1;
+    in-out property <string> tablet-mode-off-current: "";
+
+    // Callbacks for lid close
+    callback lid-close-add();
+    callback lid-close-remove(int);
+    callback lid-close-select(int);
+    callback lid-close-changed(string);
+
+    // Callbacks for lid open
+    callback lid-open-add();
+    callback lid-open-remove(int);
+    callback lid-open-select(int);
+    callback lid-open-changed(string);
+
+    // Callbacks for tablet mode on
+    callback tablet-mode-on-add();
+    callback tablet-mode-on-remove(int);
+    callback tablet-mode-on-select(int);
+    callback tablet-mode-on-changed(string);
+
+    // Callbacks for tablet mode off
+    callback tablet-mode-off-add();
+    callback tablet-mode-off-remove(int);
+    callback tablet-mode-off-select(int);
+    callback tablet-mode-off-changed(string);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Info banner
+            Rectangle {
+                background: Theme.card-background;
+                border-radius: Theme.radius-md;
+                height: info-layout.preferred-height + Theme.spacing-md * 2;
+
+                info-layout := VerticalLayout {
+                    padding: Theme.spacing-md;
+                    spacing: Theme.spacing-xs;
+
+                    Text {
+                        text: "Hardware Switch Events";
+                        color: Theme.text-primary;
+                        font-size: Theme.font-size-lg;
+                        font-weight: 600;
+                    }
+
+                    Text {
+                        text: "Configure commands to run when hardware switches change state. These are typically laptop lid and tablet mode switches. Commands are spawned as separate processes.";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Lid Close Section
+            SettingsSection {
+                title: "LID CLOSE";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Commands to run when the laptop lid is closed";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                    }
+
+                    // Command list
+                    Rectangle {
+                        background: Theme.background;
+                        border-radius: Theme.radius-sm;
+                        height: lid-close-list.preferred-height + Theme.spacing-sm * 2;
+                        
+                        lid-close-list := VerticalLayout {
+                            padding: Theme.spacing-sm;
+                            spacing: Theme.spacing-xs;
+
+                            for cmd[index] in root.lid-close-commands : Rectangle {
+                                height: 36px;
+                                background: index == root.lid-close-selected ? Theme.accent.with-alpha(0.2) : transparent;
+                                border-radius: Theme.radius-sm;
+
+                                TouchArea {
+                                    accessible-role: list-item;
+                                    accessible-label: "Lid close command: " + cmd;
+
+                                    clicked => {
+                                        root.lid-close-selected = index;
+                                        root.lid-close-select(index);
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: Theme.spacing-sm;
+                                    padding-right: Theme.spacing-sm;
+
+                                    Text {
+                                        text: cmd;
+                                        color: index == root.lid-close-selected ? Theme.accent : Theme.text-primary;
+                                        font-size: Theme.font-size-sm;
+                                        vertical-alignment: center;
+                                        horizontal-stretch: 1;
+                                        overflow: elide;
+                                    }
+
+                                    Button {
+                                        visible: index == root.lid-close-selected;
+                                        text: "x";
+                                        clicked => { root.lid-close-remove(index); }
+                                    }
+                                }
+                            }
+
+                            if root.lid-close-commands.length == 0: Text {
+                                text: "No commands configured";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Add/Edit controls
+                    HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        LineEdit {
+                            horizontal-stretch: 1;
+                            text: root.lid-close-current;
+                            placeholder-text: "e.g., swaylock";
+                            edited(value) => {
+                                root.lid-close-current = value;
+                                if (root.lid-close-selected >= 0) {
+                                    root.lid-close-changed(value);
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: "Add";
+                            clicked => { root.lid-close-add(); }
+                        }
+                    }
+                }
+            }
+
+            // Lid Open Section
+            SettingsSection {
+                title: "LID OPEN";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Commands to run when the laptop lid is opened";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                    }
+
+                    Rectangle {
+                        background: Theme.background;
+                        border-radius: Theme.radius-sm;
+                        height: lid-open-list.preferred-height + Theme.spacing-sm * 2;
+                        
+                        lid-open-list := VerticalLayout {
+                            padding: Theme.spacing-sm;
+                            spacing: Theme.spacing-xs;
+
+                            for cmd[index] in root.lid-open-commands : Rectangle {
+                                height: 36px;
+                                background: index == root.lid-open-selected ? Theme.accent.with-alpha(0.2) : transparent;
+                                border-radius: Theme.radius-sm;
+
+                                TouchArea {
+                                    accessible-role: list-item;
+                                    accessible-label: "Lid open command: " + cmd;
+
+                                    clicked => {
+                                        root.lid-open-selected = index;
+                                        root.lid-open-select(index);
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: Theme.spacing-sm;
+                                    padding-right: Theme.spacing-sm;
+
+                                    Text {
+                                        text: cmd;
+                                        color: index == root.lid-open-selected ? Theme.accent : Theme.text-primary;
+                                        font-size: Theme.font-size-sm;
+                                        vertical-alignment: center;
+                                        horizontal-stretch: 1;
+                                        overflow: elide;
+                                    }
+
+                                    Button {
+                                        visible: index == root.lid-open-selected;
+                                        text: "x";
+                                        clicked => { root.lid-open-remove(index); }
+                                    }
+                                }
+                            }
+
+                            if root.lid-open-commands.length == 0: Text {
+                                text: "No commands configured";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        LineEdit {
+                            horizontal-stretch: 1;
+                            text: root.lid-open-current;
+                            placeholder-text: "e.g., killall swaylock";
+                            edited(value) => {
+                                root.lid-open-current = value;
+                                if (root.lid-open-selected >= 0) {
+                                    root.lid-open-changed(value);
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: "Add";
+                            clicked => { root.lid-open-add(); }
+                        }
+                    }
+                }
+            }
+
+            // Tablet Mode On Section
+            SettingsSection {
+                title: "TABLET MODE ON";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Commands to run when tablet mode is activated";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                    }
+
+                    Rectangle {
+                        background: Theme.background;
+                        border-radius: Theme.radius-sm;
+                        height: tablet-on-list.preferred-height + Theme.spacing-sm * 2;
+                        
+                        tablet-on-list := VerticalLayout {
+                            padding: Theme.spacing-sm;
+                            spacing: Theme.spacing-xs;
+
+                            for cmd[index] in root.tablet-mode-on-commands : Rectangle {
+                                height: 36px;
+                                background: index == root.tablet-mode-on-selected ? Theme.accent.with-alpha(0.2) : transparent;
+                                border-radius: Theme.radius-sm;
+
+                                TouchArea {
+                                    accessible-role: list-item;
+                                    accessible-label: "Tablet mode on command: " + cmd;
+
+                                    clicked => {
+                                        root.tablet-mode-on-selected = index;
+                                        root.tablet-mode-on-select(index);
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: Theme.spacing-sm;
+                                    padding-right: Theme.spacing-sm;
+
+                                    Text {
+                                        text: cmd;
+                                        color: index == root.tablet-mode-on-selected ? Theme.accent : Theme.text-primary;
+                                        font-size: Theme.font-size-sm;
+                                        vertical-alignment: center;
+                                        horizontal-stretch: 1;
+                                        overflow: elide;
+                                    }
+
+                                    Button {
+                                        visible: index == root.tablet-mode-on-selected;
+                                        text: "x";
+                                        clicked => { root.tablet-mode-on-remove(index); }
+                                    }
+                                }
+                            }
+
+                            if root.tablet-mode-on-commands.length == 0: Text {
+                                text: "No commands configured";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        LineEdit {
+                            horizontal-stretch: 1;
+                            text: root.tablet-mode-on-current;
+                            placeholder-text: "e.g., onboard";
+                            edited(value) => {
+                                root.tablet-mode-on-current = value;
+                                if (root.tablet-mode-on-selected >= 0) {
+                                    root.tablet-mode-on-changed(value);
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: "Add";
+                            clicked => { root.tablet-mode-on-add(); }
+                        }
+                    }
+                }
+            }
+
+            // Tablet Mode Off Section
+            SettingsSection {
+                title: "TABLET MODE OFF";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Commands to run when tablet mode is deactivated";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                    }
+
+                    Rectangle {
+                        background: Theme.background;
+                        border-radius: Theme.radius-sm;
+                        height: tablet-off-list.preferred-height + Theme.spacing-sm * 2;
+                        
+                        tablet-off-list := VerticalLayout {
+                            padding: Theme.spacing-sm;
+                            spacing: Theme.spacing-xs;
+
+                            for cmd[index] in root.tablet-mode-off-commands : Rectangle {
+                                height: 36px;
+                                background: index == root.tablet-mode-off-selected ? Theme.accent.with-alpha(0.2) : transparent;
+                                border-radius: Theme.radius-sm;
+
+                                TouchArea {
+                                    accessible-role: list-item;
+                                    accessible-label: "Tablet mode off command: " + cmd;
+
+                                    clicked => {
+                                        root.tablet-mode-off-selected = index;
+                                        root.tablet-mode-off-select(index);
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: Theme.spacing-sm;
+                                    padding-right: Theme.spacing-sm;
+
+                                    Text {
+                                        text: cmd;
+                                        color: index == root.tablet-mode-off-selected ? Theme.accent : Theme.text-primary;
+                                        font-size: Theme.font-size-sm;
+                                        vertical-alignment: center;
+                                        horizontal-stretch: 1;
+                                        overflow: elide;
+                                    }
+
+                                    Button {
+                                        visible: index == root.tablet-mode-off-selected;
+                                        text: "x";
+                                        clicked => { root.tablet-mode-off-remove(index); }
+                                    }
+                                }
+                            }
+
+                            if root.tablet-mode-off-commands.length == 0: Text {
+                                text: "No commands configured";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        LineEdit {
+                            horizontal-stretch: 1;
+                            text: root.tablet-mode-off-current;
+                            placeholder-text: "e.g., killall onboard";
+                            edited(value) => {
+                                root.tablet-mode-off-current = value;
+                                if (root.tablet-mode-off-selected >= 0) {
+                                    root.tablet-mode-off-changed(value);
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: "Add";
+                            clicked => { root.tablet-mode-off-add(); }
+                        }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle { height: Theme.spacing-lg; }
+        }
+    }
+}

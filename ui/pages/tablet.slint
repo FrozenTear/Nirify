@@ -1,0 +1,96 @@
+// Drawing Tablet settings page
+import { Theme } from "../styles.slint";
+import { ScrollView } from "std-widgets.slint";
+import { SettingsSection } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { CalibrationMatrixRow } from "../widgets/calibration_matrix_row.slint";
+import { TextInputRow } from "../widgets/text_input_row.slint";
+
+export component TabletPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Tablet settings";
+
+    // Settings
+    in-out property <bool> off: false;
+    in-out property <string> map-to-output: "";
+    in-out property <bool> left-handed: false;
+    in-out property <bool> has-calibration: false;
+    in-out property <float> cal-m0: 1.0;
+    in-out property <float> cal-m1: 0.0;
+    in-out property <float> cal-m2: 0.0;
+    in-out property <float> cal-m3: 0.0;
+    in-out property <float> cal-m4: 1.0;
+    in-out property <float> cal-m5: 0.0;
+
+    // Callbacks
+    callback off-toggled(bool);
+    callback map-to-output-changed(string);
+    callback left-handed-toggled(bool);
+    callback calibration-toggled(bool);
+    callback calibration-changed(float, float, float, float, float, float);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            SettingsSection {
+                title: "GENERAL";
+
+                ToggleRow {
+                    label: "Disable tablet";
+                    description: "Turn off the tablet device entirely";
+                    checked: root.off;
+                    toggled(val) => { root.off = val; root.off-toggled(val); }
+                }
+            }
+
+            if !off: SettingsSection {
+                title: "OUTPUT MAPPING";
+
+                TextInputRow {
+                    label: "Map to output";
+                    description: "Monitor name to map tablet to (e.g., DP-1)";
+                    placeholder: "All outputs";
+                    text-value: root.map-to-output;
+                    text-changed(val) => { root.map-to-output = val; root.map-to-output-changed(val); }
+                }
+
+                ToggleRow {
+                    label: "Left-handed mode";
+                    description: "Rotate tablet 180 degrees for left-handed use";
+                    checked: root.left-handed;
+                    toggled(val) => { root.left-handed = val; root.left-handed-toggled(val); }
+                }
+            }
+
+            if !off: SettingsSection {
+                title: "CALIBRATION";
+
+                CalibrationMatrixRow {
+                    label: "Custom calibration";
+                    description: "Advanced: 6-value transformation matrix";
+                    has-matrix: root.has-calibration;
+                    m0: root.cal-m0;
+                    m1: root.cal-m1;
+                    m2: root.cal-m2;
+                    m3: root.cal-m3;
+                    m4: root.cal-m4;
+                    m5: root.cal-m5;
+                    toggled(val) => { root.has-calibration = val; root.calibration-toggled(val); }
+                    matrix-changed(a, b, c, d, e, f) => {
+                        root.cal-m0 = a; root.cal-m1 = b; root.cal-m2 = c;
+                        root.cal-m3 = d; root.cal-m4 = e; root.cal-m5 = f;
+                        root.calibration-changed(a, b, c, d, e, f);
+                    }
+                }
+            }
+
+            // Spacer
+            Rectangle { height: Theme.spacing-lg; }
+        }
+    }
+}

@@ -1,0 +1,448 @@
+import { Theme, AnimationConfig } from "../styles.slint";
+import { ScrollView, ComboBox } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+
+// Animation type options
+global AnimationTypes {
+    out property <[string]> types: ["Default", "Off", "Spring", "Easing"];
+    out property <[string]> curves: ["Ease Out Quad", "Ease Out Cubic", "Ease Out Expo", "Linear", "Custom (Cubic Bezier)"];
+}
+
+// Single animation configuration row - now receives config from model
+component AnimationConfigRow inherits VerticalLayout {
+    in property <AnimationConfig> config;
+
+    // Callbacks with animation ID
+    callback type-changed(int /* id */, int /* type */);
+    callback damping-changed(int /* id */, float);
+    callback stiffness-changed(int /* id */, int);
+    callback epsilon-changed(int /* id */, float);
+    callback duration-changed(int /* id */, int);
+    callback curve-changed(int /* id */, int);
+    // Cubic-bezier control point callbacks
+    callback bezier-x1-changed(int /* id */, float);
+    callback bezier-y1-changed(int /* id */, float);
+    callback bezier-x2-changed(int /* id */, float);
+    callback bezier-y2-changed(int /* id */, float);
+
+    spacing: Theme.spacing-xs;
+
+    // Main row with label and type selector
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+
+            Text {
+                text: config.name;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-md;
+            }
+
+            Text {
+                text: config.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-sm;
+            }
+        }
+
+        ComboBox {
+            width: 120px;
+            model: AnimationTypes.types;
+            current-index: config.anim-type;
+            selected(text) => {
+                root.type-changed(config.id, self.current-index);
+            }
+        }
+    }
+
+    // Spring parameters (shown when type is Spring = 2)
+    if config.anim-type == 2: Rectangle {
+        background: Theme.surface-elevated;
+        border-radius: Theme.radius-sm;
+
+        VerticalLayout {
+            padding: Theme.spacing-sm;
+            spacing: Theme.spacing-xs;
+
+            SliderRow {
+                label: "Damping ratio";
+                description: "1.0 = smooth stop, <1.0 = bouncy";
+                minimum: 0.1;
+                maximum: 3.0;
+                value: config.damping;
+                changed(val) => {
+                    root.damping-changed(config.id, val);
+                }
+            }
+
+            SliderRow {
+                label: "Stiffness";
+                description: "Higher = faster/stiffer";
+                minimum: 50;
+                maximum: 2000;
+                value: config.stiffness;
+                changed(val) => {
+                    root.stiffness-changed(config.id, round(val));
+                }
+            }
+
+            SliderRow {
+                label: "Epsilon";
+                description: "Animation end threshold";
+                minimum: 0.00001;
+                maximum: 0.01;
+                value: config.epsilon;
+                changed(val) => {
+                    root.epsilon-changed(config.id, val);
+                }
+            }
+        }
+    }
+
+    // Easing parameters (shown when type is Easing = 3)
+    if config.anim-type == 3: Rectangle {
+        background: Theme.surface-elevated;
+        border-radius: Theme.radius-sm;
+
+        VerticalLayout {
+            padding: Theme.spacing-sm;
+            spacing: Theme.spacing-xs;
+
+            SliderRow {
+                label: "Duration";
+                description: "Animation duration in milliseconds";
+                suffix: "ms";
+                minimum: 50;
+                maximum: 1000;
+                value: config.duration;
+                changed(val) => {
+                    root.duration-changed(config.id, round(val));
+                }
+            }
+
+            HorizontalLayout {
+                spacing: Theme.spacing-md;
+
+                Text {
+                    text: "Easing curve";
+                    color: Theme.text-primary;
+                    font-size: Theme.font-size-md;
+                    vertical-alignment: center;
+                }
+
+                ComboBox {
+                    width: 180px;
+                    model: AnimationTypes.curves;
+                    current-index: config.curve;
+                    selected(text) => {
+                        root.curve-changed(config.id, self.current-index);
+                    }
+                }
+            }
+
+            // Cubic-bezier control points (shown when curve is Custom = 4)
+            if config.curve == 4: VerticalLayout {
+                spacing: Theme.spacing-xs;
+                padding-top: Theme.spacing-xs;
+
+                Text {
+                    text: "Bezier Control Points";
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size-sm;
+                }
+
+                HorizontalLayout {
+                    spacing: Theme.spacing-md;
+
+                    SliderRow {
+                        horizontal-stretch: 1;
+                        label: "X1";
+                        description: "First control point X";
+                        minimum: 0.0;
+                        maximum: 1.0;
+                        value: config.bezier-x1;
+                        changed(val) => {
+                            root.bezier-x1-changed(config.id, val);
+                        }
+                    }
+
+                    SliderRow {
+                        horizontal-stretch: 1;
+                        label: "Y1";
+                        description: "First control point Y";
+                        minimum: -1.0;
+                        maximum: 2.0;
+                        value: config.bezier-y1;
+                        changed(val) => {
+                            root.bezier-y1-changed(config.id, val);
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: Theme.spacing-md;
+
+                    SliderRow {
+                        horizontal-stretch: 1;
+                        label: "X2";
+                        description: "Second control point X";
+                        minimum: 0.0;
+                        maximum: 1.0;
+                        value: config.bezier-x2;
+                        changed(val) => {
+                            root.bezier-x2-changed(config.id, val);
+                        }
+                    }
+
+                    SliderRow {
+                        horizontal-stretch: 1;
+                        label: "Y2";
+                        description: "Second control point Y";
+                        minimum: -1.0;
+                        maximum: 2.0;
+                        value: config.bezier-y2;
+                        changed(val) => {
+                            root.bezier-y2-changed(config.id, val);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Animations settings page for niri - now model-based
+export component AnimationsPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Animations settings";
+
+    // Global animation settings
+    in-out property <bool> animations-enabled: true;
+    in-out property <float> slowdown: 1.0;
+
+    // Expanded state for advanced section
+    in-out property <bool> advanced-expanded: false;
+
+    // Animation configurations as a model (11 animations)
+    in property <[AnimationConfig]> animations-model;
+
+    // Global callbacks
+    callback animations-toggled(bool);
+    callback slowdown-changed(float);
+
+    // Indexed callbacks for animation properties
+    callback animation-type-changed(int /* id */, int /* type */);
+    callback animation-damping-changed(int /* id */, float);
+    callback animation-stiffness-changed(int /* id */, int);
+    callback animation-epsilon-changed(int /* id */, float);
+    callback animation-duration-changed(int /* id */, int);
+    callback animation-curve-changed(int /* id */, int);
+    // Cubic-bezier control point callbacks
+    callback animation-bezier-x1-changed(int /* id */, float);
+    callback animation-bezier-y1-changed(int /* id */, float);
+    callback animation-bezier-x2-changed(int /* id */, float);
+    callback animation-bezier-y2-changed(int /* id */, float);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Global Animations Section
+            SettingsSection {
+                title: "ANIMATIONS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Enable animations";
+                        description: "Animate window movements, workspace switches, and other transitions";
+                        checked: root.animations-enabled;
+                        toggled(val) => {
+                            root.animations-enabled = val;
+                            root.animations-toggled(val);
+                        }
+                    }
+
+                    if root.animations-enabled: SliderRow {
+                        label: "Animation speed";
+                        description: "Slowdown factor (1.0 = normal, higher = slower)";
+                        suffix: "x";
+                        minimum: 0.1;
+                        maximum: 10.0;
+                        value: root.slowdown;
+                        changed(val) => {
+                            root.slowdown = val;
+                            root.slowdown-changed(val);
+                        }
+                    }
+                }
+            }
+
+            // Expandable Advanced Section
+            if root.animations-enabled: Rectangle {
+                background: Theme.card-background;
+                border-radius: Theme.radius-md;
+
+                VerticalLayout {
+                    padding: Theme.spacing-md;
+                    spacing: Theme.spacing-sm;
+
+                    // Header with expand/collapse
+                    TouchArea {
+                        accessible-role: button;
+                        accessible-label: root.advanced-expanded
+                            ? "Collapse individual animation settings"
+                            : "Expand individual animation settings";
+
+                        clicked => { root.advanced-expanded = !root.advanced-expanded; }
+
+                        HorizontalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            Text {
+                                text: root.advanced-expanded ? "▼" : "▶";
+                                color: Theme.text-secondary;
+                                font-size: Theme.font-size-sm;
+                            }
+
+                            Text {
+                                text: "INDIVIDUAL ANIMATIONS";
+                                color: Theme.text-secondary;
+                                font-size: Theme.font-size-sm;
+                                font-weight: 600;
+                                letter-spacing: 0.5px;
+                            }
+
+                            Rectangle { horizontal-stretch: 1; }
+
+                            Text {
+                                text: "(Advanced)";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                            }
+                        }
+                    }
+
+                    if !root.advanced-expanded: Text {
+                        text: "Customize each animation type separately";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                    }
+
+                    // Expanded content - model-based rendering
+                    if root.advanced-expanded: VerticalLayout {
+                        spacing: Theme.spacing-lg;
+
+                        // Workspace & Navigation group (IDs 0-1)
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            Text {
+                                text: "Workspace & Navigation";
+                                color: Theme.accent;
+                                font-size: Theme.font-size-sm;
+                                font-weight: 600;
+                            }
+
+                            for anim in root.animations-model: Rectangle {
+                                visible: anim.id <= 1;
+                                height: self.visible ? config-row.preferred-height : 0;
+
+                                config-row := AnimationConfigRow {
+                                    config: anim;
+                                    type-changed(id, val) => { root.animation-type-changed(id, val); }
+                                    damping-changed(id, val) => { root.animation-damping-changed(id, val); }
+                                    stiffness-changed(id, val) => { root.animation-stiffness-changed(id, val); }
+                                    epsilon-changed(id, val) => { root.animation-epsilon-changed(id, val); }
+                                    duration-changed(id, val) => { root.animation-duration-changed(id, val); }
+                                    curve-changed(id, val) => { root.animation-curve-changed(id, val); }
+                                    bezier-x1-changed(id, val) => { root.animation-bezier-x1-changed(id, val); }
+                                    bezier-y1-changed(id, val) => { root.animation-bezier-y1-changed(id, val); }
+                                    bezier-x2-changed(id, val) => { root.animation-bezier-x2-changed(id, val); }
+                                    bezier-y2-changed(id, val) => { root.animation-bezier-y2-changed(id, val); }
+                                }
+                            }
+                        }
+
+                        // Window Animations group (IDs 2-6)
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            Text {
+                                text: "Window Animations";
+                                color: Theme.accent;
+                                font-size: Theme.font-size-sm;
+                                font-weight: 600;
+                            }
+
+                            for anim in root.animations-model: Rectangle {
+                                visible: anim.id >= 2 && anim.id <= 6;
+                                height: self.visible ? config-row2.preferred-height : 0;
+
+                                config-row2 := AnimationConfigRow {
+                                    config: anim;
+                                    type-changed(id, val) => { root.animation-type-changed(id, val); }
+                                    damping-changed(id, val) => { root.animation-damping-changed(id, val); }
+                                    stiffness-changed(id, val) => { root.animation-stiffness-changed(id, val); }
+                                    epsilon-changed(id, val) => { root.animation-epsilon-changed(id, val); }
+                                    duration-changed(id, val) => { root.animation-duration-changed(id, val); }
+                                    curve-changed(id, val) => { root.animation-curve-changed(id, val); }
+                                    bezier-x1-changed(id, val) => { root.animation-bezier-x1-changed(id, val); }
+                                    bezier-y1-changed(id, val) => { root.animation-bezier-y1-changed(id, val); }
+                                    bezier-x2-changed(id, val) => { root.animation-bezier-x2-changed(id, val); }
+                                    bezier-y2-changed(id, val) => { root.animation-bezier-y2-changed(id, val); }
+                                }
+                            }
+                        }
+
+                        // UI Animations group (IDs 7-10)
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            Text {
+                                text: "UI Animations";
+                                color: Theme.accent;
+                                font-size: Theme.font-size-sm;
+                                font-weight: 600;
+                            }
+
+                            for anim in root.animations-model: Rectangle {
+                                visible: anim.id >= 7;
+                                height: self.visible ? config-row3.preferred-height : 0;
+
+                                config-row3 := AnimationConfigRow {
+                                    config: anim;
+                                    type-changed(id, val) => { root.animation-type-changed(id, val); }
+                                    damping-changed(id, val) => { root.animation-damping-changed(id, val); }
+                                    stiffness-changed(id, val) => { root.animation-stiffness-changed(id, val); }
+                                    epsilon-changed(id, val) => { root.animation-epsilon-changed(id, val); }
+                                    duration-changed(id, val) => { root.animation-duration-changed(id, val); }
+                                    curve-changed(id, val) => { root.animation-curve-changed(id, val); }
+                                    bezier-x1-changed(id, val) => { root.animation-bezier-x1-changed(id, val); }
+                                    bezier-y1-changed(id, val) => { root.animation-bezier-y1-changed(id, val); }
+                                    bezier-x2-changed(id, val) => { root.animation-bezier-x2-changed(id, val); }
+                                    bezier-y2-changed(id, val) => { root.animation-bezier-y2-changed(id, val); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle {
+                height: Theme.spacing-lg;
+            }
+        }
+    }
+}

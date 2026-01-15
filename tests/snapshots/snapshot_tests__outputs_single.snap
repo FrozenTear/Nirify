@@ -1,0 +1,11 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Output/Display settings - managed by niri-settings-rust
+
+output "DP-1" {
+    scale 1.50
+    mode "2560x1440@144"
+    variable-refresh-rate "on"
+}

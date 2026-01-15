@@ -1,0 +1,17 @@
+# Cargo configuration for niri-settings
+
+[alias]
+# Run all tests
+test-all = "test --all-features"
+
+# Run tests with coverage (requires cargo-llvm-cov)
+# Install: cargo install cargo-llvm-cov
+coverage = "llvm-cov --html"
+coverage-open = "llvm-cov --html --open"
+coverage-lcov = "llvm-cov --lcov --output-path lcov.info"
+
+# Run benchmarks
+bench-all = "bench --all-features"
+
+# Check code formatting and lints
+check-all = ["fmt --check", "clippy --all-targets --all-features"]

@@ -1,0 +1,178 @@
+import { Theme, KeyPart } from "../styles.slint";
+import { Button } from "std-widgets.slint";
+import { KeyBadges } from "key_badges.slint";
+
+// Key capture input widget
+// Displays "Press keys..." when active, captures keyboard input
+// Sends raw key event info to Rust side for processing via callbacks
+export component KeyCaptureInput inherits Rectangle {
+    // Current key combination string (e.g., "Mod+Shift+Q")
+    in-out property <string> key-combo: "";
+    // Parsed key parts for badge display
+    in-out property <[KeyPart]> key-parts: [];
+    // Whether capture mode is active
+    in-out property <bool> capturing: false;
+    // Placeholder text when empty
+    in property <string> placeholder: "Click to capture...";
+
+    // Callbacks
+    callback capture-started();
+    callback capture-cancelled();
+    callback key-captured(string);  // Called when a valid combo is captured
+    // Raw key event - passes text and modifier flags to Rust for processing
+    callback raw-key-pressed(/* text */ string, /* meta */ bool, /* ctrl */ bool, /* alt */ bool, /* shift */ bool);
+
+    // Accessibility
+    accessible-role: text-input;
+    accessible-label: key-combo != "" ? "Key combination: " + key-combo : placeholder;
+
+    height: 40px;
+    min-width: 200px;
+
+    background: capturing ? Theme.accent.with-alpha(0.1) : Theme.control-background;
+    border-radius: Theme.radius-md;
+    border-width: capturing ? 2px : 1px;
+    border-color: capturing ? Theme.accent : Theme.border;
+
+    animate background { duration: Theme.duration-fast; }
+    animate border-color { duration: Theme.duration-fast; }
+    animate border-width { duration: Theme.duration-fast; }
+
+    // Click to start capture
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            if !root.capturing {
+                root.capturing = true;
+                focus-scope.focus();
+                root.capture-started();
+            }
+        }
+    }
+
+    // Focus scope for keyboard capture
+    focus-scope := FocusScope {
+        enabled: root.capturing;
+
+        key-pressed(event) => {
+            // Escape cancels capture
+            if event.text == "\u{001b}" {
+                root.capturing = false;
+                root.capture-cancelled();
+                return accept;
+            }
+
+            // Pass raw key info to Rust for processing
+            root.raw-key-pressed(
+                event.text,
+                event.modifiers.meta,
+                event.modifiers.control,
+                event.modifiers.alt,
+                event.modifiers.shift
+            );
+
+            return accept;
+        }
+
+        key-released(event) => {
+            return accept;
+        }
+
+        focus-changed-event => {
+            if !self.has-focus && root.capturing {
+                root.capturing = false;
+                root.capture-cancelled();
+            }
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Theme.spacing-sm;
+        padding-right: Theme.spacing-sm;
+        spacing: Theme.spacing-sm;
+        alignment: start;
+
+        // Show badges when we have a combo, otherwise show placeholder/capture text
+        if key-combo != "" && !capturing: KeyBadges {
+            parts: root.key-parts;
+            vertical-stretch: 0;
+        }
+
+        if key-combo == "" && !capturing: Text {
+            text: placeholder;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-sm;
+            vertical-alignment: center;
+        }
+
+        if capturing: Text {
+            text: "Press keys... (Esc to cancel)";
+            color: Theme.accent;
+            font-size: Theme.font-size-sm;
+            vertical-alignment: center;
+        }
+
+        // Clear button when we have a value
+        if key-combo != "" && !capturing: Rectangle {
+            width: 24px;
+            height: 24px;
+            background: clear-touch.has-hover ? Theme.surface-elevated : transparent;
+            border-radius: 12px;
+
+            clear-touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    root.key-combo = "";
+                    root.key-parts = [];
+                }
+            }
+
+            Text {
+                text: "\u{00d7}";  // multiplication sign as X
+                color: Theme.text-muted;
+                font-size: Theme.font-size-md;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// Compact version for inline use in lists
+export component KeyCaptureButton inherits Rectangle {
+    in-out property <string> key-combo: "";
+    in-out property <bool> capturing: false;
+
+    callback capture-requested();
+    callback capture-completed(string);
+
+    height: 32px;
+    min-width: 100px;
+
+    background: capturing ? Theme.accent.with-alpha(0.2) : Theme.control-background;
+    border-radius: Theme.radius-sm;
+    border-width: 1px;
+    border-color: capturing ? Theme.accent : Theme.border;
+
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            if !root.capturing {
+                root.capture-requested();
+            }
+        }
+    }
+
+    HorizontalLayout {
+        padding: Theme.spacing-xs;
+        alignment: center;
+
+        Text {
+            text: capturing ? "Press keys..." : (key-combo != "" ? key-combo : "Set key");
+            color: capturing ? Theme.accent : (key-combo != "" ? Theme.text-primary : Theme.text-muted);
+            font-size: Theme.font-size-xs;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}

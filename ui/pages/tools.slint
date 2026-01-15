@@ -1,0 +1,173 @@
+import { Theme } from "../styles.slint";
+import { ScrollView, Button, ComboBox } from "std-widgets.slint";
+import { SettingsSection } from "../widgets/section.slint";
+
+// System toolbox for querying niri state
+export component ToolsPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Tools";
+
+    in-out property <bool> niri-running: false;
+    in-out property <string> output-text: "";
+    in-out property <string> last-action: "";
+
+    // Callbacks for each tool action
+    callback list-windows-requested();
+    callback list-workspaces-requested();
+    callback list-outputs-requested();
+    callback focused-window-requested();
+    callback focused-output-requested();
+    callback reload-config-requested();
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Status banner
+            if !root.niri-running: Rectangle {
+                background: Theme.warning.with-alpha(0.15);
+                border-radius: Theme.radius-md;
+                border-width: 1px;
+                border-color: Theme.warning.with-alpha(0.3);
+                height: 48px;
+
+                HorizontalLayout {
+                    padding: Theme.spacing-md;
+                    spacing: Theme.spacing-sm;
+
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: Theme.warning;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: "Niri is not running. Tools require a running niri session.";
+                        color: Theme.warning;
+                        font-size: Theme.font-size-md;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // Query Tools Section
+            SettingsSection {
+                title: "QUERY TOOLS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-md;
+
+                    // Row 1: Windows and Workspaces
+                    HorizontalLayout {
+                        spacing: Theme.spacing-md;
+
+                        Button {
+                            text: "List Windows";
+                            enabled: root.niri-running;
+                            clicked => {
+                                root.last-action = "Windows";
+                                root.list-windows-requested();
+                            }
+                        }
+
+                        Button {
+                            text: "List Workspaces";
+                            enabled: root.niri-running;
+                            clicked => {
+                                root.last-action = "Workspaces";
+                                root.list-workspaces-requested();
+                            }
+                        }
+
+                        Button {
+                            text: "List Outputs";
+                            enabled: root.niri-running;
+                            clicked => {
+                                root.last-action = "Outputs";
+                                root.list-outputs-requested();
+                            }
+                        }
+                    }
+
+                    // Row 2: Focused info
+                    HorizontalLayout {
+                        spacing: Theme.spacing-md;
+
+                        Button {
+                            text: "Focused Window";
+                            enabled: root.niri-running;
+                            clicked => {
+                                root.last-action = "Focused Window";
+                                root.focused-window-requested();
+                            }
+                        }
+
+                        Button {
+                            text: "Focused Output";
+                            enabled: root.niri-running;
+                            clicked => {
+                                root.last-action = "Focused Output";
+                                root.focused-output-requested();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Actions Section
+            SettingsSection {
+                title: "ACTIONS";
+
+                HorizontalLayout {
+                    spacing: Theme.spacing-md;
+
+                    Button {
+                        text: "Reload Config";
+                        enabled: root.niri-running;
+                        clicked => {
+                            root.last-action = "Reload Config";
+                            root.reload-config-requested();
+                        }
+                    }
+                }
+            }
+
+            // Output Section
+            SettingsSection {
+                title: root.last-action != "" ? "OUTPUT: " + root.last-action : "OUTPUT";
+
+                Rectangle {
+                    background: Theme.card-background;
+                    border-radius: Theme.radius-md;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    min-height: 200px;
+                    max-height: 400px;
+
+                    ScrollView {
+                        VerticalLayout {
+                            padding: Theme.spacing-md;
+
+                            Text {
+                                text: root.output-text != "" ? root.output-text : "Click a button above to query niri...";
+                                color: root.output-text != "" ? Theme.text-primary : Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                                font-family: "monospace";
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle { height: Theme.spacing-lg; }
+        }
+    }
+}

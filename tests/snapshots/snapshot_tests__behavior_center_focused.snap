@@ -1,0 +1,5 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Behavior settings - managed by niri-settings-rust

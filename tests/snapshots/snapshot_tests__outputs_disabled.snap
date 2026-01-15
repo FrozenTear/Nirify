@@ -1,0 +1,9 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Output/Display settings - managed by niri-settings-rust
+
+output "HDMI-A-1" {
+    off
+}

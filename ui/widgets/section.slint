@@ -1,0 +1,117 @@
+import { Theme } from "../styles.slint";
+
+// Card-based settings section with accent line (Control Deck design)
+export component SettingsSection inherits Rectangle {
+    in property <string> title;
+    in property <color> accent-color: Theme.accent-visual;  // Category accent
+
+    // Accessibility - use list role for grouped settings
+    accessible-role: list;
+    accessible-label: title + " settings section";
+
+    // Prevent vertical stretching - size to content only
+    vertical-stretch: 0;
+
+    background: Theme.card-background;
+    border-radius: Theme.radius-lg;
+    border-width: 1px;
+    border-color: Theme.border.with-alpha(0.5);
+    clip: true;
+
+    // Left accent line
+    Rectangle {
+        x: 0;
+        y: 0;
+        width: Theme.accent-line-width;
+        height: parent.height;
+        background: accent-color;
+        border-top-left-radius: Theme.radius-lg;
+        border-bottom-left-radius: Theme.radius-lg;
+    }
+
+    VerticalLayout {
+        padding: Theme.panel-padding;
+        padding-left: Theme.panel-padding + Theme.accent-line-width;
+        spacing: Theme.spacing-sm;
+
+        // Section header with accent color and subtle underline
+        VerticalLayout {
+            spacing: Theme.spacing-xs;
+
+            HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: start;
+
+                Text {
+                    text: title;
+                    color: accent-color;
+                    font-size: Theme.font-size-md;
+                    font-weight: 600;
+                    letter-spacing: 0.5px;
+                    // Section title - accessibility handled by parent list role
+                    accessible-role: none;
+                }
+            }
+
+            // Subtle gradient underline
+            Rectangle {
+                height: 1px;
+                background: @linear-gradient(90deg, accent-color.with-alpha(0.4) 0%, transparent 60%);
+            }
+        }
+
+        // Content
+        @children
+    }
+}
+
+// Setting row with label and description
+export component SettingRow inherits Rectangle {
+    in property <string> label;
+    in property <string> description;
+
+    // Accessibility - use list-item role for individual settings
+    accessible-role: list-item;
+    accessible-label: label;
+    accessible-description: description;
+
+    min-height: 44px;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+
+        // Label takes remaining space
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+
+            Text {
+                text: label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-md;
+                // Label text - accessibility handled by parent list-item role
+                accessible-role: none;
+            }
+
+            if description != "": Text {
+                text: description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-sm;
+                // Description text - accessibility handled by parent list-item role
+                accessible-role: none;
+            }
+        }
+
+        // Fixed-width control column for consistent alignment
+        Rectangle {
+            width: Theme.control-column-width;
+            background: transparent;
+
+            HorizontalLayout {
+                alignment: end;
+
+                @children
+            }
+        }
+    }
+}

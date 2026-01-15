@@ -1,0 +1,305 @@
+import { Theme } from "../styles.slint";
+import { ScrollView } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+import { ComboBoxRow } from "../widgets/combobox_row.slint";
+import { PercentageSliderRow } from "../widgets/percentage_slider_row.slint";
+
+// Behavior settings page for niri
+export component BehaviorPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Behavior settings";
+
+    // Focus settings
+    in-out property <bool> focus-follows-mouse: false;
+    in-out property <bool> warp-mouse-to-focus: false;
+
+    // Workspace settings
+    in-out property <bool> center-focused-column: false;
+    in-out property <bool> always-center-single-column: false;
+
+    // Window opening behavior
+    in-out property <int> default-column-width-index: 0;  // 0=proportion, 1=fixed
+    in-out property <float> default-column-width-proportion: 0.5;
+    in-out property <float> default-column-width-fixed: 800;
+
+    // Struts (screen edge reserved space)
+    in-out property <float> strut-left: 0;
+    in-out property <float> strut-right: 0;
+    in-out property <float> strut-top: 0;
+    in-out property <float> strut-bottom: 0;
+
+    // Modifier keys
+    in-out property <int> mod-key-index: 0;  // 0=Super, 1=Alt, 2=Ctrl, 3=Shift, 4=Mod3, 5=Mod5
+    in-out property <bool> mod-key-nested-enabled: false;
+    in-out property <int> mod-key-nested-index: 0;
+
+    // Power handling
+    in-out property <bool> disable-power-key-handling: false;
+
+    // Callbacks
+    callback focus-follows-mouse-toggled(bool);
+    callback warp-mouse-to-focus-toggled(bool);
+    callback center-focused-column-toggled(bool);
+    callback always-center-single-column-toggled(bool);
+    callback default-column-width-type-changed(int);
+    callback default-column-width-proportion-changed(float);
+    callback default-column-width-fixed-changed(float);
+    callback strut-left-changed(float);
+    callback strut-right-changed(float);
+    callback strut-top-changed(float);
+    callback strut-bottom-changed(float);
+    callback mod-key-changed(int);
+    callback mod-key-nested-enabled-toggled(bool);
+    callback mod-key-nested-changed(int);
+    callback disable-power-key-handling-toggled(bool);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Focus Settings Section
+            SettingsSection {
+                title: "FOCUS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Focus follows mouse";
+                        description: "Windows get focus when the mouse moves over them";
+                        checked: root.focus-follows-mouse;
+                        toggled(val) => {
+                            root.focus-follows-mouse = val;
+                            root.focus-follows-mouse-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Warp mouse to focus";
+                        description: "Move the mouse cursor when focus changes via keyboard";
+                        checked: root.warp-mouse-to-focus;
+                        toggled(val) => {
+                            root.warp-mouse-to-focus = val;
+                            root.warp-mouse-to-focus-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Workspace Layout Section
+            SettingsSection {
+                title: "WORKSPACE LAYOUT";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Center focused column";
+                        description: "Keep the focused column centered on screen";
+                        checked: root.center-focused-column;
+                        toggled(val) => {
+                            root.center-focused-column = val;
+                            root.center-focused-column-toggled(val);
+                        }
+                    }
+
+                    if root.center-focused-column: ToggleRow {
+                        label: "Always center single column";
+                        description: "Center even when there's only one column";
+                        checked: root.always-center-single-column;
+                        toggled(val) => {
+                            root.always-center-single-column = val;
+                            root.always-center-single-column-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Default Window Size Section
+            SettingsSection {
+                title: "DEFAULT WINDOW SIZE";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    // Column width type selector
+                    ComboBoxRow {
+                        label: "Width type";
+                        description: "How to calculate default window width";
+                        model: ["Proportion", "Fixed pixels"];
+                        current-index: root.default-column-width-index;
+                        selected(idx) => {
+                            root.default-column-width-index = idx;
+                            root.default-column-width-type-changed(idx);
+                        }
+                    }
+
+                    if root.default-column-width-index == 0: PercentageSliderRow {
+                        label: "Width proportion";
+                        description: "Fraction of screen width for new windows";
+                        minimum: 10;
+                        maximum: 100;
+                        value: root.default-column-width-proportion;
+                        changed(val) => {
+                            root.default-column-width-proportion = val;
+                            root.default-column-width-proportion-changed(val);
+                        }
+                    }
+
+                    if root.default-column-width-index == 1: SliderRow {
+                        label: "Width pixels";
+                        description: "Fixed width in pixels for new windows";
+                        suffix: "px";
+                        minimum: 200;
+                        maximum: 4000;
+                        value: root.default-column-width-fixed;
+                        changed(val) => {
+                            root.default-column-width-fixed = val;
+                            root.default-column-width-fixed-changed(val);
+                        }
+                    }
+                }
+            }
+
+            // Struts Section
+            SettingsSection {
+                title: "SCREEN EDGE RESERVED SPACE";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Reserve space at screen edges for panels or docks";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                        accessible-role: text;
+                    }
+
+                    SliderRow {
+                        label: "Left";
+                        description: "Reserved space on the left edge";
+                        suffix: "px";
+                        minimum: 0;
+                        maximum: 500;
+                        value: root.strut-left;
+                        changed(val) => {
+                            root.strut-left = val;
+                            root.strut-left-changed(val);
+                        }
+                    }
+
+                    SliderRow {
+                        label: "Right";
+                        description: "Reserved space on the right edge";
+                        suffix: "px";
+                        minimum: 0;
+                        maximum: 500;
+                        value: root.strut-right;
+                        changed(val) => {
+                            root.strut-right = val;
+                            root.strut-right-changed(val);
+                        }
+                    }
+
+                    SliderRow {
+                        label: "Top";
+                        description: "Reserved space at the top edge";
+                        suffix: "px";
+                        minimum: 0;
+                        maximum: 500;
+                        value: root.strut-top;
+                        changed(val) => {
+                            root.strut-top = val;
+                            root.strut-top-changed(val);
+                        }
+                    }
+
+                    SliderRow {
+                        label: "Bottom";
+                        description: "Reserved space at the bottom edge";
+                        suffix: "px";
+                        minimum: 0;
+                        maximum: 500;
+                        value: root.strut-bottom;
+                        changed(val) => {
+                            root.strut-bottom = val;
+                            root.strut-bottom-changed(val);
+                        }
+                    }
+                }
+            }
+
+            // Modifier Keys Section
+            SettingsSection {
+                title: "MODIFIER KEYS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ComboBoxRow {
+                        label: "Modifier key";
+                        description: "Primary modifier for window management shortcuts";
+                        model: ["Super", "Alt", "Ctrl", "Shift", "Mod3", "Mod5"];
+                        current-index: root.mod-key-index;
+                        selected(idx) => {
+                            root.mod-key-index = idx;
+                            root.mod-key-changed(idx);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Custom nested modifier";
+                        description: "Use a different modifier when running inside another compositor";
+                        checked: root.mod-key-nested-enabled;
+                        toggled(val) => {
+                            root.mod-key-nested-enabled = val;
+                            root.mod-key-nested-enabled-toggled(val);
+                        }
+                    }
+
+                    if root.mod-key-nested-enabled: ComboBoxRow {
+                        label: "Nested modifier key";
+                        description: "Modifier to use when niri runs nested";
+                        model: ["Super", "Alt", "Ctrl", "Shift", "Mod3", "Mod5"];
+                        current-index: root.mod-key-nested-index;
+                        selected(idx) => {
+                            root.mod-key-nested-index = idx;
+                            root.mod-key-nested-changed(idx);
+                        }
+                    }
+                }
+            }
+
+            // Power Handling Section
+            SettingsSection {
+                title: "POWER";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "System handles power button";
+                        description: "Let the system handle power button events instead of niri";
+                        checked: root.disable-power-key-handling;
+                        toggled(val) => {
+                            root.disable-power-key-handling = val;
+                            root.disable-power-key-handling-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle {
+                height: Theme.spacing-lg;
+            }
+        }
+    }
+}

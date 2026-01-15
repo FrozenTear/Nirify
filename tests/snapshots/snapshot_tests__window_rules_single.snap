@@ -1,0 +1,13 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Window rules - managed by niri-settings-rust
+
+// Firefox Floating
+window-rule {
+    match app-id="firefox"
+    open-floating true
+    opacity 0.95
+    geometry-corner-radius 12
+}

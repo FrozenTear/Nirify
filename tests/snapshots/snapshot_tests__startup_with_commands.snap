@@ -1,0 +1,10 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Startup commands - managed by niri-settings-rust
+
+// These commands run when niri starts.
+
+spawn-at-startup "waybar"
+spawn-at-startup "swaybg" "-i" "~/wallpaper.png"

@@ -1,0 +1,136 @@
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+
+// Cursor settings page for niri
+export component CursorPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Cursor settings";
+
+    // Cursor theme
+    in-out property <string> cursor-theme: "";
+
+    // Cursor size
+    in-out property <int> cursor-size: 24;
+
+    // Hide cursor options
+    in-out property <bool> hide-when-typing: false;
+    in-out property <bool> hide-after-inactive-enabled: false;
+    in-out property <int> hide-after-inactive-ms: 1000;
+
+    // Callbacks
+    callback cursor-theme-changed(string);
+    callback cursor-size-changed(int);
+    callback hide-when-typing-toggled(bool);
+    callback hide-after-inactive-toggled(bool);
+    callback hide-after-inactive-ms-changed(int);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Cursor Theme Section
+            SettingsSection {
+                title: "CURSOR THEME";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    SettingRow {
+                        label: "Theme name";
+                        description: "XCursor theme (leave empty for system default)";
+
+                        LineEdit {
+                            width: Theme.input-width-wide;
+                            text: root.cursor-theme;
+                            placeholder-text: "System default";
+
+                            accessible-role: text-input;
+                            accessible-label: "Cursor theme name";
+                            accessible-description: "Enter the name of an installed cursor theme";
+
+                            edited(value) => {
+                                root.cursor-theme = value;
+                                root.cursor-theme-changed(value);
+                            }
+                        }
+                    }
+
+                    SliderRow {
+                        label: "Cursor size";
+                        description: "Size of the cursor in pixels";
+                        suffix: "px";
+                        minimum: 16;
+                        maximum: 64;
+                        value: root.cursor-size;
+                        changed(val) => {
+                            root.cursor-size = round(val);
+                            root.cursor-size-changed(round(val));
+                        }
+                    }
+                }
+            }
+
+            // Cursor Visibility Section
+            SettingsSection {
+                title: "CURSOR VISIBILITY";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Control when the cursor is automatically hidden";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                        accessible-role: text;
+                    }
+
+                    ToggleRow {
+                        label: "Hide when typing";
+                        description: "Hide cursor while pressing keyboard keys";
+                        checked: root.hide-when-typing;
+                        toggled(val) => {
+                            root.hide-when-typing = val;
+                            root.hide-when-typing-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Hide after inactivity";
+                        description: "Automatically hide cursor after a period of no movement";
+                        checked: root.hide-after-inactive-enabled;
+                        toggled(val) => {
+                            root.hide-after-inactive-enabled = val;
+                            root.hide-after-inactive-toggled(val);
+                        }
+                    }
+
+                    if root.hide-after-inactive-enabled: SliderRow {
+                        label: "Inactivity timeout";
+                        description: "Time before cursor hides";
+                        suffix: "ms";
+                        minimum: 100;
+                        maximum: 10000;
+                        value: root.hide-after-inactive-ms;
+                        changed(val) => {
+                            root.hide-after-inactive-ms = round(val);
+                            root.hide-after-inactive-ms-changed(round(val));
+                        }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle {
+                height: Theme.spacing-lg;
+            }
+        }
+    }
+}

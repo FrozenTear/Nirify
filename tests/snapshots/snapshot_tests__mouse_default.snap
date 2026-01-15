@@ -1,0 +1,13 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Mouse settings - managed by niri-settings-rust
+
+input {
+    mouse {
+        accel-speed 0.00
+        accel-profile "adaptive"
+        scroll-factor 1.00
+    }
+}

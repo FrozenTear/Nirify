@@ -1,0 +1,16 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Keyboard settings - managed by niri-settings-rust
+
+input {
+    keyboard {
+        xkb {
+            layout "us"
+        }
+        repeat-delay 600
+        repeat-rate 25
+        track-layout "global"
+    }
+}

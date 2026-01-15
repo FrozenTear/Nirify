@@ -1,0 +1,232 @@
+import { Theme } from "../styles.slint";
+import { ScrollView } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+import { PercentageSliderRow } from "../widgets/percentage_slider_row.slint";
+import { ColorPicker } from "../widgets/color_picker.slint";
+
+// Recent Windows (Alt-Tab) settings page for niri (v25.05+)
+export component RecentWindowsPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Recent windows settings";
+
+    // Global enable/disable
+    in-out property <bool> enabled: true;
+
+    // Timing settings
+    in-out property <int> debounce-ms: 100;
+    in-out property <int> open-delay-ms: 200;
+
+    // Highlight settings
+    in-out property <color> highlight-active-color: #7fc8ff;
+    in-out property <string> highlight-active-color-hex: "#7fc8ff";
+    in-out property <color> highlight-urgent-color: #eb6f92;
+    in-out property <string> highlight-urgent-color-hex: "#eb6f92";
+    in-out property <int> highlight-padding: 8;
+    in-out property <int> highlight-corner-radius: 12;
+
+    // Preview settings
+    in-out property <int> previews-max-height: 200;
+    in-out property <float> previews-max-scale: 0.5;
+
+    // Callbacks
+    callback enabled-toggled(bool);
+    callback debounce-ms-changed(int);
+    callback open-delay-ms-changed(int);
+    callback highlight-active-color-changed(color);
+    callback highlight-urgent-color-changed(color);
+    callback highlight-padding-changed(int);
+    callback highlight-corner-radius-changed(int);
+    callback previews-max-height-changed(int);
+    callback previews-max-scale-changed(float);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Enable/Disable Section
+            SettingsSection {
+                title: "RECENT WINDOWS SWITCHER";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Configure the Alt-Tab window switcher appearance and behavior (v25.05+)";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                        accessible-role: text;
+                    }
+
+                    ToggleRow {
+                        label: "Enable recent windows switcher";
+                        description: "When disabled, the window switcher will not appear";
+                        checked: root.enabled;
+                        toggled(val) => {
+                            root.enabled = val;
+                            root.enabled-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Timing Section (only shown when enabled)
+            if root.enabled: SettingsSection {
+                title: "TIMING";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Control when windows are added to the recent list and when the UI appears";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+
+                    SliderRow {
+                        label: "Debounce delay";
+                        description: "Time before window is added to recent list (ms)";
+                        suffix: "ms";
+                        minimum: 0;
+                        maximum: 1000;
+                        value: root.debounce-ms;
+                        changed(val) => {
+                            root.debounce-ms = round(val);
+                            root.debounce-ms-changed(round(val));
+                        }
+                    }
+
+                    SliderRow {
+                        label: "Open delay";
+                        description: "Time before the switcher UI appears (ms)";
+                        suffix: "ms";
+                        minimum: 0;
+                        maximum: 1000;
+                        value: root.open-delay-ms;
+                        changed(val) => {
+                            root.open-delay-ms = round(val);
+                            root.open-delay-ms-changed(round(val));
+                        }
+                    }
+                }
+            }
+
+            // Highlight Section (only shown when enabled)
+            if root.enabled: SettingsSection {
+                title: "HIGHLIGHT APPEARANCE";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Customize the highlight appearance around selected windows";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+
+                    ColorPicker {
+                        label: "Active window color";
+                        description: "Highlight color for the currently selected window";
+                        selected-color: root.highlight-active-color;
+                        hex-value: root.highlight-active-color-hex;
+                        changed(col) => {
+                            root.highlight-active-color = col;
+                            root.highlight-active-color-changed(col);
+                        }
+                    }
+
+                    ColorPicker {
+                        label: "Urgent window color";
+                        description: "Highlight color for urgent/attention-requesting windows";
+                        selected-color: root.highlight-urgent-color;
+                        hex-value: root.highlight-urgent-color-hex;
+                        changed(col) => {
+                            root.highlight-urgent-color = col;
+                            root.highlight-urgent-color-changed(col);
+                        }
+                    }
+
+                    SliderRow {
+                        label: "Padding";
+                        description: "Space between window and highlight border";
+                        suffix: "px";
+                        minimum: 0;
+                        maximum: 32;
+                        value: root.highlight-padding;
+                        changed(val) => {
+                            root.highlight-padding = round(val);
+                            root.highlight-padding-changed(round(val));
+                        }
+                    }
+
+                    SliderRow {
+                        label: "Corner radius";
+                        description: "Roundness of the highlight corners";
+                        suffix: "px";
+                        minimum: 0;
+                        maximum: 32;
+                        value: root.highlight-corner-radius;
+                        changed(val) => {
+                            root.highlight-corner-radius = round(val);
+                            root.highlight-corner-radius-changed(round(val));
+                        }
+                    }
+                }
+            }
+
+            // Previews Section (only shown when enabled)
+            if root.enabled: SettingsSection {
+                title: "WINDOW PREVIEWS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Configure the size of window preview thumbnails";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+
+                    SliderRow {
+                        label: "Maximum height";
+                        description: "Maximum height of window previews in logical pixels";
+                        suffix: "px";
+                        minimum: 50;
+                        maximum: 500;
+                        value: root.previews-max-height;
+                        changed(val) => {
+                            root.previews-max-height = round(val);
+                            root.previews-max-height-changed(round(val));
+                        }
+                    }
+
+                    PercentageSliderRow {
+                        label: "Maximum scale";
+                        description: "Maximum scale factor for window previews";
+                        minimum: 10;
+                        maximum: 100;
+                        value: root.previews-max-scale;
+                        changed(val) => {
+                            root.previews-max-scale = val;
+                            root.previews-max-scale-changed(val);
+                        }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle {
+                height: Theme.spacing-lg;
+            }
+        }
+    }
+}

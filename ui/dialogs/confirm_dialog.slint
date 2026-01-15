@@ -1,0 +1,127 @@
+// Confirmation dialog for dangerous actions
+import { Button } from "std-widgets.slint";
+import { Theme } from "../styles.slint";
+
+export component ConfirmDialog inherits Rectangle {
+    in property <bool> show-dialog: false;
+    in property <string> title: "Confirm Action";
+    in property <string> message: "Are you sure you want to proceed?";
+    in property <string> warning: "";
+    in property <string> confirm-text: "Confirm";
+    in property <string> cancel-text: "Cancel";
+
+    callback confirmed();
+    callback cancelled();
+
+    // Only render when visible
+    visible: show-dialog;
+
+    // Modal overlay
+    background: Theme.overlay-background.with-alpha(0.82);
+
+    // Consume clicks on overlay - treat as cancel
+    TouchArea {
+        clicked => { cancelled(); }
+    }
+
+    // Dialog box
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(450px, parent.width - 40px);
+        height: content.preferred-height + 2 * Theme.spacing-lg;
+        background: Theme.card-background;
+        border-radius: Theme.radius-lg;
+        drop-shadow-blur: 30px;
+        drop-shadow-color: Theme.panel-shadow-color.with-alpha(0.38);
+        accessible-role: none;
+        accessible-label: "Confirmation dialog: " + title;
+
+        // Prevent overlay click from dismissing
+        TouchArea { }
+
+        content := VerticalLayout {
+            padding: Theme.spacing-lg;
+            spacing: Theme.spacing-md;
+
+            // Header with warning icon
+            HorizontalLayout {
+                spacing: Theme.spacing-md;
+                alignment: start;
+
+                // Warning icon (decorative)
+                Rectangle {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 20px;
+                    background: Theme.warning;
+                    accessible-role: none;
+
+                    Text {
+                        text: "!";
+                        color: #000;
+                        font-size: 24px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: Theme.spacing-xs;
+
+                    Text {
+                        text: title;
+                        color: Theme.text-primary;
+                        font-size: Theme.font-size-xl;
+                        font-weight: 600;
+                    }
+
+                    Text {
+                        text: message;
+                        color: Theme.text-secondary;
+                        font-size: Theme.font-size-md;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Warning box (if warning text provided)
+            if warning != "": Rectangle {
+                background: Theme.error.with-alpha(0.15);
+                border-radius: Theme.radius-md;
+                border-width: 1px;
+                border-color: Theme.error.with-alpha(0.3);
+                height: warning-text.preferred-height + Theme.spacing-md;
+
+                warning-text := Text {
+                    x: Theme.spacing-sm;
+                    y: Theme.spacing-xs;
+                    width: parent.width - 2 * Theme.spacing-sm;
+                    text: warning;
+                    color: Theme.error;
+                    font-size: Theme.font-size-sm;
+                    wrap: word-wrap;
+                }
+            }
+
+            // Footer with buttons
+            HorizontalLayout {
+                spacing: Theme.spacing-md;
+
+                Rectangle { horizontal-stretch: 1; }
+
+                Button {
+                    text: cancel-text;
+                    clicked => { cancelled(); }
+                }
+
+                Button {
+                    text: confirm-text;
+                    clicked => { confirmed(); }
+                }
+            }
+        }
+    }
+}

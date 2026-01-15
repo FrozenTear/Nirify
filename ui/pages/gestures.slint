@@ -1,0 +1,435 @@
+import { Theme } from "../styles.slint";
+import { ScrollView } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+
+// Gestures settings page for niri
+export component GesturesPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Gestures settings";
+
+    // Hot corners
+    in-out property <bool> hot-corners-enabled: false;
+    in-out property <bool> hot-corner-top-left: true;
+    in-out property <bool> hot-corner-top-right: false;
+    in-out property <bool> hot-corner-bottom-left: false;
+    in-out property <bool> hot-corner-bottom-right: false;
+
+    // DND edge view scroll
+    in-out property <bool> dnd-edge-scroll-enabled: true;
+    in-out property <int> dnd-edge-scroll-trigger-width: 30;
+    in-out property <int> dnd-edge-scroll-delay: 100;
+    in-out property <int> dnd-edge-scroll-max-speed: 1500;
+
+    // DND workspace switch
+    in-out property <bool> dnd-workspace-switch-enabled: true;
+    in-out property <int> dnd-workspace-switch-trigger-height: 50;
+    in-out property <int> dnd-workspace-switch-delay: 100;
+    in-out property <int> dnd-workspace-switch-max-speed: 1500;
+
+    // Hot corner callbacks
+    callback hot-corners-toggled(bool);
+    callback hot-corner-top-left-toggled(bool);
+    callback hot-corner-top-right-toggled(bool);
+    callback hot-corner-bottom-left-toggled(bool);
+    callback hot-corner-bottom-right-toggled(bool);
+
+    // DND edge scroll callbacks
+    callback dnd-edge-scroll-toggled(bool);
+    callback dnd-edge-scroll-trigger-width-changed(int);
+    callback dnd-edge-scroll-delay-changed(int);
+    callback dnd-edge-scroll-max-speed-changed(int);
+
+    // DND workspace switch callbacks
+    callback dnd-workspace-switch-toggled(bool);
+    callback dnd-workspace-switch-trigger-height-changed(int);
+    callback dnd-workspace-switch-delay-changed(int);
+    callback dnd-workspace-switch-max-speed-changed(int);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Hot Corners Section
+            SettingsSection {
+                title: "HOT CORNERS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Moving the cursor to screen corners can trigger the overview";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+
+                    ToggleRow {
+                        label: "Enable hot corners";
+                        description: "Trigger overview when cursor reaches corners";
+                        checked: root.hot-corners-enabled;
+                        toggled(val) => { root.hot-corners-enabled = val; root.hot-corners-toggled(val); }
+                    }
+
+                    if root.hot-corners-enabled: VerticalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        // Visual corner selector
+                        Rectangle {
+                            height: 120px;
+                            background: Theme.card-background;
+                            border-radius: Theme.radius-md;
+
+                            // Corner grid
+                            GridLayout {
+                                padding: Theme.spacing-md;
+                                spacing: Theme.spacing-sm;
+
+                                Row {
+                                    // Top-left corner
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 40px;
+                                        background: root.hot-corner-top-left ? Theme.accent : Theme.background;
+                                        border-radius: Theme.radius-sm;
+                                        border-width: tl-focus.has-focus ? 2px : 0px;
+                                        border-color: Theme.border-focus;
+
+                                        accessible-role: checkbox;
+                                        accessible-label: "Top left hot corner";
+                                        accessible-checkable: true;
+                                        accessible-checked: root.hot-corner-top-left;
+
+                                        tl-focus := FocusScope {
+                                            key-pressed(event) => {
+                                                if (event.text == " " || event.text == "\n") {
+                                                    root.hot-corner-top-left = !root.hot-corner-top-left;
+                                                    root.hot-corner-top-left-toggled(root.hot-corner-top-left);
+                                                    accept
+                                                }
+                                                reject
+                                            }
+                                        }
+
+                                        TouchArea {
+                                            clicked => {
+                                                tl-focus.focus();
+                                                root.hot-corner-top-left = !root.hot-corner-top-left;
+                                                root.hot-corner-top-left-toggled(root.hot-corner-top-left);
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "Top Left";
+                                            color: root.hot-corner-top-left ? Theme.text-primary : Theme.text-muted;
+                                            font-size: Theme.font-size-sm;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            accessible-role: none;
+                                        }
+
+                                        animate border-width { duration: Theme.duration-fast; }
+                                    }
+
+                                    // Spacer
+                                    Rectangle {
+                                        horizontal-stretch: 2;
+                                    }
+
+                                    // Top-right corner
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 40px;
+                                        background: root.hot-corner-top-right ? Theme.accent : Theme.background;
+                                        border-radius: Theme.radius-sm;
+                                        border-width: tr-focus.has-focus ? 2px : 0px;
+                                        border-color: Theme.border-focus;
+
+                                        accessible-role: checkbox;
+                                        accessible-label: "Top right hot corner";
+                                        accessible-checkable: true;
+                                        accessible-checked: root.hot-corner-top-right;
+
+                                        tr-focus := FocusScope {
+                                            key-pressed(event) => {
+                                                if (event.text == " " || event.text == "\n") {
+                                                    root.hot-corner-top-right = !root.hot-corner-top-right;
+                                                    root.hot-corner-top-right-toggled(root.hot-corner-top-right);
+                                                    accept
+                                                }
+                                                reject
+                                            }
+                                        }
+
+                                        TouchArea {
+                                            clicked => {
+                                                tr-focus.focus();
+                                                root.hot-corner-top-right = !root.hot-corner-top-right;
+                                                root.hot-corner-top-right-toggled(root.hot-corner-top-right);
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "Top Right";
+                                            color: root.hot-corner-top-right ? Theme.text-primary : Theme.text-muted;
+                                            font-size: Theme.font-size-sm;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            accessible-role: none;
+                                        }
+
+                                        animate border-width { duration: Theme.duration-fast; }
+                                    }
+                                }
+
+                                Row {
+                                    // Bottom-left corner
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 40px;
+                                        background: root.hot-corner-bottom-left ? Theme.accent : Theme.background;
+                                        border-radius: Theme.radius-sm;
+                                        border-width: bl-focus.has-focus ? 2px : 0px;
+                                        border-color: Theme.border-focus;
+
+                                        accessible-role: checkbox;
+                                        accessible-label: "Bottom left hot corner";
+                                        accessible-checkable: true;
+                                        accessible-checked: root.hot-corner-bottom-left;
+
+                                        bl-focus := FocusScope {
+                                            key-pressed(event) => {
+                                                if (event.text == " " || event.text == "\n") {
+                                                    root.hot-corner-bottom-left = !root.hot-corner-bottom-left;
+                                                    root.hot-corner-bottom-left-toggled(root.hot-corner-bottom-left);
+                                                    accept
+                                                }
+                                                reject
+                                            }
+                                        }
+
+                                        TouchArea {
+                                            clicked => {
+                                                bl-focus.focus();
+                                                root.hot-corner-bottom-left = !root.hot-corner-bottom-left;
+                                                root.hot-corner-bottom-left-toggled(root.hot-corner-bottom-left);
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "Bottom Left";
+                                            color: root.hot-corner-bottom-left ? Theme.text-primary : Theme.text-muted;
+                                            font-size: Theme.font-size-sm;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            accessible-role: none;
+                                        }
+
+                                        animate border-width { duration: Theme.duration-fast; }
+                                    }
+
+                                    // Spacer
+                                    Rectangle {
+                                        horizontal-stretch: 2;
+                                    }
+
+                                    // Bottom-right corner
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 40px;
+                                        background: root.hot-corner-bottom-right ? Theme.accent : Theme.background;
+                                        border-radius: Theme.radius-sm;
+                                        border-width: br-focus.has-focus ? 2px : 0px;
+                                        border-color: Theme.border-focus;
+
+                                        accessible-role: checkbox;
+                                        accessible-label: "Bottom right hot corner";
+                                        accessible-checkable: true;
+                                        accessible-checked: root.hot-corner-bottom-right;
+
+                                        br-focus := FocusScope {
+                                            key-pressed(event) => {
+                                                if (event.text == " " || event.text == "\n") {
+                                                    root.hot-corner-bottom-right = !root.hot-corner-bottom-right;
+                                                    root.hot-corner-bottom-right-toggled(root.hot-corner-bottom-right);
+                                                    accept
+                                                }
+                                                reject
+                                            }
+                                        }
+
+                                        TouchArea {
+                                            clicked => {
+                                                br-focus.focus();
+                                                root.hot-corner-bottom-right = !root.hot-corner-bottom-right;
+                                                root.hot-corner-bottom-right-toggled(root.hot-corner-bottom-right);
+                                            }
+                                        }
+
+                                        Text {
+                                            text: "Bottom Right";
+                                            color: root.hot-corner-bottom-right ? Theme.text-primary : Theme.text-muted;
+                                            font-size: Theme.font-size-sm;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            accessible-role: none;
+                                        }
+
+                                        animate border-width { duration: Theme.duration-fast; }
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "Click corners to toggle. Action: Toggle Overview";
+                            color: Theme.text-muted;
+                            font-size: Theme.font-size-sm;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            // DND Edge View Scroll Section
+            SettingsSection {
+                title: "DRAG-AND-DROP EDGE SCROLLING";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "When dragging items near screen edges, the view scrolls automatically";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+
+                    ToggleRow {
+                        label: "Enable edge scrolling";
+                        description: "Scroll view when dragging near edges";
+                        checked: root.dnd-edge-scroll-enabled;
+                        toggled(val) => { root.dnd-edge-scroll-enabled = val; root.dnd-edge-scroll-toggled(val); }
+                    }
+
+                    if root.dnd-edge-scroll-enabled: VerticalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        SliderRow {
+                            label: "Trigger width";
+                            description: "Distance from edge to trigger scrolling";
+                            suffix: "px";
+                            minimum: 10;
+                            maximum: 100;
+                            value: root.dnd-edge-scroll-trigger-width;
+                            changed(val) => {
+                                root.dnd-edge-scroll-trigger-width = round(val);
+                                root.dnd-edge-scroll-trigger-width-changed(round(val));
+                            }
+                        }
+
+                        SliderRow {
+                            label: "Delay";
+                            description: "Time before scrolling starts";
+                            suffix: "ms";
+                            minimum: 0;
+                            maximum: 500;
+                            value: root.dnd-edge-scroll-delay;
+                            changed(val) => {
+                                root.dnd-edge-scroll-delay = round(val);
+                                root.dnd-edge-scroll-delay-changed(round(val));
+                            }
+                        }
+
+                        SliderRow {
+                            label: "Max speed";
+                            description: "Maximum scroll speed";
+                            suffix: "px/s";
+                            minimum: 100;
+                            maximum: 5000;
+                            value: root.dnd-edge-scroll-max-speed;
+                            changed(val) => {
+                                root.dnd-edge-scroll-max-speed = round(val);
+                                root.dnd-edge-scroll-max-speed-changed(round(val));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // DND Workspace Switch Section
+            SettingsSection {
+                title: "DRAG-AND-DROP WORKSPACE SWITCHING";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "In overview, dragging near top/bottom edges switches workspaces";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+
+                    ToggleRow {
+                        label: "Enable workspace switching";
+                        description: "Switch workspaces when dragging in overview";
+                        checked: root.dnd-workspace-switch-enabled;
+                        toggled(val) => { root.dnd-workspace-switch-enabled = val; root.dnd-workspace-switch-toggled(val); }
+                    }
+
+                    if root.dnd-workspace-switch-enabled: VerticalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        SliderRow {
+                            label: "Trigger height";
+                            description: "Distance from edge to trigger switching";
+                            suffix: "px";
+                            minimum: 20;
+                            maximum: 150;
+                            value: root.dnd-workspace-switch-trigger-height;
+                            changed(val) => {
+                                root.dnd-workspace-switch-trigger-height = round(val);
+                                root.dnd-workspace-switch-trigger-height-changed(round(val));
+                            }
+                        }
+
+                        SliderRow {
+                            label: "Delay";
+                            description: "Time before switching starts";
+                            suffix: "ms";
+                            minimum: 0;
+                            maximum: 500;
+                            value: root.dnd-workspace-switch-delay;
+                            changed(val) => {
+                                root.dnd-workspace-switch-delay = round(val);
+                                root.dnd-workspace-switch-delay-changed(round(val));
+                            }
+                        }
+
+                        SliderRow {
+                            label: "Max speed";
+                            description: "Maximum switch speed";
+                            suffix: "px/s";
+                            minimum: 100;
+                            maximum: 5000;
+                            value: root.dnd-workspace-switch-max-speed;
+                            changed(val) => {
+                                root.dnd-workspace-switch-max-speed = round(val);
+                                root.dnd-workspace-switch-max-speed-changed(round(val));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle { height: Theme.spacing-lg; }
+        }
+    }
+}

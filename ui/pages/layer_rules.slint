@@ -1,0 +1,742 @@
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, ComboBox, Button, CheckBox } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+import { ColorPicker } from "../widgets/color_picker.slint";
+
+// Layer Rules settings page for niri
+// Layer rules apply to layer-shell surfaces like panels, notifications, etc.
+export component LayerRulesPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Layer rules";
+
+    // Rule list (as model array of names)
+    in-out property <[string]> rule-list: [];
+    in-out property <int> selected-rule-index: -1;
+
+    // Current rule properties (when a rule is selected)
+    in-out property <string> current-rule-name: "";
+
+    // Match criteria
+    in-out property <[string]> matches-list: [];
+    in-out property <int> selected-match-index: 0;
+    in-out property <int> matches-count: 0;
+    in-out property <string> current-match-namespace: "";
+    in-out property <bool> current-match-at-startup: false;
+    in-out property <bool> current-match-has-at-startup: false;
+
+    // Rule effects
+    in-out property <bool> current-has-block-out-from: false;
+    in-out property <int> current-block-out-from-index: 0;
+    in-out property <bool> current-has-opacity: false;
+    in-out property <float> current-opacity: 1.0;
+    in-out property <bool> current-has-corner-radius: false;
+    in-out property <int> current-corner-radius: 12;
+    in-out property <bool> current-place-within-backdrop: false;
+    in-out property <bool> current-baba-is-float: false;
+
+    // Shadow settings
+    in-out property <bool> current-has-shadow: false;
+    in-out property <bool> current-shadow-enabled: true;
+    in-out property <int> current-shadow-softness: 30;
+    in-out property <int> current-shadow-spread: 5;
+    in-out property <int> current-shadow-offset-x: 0;
+    in-out property <int> current-shadow-offset-y: 5;
+    in-out property <bool> current-shadow-draw-behind: false;
+    in-out property <color> current-shadow-color: #00000070;
+    in-out property <color> current-shadow-inactive-color: #00000050;
+    in-out property <string> current-shadow-color-hex: "#00000070";
+    in-out property <string> current-shadow-inactive-color-hex: "#00000050";
+
+    // Callbacks
+    callback add-rule();
+    callback remove-rule(int);
+    callback select-rule(int);
+    callback rule-name-changed(string);
+    callback reorder-rule(int, int);  // from-index, to-index
+
+    // Match callbacks
+    callback add-match();
+    callback remove-match(int);
+    callback select-match(int);
+    callback match-namespace-changed(string);
+    callback match-at-startup-has-toggled(bool);
+    callback match-at-startup-toggled(bool);
+
+    // Effect callbacks
+    callback block-out-from-toggled(bool);
+    callback block-out-from-changed(int);
+    callback opacity-toggled(bool);
+    callback opacity-changed(float);
+    callback corner-radius-toggled(bool);
+    callback corner-radius-changed(int);
+    callback place-within-backdrop-toggled(bool);
+    callback baba-is-float-toggled(bool);
+
+    // Shadow callbacks
+    callback shadow-toggled(bool);
+    callback shadow-enabled-toggled(bool);
+    callback shadow-softness-changed(int);
+    callback shadow-spread-changed(int);
+    callback shadow-offset-x-changed(int);
+    callback shadow-offset-y-changed(int);
+    callback shadow-draw-behind-toggled(bool);
+    callback shadow-color-changed(color);
+    callback shadow-inactive-color-changed(color);
+
+    background: transparent;
+
+    // Keyboard focus index for rules list
+    property <int> focused-rule-index: -1;
+
+    // Drag-and-drop state
+    property <bool> is-dragging: false;
+    property <int> drag-from-index: -1;
+    property <int> drag-target-index: -1;
+    property <length> drag-current-y: 0;
+    property <length> item-height: 40px;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+
+        // Rules list panel
+        Rectangle {
+            width: Theme.panel-width-narrow;
+            background: Theme.card-background;
+            border-radius: Theme.radius-md;
+
+            VerticalLayout {
+                padding: Theme.spacing-sm;
+                spacing: Theme.spacing-sm;
+
+                // Header
+                HorizontalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Layer Rules";
+                        color: Theme.text-primary;
+                        font-size: Theme.font-size-md;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+
+                    Button {
+                        text: "+";
+                        accessible-label: "Add new layer rule";
+                        clicked => { root.add-rule(); }
+                    }
+                }
+
+                // Rules list with keyboard navigation
+                rules-focus := FocusScope {
+                    vertical-stretch: 1;
+
+                    accessible-role: list;
+                    accessible-label: "Layer rules list";
+
+                    key-pressed(event) => {
+                        if (event.text == Key.DownArrow) {
+                            if (root.focused-rule-index < root.rule-list.length - 1) {
+                                root.focused-rule-index = root.focused-rule-index + 1;
+                            }
+                            accept
+                        } else if (event.text == Key.UpArrow) {
+                            if (root.focused-rule-index > 0) {
+                                root.focused-rule-index = root.focused-rule-index - 1;
+                            } else if (root.focused-rule-index == -1 && root.rule-list.length > 0) {
+                                root.focused-rule-index = 0;
+                            }
+                            accept
+                        } else if (event.text == Key.Return || event.text == " ") {
+                            if (root.focused-rule-index >= 0) {
+                                root.selected-rule-index = root.focused-rule-index;
+                                root.select-rule(root.focused-rule-index);
+                            }
+                            accept
+                        } else if (event.text == Key.Delete) {
+                            if (root.focused-rule-index >= 0 && root.focused-rule-index == root.selected-rule-index) {
+                                root.remove-rule(root.focused-rule-index);
+                            }
+                            accept
+                        }
+                        reject
+                    }
+
+                    focus-changed-event => {
+                        if (self.has-focus && root.focused-rule-index == -1 && root.rule-list.length > 0) {
+                            root.focused-rule-index = root.selected-rule-index >= 0 ? root.selected-rule-index : 0;
+                        }
+                    }
+
+                    ScrollView {
+                        list-container := VerticalLayout {
+                            spacing: Theme.spacing-xs;
+
+                            for rule[index] in root.rule-list : VerticalLayout {
+                                spacing: 0;
+
+                                // Drop indicator - shows above this item when dragging
+                                Rectangle {
+                                    height: root.is-dragging && root.drag-target-index == index ? 3px : 0;
+                                    background: Theme.accent;
+                                    border-radius: 1.5px;
+                                }
+
+                                Rectangle {
+                                    height: root.item-height;
+                                    background: root.is-dragging && root.drag-from-index == index
+                                        ? Theme.card-background.with-alpha(0.3)
+                                        : index == root.selected-rule-index
+                                            ? Theme.accent.with-alpha(0.2)
+                                            : transparent;
+                                    border-radius: Theme.radius-sm;
+                                    border-width: index == root.focused-rule-index && rules-focus.has-focus ? 2px : 0px;
+                                    border-color: Theme.accent;
+                                    opacity: root.is-dragging && root.drag-from-index == index ? 0.5 : 1.0;
+
+                                    accessible-role: list-item;
+                                    accessible-label: rule;
+
+                                    touch := TouchArea {
+                                        property <length> press-start-y: 0;
+                                        property <bool> drag-started: false;
+
+                                        pointer-event(event) => {
+                                            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                                                self.press-start-y = self.mouse-y;
+                                                self.drag-started = false;
+                                            } else if (event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel) {
+                                                if (root.is-dragging) {
+                                                    // Complete the drag
+                                                    if (root.drag-target-index >= 0 && root.drag-target-index != root.drag-from-index) {
+                                                        root.reorder-rule(root.drag-from-index, root.drag-target-index);
+                                                    }
+                                                    root.is-dragging = false;
+                                                    root.drag-from-index = -1;
+                                                    root.drag-target-index = -1;
+                                                } else if (!self.drag-started) {
+                                                    // Normal click - select item
+                                                    root.focused-rule-index = index;
+                                                    root.selected-rule-index = index;
+                                                    root.select-rule(index);
+                                                    rules-focus.focus();
+                                                }
+                                                self.drag-started = false;
+                                            }
+                                        }
+
+                                        moved => {
+                                            if (self.pressed) {
+                                                // Check drag threshold (5px)
+                                                if (!self.drag-started && abs(self.mouse-y - self.press-start-y) > 5px) {
+                                                    self.drag-started = true;
+                                                    root.is-dragging = true;
+                                                    root.drag-from-index = index;
+                                                }
+
+                                                if (root.is-dragging) {
+                                                    // Update drag position for ghost
+                                                    root.drag-current-y = self.mouse-y + index * (root.item-height + Theme.spacing-xs);
+
+                                                    // Calculate target index based on Y position
+                                                    root.drag-target-index = clamp(
+                                                        round(root.drag-current-y / (root.item-height + Theme.spacing-xs)),
+                                                        0,
+                                                        root.rule-list.length
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: Theme.spacing-sm;
+                                        padding-right: Theme.spacing-sm;
+
+                                        Text {
+                                            text: rule;
+                                            color: index == root.selected-rule-index ? Theme.accent : Theme.text-primary;
+                                            font-size: Theme.font-size-sm;
+                                            vertical-alignment: center;
+                                            horizontal-stretch: 1;
+                                            overflow: elide;
+                                        }
+
+                                        Button {
+                                            visible: index == root.selected-rule-index && !root.is-dragging;
+                                            text: "×";
+                                            accessible-label: "Remove rule";
+                                            clicked => { root.remove-rule(index); }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Drop indicator at end of list
+                            Rectangle {
+                                height: root.is-dragging && root.drag-target-index == root.rule-list.length ? 3px : 0;
+                                background: Theme.accent;
+                                border-radius: 1.5px;
+                            }
+
+                            if root.rule-list.length == 0: Text {
+                                text: "No layer rules yet.\nClick + to add one.";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                                horizontal-alignment: center;
+                            }
+                        }
+
+                        // Ghost item while dragging
+                        if root.is-dragging && root.drag-from-index >= 0 && root.drag-from-index < root.rule-list.length: Rectangle {
+                            x: Theme.spacing-sm;
+                            y: root.drag-current-y - root.item-height / 2;
+                            width: list-container.width - Theme.spacing-md;
+                            height: root.item-height;
+                            background: Theme.card-background;
+                            border-radius: Theme.radius-sm;
+                            border-width: 2px;
+                            border-color: Theme.accent;
+                            opacity: 0.9;
+
+                            HorizontalLayout {
+                                padding-left: Theme.spacing-sm;
+                                padding-right: Theme.spacing-sm;
+
+                                Text {
+                                    text: root.rule-list[root.drag-from-index];
+                                    color: Theme.accent;
+                                    font-size: Theme.font-size-sm;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Rule editor panel
+        if root.selected-rule-index >= 0: Rectangle {
+            horizontal-stretch: 1;
+
+            ScrollView {
+                VerticalLayout {
+                    alignment: start;
+            spacing: Theme.spacing-lg;
+                    padding-right: Theme.spacing-md;
+
+                    // Rule name
+                    SettingsSection {
+                        title: "RULE SETTINGS";
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            SettingRow {
+                                label: "Rule name";
+                                description: "Display name for this rule";
+
+                                LineEdit {
+                                    width: 200px;
+                                    text: root.current-rule-name;
+                                    edited(value) => {
+                                        root.current-rule-name = value;
+                                        root.rule-name-changed(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Match criteria
+                    SettingsSection {
+                        title: "MATCH CRITERIA";
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            Text {
+                                text: "Rule applies if ANY match criteria is satisfied";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                                wrap: word-wrap;
+                            }
+
+                            // Match list with add/remove
+                            HorizontalLayout {
+                                spacing: Theme.spacing-sm;
+                                height: 28px;
+
+                                Text {
+                                    text: "Match entries:";
+                                    color: Theme.text-secondary;
+                                    font-size: Theme.font-size-sm;
+                                    vertical-alignment: center;
+                                }
+
+                                Rectangle { horizontal-stretch: 1; }
+
+                                Button {
+                                    text: "+";
+                                    accessible-label: "Add match criteria";
+                                    clicked => { root.add-match(); }
+                                }
+
+                                if root.matches-count > 1: Button {
+                                    text: "-";
+                                    accessible-label: "Remove selected match criteria";
+                                    clicked => { root.remove-match(root.selected-match-index); }
+                                }
+                            }
+
+                            // Match selector (show as small clickable chips/buttons)
+                            if root.matches-count > 0: HorizontalLayout {
+                                spacing: Theme.spacing-xs;
+
+                                for match-label[idx] in root.matches-list : Rectangle {
+                                    height: 28px;
+                                    min-width: 60px;
+                                    background: idx == root.selected-match-index ? Theme.accent : Theme.background;
+                                    border-radius: Theme.radius-sm;
+                                    border-width: 1px;
+                                    border-color: idx == root.selected-match-index ? Theme.accent : Theme.border;
+
+                                    TouchArea {
+                                        accessible-role: button;
+                                        accessible-label: "Select match criteria " + (idx + 1);
+
+                                        clicked => {
+                                            root.selected-match-index = idx;
+                                            root.select-match(idx);
+                                        }
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: Theme.spacing-sm;
+                                        padding-right: Theme.spacing-sm;
+                                        alignment: center;
+
+                                        Text {
+                                            text: "Match " + (idx + 1);
+                                            color: idx == root.selected-match-index ? #ffffff : Theme.text-primary;
+                                            font-size: Theme.font-size-sm;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Current match fields
+                            SettingRow {
+                                label: "Namespace";
+                                description: "Layer-shell namespace (regex supported)";
+
+                                LineEdit {
+                                    width: 200px;
+                                    text: root.current-match-namespace;
+                                    placeholder-text: "e.g., waybar";
+                                    edited(value) => {
+                                        root.current-match-namespace = value;
+                                        root.match-namespace-changed(value);
+                                    }
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Filter by startup state";
+                                description: "Only match layers at startup or after";
+                                checked: root.current-match-has-at-startup;
+                                toggled(val) => {
+                                    root.current-match-has-at-startup = val;
+                                    root.match-at-startup-has-toggled(val);
+                                }
+                            }
+
+                            if root.current-match-has-at-startup: ToggleRow {
+                                label: "At startup";
+                                description: "Match only layers created at compositor startup";
+                                checked: root.current-match-at-startup;
+                                toggled(val) => {
+                                    root.current-match-at-startup = val;
+                                    root.match-at-startup-toggled(val);
+                                }
+                            }
+                        }
+                    }
+
+                    // Visual properties
+                    SettingsSection {
+                        title: "VISUAL PROPERTIES";
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            ToggleRow {
+                                label: "Custom opacity";
+                                description: "Set layer transparency";
+                                checked: root.current-has-opacity;
+                                toggled(val) => {
+                                    root.current-has-opacity = val;
+                                    root.opacity-toggled(val);
+                                }
+                            }
+
+                            if root.current-has-opacity: SliderRow {
+                                label: "Opacity";
+                                description: "Layer transparency level";
+                                suffix: "%";
+                                minimum: 0;
+                                maximum: 100;
+                                value: root.current-opacity * 100;
+                                changed(val) => {
+                                    root.current-opacity = val / 100;
+                                    root.opacity-changed(val / 100);
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Geometry corner radius";
+                                description: "Round layer surface corners";
+                                checked: root.current-has-corner-radius;
+                                toggled(val) => {
+                                    root.current-has-corner-radius = val;
+                                    root.corner-radius-toggled(val);
+                                }
+                            }
+
+                            if root.current-has-corner-radius: SliderRow {
+                                label: "Radius";
+                                description: "Corner radius in logical pixels";
+                                suffix: "px";
+                                minimum: 0;
+                                maximum: 32;
+                                value: root.current-corner-radius;
+                                changed(val) => {
+                                    root.current-corner-radius = round(val);
+                                    root.corner-radius-changed(round(val));
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Block from screen capture";
+                                description: "Hide this layer in screen recordings";
+                                checked: root.current-has-block-out-from;
+                                toggled(val) => {
+                                    root.current-has-block-out-from = val;
+                                    root.block-out-from-toggled(val);
+                                }
+                            }
+
+                            if root.current-has-block-out-from: SettingRow {
+                                label: "Block from";
+                                description: "What to block the layer from";
+
+                                ComboBox {
+                                    width: Theme.combobox-width;
+                                    model: ["Screencast", "Screen Capture"];
+                                    current-index: root.current-block-out-from-index;
+                                    selected(text) => {
+                                        root.current-block-out-from-index = self.current-index;
+                                        root.block-out-from-changed(self.current-index);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Shadow settings
+                    SettingsSection {
+                        title: "SHADOW";
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            ToggleRow {
+                                label: "Custom shadow";
+                                description: "Override shadow settings for this layer";
+                                checked: root.current-has-shadow;
+                                toggled(val) => {
+                                    root.current-has-shadow = val;
+                                    root.shadow-toggled(val);
+                                }
+                            }
+
+                            if root.current-has-shadow: VerticalLayout {
+                                spacing: Theme.spacing-sm;
+
+                                ToggleRow {
+                                    label: "Shadow enabled";
+                                    description: "Draw shadow for this layer";
+                                    checked: root.current-shadow-enabled;
+                                    toggled(val) => {
+                                        root.current-shadow-enabled = val;
+                                        root.shadow-enabled-toggled(val);
+                                    }
+                                }
+
+                                if root.current-shadow-enabled: VerticalLayout {
+                                    spacing: Theme.spacing-sm;
+
+                                    SliderRow {
+                                        label: "Softness";
+                                        description: "Shadow blur amount";
+                                        suffix: "";
+                                        minimum: 0;
+                                        maximum: 100;
+                                        value: root.current-shadow-softness;
+                                        changed(val) => {
+                                            root.current-shadow-softness = round(val);
+                                            root.shadow-softness-changed(round(val));
+                                        }
+                                    }
+
+                                    SliderRow {
+                                        label: "Spread";
+                                        description: "Shadow expansion";
+                                        suffix: "";
+                                        minimum: 0;
+                                        maximum: 50;
+                                        value: root.current-shadow-spread;
+                                        changed(val) => {
+                                            root.current-shadow-spread = round(val);
+                                            root.shadow-spread-changed(round(val));
+                                        }
+                                    }
+
+                                    SliderRow {
+                                        label: "Offset X";
+                                        description: "Horizontal shadow offset";
+                                        suffix: "";
+                                        minimum: -50;
+                                        maximum: 50;
+                                        value: root.current-shadow-offset-x;
+                                        changed(val) => {
+                                            root.current-shadow-offset-x = round(val);
+                                            root.shadow-offset-x-changed(round(val));
+                                        }
+                                    }
+
+                                    SliderRow {
+                                        label: "Offset Y";
+                                        description: "Vertical shadow offset";
+                                        suffix: "";
+                                        minimum: -50;
+                                        maximum: 50;
+                                        value: root.current-shadow-offset-y;
+                                        changed(val) => {
+                                            root.current-shadow-offset-y = round(val);
+                                            root.shadow-offset-y-changed(round(val));
+                                        }
+                                    }
+
+                                    ToggleRow {
+                                        label: "Draw behind window";
+                                        description: "Render shadow behind transparent windows";
+                                        checked: root.current-shadow-draw-behind;
+                                        toggled(val) => {
+                                            root.current-shadow-draw-behind = val;
+                                            root.shadow-draw-behind-toggled(val);
+                                        }
+                                    }
+
+                                    ColorPicker {
+                                        label: "Shadow color";
+                                        description: "Active layer shadow color";
+                                        selected-color: root.current-shadow-color;
+                                        hex-value: root.current-shadow-color-hex;
+                                        changed(col) => {
+                                            root.current-shadow-color = col;
+                                            root.shadow-color-changed(col);
+                                        }
+                                    }
+
+                                    ColorPicker {
+                                        label: "Inactive shadow color";
+                                        description: "Inactive layer shadow color";
+                                        selected-color: root.current-shadow-inactive-color;
+                                        hex-value: root.current-shadow-inactive-color-hex;
+                                        changed(col) => {
+                                            root.current-shadow-inactive-color = col;
+                                            root.shadow-inactive-color-changed(col);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Advanced options
+                    SettingsSection {
+                        title: "ADVANCED";
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            ToggleRow {
+                                label: "Place within backdrop";
+                                description: "Position layer within the overview backdrop";
+                                checked: root.current-place-within-backdrop;
+                                toggled(val) => {
+                                    root.current-place-within-backdrop = val;
+                                    root.place-within-backdrop-toggled(val);
+                                }
+                            }
+
+                            ToggleRow {
+                                label: "Baba is float";
+                                description: "Treat this layer as floating (special behavior)";
+                                checked: root.current-baba-is-float;
+                                toggled(val) => {
+                                    root.current-baba-is-float = val;
+                                    root.baba-is-float-toggled(val);
+                                }
+                            }
+                        }
+                    }
+
+                    // Spacer at bottom
+                    Rectangle { height: Theme.spacing-lg; }
+                }
+            }
+        }
+
+        // No selection message
+        if root.selected-rule-index < 0: Rectangle {
+            horizontal-stretch: 1;
+            background: Theme.card-background;
+            border-radius: Theme.radius-md;
+
+            VerticalLayout {
+                alignment: center;
+
+                Text {
+                    text: "Select a rule to edit";
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-md;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: "Or click + to create a new rule";
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: center;
+                }
+
+                Rectangle { height: Theme.spacing-md; }
+
+                Text {
+                    text: "Layer rules apply to layer-shell surfaces\nlike panels, notifications, and widgets.";
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+}

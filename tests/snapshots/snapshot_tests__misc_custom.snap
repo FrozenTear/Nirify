@@ -1,0 +1,11 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Miscellaneous settings - managed by niri-settings-rust
+
+prefer-no-csd
+screenshot-path "~/Pictures/Screenshots"
+hotkey-overlay {
+    skip-at-startup
+}

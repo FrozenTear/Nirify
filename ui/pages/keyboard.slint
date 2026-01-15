@@ -1,0 +1,415 @@
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, Button } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+import { ComboBoxRow } from "../widgets/combobox_row.slint";
+import { ExpandableSection } from "../widgets/expandable_section.slint";
+import { TextInputRow } from "../widgets/text_input_row.slint";
+
+// Keyboard settings page for niri
+export component KeyboardPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Keyboard settings";
+
+    // Device enable/disable
+    in-out property <bool> off: false;
+
+    // Warning dialog state
+    property <bool> show-warning-dialog: false;
+
+    // XKB settings
+    in-out property <string> xkb-layout: "us";
+    in-out property <string> xkb-variant: "";
+    in-out property <string> xkb-model: "";
+    in-out property <string> xkb-rules: "";
+    in-out property <string> xkb-options: "";
+
+    // Repeat settings
+    in-out property <int> repeat-delay: 600;
+    in-out property <int> repeat-rate: 25;
+
+    // Other settings
+    in-out property <bool> numlock: false;
+    in-out property <int> track-layout-index: 0;  // 0=global, 1=window
+
+    // Advanced settings
+    in-out property <string> xkb-file: "";  // Path to custom .xkb keymap file
+
+    // Callbacks
+    callback off-toggled(bool);
+    callback xkb-layout-changed(string);
+    callback xkb-variant-changed(string);
+    callback xkb-model-changed(string);
+    callback xkb-rules-changed(string);
+    callback xkb-options-changed(string);
+    callback repeat-delay-changed(int);
+    callback repeat-rate-changed(int);
+    callback numlock-toggled(bool);
+    callback track-layout-changed(int);
+    callback xkb-file-changed(string);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Device Control Section
+            SettingsSection {
+                title: "DEVICE CONTROL";
+                accent-color: Theme.accent-input;
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Disable keyboard";
+                        description: "Turn off the keyboard device entirely (WARNING: May lock you out!)";
+                        checked: root.off;
+                        toggled(val) => {
+                            if val {
+                                // Show warning dialog before enabling
+                                root.show-warning-dialog = true;
+                            } else {
+                                root.off = false;
+                                root.off-toggled(false);
+                            }
+                        }
+                    }
+
+                    // Warning message when disabled
+                    if root.off: Rectangle {
+                        background: Theme.error.with-alpha(0.15);
+                        border-radius: Theme.radius-sm;
+                        height: warning-text.preferred-height + Theme.spacing-md;
+
+                        warning-text := Text {
+                            x: Theme.spacing-sm;
+                            y: Theme.spacing-xs;
+                            width: parent.width - 2 * Theme.spacing-sm;
+                            text: "Keyboard is disabled! You may not be able to use the keyboard until you re-enable it or restart niri.";
+                            color: Theme.error;
+                            font-size: Theme.font-size-sm;
+                            wrap: word-wrap;
+                            font-weight: 500;
+                        }
+                    }
+                }
+            }
+
+            // XKB Layout Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "KEYBOARD LAYOUT";
+                accent-color: Theme.accent-input;
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Configure XKB keyboard layout settings";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                        accessible-role: text;
+                    }
+
+                    SettingRow {
+                        label: "Layout";
+                        description: "Keyboard layout (e.g., us, de, fr)";
+
+                        LineEdit {
+                            width: Theme.input-width;
+                            text: root.xkb-layout;
+                            placeholder-text: "us";
+
+                            accessible-role: text-input;
+                            accessible-label: "Keyboard layout";
+                            accessible-description: "Enter XKB layout code";
+
+                            edited(value) => {
+                                root.xkb-layout = value;
+                                root.xkb-layout-changed(value);
+                            }
+                        }
+                    }
+
+                    SettingRow {
+                        label: "Variant";
+                        description: "Layout variant (optional)";
+
+                        LineEdit {
+                            width: Theme.input-width;
+                            text: root.xkb-variant;
+                            placeholder-text: "None";
+
+                            accessible-role: text-input;
+                            accessible-label: "Layout variant";
+                            accessible-description: "Enter XKB variant";
+
+                            edited(value) => {
+                                root.xkb-variant = value;
+                                root.xkb-variant-changed(value);
+                            }
+                        }
+                    }
+
+                    SettingRow {
+                        label: "Model";
+                        description: "Keyboard model (optional, e.g., pc104)";
+
+                        LineEdit {
+                            width: Theme.input-width;
+                            text: root.xkb-model;
+                            placeholder-text: "None";
+
+                            accessible-role: text-input;
+                            accessible-label: "Keyboard model";
+                            accessible-description: "Enter XKB model";
+
+                            edited(value) => {
+                                root.xkb-model = value;
+                                root.xkb-model-changed(value);
+                            }
+                        }
+                    }
+
+                    SettingRow {
+                        label: "Rules";
+                        description: "XKB rules file (optional)";
+
+                        LineEdit {
+                            width: Theme.input-width;
+                            text: root.xkb-rules;
+                            placeholder-text: "None";
+
+                            accessible-role: text-input;
+                            accessible-label: "XKB rules";
+                            accessible-description: "Enter XKB rules file";
+
+                            edited(value) => {
+                                root.xkb-rules = value;
+                                root.xkb-rules-changed(value);
+                            }
+                        }
+                    }
+
+                    SettingRow {
+                        label: "Options";
+                        description: "XKB options (e.g., ctrl:nocaps)";
+
+                        LineEdit {
+                            width: Theme.input-width-wide;
+                            text: root.xkb-options;
+                            placeholder-text: "None";
+
+                            accessible-role: text-input;
+                            accessible-label: "XKB options";
+                            accessible-description: "Enter comma-separated XKB options";
+
+                            edited(value) => {
+                                root.xkb-options = value;
+                                root.xkb-options-changed(value);
+                            }
+                        }
+                    }
+
+                    ComboBoxRow {
+                        label: "Track layout";
+                        description: "How to track keyboard layout changes";
+                        model: ["Global", "Per window"];
+                        current-index: root.track-layout-index;
+                        selected(idx) => {
+                            root.track-layout-index = idx;
+                            root.track-layout-changed(idx);
+                        }
+                    }
+                }
+            }
+
+            // Key Repeat Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "KEY REPEAT";
+                accent-color: Theme.accent-input;
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    SliderRow {
+                        label: "Repeat delay";
+                        description: "Delay before key starts repeating";
+                        suffix: "ms";
+                        minimum: 100;
+                        maximum: 2000;
+                        value: root.repeat-delay;
+                        changed(val) => {
+                            root.repeat-delay = round(val);
+                            root.repeat-delay-changed(round(val));
+                        }
+                    }
+
+                    SliderRow {
+                        label: "Repeat rate";
+                        description: "Characters per second when repeating";
+                        suffix: "/s";
+                        minimum: 1;
+                        maximum: 100;
+                        value: root.repeat-rate;
+                        changed(val) => {
+                            root.repeat-rate = round(val);
+                            root.repeat-rate-changed(round(val));
+                        }
+                    }
+                }
+            }
+
+            // Other Settings Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "OTHER";
+                accent-color: Theme.accent-input;
+
+                ToggleRow {
+                    label: "Enable NumLock on startup";
+                    description: "Turn on NumLock when niri starts";
+                    checked: root.numlock;
+                    toggled(val) => {
+                        root.numlock = val;
+                        root.numlock-toggled(val);
+                    }
+                }
+            }
+
+            // Advanced Settings Section (collapsible, hidden when disabled)
+            if !off: ExpandableSection {
+                title: "Advanced";
+                description: "Custom keymap configuration";
+                expanded: false;
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    TextInputRow {
+                        label: "Custom keymap file";
+                        description: "Path to a .xkb file (overrides layout, variant, and options)";
+                        placeholder: "~/.config/keymap.xkb";
+                        text-value: root.xkb-file;
+                        text-changed(val) => {
+                            root.xkb-file = val;
+                            root.xkb-file-changed(val);
+                        }
+                    }
+
+                    Text {
+                        text: "When set, this file overrides the layout, variant, and options settings above.";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-xs;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle {
+                height: Theme.spacing-lg;
+            }
+        }
+    }
+
+    // Warning dialog for disabling keyboard
+    if show-warning-dialog: Rectangle {
+        background: #00000080;
+
+        TouchArea {
+            clicked => {
+                root.show-warning-dialog = false;
+            }
+        }
+
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: min(450px, parent.width - 40px);
+            height: dialog-content.preferred-height + 2 * Theme.spacing-lg;
+            background: Theme.card-background;
+            border-radius: Theme.radius-lg;
+            drop-shadow-blur: 20px;
+            drop-shadow-color: #00000040;
+
+            TouchArea { }
+
+            dialog-content := VerticalLayout {
+                padding: Theme.spacing-lg;
+                spacing: Theme.spacing-md;
+
+                HorizontalLayout {
+                    spacing: Theme.spacing-md;
+                    alignment: start;
+
+                    Rectangle {
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 20px;
+                        background: Theme.warning;
+
+                        Text {
+                            text: "!";
+                            color: white;
+                            font-size: 24px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Text {
+                        text: "Disable Keyboard?";
+                        color: Theme.text-primary;
+                        font-size: Theme.font-size-xl;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: "Disabling the keyboard will prevent all keyboard input. You will not be able to type, use shortcuts, or control niri with the keyboard until you re-enable it or restart niri.";
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size-md;
+                    wrap: word-wrap;
+                    horizontal-stretch: 1;
+                }
+
+                Text {
+                    text: "Make sure you have an alternative way to control your system (mouse, touchpad, or SSH access) before proceeding.";
+                    color: Theme.warning;
+                    font-size: Theme.font-size-sm;
+                    wrap: word-wrap;
+                    horizontal-stretch: 1;
+                    font-weight: 500;
+                }
+
+                HorizontalLayout {
+                    spacing: Theme.spacing-sm;
+                    alignment: end;
+
+                    Button {
+                        text: "Cancel";
+                        clicked => {
+                            root.show-warning-dialog = false;
+                        }
+                    }
+
+                    Button {
+                        text: "Disable Keyboard";
+                        clicked => {
+                            root.off = true;
+                            root.off-toggled(true);
+                            root.show-warning-dialog = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

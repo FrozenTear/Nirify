@@ -1,0 +1,200 @@
+// Base setting row component
+// Provides common styling and layout for all setting row widgets
+
+import { Theme } from "../styles.slint";
+
+// Base component for setting rows with consistent styling
+// Use @children slot to place controls on the right side
+export component BaseSettingRow inherits Rectangle {
+    in property <string> label;
+    in property <string> description;
+    in property <length> row-min-height: Theme.row-height-compact;
+    // When true, TouchArea covers entire row (for toggle rows)
+    // When false, TouchArea only covers label area (for slider/input rows)
+    in property <bool> full-row-clickable: false;
+    // Mouse cursor for the touch area
+    in property <MouseCursor> hover-cursor: default;
+
+    // Expose hover state for child components
+    out property <bool> has-hover: full-row-touch.has-hover || label-touch.has-hover;
+    out property <bool> is-pressed: full-row-touch.pressed;
+
+    // Callback when the row is clicked (only used when full-row-clickable is true)
+    callback clicked();
+
+    // Prevent vertical stretching
+    vertical-stretch: 0;
+
+    min-height: row-min-height;
+    background: is-pressed ? Theme.surface-elevated.with-alpha(0.7) :
+                has-hover ? Theme.surface-elevated.with-alpha(0.4) : transparent;
+    border-radius: Theme.radius-md;
+    border-width: has-hover ? 1px : 0px;
+    border-color: Theme.border.with-alpha(0.3);
+
+    animate background { duration: Theme.duration-fast; easing: ease-out; }
+    animate border-width { duration: Theme.duration-fast; easing: ease-out; }
+
+    // Full row touch area (active when full-row-clickable is true)
+    full-row-touch := TouchArea {
+        enabled: full-row-clickable;
+        mouse-cursor: full-row-clickable ? hover-cursor : default;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Theme.spacing-sm;
+        padding-right: Theme.spacing-sm;
+        spacing: Theme.spacing-md;
+
+        // Label section with optional hover detection
+        label-touch := TouchArea {
+            enabled: !full-row-clickable;
+            horizontal-stretch: 1;
+            mouse-cursor: default;
+
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+
+                Text {
+                    text: root.label;
+                    color: Theme.text-primary;
+                    font-size: Theme.font-size-md;
+                }
+
+                if root.description != "": Text {
+                    text: root.description;
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-sm;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        // Control section - populated by child components via @children
+        @children
+    }
+}
+
+// Label section component for slider rows
+// Provides consistent label/description styling with hover detection
+component SliderRowLabelSection {
+    in property <string> label;
+    in property <string> description;
+
+    // Expose hover state to parent
+    out property <bool> has-hover: touch.has-hover;
+
+    horizontal-stretch: 1;
+
+    touch := TouchArea {
+        mouse-cursor: default;
+
+        VerticalLayout {
+            alignment: center;
+
+            Text {
+                text: label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-md;
+            }
+
+            if description != "": Text {
+                text: description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-sm;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+// Styled value pill for slider value display
+export component SliderValueDisplay inherits Rectangle {
+    in property <string> value-text;
+    in property <color> accent-color: Theme.accent;
+    in property <bool> use-accent-style: true;
+
+    width: Theme.value-display-width + 8px;
+    height: 28px;
+    background: use-accent-style ? accent-color.with-alpha(0.15) : Theme.background;
+    border-radius: use-accent-style ? Theme.radius-md : Theme.radius-sm;
+    border-width: use-accent-style ? 1px : 0px;
+    border-color: accent-color.with-alpha(0.3);
+
+    accessible-role: text;
+    accessible-label: "Current value: " + value-text;
+
+    Text {
+        text: value-text;
+        color: use-accent-style ? accent-color : Theme.text-primary;
+        font-size: Theme.font-size-sm;
+        font-weight: use-accent-style ? 500 : 400;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// Base component for slider-style rows with vertical layout
+// Has label/value row on top, slider slot below via @children
+export component BaseSliderRow inherits Rectangle {
+    in property <string> label;
+    in property <string> description;
+    in property <length> row-min-height: 64px;
+    in property <string> value-text: "";
+    in property <color> accent-color: Theme.accent;
+    // Set to false for simple value display (percentage slider style)
+    in property <bool> use-accent-value-style: true;
+
+    // Expose hover state for child components
+    out property <bool> has-hover: label-section.has-hover;
+
+    // Prevent vertical stretching
+    vertical-stretch: 0;
+
+    min-height: row-min-height;
+    background: has-hover ? Theme.surface-elevated.with-alpha(0.4) : transparent;
+    border-radius: Theme.radius-md;
+    border-width: has-hover ? 1px : 0px;
+    border-color: Theme.border.with-alpha(0.3);
+
+    animate background { duration: Theme.duration-fast; easing: ease-out; }
+    animate border-width { duration: Theme.duration-fast; easing: ease-out; }
+
+    VerticalLayout {
+        padding: Theme.spacing-sm;
+        spacing: Theme.spacing-xs;
+
+        HorizontalLayout {
+            spacing: Theme.spacing-md;
+
+            // Label area with hover detection (doesn't block slider)
+            label-section := SliderRowLabelSection {
+                label: root.label;
+                description: root.description;
+            }
+
+            // Fixed-width value display column (aligned with other controls)
+            Rectangle {
+                width: Theme.control-column-width;
+                background: transparent;
+
+                HorizontalLayout {
+                    alignment: end;
+
+                    SliderValueDisplay {
+                        value-text: root.value-text;
+                        accent-color: root.accent-color;
+                        use-accent-style: root.use-accent-value-style;
+                    }
+                }
+            }
+        }
+
+        // Slider slot - populated by child components via @children
+        @children
+    }
+}

@@ -1,0 +1,15 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Named workspaces - managed by niri-settings-rust
+
+// Workspaces declared here will always exist.
+
+// No named workspaces configured yet.
+// Add workspaces through the UI or manually here.
+// Example:
+// workspace "browser"
+// workspace "coding" {
+//     open-on-output "DP-1"
+// }

@@ -1,0 +1,206 @@
+import { Theme } from "../styles.slint";
+import { ScrollView } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+import { PercentageSliderRow } from "../widgets/percentage_slider_row.slint";
+import { ColorPicker } from "../widgets/color_picker.slint";
+
+// Overview settings page for niri
+export component OverviewPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Overview settings";
+
+    // Zoom level (0.1 to 1.0)
+    in-out property <float> zoom: 0.5;
+
+    // Backdrop color (optional)
+    in-out property <bool> backdrop-enabled: false;
+    in-out property <color> backdrop-color: #000000;
+    in-out property <string> backdrop-hex: "#000000";
+
+    // Phase 8: Workspace shadow
+    in-out property <bool> workspace-shadow-enabled: false;
+    in-out property <float> workspace-shadow-softness: 30;
+    in-out property <float> workspace-shadow-spread: 10;
+    in-out property <float> workspace-shadow-offset-x: 0;
+    in-out property <float> workspace-shadow-offset-y: 5;
+    in-out property <color> workspace-shadow-color: #00000080;
+    in-out property <string> workspace-shadow-color-hex: "#00000080";
+
+    // Callbacks
+    callback zoom-changed(float);
+    callback backdrop-toggled(bool);
+    callback backdrop-color-changed(color);
+
+    // Phase 8 callbacks
+    callback workspace-shadow-toggled(bool);
+    callback workspace-shadow-softness-changed(float);
+    callback workspace-shadow-spread-changed(float);
+    callback workspace-shadow-offset-x-changed(float);
+    callback workspace-shadow-offset-y-changed(float);
+    callback workspace-shadow-color-changed(color);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Overview Zoom Section
+            SettingsSection {
+                title: "OVERVIEW APPEARANCE";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Configure how the workspace overview looks when activated";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                        accessible-role: text;
+                    }
+
+                    PercentageSliderRow {
+                        label: "Zoom level";
+                        description: "Scale of windows in the overview (lower = more zoomed out)";
+                        minimum: 10;
+                        maximum: 100;
+                        value: root.zoom;
+                        changed(val) => {
+                            root.zoom = val;
+                            root.zoom-changed(val);
+                        }
+                    }
+                }
+            }
+
+            // Backdrop Section
+            SettingsSection {
+                title: "BACKDROP";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Custom backdrop color";
+                        description: "Use a custom color behind the overview instead of default";
+                        checked: root.backdrop-enabled;
+                        toggled(val) => {
+                            root.backdrop-enabled = val;
+                            root.backdrop-toggled(val);
+                        }
+                    }
+
+                    if root.backdrop-enabled: ColorPicker {
+                        label: "Backdrop color";
+                        description: "Color shown behind windows in overview";
+                        selected-color: root.backdrop-color;
+                        hex-value: root.backdrop-hex;
+                        changed(col) => {
+                            root.backdrop-color = col;
+                            root.backdrop-color-changed(col);
+                        }
+                    }
+                }
+            }
+
+            // Phase 8: Workspace Shadow Section
+            SettingsSection {
+                title: "WORKSPACE SHADOW";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Configure the shadow appearance of workspaces in the overview";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+
+                    ToggleRow {
+                        label: "Enable workspace shadow";
+                        description: "Show a shadow around workspaces in the overview";
+                        checked: root.workspace-shadow-enabled;
+                        toggled(val) => {
+                            root.workspace-shadow-enabled = val;
+                            root.workspace-shadow-toggled(val);
+                        }
+                    }
+
+                    if root.workspace-shadow-enabled: VerticalLayout {
+                        spacing: Theme.spacing-sm;
+
+                        SliderRow {
+                            label: "Softness";
+                            description: "How blurred the shadow edge is";
+                            minimum: 0;
+                            maximum: 100;
+                            value: root.workspace-shadow-softness;
+                            changed(val) => {
+                                root.workspace-shadow-softness = val;
+                                root.workspace-shadow-softness-changed(val);
+                            }
+                        }
+
+                        SliderRow {
+                            label: "Spread";
+                            description: "How far the shadow extends";
+                            minimum: 0;
+                            maximum: 50;
+                            value: root.workspace-shadow-spread;
+                            changed(val) => {
+                                root.workspace-shadow-spread = val;
+                                root.workspace-shadow-spread-changed(val);
+                            }
+                        }
+
+                        SliderRow {
+                            label: "Offset X";
+                            description: "Horizontal shadow offset";
+                            minimum: -50;
+                            maximum: 50;
+                            value: root.workspace-shadow-offset-x;
+                            changed(val) => {
+                                root.workspace-shadow-offset-x = val;
+                                root.workspace-shadow-offset-x-changed(val);
+                            }
+                        }
+
+                        SliderRow {
+                            label: "Offset Y";
+                            description: "Vertical shadow offset";
+                            minimum: -50;
+                            maximum: 50;
+                            value: root.workspace-shadow-offset-y;
+                            changed(val) => {
+                                root.workspace-shadow-offset-y = val;
+                                root.workspace-shadow-offset-y-changed(val);
+                            }
+                        }
+
+                        ColorPicker {
+                            label: "Shadow color";
+                            description: "Color of the workspace shadow (with alpha)";
+                            selected-color: root.workspace-shadow-color;
+                            hex-value: root.workspace-shadow-color-hex;
+                            changed(col) => {
+                                root.workspace-shadow-color = col;
+                                root.workspace-shadow-color-changed(col);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle {
+                height: Theme.spacing-lg;
+            }
+        }
+    }
+}

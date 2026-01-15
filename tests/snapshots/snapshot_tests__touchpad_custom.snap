@@ -1,0 +1,21 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Touchpad settings - managed by niri-settings-rust
+
+input {
+    touchpad {
+        tap
+        dwt
+        dwtp
+        drag true
+        natural-scroll
+        accel-speed 0.30
+        accel-profile "adaptive"
+        scroll-factor 1.00
+        tap-button-map "left-right-middle"
+        click-method "clickfinger"
+        scroll-method "two-finger"
+    }
+}

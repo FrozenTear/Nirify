@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Niri Settings
+Comment=Native settings application for the niri Wayland compositor
+Exec=niri-settings
+Type=Application
+Icon=niri-settings
+Categories=Settings;DesktopSettings;
+Keywords=niri;wayland;compositor;settings;configuration;
+StartupWMClass=niri-settings

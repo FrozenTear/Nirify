@@ -1,0 +1,336 @@
+import { Theme } from "../styles.slint";
+import { ScrollView } from "std-widgets.slint";
+import { SettingsSection, SettingRow } from "../widgets/section.slint";
+import { ToggleRow } from "../widgets/toggle_row.slint";
+import { SliderRow } from "../widgets/slider_row.slint";
+import { ComboBoxRow } from "../widgets/combobox_row.slint";
+import { PercentageSliderRow } from "../widgets/percentage_slider_row.slint";
+import { IntegerInputRow } from "../widgets/integer_input_row.slint";
+
+// Touchpad settings page for niri
+export component TouchpadPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Touchpad settings";
+
+    // Device enable/disable
+    in-out property <bool> off: false;
+
+    // Tap settings
+    in-out property <bool> tap: true;
+    in-out property <int> tap-button-map-index: 0;  // 0=LRM, 1=LMR
+
+    // Scroll settings
+    in-out property <bool> natural-scroll: true;
+    in-out property <int> scroll-method-index: 0;  // 0=TwoFinger, 1=Edge, 2=OnButtonDown, 3=NoScroll
+    in-out property <float> scroll-factor: 1.0;
+
+    // Click settings
+    in-out property <int> click-method-index: 0;  // 0=ButtonAreas, 1=Clickfinger
+    in-out property <bool> middle-emulation: false;
+
+    // Handedness
+    in-out property <bool> left-handed: false;
+
+    // Disable while typing settings
+    in-out property <bool> dwt: true;
+    in-out property <bool> dwtp: false;
+
+    // Drag settings
+    in-out property <bool> drag: true;
+    in-out property <bool> drag-lock: false;
+
+    // Acceleration settings
+    in-out property <float> accel-speed: 0.0;
+    in-out property <int> accel-profile-index: 0;  // 0=Adaptive, 1=Flat
+
+    // Other
+    in-out property <bool> disabled-on-external-mouse: false;
+    in-out property <int> scroll-button: 0;  // Button code for on-button-down scrolling
+    in-out property <bool> scroll-button-lock: false;  // Toggle scroll mode instead of holding
+
+    // Callbacks
+    callback off-toggled(bool);
+    callback tap-toggled(bool);
+    callback tap-button-map-changed(int);
+    callback natural-scroll-toggled(bool);
+    callback scroll-method-changed(int);
+    callback scroll-factor-changed(float);
+    callback click-method-changed(int);
+    callback middle-emulation-toggled(bool);
+    callback left-handed-toggled(bool);
+    callback dwt-toggled(bool);
+    callback dwtp-toggled(bool);
+    callback drag-toggled(bool);
+    callback drag-lock-toggled(bool);
+    callback accel-speed-changed(float);
+    callback accel-profile-changed(int);
+    callback disabled-on-external-mouse-toggled(bool);
+    callback scroll-button-changed(int);
+    callback scroll-button-lock-toggled(bool);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Device Control Section
+            SettingsSection {
+                title: "DEVICE CONTROL";
+
+                ToggleRow {
+                    label: "Disable touchpad";
+                    description: "Turn off the touchpad device entirely";
+                    checked: root.off;
+                    toggled(val) => {
+                        root.off = val;
+                        root.off-toggled(val);
+                    }
+                }
+            }
+
+            // Tap Settings Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "TAP TO CLICK";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Enable tap to click";
+                        description: "Tap the touchpad to click";
+                        checked: root.tap;
+                        toggled(val) => {
+                            root.tap = val;
+                            root.tap-toggled(val);
+                        }
+                    }
+
+                    if root.tap: ComboBoxRow {
+                        label: "Tap button mapping";
+                        description: "Button assignment for multi-finger taps";
+                        model: ["Left-Right-Middle", "Left-Middle-Right"];
+                        current-index: root.tap-button-map-index;
+                        selected(idx) => {
+                            root.tap-button-map-index = idx;
+                            root.tap-button-map-changed(idx);
+                        }
+                    }
+                }
+            }
+
+            // Scrolling Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "SCROLLING";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Natural scrolling";
+                        description: "Scroll content in the direction of finger movement";
+                        checked: root.natural-scroll;
+                        toggled(val) => {
+                            root.natural-scroll = val;
+                            root.natural-scroll-toggled(val);
+                        }
+                    }
+
+                    ComboBoxRow {
+                        label: "Scroll method";
+                        description: "How to scroll with the touchpad";
+                        model: ["Two finger", "Edge", "On button down", "Disabled"];
+                        current-index: root.scroll-method-index;
+                        selected(idx) => {
+                            root.scroll-method-index = idx;
+                            root.scroll-method-changed(idx);
+                        }
+                    }
+
+                    PercentageSliderRow {
+                        label: "Scroll factor";
+                        description: "Scroll speed multiplier";
+                        suffix: "x";
+                        minimum: 10;
+                        maximum: 300;
+                        value: root.scroll-factor;
+                        changed(val) => {
+                            root.scroll-factor = val;
+                            root.scroll-factor-changed(val);
+                        }
+                    }
+
+                    // Show scroll button settings when on-button-down scroll method is selected
+                    if scroll-method-index == 2: IntegerInputRow {
+                        label: "Scroll button";
+                        description: "Button code (Middle=274, Side=275)";
+                        minimum: 0;
+                        maximum: 999;
+                        value: root.scroll-button;
+                        changed(val) => { root.scroll-button = val; root.scroll-button-changed(val); }
+                    }
+
+                    if scroll-method-index == 2: ToggleRow {
+                        label: "Lock scroll mode";
+                        description: "Toggle scrolling without holding the button";
+                        checked: root.scroll-button-lock;
+                        toggled(val) => { root.scroll-button-lock = val; root.scroll-button-lock-toggled(val); }
+                    }
+                }
+            }
+
+            // Click Settings Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "CLICK BEHAVIOR";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ComboBoxRow {
+                        label: "Click method";
+                        description: "How physical clicks are detected";
+                        model: ["Button areas", "Clickfinger"];
+                        current-index: root.click-method-index;
+                        selected(idx) => {
+                            root.click-method-index = idx;
+                            root.click-method-changed(idx);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Middle click emulation";
+                        description: "Emulate middle click with left+right click";
+                        checked: root.middle-emulation;
+                        toggled(val) => {
+                            root.middle-emulation = val;
+                            root.middle-emulation-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Left-handed mode";
+                        description: "Swap left and right buttons";
+                        checked: root.left-handed;
+                        toggled(val) => {
+                            root.left-handed = val;
+                            root.left-handed-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Disable While Typing Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "PALM REJECTION";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Disable while typing (DWT)";
+                        description: "Prevents accidental touchpad input while typing on the keyboard";
+                        checked: root.dwt;
+                        toggled(val) => {
+                            root.dwt = val;
+                            root.dwt-toggled(val);
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "Disable while trackpointing (DWTP)";
+                        description: "Prevents accidental touchpad input while using the trackpoint (ThinkPad-style pointing stick)";
+                        checked: root.dwtp;
+                        toggled(val) => {
+                            root.dwtp = val;
+                            root.dwtp-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Drag Settings Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "DRAG";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ToggleRow {
+                        label: "Enable tap-and-drag";
+                        description: "Tap and hold to drag items";
+                        checked: root.drag;
+                        toggled(val) => {
+                            root.drag = val;
+                            root.drag-toggled(val);
+                        }
+                    }
+
+                    if root.drag: ToggleRow {
+                        label: "Drag lock";
+                        description: "Continue dragging after lifting finger briefly";
+                        checked: root.drag-lock;
+                        toggled(val) => {
+                            root.drag-lock = val;
+                            root.drag-lock-toggled(val);
+                        }
+                    }
+                }
+            }
+
+            // Acceleration Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "POINTER ACCELERATION";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    ComboBoxRow {
+                        label: "Acceleration profile";
+                        description: "How pointer speed changes with movement";
+                        model: ["Adaptive", "Flat"];
+                        current-index: root.accel-profile-index;
+                        selected(idx) => {
+                            root.accel-profile-index = idx;
+                            root.accel-profile-changed(idx);
+                        }
+                    }
+
+                    PercentageSliderRow {
+                        label: "Acceleration speed";
+                        description: "Pointer speed adjustment (-1 to 1)";
+                        suffix: "";
+                        minimum: -100;
+                        maximum: 100;
+                        value: root.accel-speed;
+                        changed(val) => {
+                            root.accel-speed = val;
+                            root.accel-speed-changed(val);
+                        }
+                    }
+                }
+            }
+
+            // Other Section (hidden when disabled)
+            if !off: SettingsSection {
+                title: "OTHER";
+
+                ToggleRow {
+                    label: "Disable on external mouse";
+                    description: "Disable touchpad when an external mouse is connected";
+                    checked: root.disabled-on-external-mouse;
+                    toggled(val) => {
+                        root.disabled-on-external-mouse = val;
+                        root.disabled-on-external-mouse-toggled(val);
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle {
+                height: Theme.spacing-lg;
+            }
+        }
+    }
+}

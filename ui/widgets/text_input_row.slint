@@ -1,0 +1,45 @@
+// Text input row widget for string settings
+import { Theme } from "../styles.slint";
+import { LineEdit } from "std-widgets.slint";
+
+export component TextInputRow inherits Rectangle {
+    in property <string> label;
+    in property <string> description;
+    in property <string> placeholder: "";
+    in-out property <string> text-value: "";
+
+    callback text-changed(string);
+
+    background: transparent;
+    min-height: 60px;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+
+        VerticalLayout {
+            spacing: 2px;
+            horizontal-stretch: 1;
+
+            Text {
+                text: label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-md;
+            }
+            Text {
+                text: description;
+                color: Theme.text-secondary;
+                font-size: Theme.font-size-sm;
+            }
+        }
+
+        LineEdit {
+            text <=> root.text-value;
+            placeholder-text: placeholder;
+            width: 200px;
+            accessible-label: label;
+            edited(val) => {
+                root.text-changed(val);
+            }
+        }
+    }
+}

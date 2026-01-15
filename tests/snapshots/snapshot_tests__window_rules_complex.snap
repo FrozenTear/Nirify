@@ -1,0 +1,19 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Window rules - managed by niri-settings-rust
+
+// Terminals floating
+window-rule {
+    match app-id="kitty"
+    match app-id="Alacritty"
+    open-floating true
+}
+
+// Video players fullscreen
+window-rule {
+    match app-id="mpv"
+    open-fullscreen true
+    block-out-from "screencast"
+}

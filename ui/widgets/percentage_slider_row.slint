@@ -1,0 +1,40 @@
+import { Theme } from "../styles.slint";
+import { Slider } from "std-widgets.slint";
+import { BaseSliderRow } from "base_setting_row.slint";
+
+// A slider that displays percentage while storing decimal (0.0-1.0)
+// Automatically handles *100 conversion for display and /100 for storage
+export component PercentageSliderRow inherits BaseSliderRow {
+    in property <string> suffix: "%";
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in property <float> scale-factor: 100;
+    in-out property <float> value: 0;
+
+    callback changed(float);
+
+    // Computed display value (scaled for percentage display)
+    property <float> display-value: root.value * root.scale-factor;
+    // Memoize rounded value to avoid repeated Math.round() calls each frame
+    property <int> rounded-display: Math.round(display-value);
+
+    // Configure base slider row - use simple style (no accent)
+    value-text: "\{rounded-display}" + suffix;
+    use-accent-value-style: false;
+
+    Slider {
+        minimum: root.minimum;
+        maximum: root.maximum;
+        value: root.display-value;
+
+        accessible-label: root.label;
+        accessible-value: "\{root.rounded-display}" + root.suffix;
+        accessible-value-minimum: root.minimum;
+        accessible-value-maximum: root.maximum;
+
+        changed(val) => {
+            root.value = val / root.scale-factor;
+            root.changed(val / root.scale-factor);
+        }
+    }
+}

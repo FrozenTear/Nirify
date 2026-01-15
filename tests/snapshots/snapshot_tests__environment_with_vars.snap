@@ -1,0 +1,12 @@
+---
+source: tests/snapshot_tests.rs
+expression: kdl
+---
+// Environment variables - managed by niri-settings-rust
+
+// These are set for all processes spawned by niri.
+
+environment {
+    GTK_THEME "Adwaita:dark"
+    QT_QPA_PLATFORM "wayland"
+}
