@@ -15,14 +15,14 @@ pub struct AppearanceSettings {
     pub focus_ring_width: f32,
     pub focus_ring_active: ColorOrGradient,
     pub focus_ring_inactive: ColorOrGradient,
-    pub focus_ring_urgent_color: Color, // urgent is always solid color
+    pub focus_ring_urgent: ColorOrGradient,
 
     // Window border
     pub border_enabled: bool,
     pub border_thickness: f32,
     pub border_active: ColorOrGradient,
     pub border_inactive: ColorOrGradient,
-    pub border_urgent_color: Color, // urgent is always solid color
+    pub border_urgent: ColorOrGradient,
 
     // Gaps
     pub gaps_inner: f32,
@@ -50,7 +50,9 @@ impl Default for AppearanceSettings {
             focus_ring_inactive: ColorOrGradient::Color(
                 Color::from_hex(DEFAULT_FOCUS_RING_INACTIVE_COLOR).unwrap_or_default(),
             ),
-            focus_ring_urgent_color: Color::from_hex("#eb6f92").unwrap_or_default(), // Rose Pine gold/urgent
+            focus_ring_urgent: ColorOrGradient::Color(
+                Color::from_hex("#eb6f92").unwrap_or_default(), // Rose Pine urgent
+            ),
             border_enabled: false,
             border_thickness: DEFAULT_BORDER_WIDTH as f32,
             border_active: ColorOrGradient::Color(
@@ -59,7 +61,9 @@ impl Default for AppearanceSettings {
             border_inactive: ColorOrGradient::Color(
                 Color::from_hex(DEFAULT_BORDER_INACTIVE_COLOR).unwrap_or_default(),
             ),
-            border_urgent_color: Color::from_hex("#eb6f92").unwrap_or_default(),
+            border_urgent: ColorOrGradient::Color(
+                Color::from_hex("#eb6f92").unwrap_or_default(),
+            ),
             gaps_inner: DEFAULT_GAP_SIZE as f32,
             gaps_outer: DEFAULT_GAPS_OUTER,
             corner_radius: DEFAULT_CORNER_RADIUS,

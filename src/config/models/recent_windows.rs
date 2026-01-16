@@ -2,6 +2,66 @@
 
 use crate::types::Color;
 
+/// Scope for recent windows filter
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RecentWindowsScope {
+    /// All windows across all outputs and workspaces
+    #[default]
+    All,
+    /// Windows on the current output
+    Output,
+    /// Windows on the current workspace
+    Workspace,
+}
+
+impl RecentWindowsScope {
+    /// Convert to KDL string
+    pub fn to_kdl(&self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::Output => "output",
+            Self::Workspace => "workspace",
+        }
+    }
+
+    /// Parse from KDL string
+    pub fn from_kdl(s: &str) -> Option<Self> {
+        match s {
+            "all" => Some(Self::All),
+            "output" => Some(Self::Output),
+            "workspace" => Some(Self::Workspace),
+            _ => None,
+        }
+    }
+}
+
+/// A keybind for the recent windows switcher
+#[derive(Debug, Clone, PartialEq)]
+pub struct RecentWindowsBind {
+    /// Key combination (e.g., "Alt+Tab")
+    pub key_combo: String,
+    /// Whether this is next-window (true) or previous-window (false)
+    pub is_next: bool,
+    /// Filter to current app's windows
+    pub filter_app_id: bool,
+    /// Scope for the switcher
+    pub scope: Option<RecentWindowsScope>,
+    /// Cooldown in milliseconds
+    pub cooldown_ms: Option<i32>,
+}
+
+impl Default for RecentWindowsBind {
+    fn default() -> Self {
+        Self {
+            key_combo: String::from("Alt+Tab"),
+            is_next: true,
+            filter_app_id: false,
+            scope: None,
+            cooldown_ms: None,
+        }
+    }
+}
+
 /// Highlight style settings for recent windows switcher
 #[derive(Debug, Clone, PartialEq)]
 pub struct RecentWindowsHighlight {
@@ -59,6 +119,8 @@ pub struct RecentWindowsSettings {
     pub highlight: RecentWindowsHighlight,
     /// Preview settings
     pub previews: RecentWindowsPreviews,
+    /// Custom keybinds for the recent windows switcher
+    pub binds: Vec<RecentWindowsBind>,
 }
 
 impl Default for RecentWindowsSettings {
@@ -69,6 +131,7 @@ impl Default for RecentWindowsSettings {
             open_delay_ms: 200,
             highlight: RecentWindowsHighlight::default(),
             previews: RecentWindowsPreviews::default(),
+            binds: vec![],
         }
     }
 }

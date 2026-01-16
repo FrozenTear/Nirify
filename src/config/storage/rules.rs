@@ -19,10 +19,26 @@ fn build_match_line<F>(content: &mut String, builder: F)
 where
     F: FnOnce(&mut Vec<String>),
 {
-    let mut match_parts = Vec::new();
-    builder(&mut match_parts);
-    if !match_parts.is_empty() {
-        content.push_str(&format!("    match {}\n", match_parts.join(" ")));
+    build_match_or_exclude_line(content, "match", builder);
+}
+
+/// Helper to build an exclude line with criteria
+fn build_exclude_line<F>(content: &mut String, builder: F)
+where
+    F: FnOnce(&mut Vec<String>),
+{
+    build_match_or_exclude_line(content, "exclude", builder);
+}
+
+/// Helper to build a match or exclude line with criteria
+fn build_match_or_exclude_line<F>(content: &mut String, directive: &str, builder: F)
+where
+    F: FnOnce(&mut Vec<String>),
+{
+    let mut parts = Vec::new();
+    builder(&mut parts);
+    if !parts.is_empty() {
+        content.push_str(&format!("    {} {}\n", directive, parts.join(" ")));
     }
 }
 
@@ -155,6 +171,21 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
             // Match criteria (multiple matches supported - rule applies if ANY match)
             for m in &rule.matches {
                 build_match_line(&mut content, |parts| {
+                    add_string_criterion(parts, "app-id", &m.app_id);
+                    add_string_criterion(parts, "title", &m.title);
+                    add_bool_criterion(parts, "is-floating", m.is_floating);
+                    add_bool_criterion(parts, "is-active", m.is_active);
+                    add_bool_criterion(parts, "is-focused", m.is_focused);
+                    add_bool_criterion(parts, "is-active-in-column", m.is_active_in_column);
+                    add_bool_criterion(parts, "is-window-cast-target", m.is_window_cast_target);
+                    add_bool_criterion(parts, "is-urgent", m.is_urgent);
+                    add_bool_criterion(parts, "at-startup", m.at_startup);
+                });
+            }
+
+            // Exclude criteria (multiple excludes supported - rule doesn't apply if ANY exclude matches)
+            for m in &rule.excludes {
+                build_exclude_line(&mut content, |parts| {
                     add_string_criterion(parts, "app-id", &m.app_id);
                     add_string_criterion(parts, "title", &m.title);
                     add_bool_criterion(parts, "is-floating", m.is_floating);

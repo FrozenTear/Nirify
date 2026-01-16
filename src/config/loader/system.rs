@@ -5,7 +5,9 @@
 
 use super::helpers::{load_color, read_kdl_file};
 use super::rules::has_flag_in_node;
-use crate::config::models::{EnvironmentVariable, Settings, StartupCommand};
+use crate::config::models::{
+    EnvironmentVariable, RecentWindowsBind, RecentWindowsScope, Settings, StartupCommand,
+};
 use crate::config::parser::{get_f64, get_i64, get_string, has_flag};
 use kdl::KdlDocument;
 use log::debug;
@@ -363,6 +365,69 @@ pub fn parse_recent_windows_from_doc(doc: &KdlDocument, settings: &mut Settings)
                     // max-scale
                     if let Some(v) = get_f64(p_children, &["max-scale"]) {
                         settings.recent_windows.previews.max_scale = v;
+                    }
+                }
+            }
+
+            // binds block
+            if let Some(binds_node) = rw_children.get("binds") {
+                if let Some(b_children) = binds_node.children() {
+                    settings.recent_windows.binds.clear();
+                    for bind_node in b_children.nodes() {
+                        // The node name is the key combo (e.g., "Alt+Tab")
+                        let key_combo = bind_node.name().value().to_string();
+
+                        // Parse cooldown-ms from the bind node entries
+                        let mut cooldown_ms = None;
+                        for entry in bind_node.entries() {
+                            if let Some(name) = entry.name() {
+                                if name.value() == "cooldown-ms" {
+                                    if let Some(v) = entry.value().as_integer() {
+                                        cooldown_ms = Some(v as i32);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Parse the action from children (next-window or previous-window)
+                        if let Some(action_children) = bind_node.children() {
+                            for action_node in action_children.nodes() {
+                                let action_name = action_node.name().value();
+                                let is_next = action_name == "next-window";
+                                let is_prev = action_name == "previous-window";
+
+                                if is_next || is_prev {
+                                    let mut filter_app_id = false;
+                                    let mut scope = None;
+
+                                    for entry in action_node.entries() {
+                                        if let Some(name) = entry.name() {
+                                            match name.value() {
+                                                "filter" => {
+                                                    if let Some(v) = entry.value().as_string() {
+                                                        filter_app_id = v == "app-id";
+                                                    }
+                                                }
+                                                "scope" => {
+                                                    if let Some(v) = entry.value().as_string() {
+                                                        scope = RecentWindowsScope::from_kdl(v);
+                                                    }
+                                                }
+                                                _ => {}
+                                            }
+                                        }
+                                    }
+
+                                    settings.recent_windows.binds.push(RecentWindowsBind {
+                                        key_combo: key_combo.clone(),
+                                        is_next,
+                                        filter_app_id,
+                                        scope,
+                                        cooldown_ms,
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
             }

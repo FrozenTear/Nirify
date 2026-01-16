@@ -327,6 +327,42 @@ pub fn generate_recent_windows_kdl(settings: &RecentWindowsSettings) -> String {
             p.field_i32("max-height", settings.previews.max_height);
             p.field_f32("max-scale", settings.previews.max_scale as f32);
         });
+
+        // Binds (if any custom binds configured)
+        if !settings.binds.is_empty() {
+            b.newline();
+            b.block("binds", |binds| {
+                for bind in &settings.binds {
+                    // Build the bind line: KeyCombo cooldown-ms=50 { action filter="app-id" scope="output"; }
+                    let action = if bind.is_next {
+                        "next-window"
+                    } else {
+                        "previous-window"
+                    };
+
+                    let mut action_parts = vec![action.to_string()];
+                    if bind.filter_app_id {
+                        action_parts.push("filter=\"app-id\"".to_string());
+                    }
+                    if let Some(scope) = bind.scope {
+                        action_parts.push(format!("scope=\"{}\"", scope.to_kdl()));
+                    }
+
+                    let cooldown_part = if let Some(ms) = bind.cooldown_ms {
+                        format!(" cooldown-ms={}", ms)
+                    } else {
+                        String::new()
+                    };
+
+                    binds.raw(&format!(
+                        "{}{}  {{ {}; }}",
+                        bind.key_combo,
+                        cooldown_part,
+                        action_parts.join(" ")
+                    ));
+                }
+            });
+        }
     });
 
     kdl.build()

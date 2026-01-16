@@ -6,7 +6,7 @@ use super::super::parser::{get_f64, get_i64, get_string, has_flag};
 use super::gradient::load_color_or_gradient;
 use super::helpers::{parse_color, read_kdl_file};
 use crate::config::models::{ColumnWidthType, Settings};
-use crate::types::{CenterFocusedColumn, Color, ColorOrGradient};
+use crate::types::{CenterFocusedColumn, ColorOrGradient};
 use kdl::KdlDocument;
 use log::debug;
 use std::path::Path;
@@ -14,7 +14,7 @@ use std::path::Path;
 /// Parsed data for styled features like focus-ring and border.
 ///
 /// These features share a common structure: they can be enabled/disabled,
-/// have a width, active/inactive colors or gradients, and an urgent color.
+/// have a width, active/inactive/urgent colors or gradients.
 struct StyledFeatureData {
     /// Whether the feature is enabled (false if "off" is present)
     enabled: bool,
@@ -24,8 +24,8 @@ struct StyledFeatureData {
     active: Option<ColorOrGradient>,
     /// Inactive color or gradient
     inactive: Option<ColorOrGradient>,
-    /// Urgent color (solid color only)
-    urgent_color: Option<Color>,
+    /// Urgent color or gradient
+    urgent: Option<ColorOrGradient>,
 }
 
 /// Parse a styled feature (focus-ring, border) from a layout's children.
@@ -35,7 +35,7 @@ struct StyledFeatureData {
 /// - Have a "width" property
 /// - Have "active-color" or "active-gradient" for active state
 /// - Have "inactive-color" or "inactive-gradient" for inactive state
-/// - Have "urgent-color" for urgent windows
+/// - Have "urgent-color" or "urgent-gradient" for urgent windows
 ///
 /// Returns `None` if the feature node is not present in the document.
 fn parse_styled_feature(children: &KdlDocument, feature_name: &str) -> Option<StyledFeatureData> {
@@ -49,7 +49,7 @@ fn parse_styled_feature(children: &KdlDocument, feature_name: &str) -> Option<St
             width: None,
             active: None,
             inactive: None,
-            urgent_color: None,
+            urgent: None,
         });
     }
 
@@ -57,17 +57,14 @@ fn parse_styled_feature(children: &KdlDocument, feature_name: &str) -> Option<St
     let width = get_i64(feature_children, &["width"]).map(|w| w as f32);
     let active = load_color_or_gradient(feature_children, "active");
     let inactive = load_color_or_gradient(feature_children, "inactive");
-
-    // Parse urgent color
-    let urgent_color =
-        get_string(feature_children, &["urgent-color"]).and_then(|hex| parse_color(&hex));
+    let urgent = load_color_or_gradient(feature_children, "urgent");
 
     Some(StyledFeatureData {
         enabled: true,
         width,
         active,
         inactive,
-        urgent_color,
+        urgent,
     })
 }
 
@@ -150,8 +147,8 @@ pub fn parse_layout_children(layout_children: &KdlDocument, settings: &mut Setti
         if let Some(inactive) = data.inactive {
             settings.appearance.focus_ring_inactive = inactive;
         }
-        if let Some(urgent) = data.urgent_color {
-            settings.appearance.focus_ring_urgent_color = urgent;
+        if let Some(urgent) = data.urgent {
+            settings.appearance.focus_ring_urgent = urgent;
         }
     }
 
@@ -167,8 +164,8 @@ pub fn parse_layout_children(layout_children: &KdlDocument, settings: &mut Setti
         if let Some(inactive) = data.inactive {
             settings.appearance.border_inactive = inactive;
         }
-        if let Some(urgent) = data.urgent_color {
-            settings.appearance.border_urgent_color = urgent;
+        if let Some(urgent) = data.urgent {
+            settings.appearance.border_urgent = urgent;
         }
     }
 

@@ -39,7 +39,7 @@ pub fn generate_appearance_kdl(
                 fr.field_f32_as_int("width", settings.focus_ring_width);
                 fr.field_color_or_gradient("active", &settings.focus_ring_active);
                 fr.field_color_or_gradient("inactive", &settings.focus_ring_inactive);
-                fr.field_color("urgent-color", &settings.focus_ring_urgent_color);
+                fr.field_color_or_gradient("urgent", &settings.focus_ring_urgent);
             });
         }
 
@@ -50,7 +50,7 @@ pub fn generate_appearance_kdl(
                 br.field_f32_as_int("width", settings.border_thickness);
                 br.field_color_or_gradient("active", &settings.border_active);
                 br.field_color_or_gradient("inactive", &settings.border_inactive);
-                br.field_color("urgent-color", &settings.border_urgent_color);
+                br.field_color_or_gradient("urgent", &settings.border_urgent);
             });
         }
 

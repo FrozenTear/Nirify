@@ -102,19 +102,14 @@ fn sync_appearance(ui: &MainWindow, settings: &Settings) {
         ]
     );
 
-    // Urgent colors (Color type, not ColorOrGradient)
-    sync_color_props!(
-        ui,
-        a,
-        [
-            (focus_ring_urgent_color, set_focus_ring_urgent_color),
-            (border_urgent_color, set_border_urgent_color),
-        ]
-    );
+    // Urgent colors (ColorOrGradient type - use primary_color for UI display)
+    // Note: UI currently only shows color, but the model supports gradients
+    ui.set_focus_ring_urgent_color(color_to_slint_color(a.focus_ring_urgent.primary_color()));
+    ui.set_border_urgent_color(color_to_slint_color(a.border_urgent.primary_color()));
 
     // Urgent color hex values
-    ui.set_focus_ring_urgent_hex(a.focus_ring_urgent_color.to_hex().into());
-    ui.set_border_urgent_hex(a.border_urgent_color.to_hex().into());
+    ui.set_focus_ring_urgent_hex(a.focus_ring_urgent.to_hex().into());
+    ui.set_border_urgent_hex(a.border_urgent.to_hex().into());
 
     // Background color (optional)
     if let Some(ref bg) = a.background_color {

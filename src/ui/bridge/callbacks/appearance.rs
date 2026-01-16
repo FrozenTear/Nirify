@@ -107,37 +107,18 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                 border_inactive,
                 "Border inactive color changed"
             ),
+            (
+                on_focus_ring_urgent_color_changed,
+                focus_ring_urgent,
+                "Focus ring urgent color changed"
+            ),
+            (
+                on_border_urgent_color_changed,
+                border_urgent,
+                "Border urgent color changed"
+            ),
         ]
     );
-
-    // Urgent colors (Color type, not ColorOrGradient)
-    {
-        let settings = settings.clone();
-        let save_manager = Rc::clone(&save_manager);
-        ui.on_focus_ring_urgent_color_changed(move |color| match settings.lock() {
-            Ok(mut s) => {
-                s.appearance.focus_ring_urgent_color = slint_color_to_color(color);
-                debug!("Focus ring urgent color changed");
-                save_manager.mark_dirty(SettingsCategory::Appearance);
-                save_manager.request_save();
-            }
-            Err(e) => error!("Settings lock error: {}", e),
-        });
-    }
-
-    {
-        let settings = settings.clone();
-        let save_manager = Rc::clone(&save_manager);
-        ui.on_border_urgent_color_changed(move |color| match settings.lock() {
-            Ok(mut s) => {
-                s.appearance.border_urgent_color = slint_color_to_color(color);
-                debug!("Border urgent color changed");
-                save_manager.mark_dirty(SettingsCategory::Appearance);
-                save_manager.request_save();
-            }
-            Err(e) => error!("Settings lock error: {}", e),
-        });
-    }
 
     {
         let settings = settings.clone();

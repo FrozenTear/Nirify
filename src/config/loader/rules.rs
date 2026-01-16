@@ -320,6 +320,7 @@ pub fn load_layer_rules(path: &Path, settings: &mut Settings) {
 /// Shared parsing logic used by both file loader and import.
 pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut WindowRule) {
     rule.matches.clear();
+    rule.excludes.clear();
 
     // Parse match criteria
     for child in wr_children.nodes() {
@@ -378,6 +379,62 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
                 }
             }
             rule.matches.push(m);
+        } else if child.name().value() == "exclude" {
+            // Parse exclude criteria (same structure as match)
+            let mut m = WindowRuleMatch::default();
+            for entry in child.entries() {
+                if let Some(name) = entry.name() {
+                    match name.value() {
+                        "app-id" => {
+                            if let Some(v) = entry.value().as_string() {
+                                m.app_id = validate_regex_pattern(v, "window rule exclude app-id");
+                            }
+                        }
+                        "title" => {
+                            if let Some(v) = entry.value().as_string() {
+                                m.title = validate_regex_pattern(v, "window rule exclude title");
+                            }
+                        }
+                        "is-floating" => {
+                            if let Some(v) = entry.value().as_bool() {
+                                m.is_floating = Some(v);
+                            }
+                        }
+                        "is-active" => {
+                            if let Some(v) = entry.value().as_bool() {
+                                m.is_active = Some(v);
+                            }
+                        }
+                        "is-focused" => {
+                            if let Some(v) = entry.value().as_bool() {
+                                m.is_focused = Some(v);
+                            }
+                        }
+                        "is-active-in-column" => {
+                            if let Some(v) = entry.value().as_bool() {
+                                m.is_active_in_column = Some(v);
+                            }
+                        }
+                        "is-window-cast-target" => {
+                            if let Some(v) = entry.value().as_bool() {
+                                m.is_window_cast_target = Some(v);
+                            }
+                        }
+                        "is-urgent" => {
+                            if let Some(v) = entry.value().as_bool() {
+                                m.is_urgent = Some(v);
+                            }
+                        }
+                        "at-startup" => {
+                            if let Some(v) = entry.value().as_bool() {
+                                m.at_startup = Some(v);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            rule.excludes.push(m);
         }
     }
 

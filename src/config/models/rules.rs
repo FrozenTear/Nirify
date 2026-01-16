@@ -182,6 +182,8 @@ pub struct WindowRule {
     pub name: String,
     /// Match criteria (multiple allowed - rule applies if ANY match)
     pub matches: Vec<WindowRuleMatch>,
+    /// Exclude criteria (multiple allowed - rule doesn't apply if ANY exclude matches)
+    pub excludes: Vec<WindowRuleMatch>,
     /// Opening behavior
     pub open_behavior: OpenBehavior,
     /// Window opacity (0.0-1.0, None = default)
@@ -258,6 +260,7 @@ impl Default for WindowRule {
             id: 0,
             name: String::from("New Rule"),
             matches: vec![WindowRuleMatch::default()],
+            excludes: vec![],
             open_behavior: OpenBehavior::Normal,
             opacity: None,
             block_out_from_screencast: false,
