@@ -518,8 +518,8 @@ fn ColorRow(
     on_change: EventHandler<Color>,
 ) -> Element {
     let hex = color.to_hex();
-    let primary = color.primary_color();
-    let bg_style = format!("background-color: rgb({}, {}, {})", primary.r, primary.g, primary.b);
+    // Ensure hex is 7 chars for color input (strip alpha if present)
+    let input_hex = if hex.len() > 7 { &hex[0..7] } else { &hex };
 
     rsx! {
         div { class: "setting-row",
@@ -530,11 +530,14 @@ fn ColorRow(
                 }
             }
             div { class: "color-picker",
-                div {
-                    class: "color-preview",
-                    style: "{bg_style}",
-                    onclick: move |_| {
-                        // TODO: Open color picker dialog
+                input {
+                    r#type: "color",
+                    class: "color-input",
+                    value: "{input_hex}",
+                    oninput: move |e| {
+                        if let Some(new_color) = Color::from_hex(&e.value()) {
+                            on_change.call(new_color);
+                        }
                     }
                 }
                 span { class: "color-hex", "{hex}" }
@@ -552,8 +555,7 @@ fn OptionalColorRow(
 ) -> Element {
     let has_color = color.is_some();
     let hex = color.as_ref().map(|c| c.to_hex()).unwrap_or_else(|| "#1e1e2e".to_string());
-    let primary = color.as_ref().cloned().unwrap_or_else(|| Color { r: 30, g: 30, b: 46, a: 255 });
-    let bg_style = format!("background-color: rgb({}, {}, {})", primary.r, primary.g, primary.b);
+    let input_hex = if hex.len() > 7 { &hex[0..7] } else { &hex };
 
     rsx! {
         div { class: "setting-row",
@@ -575,9 +577,15 @@ fn OptionalColorRow(
                     },
                 }
                 if has_color {
-                    div {
-                        class: "color-preview",
-                        style: "{bg_style}",
+                    input {
+                        r#type: "color",
+                        class: "color-input",
+                        value: "{input_hex}",
+                        oninput: move |e| {
+                            if let Some(new_color) = Color::from_hex(&e.value()) {
+                                on_change.call(Some(new_color));
+                            }
+                        }
                     }
                     span { class: "color-hex", "{hex}" }
                 }

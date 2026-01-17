@@ -411,6 +411,25 @@ select:focus {
     cursor: pointer;
 }
 
+.color-input {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    background: transparent;
+}
+
+.color-input::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-input::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
+}
+
 .color-hex {
     font-family: var(--font-mono);
     font-size: 0.75rem;
