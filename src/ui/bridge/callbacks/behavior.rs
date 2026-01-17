@@ -353,6 +353,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
             match settings.lock() {
                 Ok(mut s) => {
                     let mut needs_model_refresh = false;
+                    let mut affects_appearance = false;
 
                     match id_str.as_str() {
                         "focus_follows_mouse" => {
@@ -372,9 +373,11 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                                 CenterFocusedColumn::Never
                             };
                             needs_model_refresh = true;
+                            affects_appearance = true; // Written to appearance.kdl
                         }
                         "always_center_single_column" => {
                             s.behavior.always_center_single_column = value;
+                            affects_appearance = true; // Written to appearance.kdl
                         }
                         "mod_key_nested_enabled" => {
                             s.behavior.mod_key_nested =
@@ -398,6 +401,11 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     }
 
                     debug!("Behavior toggle {} = {}", id_str, value);
+
+                    // Some behavior settings are written to appearance.kdl
+                    if affects_appearance {
+                        save_manager.mark_dirty(SettingsCategory::Appearance);
+                    }
                     save_manager.mark_dirty(SettingsCategory::Behavior);
                     save_manager.request_save();
                 }
@@ -414,34 +422,45 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
             let id_str = id.to_string();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    let affects_appearance = match id_str.as_str() {
                         "strut_left" => {
                             s.behavior.strut_left =
                                 (value as f32).clamp(STRUT_SIZE_MIN, STRUT_SIZE_MAX);
+                            true
                         }
                         "strut_right" => {
                             s.behavior.strut_right =
                                 (value as f32).clamp(STRUT_SIZE_MIN, STRUT_SIZE_MAX);
+                            true
                         }
                         "strut_top" => {
                             s.behavior.strut_top =
                                 (value as f32).clamp(STRUT_SIZE_MIN, STRUT_SIZE_MAX);
+                            true
                         }
                         "strut_bottom" => {
                             s.behavior.strut_bottom =
                                 (value as f32).clamp(STRUT_SIZE_MIN, STRUT_SIZE_MAX);
+                            true
                         }
                         "default_column_width_fixed" => {
                             s.behavior.default_column_width_fixed =
                                 (value as f32).clamp(COLUMN_FIXED_MIN, COLUMN_FIXED_MAX);
+                            true // Written to appearance.kdl
                         }
                         _ => {
                             debug!("Unknown behavior slider int setting: {}", id_str);
                             return;
                         }
-                    }
+                    };
 
                     debug!("Behavior slider int {} = {}", id_str, value);
+
+                    // Some behavior settings are written to appearance.kdl
+                    // So when they change, we must mark BOTH categories dirty
+                    if affects_appearance {
+                        save_manager.mark_dirty(SettingsCategory::Appearance);
+                    }
                     save_manager.mark_dirty(SettingsCategory::Behavior);
                     save_manager.request_save();
                 }
@@ -458,18 +477,24 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
             let id_str = id.to_string();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    let affects_appearance = match id_str.as_str() {
                         "default_column_width_proportion" => {
                             s.behavior.default_column_width_proportion =
                                 value.clamp(COLUMN_PROPORTION_MIN, COLUMN_PROPORTION_MAX);
+                            true // Written to appearance.kdl
                         }
                         _ => {
                             debug!("Unknown behavior slider float setting: {}", id_str);
                             return;
                         }
-                    }
+                    };
 
                     debug!("Behavior slider float {} = {}", id_str, value);
+
+                    // Some behavior settings are written to appearance.kdl
+                    if affects_appearance {
+                        save_manager.mark_dirty(SettingsCategory::Appearance);
+                    }
                     save_manager.mark_dirty(SettingsCategory::Behavior);
                     save_manager.request_save();
                 }
@@ -488,12 +513,14 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
             match settings.lock() {
                 Ok(mut s) => {
                     let mut needs_model_refresh = false;
+                    let mut affects_appearance = false;
 
                     match id_str.as_str() {
                         "default_column_width_type" => {
                             s.behavior.default_column_width_type =
                                 ColumnWidthType::from_index(index);
                             needs_model_refresh = true;
+                            affects_appearance = true; // Written to appearance.kdl
                         }
                         "mod_key" => {
                             s.behavior.mod_key = ModKey::from_index(index);
@@ -515,6 +542,11 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     }
 
                     debug!("Behavior combo {} = {}", id_str, index);
+
+                    // Some behavior settings are written to appearance.kdl
+                    if affects_appearance {
+                        save_manager.mark_dirty(SettingsCategory::Appearance);
+                    }
                     save_manager.mark_dirty(SettingsCategory::Behavior);
                     save_manager.request_save();
                 }

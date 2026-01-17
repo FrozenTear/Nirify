@@ -256,6 +256,9 @@ fn clone_dirty_categories(
             }
             SettingsCategory::Behavior => {
                 result.behavior = source.behavior.clone();
+                // Behavior contains struts which are written to appearance.kdl
+                // Clone appearance defensively in case appearance.kdl needs regeneration
+                result.appearance = source.appearance.clone();
             }
             SettingsCategory::Keyboard => {
                 result.keyboard = source.keyboard.clone();
