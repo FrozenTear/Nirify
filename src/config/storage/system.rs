@@ -301,9 +301,11 @@ pub fn generate_recent_windows_kdl(settings: &RecentWindowsSettings) -> String {
     kdl.comment("Configures the Alt-Tab window switcher appearance.");
     kdl.newline();
 
-    // If disabled, just output the off flag
+    // If disabled, output the off flag properly
     if settings.off {
-        kdl.raw("recent-windows { off }");
+        kdl.block("recent-windows", |b| {
+            b.flag("off");
+        });
         return kdl.build();
     }
 

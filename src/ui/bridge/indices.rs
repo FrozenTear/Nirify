@@ -40,16 +40,6 @@ pub fn warp_mouse_is_enabled(mode: &WarpMouseMode) -> bool {
     !matches!(mode, WarpMouseMode::Off)
 }
 
-/// Convert bool to WarpMouseMode (true = CenterXY, false = Off)
-#[inline]
-pub fn bool_to_warp_mouse_mode(enabled: bool) -> WarpMouseMode {
-    if enabled {
-        WarpMouseMode::CenterXY
-    } else {
-        WarpMouseMode::Off
-    }
-}
-
 // ============================================================================
 // CENTER FOCUSED COLUMN (Behavior)
 // ============================================================================
@@ -58,14 +48,4 @@ pub fn bool_to_warp_mouse_mode(enabled: bool) -> WarpMouseMode {
 #[inline]
 pub fn center_focused_is_enabled(mode: &CenterFocusedColumn) -> bool {
     !matches!(mode, CenterFocusedColumn::Never)
-}
-
-/// Convert bool to CenterFocusedColumn (true = OnOverflow, false = Never)
-#[inline]
-pub fn bool_to_center_focused_column(enabled: bool) -> CenterFocusedColumn {
-    if enabled {
-        CenterFocusedColumn::OnOverflow
-    } else {
-        CenterFocusedColumn::Never
-    }
 }

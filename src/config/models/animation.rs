@@ -107,7 +107,12 @@ pub enum EasingCurve {
     EaseOutExpo,
     Linear,
     /// Custom cubic-bezier curve with control points (x1, y1, x2, y2)
-    CubicBezier { x1: f64, y1: f64, x2: f64, y2: f64 },
+    CubicBezier {
+        x1: f64,
+        y1: f64,
+        x2: f64,
+        y2: f64,
+    },
 }
 
 impl EasingCurve {

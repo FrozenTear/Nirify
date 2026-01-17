@@ -33,7 +33,9 @@ pub fn generate_layout_extras_kdl(settings: &LayoutExtrasSettings) -> String {
                 s.optional_flag("draw-behind-window", settings.shadow.draw_behind_window);
             });
         } else {
-            b.raw("shadow { off }");
+            b.block("shadow", |s| {
+                s.flag("off");
+            });
         }
 
         // Tab indicator settings
@@ -67,7 +69,9 @@ pub fn generate_layout_extras_kdl(settings: &LayoutExtrasSettings) -> String {
                 );
             });
         } else {
-            b.raw("tab-indicator { off }");
+            b.block("tab-indicator", |t| {
+                t.flag("off");
+            });
         }
 
         // Insert hint settings

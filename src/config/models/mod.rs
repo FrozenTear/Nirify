@@ -125,18 +125,7 @@ impl Settings {
             BORDER_THICKNESS_MAX,
             "border_thickness"
         );
-        clamp_and_log!(
-            self.appearance.gaps_inner,
-            GAP_SIZE_MIN,
-            GAP_SIZE_MAX,
-            "gaps_inner"
-        );
-        clamp_and_log!(
-            self.appearance.gaps_outer,
-            GAP_SIZE_MIN,
-            GAP_SIZE_MAX,
-            "gaps_outer"
-        );
+        clamp_and_log!(self.appearance.gaps, GAP_SIZE_MIN, GAP_SIZE_MAX, "gaps");
         clamp_and_log!(
             self.appearance.corner_radius,
             CORNER_RADIUS_MIN,

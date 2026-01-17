@@ -232,12 +232,16 @@ pub struct WindowRule {
     pub focus_ring_active: Option<ColorOrGradient>,
     /// Focus ring inactive color override
     pub focus_ring_inactive: Option<ColorOrGradient>,
+    /// Focus ring urgent color override
+    pub focus_ring_urgent: Option<ColorOrGradient>,
     /// Border width override
     pub border_width: Option<i32>,
     /// Border active color override
     pub border_active: Option<ColorOrGradient>,
     /// Border inactive color override
     pub border_inactive: Option<ColorOrGradient>,
+    /// Border urgent color override
+    pub border_urgent: Option<ColorOrGradient>,
 
     // Additional dynamic properties
     /// Enable VRR for this window
@@ -285,9 +289,11 @@ impl Default for WindowRule {
             focus_ring_width: None,
             focus_ring_active: None,
             focus_ring_inactive: None,
+            focus_ring_urgent: None,
             border_width: None,
             border_active: None,
             border_inactive: None,
+            border_urgent: None,
             // Additional dynamic properties
             variable_refresh_rate: None,
             default_column_display: None,

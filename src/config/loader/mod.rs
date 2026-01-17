@@ -603,8 +603,7 @@ layout {
         let mut settings = Settings::default();
         load_appearance(&path, &mut settings);
 
-        assert_eq!(settings.appearance.gaps_inner, 24.0);
-        assert_eq!(settings.appearance.gaps_outer, 24.0);
+        assert_eq!(settings.appearance.gaps, 24.0);
         assert_eq!(settings.appearance.focus_ring_width, 6.0);
         assert_eq!(settings.appearance.focus_ring_active.primary_color().r, 255);
         assert!(!settings.appearance.border_enabled);
@@ -684,8 +683,7 @@ animations {
 
         // Create custom settings with non-default values
         let mut original = Settings::default();
-        original.appearance.gaps_inner = 24.0;
-        // Note: gaps_outer is ignored in output since niri uses single gap value
+        original.appearance.gaps = 24.0;
         original.appearance.focus_ring_width = 6.0;
         original.appearance.corner_radius = 16.0;
         original.appearance.border_enabled = false;
@@ -704,9 +702,7 @@ animations {
         let loaded = load_settings(&paths);
 
         // Compare key values (not full equality due to potential rounding)
-        // Note: niri uses a single gap value, so inner and outer become the same
-        assert_eq!(loaded.appearance.gaps_inner, original.appearance.gaps_inner);
-        assert_eq!(loaded.appearance.gaps_outer, original.appearance.gaps_inner);
+        assert_eq!(loaded.appearance.gaps, original.appearance.gaps);
         assert_eq!(
             loaded.appearance.focus_ring_width,
             original.appearance.focus_ring_width
@@ -733,8 +729,7 @@ animations {
         let mut settings = Settings::default();
 
         // Set invalid values
-        settings.appearance.gaps_inner = -100.0;
-        settings.appearance.gaps_outer = 1000.0;
+        settings.appearance.gaps = -100.0;
         settings.appearance.focus_ring_width = 0.0;
         settings.keyboard.repeat_delay = 50;
         settings.mouse.accel_speed = 5.0;
@@ -745,8 +740,7 @@ animations {
         settings.validate();
 
         // Check values are clamped to valid ranges
-        assert_eq!(settings.appearance.gaps_inner, 0.0); // GAP_SIZE_MIN
-        assert_eq!(settings.appearance.gaps_outer, 64.0); // GAP_SIZE_MAX
+        assert_eq!(settings.appearance.gaps, 0.0); // GAP_SIZE_MIN
         assert_eq!(settings.appearance.focus_ring_width, 1.0); // FOCUS_RING_WIDTH_MIN
         assert_eq!(settings.keyboard.repeat_delay, 100); // REPEAT_DELAY_MIN
         assert_eq!(settings.mouse.accel_speed, 1.0); // ACCEL_SPEED_MAX

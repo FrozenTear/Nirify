@@ -86,10 +86,22 @@ pub fn parse_single_animation(children: &KdlDocument) -> SingleAnimationConfig {
                 if let Some(curve_str) = first.value().as_string() {
                     if curve_str == "cubic-bezier" && entries.len() >= 5 {
                         // Parse cubic-bezier control points: curve "cubic-bezier" x1 y1 x2 y2
-                        let x1 = entries.get(1).and_then(|e| e.value().as_float()).unwrap_or(0.25);
-                        let y1 = entries.get(2).and_then(|e| e.value().as_float()).unwrap_or(0.1);
-                        let x2 = entries.get(3).and_then(|e| e.value().as_float()).unwrap_or(0.25);
-                        let y2 = entries.get(4).and_then(|e| e.value().as_float()).unwrap_or(1.0);
+                        let x1 = entries
+                            .get(1)
+                            .and_then(|e| e.value().as_float())
+                            .unwrap_or(0.25);
+                        let y1 = entries
+                            .get(2)
+                            .and_then(|e| e.value().as_float())
+                            .unwrap_or(0.1);
+                        let x2 = entries
+                            .get(3)
+                            .and_then(|e| e.value().as_float())
+                            .unwrap_or(0.25);
+                        let y2 = entries
+                            .get(4)
+                            .and_then(|e| e.value().as_float())
+                            .unwrap_or(1.0);
                         config.easing.curve = EasingCurve::CubicBezier { x1, y1, x2, y2 };
                     } else {
                         // Preset curve
@@ -477,12 +489,32 @@ pub fn parse_output_node_children(o_children: &KdlDocument, output: &mut OutputC
         };
     }
 
-    if let Some(v) = get_string(o_children, &["variable-refresh-rate"]) {
+    // VRR: can be a flag (variable-refresh-rate) or have on-demand=true
+    if has_flag(o_children, &["variable-refresh-rate"]) {
+        output.vrr = VrrMode::On;
+    } else if let Some(v) = get_string(o_children, &["variable-refresh-rate"]) {
         output.vrr = match v.as_str() {
             "on" => VrrMode::On,
             "on-demand" => VrrMode::OnDemand,
             _ => VrrMode::Off,
         };
+    } else if let Some(vrr_node) = o_children.get("variable-refresh-rate") {
+        // Check for on-demand=true attribute syntax
+        for entry in vrr_node.entries() {
+            if let Some(name) = entry.name() {
+                if name.value() == "on-demand" {
+                    if let Some(val) = entry.value().as_bool() {
+                        if val {
+                            output.vrr = VrrMode::OnDemand;
+                        }
+                    }
+                }
+            }
+        }
+        // If no on-demand attribute but node exists, it's On
+        if output.vrr == VrrMode::Off {
+            output.vrr = VrrMode::On;
+        }
     }
 
     if has_flag(o_children, &["focus-at-startup"]) {

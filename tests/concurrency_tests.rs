@@ -162,7 +162,7 @@ fn test_concurrent_settings_modifications() {
                         let mut s = settings.lock().unwrap();
                         match i % 3 {
                             0 => {
-                                s.appearance.gaps_inner = (i * 50 + j) as f32;
+                                s.appearance.gaps = (i * 50 + j) as f32;
                                 tracker.mark(SettingsCategory::Appearance);
                             }
                             1 => {
@@ -198,7 +198,7 @@ fn test_mutex_poisoning_recovery() {
     let settings_clone = Arc::clone(&settings);
     let handle = thread::spawn(move || {
         let mut s = settings_clone.lock().unwrap();
-        s.appearance.gaps_inner = 42.0;
+        s.appearance.gaps = 42.0;
         s.keyboard.repeat_delay = 999;
         panic!("Intentional panic to test poisoning recovery");
     });
@@ -217,7 +217,7 @@ fn test_mutex_poisoning_recovery() {
     };
 
     // Should have the values that were set before the panic
-    assert_eq!(recovered.appearance.gaps_inner, 42.0);
+    assert_eq!(recovered.appearance.gaps, 42.0);
     assert_eq!(recovered.keyboard.repeat_delay, 999);
 }
 
@@ -239,7 +239,7 @@ fn test_concurrent_save_same_file() {
 
             thread::spawn(move || {
                 let mut settings = Settings::default();
-                settings.appearance.gaps_inner = (i * 10) as f32;
+                settings.appearance.gaps = (i * 10) as f32;
 
                 let mut dirty = HashSet::new();
                 dirty.insert(SettingsCategory::Appearance);
@@ -258,9 +258,9 @@ fn test_concurrent_save_same_file() {
     let loaded = load_settings(&paths);
     // Value should be one of the values written (whichever finished last)
     assert!(
-        loaded.appearance.gaps_inner >= 0.0 && loaded.appearance.gaps_inner <= 40.0,
+        loaded.appearance.gaps >= 0.0 && loaded.appearance.gaps <= 40.0,
         "Unexpected gaps value: {}",
-        loaded.appearance.gaps_inner
+        loaded.appearance.gaps
     );
 
     // The file should be valid KDL
@@ -343,7 +343,7 @@ fn test_settings_lock_contention() {
                 for _ in 0..100 {
                     {
                         let mut s = settings.lock().unwrap();
-                        s.appearance.gaps_inner += 0.1;
+                        s.appearance.gaps += 0.1;
                         counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     }
                     // Small yield to increase contention
@@ -362,7 +362,7 @@ fn test_settings_lock_contention() {
     assert_eq!(total, 800, "Expected 800 increments, got {}", total);
 
     // Final value should reflect all increments
-    let final_value = settings.lock().unwrap().appearance.gaps_inner;
+    let final_value = settings.lock().unwrap().appearance.gaps;
     let expected = 16.0 + (800.0 * 0.1); // default + increments
     assert!(
         (final_value - expected).abs() < 0.01,

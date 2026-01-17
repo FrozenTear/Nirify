@@ -16,7 +16,10 @@ fn generate_single_animation_kdl(
 ) -> Option<String> {
     match config.animation_type {
         AnimationType::Default => None, // Don't output, use niri defaults
-        AnimationType::Off => Some(format!("{}{} {{ off }}\n", indent, name)),
+        AnimationType::Off => Some(format!(
+            "{}{} {{\n{}    off\n{}}}\n",
+            indent, name, indent, indent
+        )),
         AnimationType::Spring => {
             let spring = &config.spring;
             Some(format!(
@@ -37,7 +40,10 @@ fn generate_single_animation_kdl(
                 format!("curve \"cubic-bezier\" {} {} {} {}", x1, y1, x2, y2)
             } else {
                 // Preset curve format: curve "ease-out-quad"
-                format!("curve \"{}\"", easing.curve.to_kdl().unwrap_or("ease-out-quad"))
+                format!(
+                    "curve \"{}\"",
+                    easing.curve.to_kdl().unwrap_or("ease-out-quad")
+                )
             };
             Some(format!(
                 "{}{} {{\n{}    duration-ms {}\n{}    {}\n{}}}\n",

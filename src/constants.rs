@@ -63,9 +63,6 @@ pub const DEFAULT_FOCUS_RING_INACTIVE_COLOR: &str = "#505050";
 /// Default inactive border color (gray)
 pub const DEFAULT_BORDER_INACTIVE_COLOR: &str = "#808080";
 
-/// Default outer gaps (pixels)
-pub const DEFAULT_GAPS_OUTER: f32 = 8.0;
-
 /// Default corner radius (pixels)
 pub const DEFAULT_CORNER_RADIUS: f32 = 12.0;
 

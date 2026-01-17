@@ -74,25 +74,21 @@ proptest! {
     /// Settings::validate() should always produce values within valid ranges
     #[test]
     fn validate_clamps_appearance_values(
-        gaps_inner in -1000.0f32..1000.0,
-        gaps_outer in -1000.0f32..1000.0,
+        gaps in -1000.0f32..1000.0,
         focus_ring_width in -100.0f32..100.0,
         border_thickness in -100.0f32..100.0,
         corner_radius in -100.0f32..100.0,
     ) {
         let mut settings = Settings::default();
-        settings.appearance.gaps_inner = gaps_inner;
-        settings.appearance.gaps_outer = gaps_outer;
+        settings.appearance.gaps = gaps;
         settings.appearance.focus_ring_width = focus_ring_width;
         settings.appearance.border_thickness = border_thickness;
         settings.appearance.corner_radius = corner_radius;
 
         settings.validate();
 
-        prop_assert!(settings.appearance.gaps_inner >= GAP_SIZE_MIN);
-        prop_assert!(settings.appearance.gaps_inner <= GAP_SIZE_MAX);
-        prop_assert!(settings.appearance.gaps_outer >= GAP_SIZE_MIN);
-        prop_assert!(settings.appearance.gaps_outer <= GAP_SIZE_MAX);
+        prop_assert!(settings.appearance.gaps >= GAP_SIZE_MIN);
+        prop_assert!(settings.appearance.gaps <= GAP_SIZE_MAX);
         prop_assert!(settings.appearance.focus_ring_width >= FOCUS_RING_WIDTH_MIN);
         prop_assert!(settings.appearance.focus_ring_width <= FOCUS_RING_WIDTH_MAX);
         prop_assert!(settings.appearance.border_thickness >= BORDER_THICKNESS_MIN);
@@ -176,8 +172,7 @@ proptest! {
     /// Generated appearance KDL should always be valid KDL
     #[test]
     fn appearance_kdl_is_valid(
-        gaps_inner in 0.0f32..64.0,
-        gaps_outer in 0.0f32..64.0,
+        gaps in 0.0f32..64.0,
         focus_ring_width in 1.0f32..16.0,
         border_thickness in 1.0f32..8.0,
         corner_radius in 0.0f32..32.0,
@@ -185,8 +180,7 @@ proptest! {
         border_enabled in any::<bool>(),
     ) {
         let appearance = AppearanceSettings {
-            gaps_inner,
-            gaps_outer,
+            gaps,
             focus_ring_width,
             border_thickness,
             corner_radius,
@@ -301,7 +295,7 @@ proptest! {
     /// Settings should roundtrip through save/load
     #[test]
     fn settings_save_load_roundtrip(
-        gaps_inner in 0.0f32..64.0,
+        gaps in 0.0f32..64.0,
         focus_ring_width in 1.0f32..16.0,
         repeat_delay in 100i32..2000,
         repeat_rate in 1i32..100,
@@ -312,7 +306,7 @@ proptest! {
         let paths = create_test_paths(dir.path());
 
         let mut settings = Settings::default();
-        settings.appearance.gaps_inner = gaps_inner;
+        settings.appearance.gaps = gaps;
         settings.appearance.focus_ring_width = focus_ring_width;
         settings.keyboard.repeat_delay = repeat_delay;
         settings.keyboard.repeat_rate = repeat_rate;
@@ -327,7 +321,7 @@ proptest! {
 
         // Verify values match
         // Note: floats are converted to integers in KDL output, so tolerance is 1.0
-        prop_assert!((loaded.appearance.gaps_inner - gaps_inner).abs() < 1.0, "gaps_inner mismatch");
+        prop_assert!((loaded.appearance.gaps - gaps).abs() < 1.0, "gaps mismatch");
         prop_assert!((loaded.appearance.focus_ring_width - focus_ring_width).abs() < 1.0, "focus_ring_width mismatch");
         prop_assert_eq!(loaded.keyboard.repeat_delay, repeat_delay);
         prop_assert_eq!(loaded.keyboard.repeat_rate, repeat_rate);

@@ -3,10 +3,10 @@
 //! Tests the full flow from detecting consolidation opportunities
 //! to applying merges and verifying the results.
 
+use niri_settings::config::analyze_rules;
 use niri_settings::config::models::{
     LayerRule, LayerRuleMatch, Settings, WindowRule, WindowRuleMatch,
 };
-use niri_settings::config::analyze_rules;
 
 /// Helper to create a simple window rule with app-id match
 fn window_rule(id: u32, app_id: &str, opacity: f32) -> WindowRule {
@@ -187,11 +187,19 @@ fn test_ignores_multi_match_rules() {
 // =============================================================================
 
 /// Apply window rule consolidation directly (mimics wizard.rs logic)
-fn apply_window_consolidation(settings: &mut Settings, suggestion: &niri_settings::config::ConsolidationSuggestion) {
+fn apply_window_consolidation(
+    settings: &mut Settings,
+    suggestion: &niri_settings::config::ConsolidationSuggestion,
+) {
     let first_id = suggestion.rule_ids.first().copied().unwrap();
 
     // Update first rule with merged pattern
-    if let Some(rule) = settings.window_rules.rules.iter_mut().find(|r| r.id == first_id) {
+    if let Some(rule) = settings
+        .window_rules
+        .rules
+        .iter_mut()
+        .find(|r| r.id == first_id)
+    {
         if !rule.matches.is_empty() {
             rule.matches[0].app_id = Some(suggestion.merged_pattern.clone());
         }
@@ -200,14 +208,25 @@ fn apply_window_consolidation(settings: &mut Settings, suggestion: &niri_setting
 
     // Remove other rules
     let other_ids: Vec<u32> = suggestion.rule_ids.iter().skip(1).copied().collect();
-    settings.window_rules.rules.retain(|r| !other_ids.contains(&r.id));
+    settings
+        .window_rules
+        .rules
+        .retain(|r| !other_ids.contains(&r.id));
 }
 
 /// Apply layer rule consolidation directly
-fn apply_layer_consolidation(settings: &mut Settings, suggestion: &niri_settings::config::ConsolidationSuggestion) {
+fn apply_layer_consolidation(
+    settings: &mut Settings,
+    suggestion: &niri_settings::config::ConsolidationSuggestion,
+) {
     let first_id = suggestion.rule_ids.first().copied().unwrap();
 
-    if let Some(rule) = settings.layer_rules.rules.iter_mut().find(|r| r.id == first_id) {
+    if let Some(rule) = settings
+        .layer_rules
+        .rules
+        .iter_mut()
+        .find(|r| r.id == first_id)
+    {
         if !rule.matches.is_empty() {
             rule.matches[0].namespace = Some(suggestion.merged_pattern.clone());
         }
@@ -215,7 +234,10 @@ fn apply_layer_consolidation(settings: &mut Settings, suggestion: &niri_settings
     }
 
     let other_ids: Vec<u32> = suggestion.rule_ids.iter().skip(1).copied().collect();
-    settings.layer_rules.rules.retain(|r| !other_ids.contains(&r.id));
+    settings
+        .layer_rules
+        .rules
+        .retain(|r| !other_ids.contains(&r.id));
 }
 
 #[test]
@@ -250,10 +272,7 @@ fn test_apply_window_rule_consolidation() {
 #[test]
 fn test_apply_layer_rule_consolidation() {
     let mut settings = Settings::default();
-    settings.layer_rules.rules = vec![
-        layer_rule(1, "waybar", 0.95),
-        layer_rule(2, "rofi", 0.95),
-    ];
+    settings.layer_rules.rules = vec![layer_rule(1, "waybar", 0.95), layer_rule(2, "rofi", 0.95)];
     settings.layer_rules.next_id = 3;
 
     let analysis = analyze_rules(&[], &settings.layer_rules.rules);
@@ -287,10 +306,23 @@ fn test_apply_preserves_other_rules() {
     // Should have 2 rules: merged steam+lutris, and untouched firefox
     assert_eq!(settings.window_rules.rules.len(), 2);
 
-    let merged = settings.window_rules.rules.iter().find(|r| r.id == 1).unwrap();
-    assert_eq!(merged.matches[0].app_id.as_deref(), Some("^(steam|lutris)$"));
+    let merged = settings
+        .window_rules
+        .rules
+        .iter()
+        .find(|r| r.id == 1)
+        .unwrap();
+    assert_eq!(
+        merged.matches[0].app_id.as_deref(),
+        Some("^(steam|lutris)$")
+    );
 
-    let firefox = settings.window_rules.rules.iter().find(|r| r.id == 3).unwrap();
+    let firefox = settings
+        .window_rules
+        .rules
+        .iter()
+        .find(|r| r.id == 3)
+        .unwrap();
     assert_eq!(firefox.matches[0].app_id.as_deref(), Some("firefox"));
     assert_eq!(firefox.opacity, Some(0.8));
 }
@@ -343,15 +375,14 @@ fn test_merged_pattern_handles_special_characters() {
 
     assert!(analysis.has_suggestions());
     // Note: The pattern includes the dots literally, which works in niri's regex
-    assert!(analysis.window_suggestions[0].merged_pattern.contains("com.valvesoftware.Steam"));
+    assert!(analysis.window_suggestions[0]
+        .merged_pattern
+        .contains("com.valvesoftware.Steam"));
 }
 
 #[test]
 fn test_suggestion_metadata() {
-    let rules = vec![
-        window_rule(1, "steam", 0.9),
-        window_rule(2, "lutris", 0.9),
-    ];
+    let rules = vec![window_rule(1, "steam", 0.9), window_rule(2, "lutris", 0.9)];
 
     let analysis = analyze_rules(&rules, &[]);
     let suggestion = &analysis.window_suggestions[0];
@@ -366,15 +397,9 @@ fn test_suggestion_metadata() {
 
 #[test]
 fn test_mixed_window_and_layer_suggestions() {
-    let window_rules = vec![
-        window_rule(1, "steam", 0.9),
-        window_rule(2, "lutris", 0.9),
-    ];
+    let window_rules = vec![window_rule(1, "steam", 0.9), window_rule(2, "lutris", 0.9)];
 
-    let layer_rules = vec![
-        layer_rule(1, "waybar", 0.95),
-        layer_rule(2, "rofi", 0.95),
-    ];
+    let layer_rules = vec![layer_rule(1, "waybar", 0.95), layer_rule(2, "rofi", 0.95)];
 
     let analysis = analyze_rules(&window_rules, &layer_rules);
 

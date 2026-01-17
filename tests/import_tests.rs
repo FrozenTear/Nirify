@@ -25,8 +25,8 @@ layout {
     .unwrap();
 
     let settings = import_from_niri_config(&config);
-    assert_eq!(settings.appearance.gaps_inner, 20.0);
-    assert_eq!(settings.appearance.gaps_outer, 10.0);
+    // Note: inner=20 outer=10 - loader reads inner value for backwards compatibility
+    assert_eq!(settings.appearance.gaps, 20.0);
     assert_eq!(settings.appearance.focus_ring_width, 5.0);
 }
 
@@ -39,7 +39,7 @@ fn test_import_handles_corrupted_gracefully() {
 
     // Should return defaults, not panic
     let settings = import_from_niri_config(&config);
-    assert_eq!(settings.appearance.gaps_inner, 16.0); // default
+    assert_eq!(settings.appearance.gaps, 16.0); // default
     assert!(settings.appearance.focus_ring_enabled); // default
 }
 
@@ -50,7 +50,7 @@ fn test_import_handles_missing_file() {
 
     // Should return defaults, not panic
     let settings = import_from_niri_config(&config);
-    assert_eq!(settings.appearance.gaps_inner, 16.0); // default
+    assert_eq!(settings.appearance.gaps, 16.0); // default
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn test_import_handles_empty_file() {
 
     // Should return defaults for empty file
     let settings = import_from_niri_config(&config);
-    assert_eq!(settings.appearance.gaps_inner, 16.0); // default
+    assert_eq!(settings.appearance.gaps, 16.0); // default
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn test_import_handles_comments_only() {
 
     // Should return defaults
     let settings = import_from_niri_config(&config);
-    assert_eq!(settings.appearance.gaps_inner, 16.0); // default
+    assert_eq!(settings.appearance.gaps, 16.0); // default
 }
 
 #[test]
@@ -354,8 +354,8 @@ layout {
 
     let settings = import_from_niri_config(&config);
     // Values should be clamped to valid ranges
-    assert_eq!(settings.appearance.gaps_inner, 0.0); // Clamped to min
-    assert_eq!(settings.appearance.gaps_outer, 64.0); // Clamped to max
+    // Note: inner=-50 is read first (backwards compat), then clamped to 0
+    assert_eq!(settings.appearance.gaps, 0.0); // Clamped to min
     assert_eq!(settings.appearance.focus_ring_width, 16.0); // Clamped to max
 }
 

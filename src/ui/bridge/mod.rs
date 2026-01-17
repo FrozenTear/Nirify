@@ -64,28 +64,34 @@ pub fn setup_callbacks(ui: &MainWindow, settings: Arc<Mutex<Settings>>, paths: A
     );
     info!("Auto-save enabled with 300ms debounce and dirty tracking");
 
-    // Set up callbacks for each category
-    callbacks::appearance::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::behavior::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::cursor::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::animations::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::overview::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::keyboard::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::mouse::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::touchpad::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    // Dynamic page callbacks (migrated from static)
+    callbacks::animations_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::appearance_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::behavior_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::cursor_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::debug_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::gestures_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::keyboard_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::layout_extras_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::miscellaneous_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::mouse_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::overview_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::switch_events_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::touchpad_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::window_rules_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::layer_rules_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::workspaces_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::trackpoint_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::trackball_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::tablet_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::touch_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::startup_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::environment_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+    callbacks::recent_windows_dynamic::setup(ui, settings.clone(), Rc::clone(&save_manager));
+
+    // Static callbacks (not yet migrated to dynamic)
     callbacks::outputs::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::layout_extras::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::gestures::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::miscellaneous::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::window_rules::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::input_devices::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::workspaces::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::layer_rules::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::startup::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::environment::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::debug::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::switch_events::setup(ui, settings.clone(), Rc::clone(&save_manager));
-    callbacks::recent_windows::setup(ui, settings.clone(), Rc::clone(&save_manager));
+
     callbacks::keybindings::setup(ui, settings.clone(), paths.clone(), save_manager);
 
     // Backups only needs paths (no settings modification, just file operations)

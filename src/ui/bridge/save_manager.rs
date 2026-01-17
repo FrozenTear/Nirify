@@ -106,11 +106,9 @@ impl SaveManager {
 
                         // Try to reload niri config if running (async to prevent UI freeze)
                         if ipc::is_niri_running() {
-                            ipc::async_ops::reload_config_async(move |result| {
-                                match result {
-                                    Ok(()) => info!("Niri config reloaded"),
-                                    Err(e) => debug!("Could not reload niri config: {}", e),
-                                }
+                            ipc::async_ops::reload_config_async(move |result| match result {
+                                Ok(()) => info!("Niri config reloaded"),
+                                Err(e) => debug!("Could not reload niri config: {}", e),
                             });
                         }
                     }

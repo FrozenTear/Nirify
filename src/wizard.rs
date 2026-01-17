@@ -11,7 +11,9 @@ use log::{error, info, warn};
 use slint::ComponentHandle;
 use std::sync::{Arc, Mutex};
 
-use crate::config::{self, analyze_rules, ConfigPaths, ConsolidationAnalysis, Settings, SmartReplaceResult};
+use crate::config::{
+    self, analyze_rules, ConfigPaths, ConsolidationAnalysis, Settings, SmartReplaceResult,
+};
 use crate::MainWindow;
 
 /// Configure UI state for first run or existing installation
@@ -54,10 +56,7 @@ pub fn setup_wizard_callbacks(ui: &MainWindow, settings: Arc<Mutex<Settings>>) {
 
             // Check for consolidation suggestions after wizard completes
             if let Ok(s) = settings_for_complete.lock() {
-                let analysis = analyze_rules(
-                    &s.window_rules.rules,
-                    &s.layer_rules.rules,
-                );
+                let analysis = analyze_rules(&s.window_rules.rules, &s.layer_rules.rules);
                 if analysis.has_suggestions() {
                     info!(
                         "Showing consolidation dialog with {} suggestions",
@@ -77,10 +76,7 @@ pub fn setup_wizard_callbacks(ui: &MainWindow, settings: Arc<Mutex<Settings>>) {
 
             // Also show consolidation suggestions even if wizard was skipped
             if let Ok(s) = settings.lock() {
-                let analysis = analyze_rules(
-                    &s.window_rules.rules,
-                    &s.layer_rules.rules,
-                );
+                let analysis = analyze_rules(&s.window_rules.rules, &s.layer_rules.rules);
                 if analysis.has_suggestions() {
                     info!(
                         "Showing consolidation dialog with {} suggestions (after skip)",
@@ -232,10 +228,7 @@ pub fn set_import_summary(ui: &MainWindow, import_result: &config::ImportResult)
 
 /// Analyze rules for consolidation opportunities and set UI state
 pub fn set_consolidation_suggestions(ui: &MainWindow, settings: &Settings) {
-    let analysis = analyze_rules(
-        &settings.window_rules.rules,
-        &settings.layer_rules.rules,
-    );
+    let analysis = analyze_rules(&settings.window_rules.rules, &settings.layer_rules.rules);
 
     if !analysis.has_suggestions() {
         info!("No consolidation opportunities found");
@@ -306,7 +299,10 @@ pub fn setup_consolidation_callbacks(
 
             // Update the UI model to reflect selection
             let suggestions = ui.get_consolidation_suggestions();
-            if let Some(model) = suggestions.as_any().downcast_ref::<slint::VecModel<ConsolidationItem>>() {
+            if let Some(model) = suggestions
+                .as_any()
+                .downcast_ref::<slint::VecModel<ConsolidationItem>>()
+            {
                 if let Some(mut item) = model.row_data(index as usize) {
                     item.selected = selected;
                     model.set_row_data(index as usize, item);
@@ -332,10 +328,7 @@ pub fn setup_consolidation_callbacks(
             // Get the current analysis and settings
             match settings.lock() {
                 Ok(mut s) => {
-                    let analysis = analyze_rules(
-                        &s.window_rules.rules,
-                        &s.layer_rules.rules,
-                    );
+                    let analysis = analyze_rules(&s.window_rules.rules, &s.layer_rules.rules);
 
                     // Apply each selected suggestion
                     for &idx in sel.iter() {
@@ -394,7 +387,12 @@ fn apply_window_rule_consolidation(
     let Some(first_id) = first_id else { return };
 
     // Find the first rule and update its match pattern
-    if let Some(rule) = settings.window_rules.rules.iter_mut().find(|r| r.id == first_id) {
+    if let Some(rule) = settings
+        .window_rules
+        .rules
+        .iter_mut()
+        .find(|r| r.id == first_id)
+    {
         // Update the match to use the merged regex pattern
         if !rule.matches.is_empty() {
             rule.matches[0].app_id = Some(suggestion.merged_pattern.clone());
@@ -411,7 +409,10 @@ fn apply_window_rule_consolidation(
 
     // Remove all other rules that were consolidated
     let other_ids: Vec<u32> = suggestion.rule_ids.iter().skip(1).copied().collect();
-    settings.window_rules.rules.retain(|r| !other_ids.contains(&r.id));
+    settings
+        .window_rules
+        .rules
+        .retain(|r| !other_ids.contains(&r.id));
 
     info!(
         "Consolidated {} window rules into one with pattern: {}",
@@ -432,7 +433,12 @@ fn apply_layer_rule_consolidation(
     let Some(first_id) = first_id else { return };
 
     // Find the first rule and update its match pattern
-    if let Some(rule) = settings.layer_rules.rules.iter_mut().find(|r| r.id == first_id) {
+    if let Some(rule) = settings
+        .layer_rules
+        .rules
+        .iter_mut()
+        .find(|r| r.id == first_id)
+    {
         // Update the match to use the merged regex pattern
         if !rule.matches.is_empty() {
             rule.matches[0].namespace = Some(suggestion.merged_pattern.clone());
@@ -449,7 +455,10 @@ fn apply_layer_rule_consolidation(
 
     // Remove all other rules that were consolidated
     let other_ids: Vec<u32> = suggestion.rule_ids.iter().skip(1).copied().collect();
-    settings.layer_rules.rules.retain(|r| !other_ids.contains(&r.id));
+    settings
+        .layer_rules
+        .rules
+        .retain(|r| !other_ids.contains(&r.id));
 
     info!(
         "Consolidated {} layer rules into one with pattern: {}",

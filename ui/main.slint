@@ -11,39 +11,68 @@ import { Sidebar, SidebarIndices } from "widgets/sidebar.slint";
 import { CategoryNav } from "widgets/category_nav.slint";
 import { SearchBar } from "widgets/search.slint";
 import { SettingsSection, SettingRow } from "widgets/section.slint";
-import { AppearancePage } from "pages/appearance.slint";
-import { BehaviorPage } from "pages/behavior.slint";
-import { KeyboardPage } from "pages/keyboard.slint";
-import { MousePage } from "pages/mouse.slint";
-import { TouchpadPage } from "pages/touchpad.slint";
+// Dynamic pages (full dynamic migration)
+import { AnimationsDynamicPage, AnimationSettingModel } from "pages/animations_dynamic.slint";
+import { AppearanceDynamicPage, AppearanceSettingModel } from "pages/appearance_dynamic.slint";
+import { BehaviorDynamicPage, BehaviorSettingModel } from "pages/behavior_dynamic.slint";
+import { CursorDynamicPage, CursorSettingModel } from "pages/cursor_dynamic.slint";
+import { DebugDynamicPage, DebugSettingModel } from "pages/debug_dynamic.slint";
+import { GesturesDynamicPage, GestureSettingModel } from "pages/gestures_dynamic.slint";
+import { KeyboardDynamicPage, KeyboardSettingModel } from "pages/keyboard_dynamic.slint";
+import { LayoutExtrasDynamicPage, LayoutSettingModel } from "pages/layout_extras_dynamic.slint";
+import { MiscellaneousDynamicPage, MiscSettingModel } from "pages/miscellaneous_dynamic.slint";
+import { MouseDynamicPage, MouseSettingModel } from "pages/mouse_dynamic.slint";
+import { OverviewDynamicPage, OverviewSettingModel } from "pages/overview_dynamic.slint";
+import { SwitchEventsDynamicPage, SwitchEventSettingModel } from "pages/switch_events_dynamic.slint";
+import { TouchpadDynamicPage, TouchpadSettingModel } from "pages/touchpad_dynamic.slint";
+import { WindowRulesPageDynamic, WindowRuleSettingModel } from "pages/window_rules_dynamic.slint";
+import { LayerRulesDynamicPage, LayerRuleSettingModel } from "pages/layer_rules_dynamic.slint";
+import { WorkspacesDynamicPage, WorkspaceSettingModel } from "pages/workspaces_dynamic.slint";
+import { TrackpointDynamicPage, TrackpointSettingModel } from "pages/trackpoint_dynamic.slint";
+import { StartupDynamicPage } from "pages/startup_dynamic.slint";
+import { EnvironmentDynamicPage, EnvironmentVariableModel } from "pages/environment_dynamic.slint";
+import { RecentWindowsDynamicPage, RecentWindowsSettingModel } from "pages/recent_windows_dynamic.slint";
+import { TrackballDynamicPage, TrackballSettingModel } from "pages/trackball_dynamic.slint";
+import { TabletDynamicPage, TabletSettingModel } from "pages/tablet_dynamic.slint";
+import { TouchDynamicPage, TouchSettingModel } from "pages/touch_dynamic.slint";
+
+// Static pages (not yet migrated to dynamic)
 import { DisplaysPage } from "pages/displays.slint";
-import { CursorPage } from "pages/cursor.slint";
-import { AnimationsPage } from "pages/animations.slint";
-import { OverviewPage } from "pages/overview.slint";
-import { LayoutExtrasPage } from "pages/layout_extras.slint";
-import { GesturesPage } from "pages/gestures.slint";
-import { MiscellaneousPage } from "pages/miscellaneous.slint";
-import { WindowRulesPage } from "pages/window_rules.slint";
-import { TrackpointPage } from "pages/trackpoint.slint";
-import { TrackballPage } from "pages/trackball.slint";
-import { TabletPage } from "pages/tablet.slint";
-import { TouchPage } from "pages/touch.slint";
-import { WorkspacesPage } from "pages/workspaces.slint";
-import { LayerRulesPage } from "pages/layer_rules.slint";
 import { KeybindingsPage, KeybindingItem } from "pages/keybindings.slint";
-import { StartupPage } from "pages/startup.slint";
-import { EnvironmentPage } from "pages/environment.slint";
-import { DebugPage } from "pages/debug.slint";
-import { SwitchEventsPage } from "pages/switch_events.slint";
 import { ToolsPage } from "pages/tools.slint";
 import { ConfigEditorPage } from "pages/config_editor.slint";
 import { BackupsPage, BackupEntry } from "pages/backups.slint";
-import { RecentWindowsPage } from "pages/recent_windows.slint";
 import { FirstRunWizard } from "dialogs/first_run_wizard.slint";
 import { MessageDialog, StatusNotification, DialogType } from "dialogs/error_dialog.slint";
 import { ImportSummaryDialog } from "dialogs/import_summary.slint";
 import { DiffViewDialog } from "dialogs/diff_view.slint";
 import { ConsolidationDialog, ConsolidationItem } from "dialogs/consolidation_dialog.slint";
+
+// Export structs for Rust access
+export {
+    WindowRuleSettingModel,
+    LayerRuleSettingModel,
+    AnimationSettingModel,
+    AppearanceSettingModel,
+    BehaviorSettingModel,
+    CursorSettingModel,
+    DebugSettingModel,
+    GestureSettingModel,
+    KeyboardSettingModel,
+    LayoutSettingModel,
+    MiscSettingModel,
+    MouseSettingModel,
+    OverviewSettingModel,
+    SwitchEventSettingModel,
+    TouchpadSettingModel,
+    WorkspaceSettingModel,
+    RecentWindowsSettingModel,
+    TrackpointSettingModel,
+    TrackballSettingModel,
+    TabletSettingModel,
+    TouchSettingModel,
+    EnvironmentVariableModel
+}
 
 export component MainWindow inherits Window {
     title: "Niri Settings";
@@ -77,8 +106,7 @@ export component MainWindow inherits Window {
     in-out property <string> border-active-hex: "#ffffff";
     in-out property <string> border-inactive-hex: "#808080";
     in-out property <string> border-urgent-hex: "#ff5555";
-    in-out property <float> gaps-inner: 16;
-    in-out property <float> gaps-outer: 8;
+    in-out property <float> gaps: 16;
     in-out property <float> corner-radius: 12;
     in-out property <color> background-color: #1e1e2e;
     in-out property <string> background-color-hex: "#1e1e2e";
@@ -131,7 +159,7 @@ export component MainWindow inherits Window {
     in-out property <string> overview-workspace-shadow-color-hex: "#00000080";
 
     // Keyboard settings
-    in-out property <bool> keyboard-off: false;
+    // Note: Keyboard cannot be disabled in niri, so no "off" property
     in-out property <string> xkb-layout: "us";
     in-out property <string> xkb-variant: "";
     in-out property <string> xkb-model: "";
@@ -175,50 +203,8 @@ export component MainWindow inherits Window {
     in-out property <int> touchpad-scroll-button: 0;  // Button code for on-button-down scrolling
     in-out property <bool> touchpad-scroll-button-lock: false;  // Toggle scroll mode
 
-    // Trackpoint settings
-    in-out property <bool> trackpoint-off: false;
-    in-out property <float> trackpoint-accel-speed: 0.0;
-    in-out property <int> trackpoint-accel-profile-index: 0;
-    in-out property <bool> trackpoint-natural-scroll: false;
-    in-out property <bool> trackpoint-left-handed: false;
-    in-out property <int> trackpoint-scroll-method-index: 3;
-    in-out property <int> trackpoint-scroll-button: 0;
-    in-out property <bool> trackpoint-scroll-button-lock: false;
-    in-out property <bool> trackpoint-middle-emulation: false;
-
-    // Trackball settings
-    in-out property <bool> trackball-off: false;
-    in-out property <float> trackball-accel-speed: 0.0;
-    in-out property <int> trackball-accel-profile-index: 0;
-    in-out property <bool> trackball-natural-scroll: false;
-    in-out property <bool> trackball-left-handed: false;
-    in-out property <int> trackball-scroll-method-index: 3;
-    in-out property <int> trackball-scroll-button: 0;
-    in-out property <bool> trackball-scroll-button-lock: false;
-    in-out property <bool> trackball-middle-emulation: false;
-
-    // Tablet settings
-    in-out property <bool> tablet-off: false;
-    in-out property <string> tablet-map-to-output: "";
-    in-out property <bool> tablet-left-handed: false;
-    in-out property <bool> tablet-has-calibration: false;
-    in-out property <float> tablet-cal-m0: 1.0;
-    in-out property <float> tablet-cal-m1: 0.0;
-    in-out property <float> tablet-cal-m2: 0.0;
-    in-out property <float> tablet-cal-m3: 0.0;
-    in-out property <float> tablet-cal-m4: 1.0;
-    in-out property <float> tablet-cal-m5: 0.0;
-
-    // Touch settings
-    in-out property <bool> touch-off: false;
-    in-out property <string> touch-map-to-output: "";
-    in-out property <bool> touch-has-calibration: false;
-    in-out property <float> touch-cal-m0: 1.0;
-    in-out property <float> touch-cal-m1: 0.0;
-    in-out property <float> touch-cal-m2: 0.0;
-    in-out property <float> touch-cal-m3: 0.0;
-    in-out property <float> touch-cal-m4: 1.0;
-    in-out property <float> touch-cal-m5: 0.0;
+    // Note: Trackpoint, Trackball, Tablet, and Touch settings now use dynamic pages
+    // Static properties removed - see *-dynamic-* properties below
 
     // Display/Output settings
     in-out property <[string]> output-list: [];
@@ -394,6 +380,34 @@ export component MainWindow inherits Window {
     in-out property <string> current-tab-indicator-active-color: "#cba6f7";
     in-out property <string> current-tab-indicator-inactive-color: "#45475a";
 
+    // Dynamic Window Rules (model-based approach)
+    in-out property <[string]> window-rules-list-dynamic: [];
+    in-out property <int> selected-window-rule-index-dynamic: -1;
+    in-out property <[string]> window-rules-matches-list-dynamic: [];
+    in-out property <int> selected-match-index-dynamic: 0;
+    in-out property <[string]> window-rules-running-windows-dynamic: [];
+    in-out property <bool> window-rules-show-picker-dynamic: false;
+    in-out property <[WindowRuleSettingModel]> window-rules-rule-settings: [];
+    in-out property <[WindowRuleSettingModel]> window-rules-match-settings: [];
+    in-out property <[WindowRuleSettingModel]> window-rules-opening-settings: [];
+    in-out property <[WindowRuleSettingModel]> window-rules-visual-settings: [];
+    in-out property <[WindowRuleSettingModel]> window-rules-shadow-settings: [];
+    in-out property <[WindowRuleSettingModel]> window-rules-tab-settings: [];
+    callback window-rule-add-dynamic();
+    callback window-rule-remove-dynamic(int);
+    callback window-rule-select-dynamic(int);
+    callback window-rule-reorder-dynamic(int, int);
+    callback window-rule-add-match-dynamic();
+    callback window-rule-remove-match-dynamic(int);
+    callback window-rule-select-match-dynamic(int);
+    callback window-rule-refresh-windows-dynamic();
+    callback window-rule-select-running-window-dynamic(int);
+    callback window-rule-setting-toggle-changed(string, bool);
+    callback window-rule-setting-slider-int-changed(string, int);
+    callback window-rule-setting-slider-float-changed(string, float);
+    callback window-rule-setting-combo-changed(string, int);
+    callback window-rule-setting-text-changed(string, string);
+
     // Named Workspaces settings
     in-out property <[string]> workspaces-list: [];
     in-out property <int> selected-workspace-index: -1;
@@ -411,6 +425,28 @@ export component MainWindow inherits Window {
     in-out property <bool> current-workspace-has-center-override: false;
     in-out property <int> current-workspace-center-focused-column-index: 0;
     in-out property <bool> current-workspace-always-center-single-column: false;
+
+    // Dynamic Named Workspaces (model-based approach)
+    in-out property <[string]> workspaces-list-dynamic: [];
+    in-out property <int> selected-workspace-index-dynamic: -1;
+    in-out property <bool> workspace-has-layout-override-dynamic: false;
+    in-out property <bool> workspace-has-gaps-override-dynamic: false;
+    in-out property <bool> workspace-has-struts-override-dynamic: false;
+    in-out property <bool> workspace-has-center-override-dynamic: false;
+    in-out property <[WorkspaceSettingModel]> workspace-identity-settings-dynamic: [];
+    in-out property <[WorkspaceSettingModel]> workspace-layout-override-settings-dynamic: [];
+    in-out property <[WorkspaceSettingModel]> workspace-gaps-settings-dynamic: [];
+    in-out property <[WorkspaceSettingModel]> workspace-struts-settings-dynamic: [];
+    in-out property <[WorkspaceSettingModel]> workspace-centering-settings-dynamic: [];
+    callback workspace-add-dynamic();
+    callback workspace-remove-dynamic(int);
+    callback workspace-select-dynamic(int);
+    callback workspace-reorder-dynamic(int, int);
+    callback workspace-setting-toggle-changed(string, bool);
+    callback workspace-setting-slider-int-changed(string, int);
+    callback workspace-setting-slider-float-changed(string, float);
+    callback workspace-setting-combo-changed(string, int);
+    callback workspace-setting-text-changed(string, string);
 
     // Layer Rules settings
     in-out property <[string]> layer-rules-list: [];
@@ -441,6 +477,146 @@ export component MainWindow inherits Window {
     in-out property <color> current-layer-rule-shadow-inactive-color: #00000050;
     in-out property <string> current-layer-rule-shadow-color-hex: "#00000070";
     in-out property <string> current-layer-rule-shadow-inactive-color-hex: "#00000050";
+
+    // Dynamic Layer Rules
+    in-out property <[string]> layer-rules-list-dynamic: [];
+    in-out property <int> layer-rules-selected-index: -1;
+    in-out property <[string]> layer-rules-matches-list: [];
+    in-out property <int> layer-rules-selected-match-index: 0;
+    in-out property <int> layer-rules-matches-count: 0;
+    in-out property <[LayerRuleSettingModel]> layer-rules-rule-settings: [];
+    in-out property <[LayerRuleSettingModel]> layer-rules-match-settings: [];
+    in-out property <[LayerRuleSettingModel]> layer-rules-visual-settings: [];
+    in-out property <[LayerRuleSettingModel]> layer-rules-shadow-settings: [];
+    in-out property <[LayerRuleSettingModel]> layer-rules-advanced-settings: [];
+
+    // Dynamic Cursor settings
+    in-out property <[CursorSettingModel]> cursor-theme-settings: [];
+    in-out property <[CursorSettingModel]> cursor-visibility-settings: [];
+
+    // Dynamic Appearance settings
+    in-out property <[AppearanceSettingModel]> appearance-focus-ring-settings: [];
+    in-out property <[AppearanceSettingModel]> appearance-border-settings: [];
+    in-out property <[AppearanceSettingModel]> appearance-background-settings: [];
+    in-out property <[AppearanceSettingModel]> appearance-gaps-settings: [];
+    in-out property <[AppearanceSettingModel]> appearance-corners-settings: [];
+
+    // Dynamic Behavior settings
+    in-out property <[BehaviorSettingModel]> behavior-focus-settings: [];
+    in-out property <[BehaviorSettingModel]> behavior-workspace-settings: [];
+    in-out property <[BehaviorSettingModel]> behavior-window-size-settings: [];
+    in-out property <[BehaviorSettingModel]> behavior-strut-settings: [];
+    in-out property <[BehaviorSettingModel]> behavior-modifier-settings: [];
+    in-out property <[BehaviorSettingModel]> behavior-power-settings: [];
+
+    // Dynamic Overview settings
+    in-out property <[OverviewSettingModel]> overview-appearance-settings: [];
+    in-out property <[OverviewSettingModel]> overview-backdrop-settings: [];
+    in-out property <[OverviewSettingModel]> overview-shadow-settings: [];
+
+    // Dynamic Keyboard settings
+    // Note: Keyboard cannot be disabled in niri, so no "off" property
+    in-out property <[KeyboardSettingModel]> keyboard-dynamic-layout-settings: [];
+    in-out property <[KeyboardSettingModel]> keyboard-dynamic-repeat-settings: [];
+    in-out property <[KeyboardSettingModel]> keyboard-dynamic-other-settings: [];
+    in-out property <[KeyboardSettingModel]> keyboard-dynamic-advanced-settings: [];
+
+    // Dynamic Mouse settings
+    in-out property <bool> mouse-dynamic-device-off: false;
+    in-out property <[MouseSettingModel]> mouse-dynamic-device-settings: [];
+    in-out property <[MouseSettingModel]> mouse-dynamic-basic-settings: [];
+    in-out property <[MouseSettingModel]> mouse-dynamic-acceleration-settings: [];
+    in-out property <[MouseSettingModel]> mouse-dynamic-scrolling-settings: [];
+
+    // Dynamic Touchpad settings
+    in-out property <bool> touchpad-dynamic-device-off: false;
+    in-out property <[TouchpadSettingModel]> touchpad-dynamic-device-control-settings: [];
+    in-out property <[TouchpadSettingModel]> touchpad-dynamic-tap-settings: [];
+    in-out property <[TouchpadSettingModel]> touchpad-dynamic-scroll-settings: [];
+    in-out property <[TouchpadSettingModel]> touchpad-dynamic-click-settings: [];
+    in-out property <[TouchpadSettingModel]> touchpad-dynamic-palm-rejection-settings: [];
+    in-out property <[TouchpadSettingModel]> touchpad-dynamic-drag-settings: [];
+    in-out property <[TouchpadSettingModel]> touchpad-dynamic-acceleration-settings: [];
+    in-out property <[TouchpadSettingModel]> touchpad-dynamic-other-settings: [];
+
+    // Dynamic Layout Extras settings
+    in-out property <[LayoutSettingModel]> layout-extras-shadow-settings: [];
+    in-out property <[LayoutSettingModel]> layout-extras-tab-indicator-settings: [];
+    in-out property <[LayoutSettingModel]> layout-extras-insert-hint-settings: [];
+
+    // Dynamic Gestures settings
+    in-out property <bool> gestures-hot-corners-enabled: false;
+    in-out property <bool> gestures-hot-corner-top-left: false;
+    in-out property <bool> gestures-hot-corner-top-right: false;
+    in-out property <bool> gestures-hot-corner-bottom-left: false;
+    in-out property <bool> gestures-hot-corner-bottom-right: false;
+    in-out property <[GestureSettingModel]> gestures-hot-corners-settings: [];
+    in-out property <[GestureSettingModel]> gestures-dnd-edge-scroll-settings: [];
+    in-out property <[GestureSettingModel]> gestures-dnd-workspace-switch-settings: [];
+
+    // Dynamic Miscellaneous settings
+    in-out property <[MiscSettingModel]> misc-decorations-settings: [];
+    in-out property <[MiscSettingModel]> misc-screenshots-settings: [];
+    in-out property <MiscSettingModel> misc-screenshot-path-setting;
+    in-out property <[MiscSettingModel]> misc-clipboard-settings: [];
+    in-out property <[MiscSettingModel]> misc-hotkey-overlay-settings: [];
+    in-out property <[MiscSettingModel]> misc-config-notification-settings: [];
+    in-out property <[MiscSettingModel]> misc-startup-settings: [];
+    in-out property <[MiscSettingModel]> misc-xwayland-settings: [];
+    in-out property <MiscSettingModel> misc-xwayland-path-setting;
+    in-out property <[MiscSettingModel]> misc-developer-settings: [];
+
+    // Dynamic Debug settings
+    in-out property <[DebugSettingModel]> debug-rendering-settings: [];
+    in-out property <[DebugSettingModel]> debug-gpu-settings: [];
+    in-out property <[DebugSettingModel]> debug-frame-timing-settings: [];
+    in-out property <[DebugSettingModel]> debug-window-management-settings: [];
+    in-out property <[DebugSettingModel]> debug-system-settings: [];
+    in-out property <[DebugSettingModel]> debug-screencasting-settings: [];
+
+    // Dynamic Animation settings
+    in-out property <bool> anim-animations-enabled: true;
+    in-out property <[AnimationSettingModel]> anim-global-settings: [];
+    in-out property <[AnimationSettingModel]> anim-workspace-nav-animations: [];
+    in-out property <[AnimationSettingModel]> anim-window-animations: [];
+    in-out property <[AnimationSettingModel]> anim-ui-animations: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-0: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-0: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-1: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-1: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-2: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-2: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-3: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-3: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-4: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-4: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-5: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-5: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-6: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-6: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-7: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-7: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-8: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-8: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-9: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-9: [];
+    in-out property <[AnimationSettingModel]> anim-spring-params-10: [];
+    in-out property <[AnimationSettingModel]> anim-easing-params-10: [];
+
+    // Dynamic Switch Events settings
+    in-out property <[SwitchEventSettingModel]> switch-events-general-settings: [];
+    in-out property <[string]> switch-events-lid-close-commands: [];
+    in-out property <int> switch-events-lid-close-selected: -1;
+    in-out property <string> switch-events-lid-close-current: "";
+    in-out property <[string]> switch-events-lid-open-commands: [];
+    in-out property <int> switch-events-lid-open-selected: -1;
+    in-out property <string> switch-events-lid-open-current: "";
+    in-out property <[string]> switch-events-tablet-mode-on-commands: [];
+    in-out property <int> switch-events-tablet-mode-on-selected: -1;
+    in-out property <string> switch-events-tablet-mode-on-current: "";
+    in-out property <[string]> switch-events-tablet-mode-off-commands: [];
+    in-out property <int> switch-events-tablet-mode-off-selected: -1;
+    in-out property <string> switch-events-tablet-mode-off-current: "";
 
     // Keybindings (full editing support)
     in-out property <[KeybindingItem]> keybindings-list: [];
@@ -521,6 +697,49 @@ export component MainWindow inherits Window {
     in-out property <int> recent-windows-highlight-corner-radius: 12;
     in-out property <int> recent-windows-previews-max-height: 200;
     in-out property <float> recent-windows-previews-max-scale: 0.5;
+
+    // Dynamic Recent Windows settings
+    in-out property <bool> recent-windows-dynamic-feature-enabled: true;
+    in-out property <[RecentWindowsSettingModel]> recent-windows-dynamic-general-settings: [];
+    in-out property <[RecentWindowsSettingModel]> recent-windows-dynamic-highlight-settings: [];
+    in-out property <[RecentWindowsSettingModel]> recent-windows-dynamic-preview-settings: [];
+
+    // Dynamic Trackpoint settings
+    in-out property <bool> trackpoint-dynamic-device-off: false;
+    in-out property <[TrackpointSettingModel]> trackpoint-dynamic-general-settings: [];
+    in-out property <[TrackpointSettingModel]> trackpoint-dynamic-behavior-settings: [];
+    in-out property <[TrackpointSettingModel]> trackpoint-dynamic-acceleration-settings: [];
+    in-out property <[TrackpointSettingModel]> trackpoint-dynamic-scrolling-settings: [];
+
+    // Dynamic Trackball settings
+    in-out property <bool> trackball-dynamic-device-off: false;
+    in-out property <[TrackballSettingModel]> trackball-dynamic-general-settings: [];
+    in-out property <[TrackballSettingModel]> trackball-dynamic-behavior-settings: [];
+    in-out property <[TrackballSettingModel]> trackball-dynamic-acceleration-settings: [];
+    in-out property <[TrackballSettingModel]> trackball-dynamic-scrolling-settings: [];
+
+    // Dynamic Tablet settings
+    in-out property <bool> tablet-dynamic-device-off: false;
+    in-out property <[TabletSettingModel]> tablet-dynamic-general-settings: [];
+    in-out property <[TabletSettingModel]> tablet-dynamic-mapping-settings: [];
+    in-out property <[TabletSettingModel]> tablet-dynamic-calibration-settings: [];
+
+    // Dynamic Touch settings
+    in-out property <bool> touch-dynamic-device-off: false;
+    in-out property <[TouchSettingModel]> touch-dynamic-general-settings: [];
+    in-out property <[TouchSettingModel]> touch-dynamic-mapping-settings: [];
+    in-out property <[TouchSettingModel]> touch-dynamic-calibration-settings: [];
+
+    // Dynamic Startup settings
+    in-out property <[string]> startup-dynamic-command-list: [];
+    in-out property <int> startup-dynamic-selected-index: -1;
+    in-out property <string> startup-dynamic-current-command: "";
+
+    // Dynamic Environment settings
+    in-out property <[EnvironmentVariableModel]> environment-dynamic-variable-list: [];
+    in-out property <int> environment-dynamic-selected-index: -1;
+    in-out property <string> environment-dynamic-current-name: "";
+    in-out property <string> environment-dynamic-current-value: "";
 
     // Wizard state
     in-out property <bool> wizard-visible: false;
@@ -642,9 +861,8 @@ export component MainWindow inherits Window {
     callback border-active-color-changed(color);
     callback border-inactive-color-changed(color);
     callback border-urgent-color-changed(color);
-    callback gaps-inner-changed(float);
+    callback gaps-changed(float);
     callback background-color-changed(color);
-    callback gaps-outer-changed(float);
     callback corner-radius-changed(float);
 
     // Behavior callbacks
@@ -703,7 +921,7 @@ export component MainWindow inherits Window {
     callback overview-workspace-shadow-color-changed(color);
 
     // Keyboard callbacks
-    callback keyboard-off-toggled(bool);
+    // Note: Keyboard cannot be disabled in niri, so no "off-toggled" callback
     callback xkb-layout-changed(string);
     callback xkb-variant-changed(string);
     callback xkb-model-changed(string);
@@ -747,40 +965,33 @@ export component MainWindow inherits Window {
     callback touchpad-scroll-button-changed(int);
     callback touchpad-scroll-button-lock-toggled(bool);
 
-    // Trackpoint callbacks
-    callback trackpoint-off-toggled(bool);
-    callback trackpoint-accel-speed-changed(float);
-    callback trackpoint-accel-profile-changed(int);
-    callback trackpoint-natural-scroll-toggled(bool);
-    callback trackpoint-left-handed-toggled(bool);
-    callback trackpoint-scroll-method-changed(int);
-    callback trackpoint-scroll-button-changed(int);
-    callback trackpoint-scroll-button-lock-toggled(bool);
-    callback trackpoint-middle-emulation-toggled(bool);
+    // Dynamic trackpoint callbacks
+    callback trackpoint-setting-toggle-changed(string, bool);
+    callback trackpoint-setting-slider-int-changed(string, int);
+    callback trackpoint-setting-slider-float-changed(string, float);
+    callback trackpoint-setting-combo-changed(string, int);
+    callback trackpoint-setting-text-changed(string, string);
 
-    // Trackball callbacks
-    callback trackball-off-toggled(bool);
-    callback trackball-accel-speed-changed(float);
-    callback trackball-accel-profile-changed(int);
-    callback trackball-natural-scroll-toggled(bool);
-    callback trackball-left-handed-toggled(bool);
-    callback trackball-scroll-method-changed(int);
-    callback trackball-scroll-button-changed(int);
-    callback trackball-scroll-button-lock-toggled(bool);
-    callback trackball-middle-emulation-toggled(bool);
+    // Dynamic trackball callbacks
+    callback trackball-setting-toggle-changed(string, bool);
+    callback trackball-setting-slider-int-changed(string, int);
+    callback trackball-setting-slider-float-changed(string, float);
+    callback trackball-setting-combo-changed(string, int);
+    callback trackball-setting-text-changed(string, string);
 
-    // Tablet callbacks
-    callback tablet-off-toggled(bool);
-    callback tablet-map-to-output-changed(string);
-    callback tablet-left-handed-toggled(bool);
-    callback tablet-calibration-toggled(bool);
-    callback tablet-calibration-changed(float, float, float, float, float, float);
+    // Dynamic tablet callbacks
+    callback tablet-setting-toggle-changed(string, bool);
+    callback tablet-setting-slider-int-changed(string, int);
+    callback tablet-setting-slider-float-changed(string, float);
+    callback tablet-setting-combo-changed(string, int);
+    callback tablet-setting-text-changed(string, string);
 
-    // Touch callbacks
-    callback touch-off-toggled(bool);
-    callback touch-map-to-output-changed(string);
-    callback touch-calibration-toggled(bool);
-    callback touch-calibration-changed(float, float, float, float, float, float);
+    // Dynamic touch callbacks
+    callback touch-setting-toggle-changed(string, bool);
+    callback touch-setting-slider-int-changed(string, int);
+    callback touch-setting-slider-float-changed(string, float);
+    callback touch-setting-combo-changed(string, int);
+    callback touch-setting-text-changed(string, string);
 
     // Display/Output callbacks
     callback output-add(string);
@@ -997,6 +1208,116 @@ export component MainWindow inherits Window {
     callback layer-rule-shadow-color-changed(color);
     callback layer-rule-shadow-inactive-color-changed(color);
 
+    // Dynamic Layer Rules callbacks
+    callback layer-rule-add-dynamic();
+    callback layer-rule-remove-dynamic(int);
+    callback layer-rule-select-dynamic(int);
+    callback layer-rule-reorder-dynamic(int, int);
+    callback layer-rule-add-match-dynamic();
+    callback layer-rule-remove-match-dynamic(int);
+    callback layer-rule-select-match-dynamic(int);
+    callback layer-rule-setting-toggle-changed(string, bool);
+    callback layer-rule-setting-slider-int-changed(string, int);
+    callback layer-rule-setting-slider-float-changed(string, float);
+    callback layer-rule-setting-combo-changed(string, int);
+    callback layer-rule-setting-text-changed(string, string);
+    callback layer-rule-setting-color-changed(string, color);
+
+    // Dynamic Cursor callbacks
+    callback cursor-setting-toggle-changed(string, bool);
+    callback cursor-setting-slider-int-changed(string, int);
+    callback cursor-setting-text-changed(string, string);
+
+    // Dynamic Appearance callbacks
+    callback appearance-setting-toggle-changed(string, bool);
+    callback appearance-setting-slider-int-changed(string, int);
+    callback appearance-setting-slider-float-changed(string, float);
+    callback appearance-setting-combo-changed(string, int);
+    callback appearance-setting-text-changed(string, string);
+    callback appearance-setting-color-changed(string, color);
+
+    // Dynamic Behavior callbacks
+    callback behavior-setting-toggle-changed(string, bool);
+    callback behavior-setting-slider-int-changed(string, int);
+    callback behavior-setting-slider-float-changed(string, float);
+    callback behavior-setting-combo-changed(string, int);
+    callback behavior-setting-text-changed(string, string);
+
+    // Dynamic Overview callbacks
+    callback overview-setting-toggle-changed(string, bool);
+    callback overview-setting-slider-int-changed(string, int);
+    callback overview-setting-slider-float-changed(string, float);
+    callback overview-setting-combo-changed(string, int);
+    callback overview-setting-text-changed(string, string);
+    callback overview-setting-color-changed(string, color);
+
+    // Dynamic Keyboard callbacks
+    callback keyboard-dynamic-setting-toggle-changed(string, bool);
+    callback keyboard-dynamic-setting-slider-int-changed(string, int);
+    callback keyboard-dynamic-setting-slider-float-changed(string, float);
+    callback keyboard-dynamic-setting-combo-changed(string, int);
+    callback keyboard-dynamic-setting-text-changed(string, string);
+
+    // Dynamic Mouse callbacks
+    callback mouse-setting-toggle-changed(string, bool);
+    callback mouse-setting-slider-int-changed(string, int);
+    callback mouse-setting-slider-float-changed(string, float);
+    callback mouse-setting-combo-changed(string, int);
+    callback mouse-setting-text-changed(string, string);
+
+    // Dynamic Touchpad callbacks
+    callback touchpad-setting-toggle-changed(string, bool);
+    callback touchpad-setting-slider-int-changed(string, int);
+    callback touchpad-setting-slider-float-changed(string, float);
+    callback touchpad-setting-combo-changed(string, int);
+    callback touchpad-setting-text-changed(string, string);
+
+    // Dynamic Layout Extras callbacks
+    callback layout-extras-setting-toggle-changed(string, bool);
+    callback layout-extras-setting-slider-int-changed(string, int);
+    callback layout-extras-setting-slider-float-changed(string, float);
+    callback layout-extras-setting-combo-changed(string, int);
+    callback layout-extras-setting-color-changed(string, string);
+
+    // Dynamic Gestures callbacks
+    callback gestures-setting-toggle-changed(string, bool);
+    callback gestures-setting-slider-int-changed(string, int);
+    callback gestures-setting-slider-float-changed(string, float);
+    callback gestures-setting-combo-changed(string, int);
+    callback gestures-hot-corner-toggled(string, bool);
+
+    // Dynamic Miscellaneous callbacks
+    callback misc-setting-toggle-changed(string, bool);
+    callback misc-setting-slider-int-changed(string, int);
+    callback misc-setting-slider-float-changed(string, float);
+    callback misc-setting-combo-changed(string, int);
+    callback misc-setting-text-changed(string, string);
+
+    // Dynamic Debug callbacks
+    callback debug-setting-toggle-changed(string, bool);
+    callback debug-setting-slider-int-changed(string, int);
+    callback debug-setting-slider-float-changed(string, float);
+    callback debug-setting-combo-changed(string, int);
+    callback debug-setting-text-changed(string, string);
+    callback debug-validate-requested();
+    callback debug-dynamic-expert-mode-toggled(bool);
+
+    // Dynamic Animation callbacks
+    callback anim-setting-toggle-changed(string, bool);
+    callback anim-setting-slider-int-changed(string, int);
+    callback anim-setting-slider-float-changed(string, float);
+    callback anim-setting-combo-changed(string, int);
+
+    // Dynamic Switch Events callbacks
+    callback switch-events-setting-toggle-changed(string, bool);
+    callback switch-events-setting-slider-int-changed(string, int);
+    callback switch-events-setting-combo-changed(string, int);
+    callback switch-events-setting-text-changed(string, string);
+    callback switch-events-command-add(string, string);
+    callback switch-events-command-remove(string, int);
+    callback switch-events-command-select(string, int);
+    callback switch-events-command-text-changed(string, string);
+
     // Keybindings callbacks
     callback keybindings-refresh();
     callback keybinding-selected(int);
@@ -1023,6 +1344,13 @@ export component MainWindow inherits Window {
     callback startup-command-changed(string);
     callback startup-reorder-command(int, int);
 
+    // Dynamic startup callbacks
+    callback startup-dynamic-command-add();
+    callback startup-dynamic-command-remove(int);
+    callback startup-dynamic-command-select(int);
+    callback startup-dynamic-command-changed(string);
+    callback startup-dynamic-reorder-command(int, int);
+
     // Environment variable callbacks
     callback environment-add-variable();
     callback environment-remove-variable(int);
@@ -1030,6 +1358,14 @@ export component MainWindow inherits Window {
     callback environment-name-changed(string);
     callback environment-value-changed(string);
     callback environment-reorder-variable(int, int);
+
+    // Dynamic environment callbacks
+    callback environment-dynamic-add-variable();
+    callback environment-dynamic-remove-variable(int);
+    callback environment-dynamic-select-variable(int);
+    callback environment-dynamic-name-changed(string);
+    callback environment-dynamic-value-changed(string);
+    callback environment-dynamic-reorder-variable(int, int);
 
     // Debug callbacks
     callback debug-expert-mode-toggled(bool);
@@ -1088,6 +1424,14 @@ export component MainWindow inherits Window {
     callback recent-windows-highlight-corner-radius-changed(int);
     callback recent-windows-previews-max-height-changed(int);
     callback recent-windows-previews-max-scale-changed(float);
+
+    // Dynamic recent windows callbacks
+    callback recent-windows-dynamic-setting-toggle-changed(string, bool);
+    callback recent-windows-dynamic-setting-slider-int-changed(string, int);
+    callback recent-windows-dynamic-setting-slider-float-changed(string, float);
+    callback recent-windows-dynamic-setting-combo-changed(string, int);
+    callback recent-windows-dynamic-setting-text-changed(string, string);
+    callback recent-windows-dynamic-setting-color-changed(string, color);
 
     // Category names for display
     property <[string]> category-names: [
@@ -1308,236 +1652,137 @@ export component MainWindow inherits Window {
             vertical-stretch: 1;
 
             // Page content based on selected category
-            if selected-category == SidebarIndices.appearance: AppearancePage {
-                        sub-page: nav-group == 0 ? nav-page : 0;  // Pass sub-page when in Appearance group
-                        focus-ring-enabled <=> root.focus-ring-enabled;
-                        focus-ring-width <=> root.focus-ring-width;
-                        focus-ring-active-color <=> root.focus-ring-active-color;
-                        focus-ring-inactive-color <=> root.focus-ring-inactive-color;
-                        focus-ring-urgent-color <=> root.focus-ring-urgent-color;
-                        focus-ring-active-hex <=> root.focus-ring-active-hex;
-                        focus-ring-inactive-hex <=> root.focus-ring-inactive-hex;
-                        focus-ring-urgent-hex <=> root.focus-ring-urgent-hex;
-                        border-enabled <=> root.border-enabled;
-                        border-thickness <=> root.border-thickness;
-                        border-active-color <=> root.border-active-color;
-                        border-inactive-color <=> root.border-inactive-color;
-                        border-urgent-color <=> root.border-urgent-color;
-                        border-active-hex <=> root.border-active-hex;
-                        border-inactive-hex <=> root.border-inactive-hex;
-                        border-urgent-hex <=> root.border-urgent-hex;
-                        gaps-inner <=> root.gaps-inner;
-                        gaps-outer <=> root.gaps-outer;
-                        corner-radius <=> root.corner-radius;
-                        background-color <=> root.background-color;
-                        background-color-hex <=> root.background-color-hex;
+            if selected-category == SidebarIndices.appearance: AppearanceDynamicPage {
+                        sub-page: nav-group == 0 ? nav-page : 0;
+                        focus-ring-settings <=> root.appearance-focus-ring-settings;
+                        border-settings <=> root.appearance-border-settings;
+                        background-settings <=> root.appearance-background-settings;
+                        gaps-settings <=> root.appearance-gaps-settings;
+                        corners-settings <=> root.appearance-corners-settings;
 
-                        focus-ring-toggled(val) => { root.focus-ring-toggled(val); }
-                        focus-ring-width-changed(val) => { root.focus-ring-width-changed(val); }
-                        focus-ring-active-color-changed(col) => { root.focus-ring-active-color-changed(col); }
-                        focus-ring-inactive-color-changed(col) => { root.focus-ring-inactive-color-changed(col); }
-                        focus-ring-urgent-color-changed(col) => { root.focus-ring-urgent-color-changed(col); }
-                        border-toggled(val) => { root.border-toggled(val); }
-                        border-thickness-changed(val) => { root.border-thickness-changed(val); }
-                        border-active-color-changed(col) => { root.border-active-color-changed(col); }
-                        border-inactive-color-changed(col) => { root.border-inactive-color-changed(col); }
-                        border-urgent-color-changed(col) => { root.border-urgent-color-changed(col); }
-                        gaps-inner-changed(val) => { root.gaps-inner-changed(val); }
-                        gaps-outer-changed(val) => { root.gaps-outer-changed(val); }
-                        corner-radius-changed(val) => { root.corner-radius-changed(val); }
-                        background-color-changed(col) => { root.background-color-changed(col); }
+                        setting-toggle-changed(id, val) => { root.appearance-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.appearance-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.appearance-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.appearance-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.appearance-setting-text-changed(id, val); }
+                        setting-color-changed(id, col) => { root.appearance-setting-color-changed(id, col); }
                     }
 
-                    if selected-category == SidebarIndices.behavior: BehaviorPage {
-                        focus-follows-mouse <=> root.focus-follows-mouse;
-                        warp-mouse-to-focus <=> root.warp-mouse-to-focus;
-                        center-focused-column <=> root.center-focused-column;
-                        always-center-single-column <=> root.always-center-single-column;
-                        default-column-width-index <=> root.default-column-width-index;
-                        default-column-width-proportion <=> root.default-column-width-proportion;
-                        default-column-width-fixed <=> root.default-column-width-fixed;
-                        strut-left <=> root.strut-left;
-                        strut-right <=> root.strut-right;
-                        strut-top <=> root.strut-top;
-                        strut-bottom <=> root.strut-bottom;
-                        mod-key-index <=> root.mod-key-index;
-                        mod-key-nested-enabled <=> root.mod-key-nested-enabled;
-                        mod-key-nested-index <=> root.mod-key-nested-index;
-                        disable-power-key-handling <=> root.disable-power-key-handling;
+                    if selected-category == SidebarIndices.behavior: BehaviorDynamicPage {
+                        focus-settings <=> root.behavior-focus-settings;
+                        workspace-settings <=> root.behavior-workspace-settings;
+                        window-size-settings <=> root.behavior-window-size-settings;
+                        strut-settings <=> root.behavior-strut-settings;
+                        modifier-settings <=> root.behavior-modifier-settings;
+                        power-settings <=> root.behavior-power-settings;
 
-                        focus-follows-mouse-toggled(val) => { root.focus-follows-mouse-toggled(val); }
-                        warp-mouse-to-focus-toggled(val) => { root.warp-mouse-to-focus-toggled(val); }
-                        center-focused-column-toggled(val) => { root.center-focused-column-toggled(val); }
-                        always-center-single-column-toggled(val) => { root.always-center-single-column-toggled(val); }
-                        default-column-width-type-changed(idx) => { root.default-column-width-type-changed(idx); }
-                        default-column-width-proportion-changed(val) => { root.default-column-width-proportion-changed(val); }
-                        default-column-width-fixed-changed(val) => { root.default-column-width-fixed-changed(val); }
-                        strut-left-changed(val) => { root.strut-left-changed(val); }
-                        strut-right-changed(val) => { root.strut-right-changed(val); }
-                        strut-top-changed(val) => { root.strut-top-changed(val); }
-                        strut-bottom-changed(val) => { root.strut-bottom-changed(val); }
-                        mod-key-changed(idx) => { root.mod-key-changed(idx); }
-                        mod-key-nested-enabled-toggled(val) => { root.mod-key-nested-enabled-toggled(val); }
-                        mod-key-nested-changed(idx) => { root.mod-key-nested-changed(idx); }
-                        disable-power-key-handling-toggled(val) => { root.disable-power-key-handling-toggled(val); }
+                        setting-toggle-changed(id, val) => { root.behavior-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.behavior-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.behavior-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.behavior-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.behavior-setting-text-changed(id, val); }
                     }
 
-                    if selected-category == SidebarIndices.keyboard: KeyboardPage {
-                        off <=> root.keyboard-off;
-                        xkb-layout <=> root.xkb-layout;
-                        xkb-variant <=> root.xkb-variant;
-                        xkb-model <=> root.xkb-model;
-                        xkb-rules <=> root.xkb-rules;
-                        xkb-options <=> root.xkb-options;
-                        xkb-file <=> root.xkb-file;
-                        repeat-delay <=> root.repeat-delay;
-                        repeat-rate <=> root.repeat-rate;
-                        numlock <=> root.numlock;
-                        track-layout-index <=> root.track-layout-index;
+                    if selected-category == SidebarIndices.keyboard: KeyboardDynamicPage {
+                        layout-settings <=> root.keyboard-dynamic-layout-settings;
+                        repeat-settings <=> root.keyboard-dynamic-repeat-settings;
+                        other-settings <=> root.keyboard-dynamic-other-settings;
+                        advanced-settings <=> root.keyboard-dynamic-advanced-settings;
 
-                        off-toggled(val) => { root.keyboard-off-toggled(val); }
-                        xkb-layout-changed(val) => { root.xkb-layout-changed(val); }
-                        xkb-variant-changed(val) => { root.xkb-variant-changed(val); }
-                        xkb-model-changed(val) => { root.xkb-model-changed(val); }
-                        xkb-rules-changed(val) => { root.xkb-rules-changed(val); }
-                        xkb-options-changed(val) => { root.xkb-options-changed(val); }
-                        xkb-file-changed(val) => { root.xkb-file-changed(val); }
-                        repeat-delay-changed(val) => { root.repeat-delay-changed(val); }
-                        repeat-rate-changed(val) => { root.repeat-rate-changed(val); }
-                        numlock-toggled(val) => { root.numlock-toggled(val); }
-                        track-layout-changed(idx) => { root.track-layout-changed(idx); }
+                        setting-toggle-changed(id, val) => { root.keyboard-dynamic-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.keyboard-dynamic-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.keyboard-dynamic-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.keyboard-dynamic-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.keyboard-dynamic-setting-text-changed(id, val); }
                     }
 
-                    if selected-category == SidebarIndices.mouse: MousePage {
-                        off <=> root.mouse-off;
-                        natural-scroll <=> root.mouse-natural-scroll;
-                        left-handed <=> root.mouse-left-handed;
-                        accel-speed <=> root.mouse-accel-speed;
-                        accel-profile-index <=> root.mouse-accel-profile-index;
-                        scroll-factor <=> root.mouse-scroll-factor;
-                        scroll-method-index <=> root.mouse-scroll-method-index;
-                        middle-emulation <=> root.mouse-middle-emulation;
-                        scroll-button <=> root.mouse-scroll-button;
-                        scroll-button-lock <=> root.mouse-scroll-button-lock;
+                    if selected-category == SidebarIndices.mouse: MouseDynamicPage {
+                        device-off <=> root.mouse-dynamic-device-off;
+                        device-settings <=> root.mouse-dynamic-device-settings;
+                        basic-settings <=> root.mouse-dynamic-basic-settings;
+                        acceleration-settings <=> root.mouse-dynamic-acceleration-settings;
+                        scrolling-settings <=> root.mouse-dynamic-scrolling-settings;
 
-                        off-toggled(val) => { root.mouse-off-toggled(val); }
-                        natural-scroll-toggled(val) => { root.mouse-natural-scroll-toggled(val); }
-                        left-handed-toggled(val) => { root.mouse-left-handed-toggled(val); }
-                        accel-speed-changed(val) => { root.mouse-accel-speed-changed(val); }
-                        accel-profile-changed(idx) => { root.mouse-accel-profile-changed(idx); }
-                        scroll-factor-changed(val) => { root.mouse-scroll-factor-changed(val); }
-                        scroll-method-changed(idx) => { root.mouse-scroll-method-changed(idx); }
-                        middle-emulation-toggled(val) => { root.mouse-middle-emulation-toggled(val); }
-                        scroll-button-changed(val) => { root.mouse-scroll-button-changed(val); }
-                        scroll-button-lock-toggled(val) => { root.mouse-scroll-button-lock-toggled(val); }
+                        setting-toggle-changed(id, val) => { root.mouse-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.mouse-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.mouse-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.mouse-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.mouse-setting-text-changed(id, val); }
                     }
 
-                    if selected-category == SidebarIndices.touchpad: TouchpadPage {
-                        off <=> root.touchpad-off;
-                        tap <=> root.touchpad-tap;
-                        tap-button-map-index <=> root.touchpad-tap-button-map-index;
-                        natural-scroll <=> root.touchpad-natural-scroll;
-                        scroll-method-index <=> root.touchpad-scroll-method-index;
-                        scroll-factor <=> root.touchpad-scroll-factor;
-                        click-method-index <=> root.touchpad-click-method-index;
-                        middle-emulation <=> root.touchpad-middle-emulation;
-                        left-handed <=> root.touchpad-left-handed;
-                        dwt <=> root.touchpad-dwt;
-                        dwtp <=> root.touchpad-dwtp;
-                        drag <=> root.touchpad-drag;
-                        drag-lock <=> root.touchpad-drag-lock;
-                        accel-speed <=> root.touchpad-accel-speed;
-                        accel-profile-index <=> root.touchpad-accel-profile-index;
-                        disabled-on-external-mouse <=> root.touchpad-disabled-on-external-mouse;
-                        scroll-button <=> root.touchpad-scroll-button;
-                        scroll-button-lock <=> root.touchpad-scroll-button-lock;
+                    if selected-category == SidebarIndices.touchpad: TouchpadDynamicPage {
+                        device-off <=> root.touchpad-dynamic-device-off;
+                        device-control-settings <=> root.touchpad-dynamic-device-control-settings;
+                        tap-settings <=> root.touchpad-dynamic-tap-settings;
+                        scroll-settings <=> root.touchpad-dynamic-scroll-settings;
+                        click-settings <=> root.touchpad-dynamic-click-settings;
+                        palm-rejection-settings <=> root.touchpad-dynamic-palm-rejection-settings;
+                        drag-settings <=> root.touchpad-dynamic-drag-settings;
+                        acceleration-settings <=> root.touchpad-dynamic-acceleration-settings;
+                        other-settings <=> root.touchpad-dynamic-other-settings;
 
-                        off-toggled(val) => { root.touchpad-off-toggled(val); }
-                        tap-toggled(val) => { root.touchpad-tap-toggled(val); }
-                        tap-button-map-changed(idx) => { root.touchpad-tap-button-map-changed(idx); }
-                        natural-scroll-toggled(val) => { root.touchpad-natural-scroll-toggled(val); }
-                        scroll-method-changed(idx) => { root.touchpad-scroll-method-changed(idx); }
-                        scroll-factor-changed(val) => { root.touchpad-scroll-factor-changed(val); }
-                        click-method-changed(idx) => { root.touchpad-click-method-changed(idx); }
-                        middle-emulation-toggled(val) => { root.touchpad-middle-emulation-toggled(val); }
-                        left-handed-toggled(val) => { root.touchpad-left-handed-toggled(val); }
-                        dwt-toggled(val) => { root.touchpad-dwt-toggled(val); }
-                        dwtp-toggled(val) => { root.touchpad-dwtp-toggled(val); }
-                        drag-toggled(val) => { root.touchpad-drag-toggled(val); }
-                        drag-lock-toggled(val) => { root.touchpad-drag-lock-toggled(val); }
-                        accel-speed-changed(val) => { root.touchpad-accel-speed-changed(val); }
-                        accel-profile-changed(idx) => { root.touchpad-accel-profile-changed(idx); }
-                        disabled-on-external-mouse-toggled(val) => { root.touchpad-disabled-on-external-mouse-toggled(val); }
-                        scroll-button-changed(val) => { root.touchpad-scroll-button-changed(val); }
-                        scroll-button-lock-toggled(val) => { root.touchpad-scroll-button-lock-toggled(val); }
+                        setting-toggle-changed(id, val) => { root.touchpad-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.touchpad-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.touchpad-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.touchpad-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.touchpad-setting-text-changed(id, val); }
                     }
 
-                    if selected-category == SidebarIndices.cursor: CursorPage {
-                        cursor-theme <=> root.cursor-theme;
-                        cursor-size <=> root.cursor-size;
-                        hide-when-typing <=> root.hide-when-typing;
-                        hide-after-inactive-enabled <=> root.hide-after-inactive-enabled;
-                        hide-after-inactive-ms <=> root.hide-after-inactive-ms;
+                    if selected-category == SidebarIndices.cursor: CursorDynamicPage {
+                        theme-settings <=> root.cursor-theme-settings;
+                        visibility-settings <=> root.cursor-visibility-settings;
 
-                        cursor-theme-changed(val) => { root.cursor-theme-changed(val); }
-                        cursor-size-changed(val) => { root.cursor-size-changed(val); }
-                        hide-when-typing-toggled(val) => { root.hide-when-typing-toggled(val); }
-                        hide-after-inactive-toggled(val) => { root.hide-after-inactive-toggled(val); }
-                        hide-after-inactive-ms-changed(val) => { root.hide-after-inactive-ms-changed(val); }
+                        setting-toggle-changed(id, val) => { root.cursor-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.cursor-setting-slider-int-changed(id, val); }
+                        setting-text-changed(id, val) => { root.cursor-setting-text-changed(id, val); }
                     }
 
-                    if selected-category == SidebarIndices.animations: AnimationsPage {
-                        // Global animation settings
+                    if selected-category == SidebarIndices.animations: AnimationsDynamicPage {
                         animations-enabled <=> root.animations-enabled;
-                        slowdown <=> root.animations-slowdown;
+                        global-settings <=> root.anim-global-settings;
+                        workspace-nav-animations <=> root.anim-workspace-nav-animations;
+                        window-animations <=> root.anim-window-animations;
+                        ui-animations <=> root.anim-ui-animations;
+                        spring-params-0 <=> root.anim-spring-params-0;
+                        spring-params-1 <=> root.anim-spring-params-1;
+                        spring-params-2 <=> root.anim-spring-params-2;
+                        spring-params-3 <=> root.anim-spring-params-3;
+                        spring-params-4 <=> root.anim-spring-params-4;
+                        spring-params-5 <=> root.anim-spring-params-5;
+                        spring-params-6 <=> root.anim-spring-params-6;
+                        spring-params-7 <=> root.anim-spring-params-7;
+                        spring-params-8 <=> root.anim-spring-params-8;
+                        spring-params-9 <=> root.anim-spring-params-9;
+                        spring-params-10 <=> root.anim-spring-params-10;
+                        easing-params-0 <=> root.anim-easing-params-0;
+                        easing-params-1 <=> root.anim-easing-params-1;
+                        easing-params-2 <=> root.anim-easing-params-2;
+                        easing-params-3 <=> root.anim-easing-params-3;
+                        easing-params-4 <=> root.anim-easing-params-4;
+                        easing-params-5 <=> root.anim-easing-params-5;
+                        easing-params-6 <=> root.anim-easing-params-6;
+                        easing-params-7 <=> root.anim-easing-params-7;
+                        easing-params-8 <=> root.anim-easing-params-8;
+                        easing-params-9 <=> root.anim-easing-params-9;
+                        easing-params-10 <=> root.anim-easing-params-10;
 
-                        // Animation configurations model (replaces 66 individual property bindings)
-                        animations-model: root.animations-model;
-
-                        // Global callbacks
-                        animations-toggled(val) => { root.animations-toggled(val); }
-                        slowdown-changed(val) => { root.animations-slowdown-changed(val); }
-
-                        // Indexed animation callbacks (6 total instead of 66)
-                        animation-type-changed(id, val) => { root.animation-type-changed(id, val); }
-                        animation-damping-changed(id, val) => { root.animation-damping-changed(id, val); }
-                        animation-stiffness-changed(id, val) => { root.animation-stiffness-changed(id, val); }
-                        animation-epsilon-changed(id, val) => { root.animation-epsilon-changed(id, val); }
-                        animation-duration-changed(id, val) => { root.animation-duration-changed(id, val); }
-                        animation-curve-changed(id, val) => { root.animation-curve-changed(id, val); }
-                        // Cubic-bezier control point callbacks
-                        animation-bezier-x1-changed(id, val) => { root.animation-bezier-x1-changed(id, val); }
-                        animation-bezier-y1-changed(id, val) => { root.animation-bezier-y1-changed(id, val); }
-                        animation-bezier-x2-changed(id, val) => { root.animation-bezier-x2-changed(id, val); }
-                        animation-bezier-y2-changed(id, val) => { root.animation-bezier-y2-changed(id, val); }
+                        setting-toggle-changed(id, val) => { root.anim-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.anim-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.anim-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.anim-setting-combo-changed(id, val); }
                     }
 
-                    if selected-category == SidebarIndices.overview: OverviewPage {
-                        zoom <=> root.overview-zoom;
-                        backdrop-enabled <=> root.overview-backdrop-enabled;
-                        backdrop-color <=> root.overview-backdrop-color;
-                        backdrop-hex <=> root.overview-backdrop-hex;
+                    if selected-category == SidebarIndices.overview: OverviewDynamicPage {
+                        appearance-settings <=> root.overview-appearance-settings;
+                        backdrop-settings <=> root.overview-backdrop-settings;
+                        shadow-settings <=> root.overview-shadow-settings;
 
-                        // Phase 8: Workspace shadow
-                        workspace-shadow-enabled <=> root.overview-workspace-shadow-enabled;
-                        workspace-shadow-softness <=> root.overview-workspace-shadow-softness;
-                        workspace-shadow-spread <=> root.overview-workspace-shadow-spread;
-                        workspace-shadow-offset-x <=> root.overview-workspace-shadow-offset-x;
-                        workspace-shadow-offset-y <=> root.overview-workspace-shadow-offset-y;
-                        workspace-shadow-color <=> root.overview-workspace-shadow-color;
-                        workspace-shadow-color-hex <=> root.overview-workspace-shadow-color-hex;
-
-                        zoom-changed(val) => { root.overview-zoom-changed(val); }
-                        backdrop-toggled(val) => { root.overview-backdrop-toggled(val); }
-                        backdrop-color-changed(col) => { root.overview-backdrop-color-changed(col); }
-
-                        // Phase 8: Workspace shadow callbacks
-                        workspace-shadow-toggled(val) => { root.overview-workspace-shadow-toggled(val); }
-                        workspace-shadow-softness-changed(val) => { root.overview-workspace-shadow-softness-changed(val); }
-                        workspace-shadow-spread-changed(val) => { root.overview-workspace-shadow-spread-changed(val); }
-                        workspace-shadow-offset-x-changed(val) => { root.overview-workspace-shadow-offset-x-changed(val); }
-                        workspace-shadow-offset-y-changed(val) => { root.overview-workspace-shadow-offset-y-changed(val); }
-                        workspace-shadow-color-changed(col) => { root.overview-workspace-shadow-color-changed(col); }
+                        setting-toggle-changed(id, val) => { root.overview-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.overview-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.overview-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.overview-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.overview-setting-text-changed(id, val); }
+                        setting-color-changed(id, col) => { root.overview-setting-color-changed(id, col); }
                     }
 
                     if selected-category == SidebarIndices.displays: DisplaysPage {
@@ -1619,444 +1864,210 @@ export component MainWindow inherits Window {
                         output-layout-center-changed(idx) => { root.output-layout-center-changed(idx); }
                     }
 
-                    if selected-category == SidebarIndices.layout-extras: LayoutExtrasPage {
-                        shadow-enabled <=> root.shadow-enabled;
-                        shadow-softness <=> root.shadow-softness;
-                        shadow-spread <=> root.shadow-spread;
-                        shadow-offset-x <=> root.shadow-offset-x;
-                        shadow-offset-y <=> root.shadow-offset-y;
-                        shadow-draw-behind <=> root.shadow-draw-behind;
-                        shadow-color <=> root.shadow-color;
-                        shadow-inactive-color <=> root.shadow-inactive-color;
-                        shadow-color-hex <=> root.shadow-color-hex;
-                        shadow-inactive-color-hex <=> root.shadow-inactive-color-hex;
+                    if selected-category == SidebarIndices.layout-extras: LayoutExtrasDynamicPage {
+                        shadow-settings <=> root.layout-extras-shadow-settings;
+                        tab-indicator-settings <=> root.layout-extras-tab-indicator-settings;
+                        insert-hint-settings <=> root.layout-extras-insert-hint-settings;
 
-                        tab-indicator-enabled <=> root.tab-indicator-enabled;
-                        tab-indicator-hide-single <=> root.tab-indicator-hide-single;
-                        tab-indicator-within-column <=> root.tab-indicator-within-column;
-                        tab-indicator-gap <=> root.tab-indicator-gap;
-                        tab-indicator-width <=> root.tab-indicator-width;
-                        tab-indicator-position-index <=> root.tab-indicator-position-index;
-                        tab-indicator-corner-radius <=> root.tab-indicator-corner-radius;
-                        tab-indicator-gaps-between <=> root.tab-indicator-gaps-between;
-                        tab-indicator-active-color <=> root.tab-indicator-active-color;
-                        tab-indicator-inactive-color <=> root.tab-indicator-inactive-color;
-                        tab-indicator-urgent-color <=> root.tab-indicator-urgent-color;
-                        tab-indicator-active-hex <=> root.tab-indicator-active-hex;
-                        tab-indicator-inactive-hex <=> root.tab-indicator-inactive-hex;
-                        tab-indicator-urgent-hex <=> root.tab-indicator-urgent-hex;
-
-                        insert-hint-enabled <=> root.insert-hint-enabled;
-                        insert-hint-color <=> root.insert-hint-color;
-                        insert-hint-color-hex <=> root.insert-hint-color-hex;
-
-                        shadow-toggled(val) => { root.shadow-toggled(val); }
-                        shadow-softness-changed(val) => { root.shadow-softness-changed(val); }
-                        shadow-spread-changed(val) => { root.shadow-spread-changed(val); }
-                        shadow-offset-x-changed(val) => { root.shadow-offset-x-changed(val); }
-                        shadow-offset-y-changed(val) => { root.shadow-offset-y-changed(val); }
-                        shadow-draw-behind-toggled(val) => { root.shadow-draw-behind-toggled(val); }
-                        shadow-color-changed(col) => { root.shadow-color-changed(col); }
-                        shadow-inactive-color-changed(col) => { root.shadow-inactive-color-changed(col); }
-
-                        tab-indicator-toggled(val) => { root.tab-indicator-toggled(val); }
-                        tab-indicator-hide-single-toggled(val) => { root.tab-indicator-hide-single-toggled(val); }
-                        tab-indicator-within-column-toggled(val) => { root.tab-indicator-within-column-toggled(val); }
-                        tab-indicator-gap-changed(val) => { root.tab-indicator-gap-changed(val); }
-                        tab-indicator-width-changed(val) => { root.tab-indicator-width-changed(val); }
-                        tab-indicator-position-changed(idx) => { root.tab-indicator-position-changed(idx); }
-                        tab-indicator-corner-radius-changed(val) => { root.tab-indicator-corner-radius-changed(val); }
-                        tab-indicator-gaps-between-changed(val) => { root.tab-indicator-gaps-between-changed(val); }
-                        tab-indicator-active-color-changed(col) => { root.tab-indicator-active-color-changed(col); }
-                        tab-indicator-inactive-color-changed(col) => { root.tab-indicator-inactive-color-changed(col); }
-                        tab-indicator-urgent-color-changed(col) => { root.tab-indicator-urgent-color-changed(col); }
-
-                        insert-hint-toggled(val) => { root.insert-hint-toggled(val); }
-                        insert-hint-color-changed(col) => { root.insert-hint-color-changed(col); }
+                        setting-toggle-changed(id, val) => { root.layout-extras-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.layout-extras-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.layout-extras-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.layout-extras-setting-combo-changed(id, val); }
+                        setting-color-changed(id, col) => { root.layout-extras-setting-color-changed(id, col); }
                     }
 
-                    if selected-category == SidebarIndices.gestures: GesturesPage {
-                        hot-corners-enabled <=> root.hot-corners-enabled;
-                        hot-corner-top-left <=> root.hot-corner-top-left;
-                        hot-corner-top-right <=> root.hot-corner-top-right;
-                        hot-corner-bottom-left <=> root.hot-corner-bottom-left;
-                        hot-corner-bottom-right <=> root.hot-corner-bottom-right;
+                    if selected-category == SidebarIndices.gestures: GesturesDynamicPage {
+                        hot-corners-enabled <=> root.gestures-hot-corners-enabled;
+                        hot-corner-top-left <=> root.gestures-hot-corner-top-left;
+                        hot-corner-top-right <=> root.gestures-hot-corner-top-right;
+                        hot-corner-bottom-left <=> root.gestures-hot-corner-bottom-left;
+                        hot-corner-bottom-right <=> root.gestures-hot-corner-bottom-right;
+                        hot-corners-settings <=> root.gestures-hot-corners-settings;
+                        dnd-edge-scroll-settings <=> root.gestures-dnd-edge-scroll-settings;
+                        dnd-workspace-switch-settings <=> root.gestures-dnd-workspace-switch-settings;
 
-                        dnd-edge-scroll-enabled <=> root.dnd-edge-scroll-enabled;
-                        dnd-edge-scroll-trigger-width <=> root.dnd-edge-scroll-trigger-width;
-                        dnd-edge-scroll-delay <=> root.dnd-edge-scroll-delay;
-                        dnd-edge-scroll-max-speed <=> root.dnd-edge-scroll-max-speed;
-
-                        dnd-workspace-switch-enabled <=> root.dnd-workspace-switch-enabled;
-                        dnd-workspace-switch-trigger-height <=> root.dnd-workspace-switch-trigger-height;
-                        dnd-workspace-switch-delay <=> root.dnd-workspace-switch-delay;
-                        dnd-workspace-switch-max-speed <=> root.dnd-workspace-switch-max-speed;
-
-                        hot-corners-toggled(val) => { root.hot-corners-toggled(val); }
-                        hot-corner-top-left-toggled(val) => { root.hot-corner-top-left-toggled(val); }
-                        hot-corner-top-right-toggled(val) => { root.hot-corner-top-right-toggled(val); }
-                        hot-corner-bottom-left-toggled(val) => { root.hot-corner-bottom-left-toggled(val); }
-                        hot-corner-bottom-right-toggled(val) => { root.hot-corner-bottom-right-toggled(val); }
-
-                        dnd-edge-scroll-toggled(val) => { root.dnd-edge-scroll-toggled(val); }
-                        dnd-edge-scroll-trigger-width-changed(val) => { root.dnd-edge-scroll-trigger-width-changed(val); }
-                        dnd-edge-scroll-delay-changed(val) => { root.dnd-edge-scroll-delay-changed(val); }
-                        dnd-edge-scroll-max-speed-changed(val) => { root.dnd-edge-scroll-max-speed-changed(val); }
-
-                        dnd-workspace-switch-toggled(val) => { root.dnd-workspace-switch-toggled(val); }
-                        dnd-workspace-switch-trigger-height-changed(val) => { root.dnd-workspace-switch-trigger-height-changed(val); }
-                        dnd-workspace-switch-delay-changed(val) => { root.dnd-workspace-switch-delay-changed(val); }
-                        dnd-workspace-switch-max-speed-changed(val) => { root.dnd-workspace-switch-max-speed-changed(val); }
+                        setting-toggle-changed(id, val) => { root.gestures-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.gestures-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.gestures-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.gestures-setting-combo-changed(id, val); }
+                        hot-corner-toggled(id, val) => { root.gestures-hot-corner-toggled(id, val); }
                     }
 
-                    if selected-category == SidebarIndices.miscellaneous: MiscellaneousPage {
-                        prefer-no-csd <=> root.prefer-no-csd;
-                        screenshot-path <=> root.screenshot-path;
-                        disable-primary-clipboard <=> root.disable-primary-clipboard;
-                        hotkey-overlay-skip <=> root.hotkey-overlay-skip;
+                    if selected-category == SidebarIndices.miscellaneous: MiscellaneousDynamicPage {
+                        decorations-settings <=> root.misc-decorations-settings;
+                        screenshots-settings <=> root.misc-screenshots-settings;
+                        screenshot-path-setting <=> root.misc-screenshot-path-setting;
+                        clipboard-settings <=> root.misc-clipboard-settings;
+                        hotkey-overlay-settings <=> root.misc-hotkey-overlay-settings;
+                        config-notification-settings <=> root.misc-config-notification-settings;
+                        startup-settings <=> root.misc-startup-settings;
+                        xwayland-settings <=> root.misc-xwayland-settings;
+                        xwayland-path-setting <=> root.misc-xwayland-path-setting;
+                        developer-settings <=> root.misc-developer-settings;
 
-                        // Phase 8: New settings
-                        hotkey-overlay-hide-not-bound <=> root.hotkey-overlay-hide-not-bound;
-                        config-notification-disable-failed <=> root.config-notification-disable-failed;
-
-                        // New settings (v25.08+)
-                        spawn-sh-at-startup <=> root.spawn-sh-at-startup;
-                        xwayland-satellite-index <=> root.xwayland-satellite-index;
-                        xwayland-satellite-path <=> root.xwayland-satellite-path;
-
-                        // Developer options
-                        show-debug-options <=> root.show-debug-options;
-
-                        prefer-no-csd-toggled(val) => { root.prefer-no-csd-toggled(val); }
-                        screenshot-path-changed(val) => { root.screenshot-path-changed(val); }
-                        disable-primary-clipboard-toggled(val) => { root.disable-primary-clipboard-toggled(val); }
-                        hotkey-overlay-skip-toggled(val) => { root.hotkey-overlay-skip-toggled(val); }
-
-                        // Phase 8 callbacks
-                        hotkey-overlay-hide-not-bound-toggled(val) => { root.hotkey-overlay-hide-not-bound-toggled(val); }
-                        config-notification-disable-failed-toggled(val) => { root.config-notification-disable-failed-toggled(val); }
-
-                        // New callbacks (v25.08+)
-                        spawn-sh-at-startup-toggled(val) => { root.spawn-sh-at-startup-toggled(val); }
-                        xwayland-satellite-mode-changed(idx) => { root.xwayland-satellite-mode-changed(idx); }
-                        xwayland-satellite-path-changed(val) => { root.xwayland-satellite-path-changed(val); }
-
-                        // Developer callbacks
-                        show-debug-options-toggled(val) => { root.show-debug-options-toggled(val); }
+                        setting-toggle-changed(id, val) => { root.misc-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.misc-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.misc-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.misc-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.misc-setting-text-changed(id, val); }
                     }
 
-                    if selected-category == SidebarIndices.window-rules: WindowRulesPage {
-                        rule-list <=> root.window-rules-list;
-                        selected-rule-index <=> root.selected-window-rule-index;
-                        current-rule-name <=> root.current-rule-name;
-                        // Multi-match properties
-                        matches-list <=> root.current-matches-list;
-                        selected-match-index <=> root.selected-match-index;
-                        matches-count <=> root.current-matches-count;
-                        current-match-app-id <=> root.current-match-app-id;
-                        current-match-title <=> root.current-match-title;
-                        current-match-is-floating <=> root.current-match-is-floating;
-                        current-match-is-active <=> root.current-match-is-active;
-                        current-match-is-focused <=> root.current-match-is-focused;
-                        current-match-is-active-in-column <=> root.current-match-is-active-in-column;
-                        current-match-is-window-cast-target <=> root.current-match-is-window-cast-target;
-                        current-match-is-urgent <=> root.current-match-is-urgent;
-                        current-match-at-startup <=> root.current-match-at-startup;
-                        current-open-behavior-index <=> root.current-open-behavior-index;
-                        current-has-opacity <=> root.current-has-opacity;
-                        current-opacity <=> root.current-opacity;
-                        current-block-screencast <=> root.current-block-screencast;
-                        current-has-corner-radius <=> root.current-has-corner-radius;
-                        current-corner-radius <=> root.current-corner-radius;
-                        current-clip-to-geometry <=> root.current-clip-to-geometry;
-                        current-open-on-output <=> root.current-open-on-output;
-                        current-open-on-workspace <=> root.current-open-on-workspace;
-                        // New dynamic properties
-                        current-vrr-index <=> root.current-vrr-index;
-                        current-column-display-index <=> root.current-column-display-index;
-                        current-tiled-state-index <=> root.current-tiled-state-index;
-                        current-baba-is-float <=> root.current-baba-is-float;
-                        // Floating position
-                        current-has-floating-position <=> root.current-has-floating-position;
-                        current-floating-x <=> root.current-floating-x;
-                        current-floating-y <=> root.current-floating-y;
-                        current-floating-relative-to <=> root.current-floating-relative-to;
-                        // Per-window shadow override
-                        current-shadow-mode <=> root.current-shadow-mode;
-                        current-shadow-softness <=> root.current-shadow-softness;
-                        current-shadow-spread <=> root.current-shadow-spread;
-                        current-shadow-offset-x <=> root.current-shadow-offset-x;
-                        current-shadow-offset-y <=> root.current-shadow-offset-y;
-                        current-shadow-color <=> root.current-shadow-color;
-                        current-shadow-inactive-color <=> root.current-shadow-inactive-color;
-                        current-shadow-draw-behind-window <=> root.current-shadow-draw-behind-window;
-                        // Per-window tab-indicator override
-                        current-tab-indicator-mode <=> root.current-tab-indicator-mode;
-                        current-tab-indicator-hide-when-single <=> root.current-tab-indicator-hide-when-single;
-                        current-tab-indicator-place-within-column <=> root.current-tab-indicator-place-within-column;
-                        current-tab-indicator-gap <=> root.current-tab-indicator-gap;
-                        current-tab-indicator-width <=> root.current-tab-indicator-width;
-                        current-tab-indicator-length <=> root.current-tab-indicator-length;
-                        current-tab-indicator-position <=> root.current-tab-indicator-position;
-                        current-tab-indicator-gaps-between-tabs <=> root.current-tab-indicator-gaps-between-tabs;
-                        current-tab-indicator-corner-radius <=> root.current-tab-indicator-corner-radius;
-                        current-tab-indicator-active-color <=> root.current-tab-indicator-active-color;
-                        current-tab-indicator-inactive-color <=> root.current-tab-indicator-inactive-color;
-                        // Window picker
-                        running-windows <=> root.running-windows-list;
-                        show-window-picker <=> root.show-window-picker;
+                    // DYNAMIC WINDOW RULES PAGE (replaces 123 lines with 30)
+                    if selected-category == SidebarIndices.window-rules: WindowRulesPageDynamic {
+                        rule-list <=> root.window-rules-list-dynamic;
+                        selected-rule-index <=> root.selected-window-rule-index-dynamic;
+                        matches-list <=> root.window-rules-matches-list-dynamic;
+                        selected-match-index <=> root.selected-match-index-dynamic;
+                        running-windows <=> root.window-rules-running-windows-dynamic;
+                        show-window-picker <=> root.window-rules-show-picker-dynamic;
+                        rule-settings <=> root.window-rules-rule-settings;
+                        match-settings <=> root.window-rules-match-settings;
+                        opening-settings <=> root.window-rules-opening-settings;
+                        visual-settings <=> root.window-rules-visual-settings;
+                        shadow-settings <=> root.window-rules-shadow-settings;
+                        tab-settings <=> root.window-rules-tab-settings;
 
-                        add-rule => { root.window-rule-add(); }
-                        remove-rule(idx) => { root.window-rule-remove(idx); }
-                        select-rule(idx) => { root.window-rule-select(idx); }
-                        rule-name-changed(val) => { root.window-rule-name-changed(val); }
-                        reorder-rule(from, to) => { root.window-rule-reorder(from, to); }
-                        // Multi-match callbacks
-                        add-match => { root.window-rule-add-match(); }
-                        remove-match(idx) => { root.window-rule-remove-match(idx); }
-                        select-match(idx) => { root.window-rule-select-match(idx); }
-                        match-app-id-changed(val) => { root.window-rule-match-app-id-changed(val); }
-                        match-title-changed(val) => { root.window-rule-match-title-changed(val); }
-                        // Advanced match criteria callbacks
-                        match-is-floating-changed(val) => { root.window-rule-match-is-floating-changed(val); }
-                        match-is-active-changed(val) => { root.window-rule-match-is-active-changed(val); }
-                        match-is-focused-changed(val) => { root.window-rule-match-is-focused-changed(val); }
-                        match-is-active-in-column-changed(val) => { root.window-rule-match-is-active-in-column-changed(val); }
-                        match-is-window-cast-target-changed(val) => { root.window-rule-match-is-window-cast-target-changed(val); }
-                        match-is-urgent-changed(val) => { root.window-rule-match-is-urgent-changed(val); }
-                        match-at-startup-changed(val) => { root.window-rule-match-at-startup-changed(val); }
-                        // Window picker
-                        refresh-windows => { root.window-rule-refresh-windows(); }
-                        select-running-window(idx) => { root.window-rule-select-running-window(idx); }
-                        open-behavior-changed(idx) => { root.window-rule-open-behavior-changed(idx); }
-                        opacity-toggled(val) => { root.window-rule-opacity-toggled(val); }
-                        opacity-changed(val) => { root.window-rule-opacity-changed(val); }
-                        block-screencast-toggled(val) => { root.window-rule-block-screencast-toggled(val); }
-                        corner-radius-toggled(val) => { root.window-rule-corner-radius-toggled(val); }
-                        corner-radius-changed(val) => { root.window-rule-corner-radius-changed(val); }
-                        clip-to-geometry-toggled(val) => { root.window-rule-clip-to-geometry-toggled(val); }
-                        open-on-output-changed(val) => { root.window-rule-open-on-output-changed(val); }
-                        open-on-workspace-changed(val) => { root.window-rule-open-on-workspace-changed(val); }
-                        // New dynamic property callbacks
-                        vrr-changed(val) => { root.window-rule-vrr-changed(val); }
-                        column-display-changed(val) => { root.window-rule-column-display-changed(val); }
-                        tiled-state-changed(val) => { root.window-rule-tiled-state-changed(val); }
-                        baba-is-float-toggled(val) => { root.window-rule-baba-is-float-toggled(val); }
-                        // Floating position callbacks
-                        floating-position-toggled(val) => { root.window-rule-floating-position-toggled(val); }
-                        floating-position-x-changed(val) => { root.window-rule-floating-position-x-changed(val); }
-                        floating-position-y-changed(val) => { root.window-rule-floating-position-y-changed(val); }
-                        floating-position-relative-to-changed(val) => { root.window-rule-floating-position-relative-to-changed(val); }
-                        // Shadow override callbacks
-                        shadow-mode-changed(val) => { root.window-rule-shadow-mode-changed(val); }
-                        shadow-softness-changed(val) => { root.window-rule-shadow-softness-changed(val); }
-                        shadow-spread-changed(val) => { root.window-rule-shadow-spread-changed(val); }
-                        shadow-offset-x-changed(val) => { root.window-rule-shadow-offset-x-changed(val); }
-                        shadow-offset-y-changed(val) => { root.window-rule-shadow-offset-y-changed(val); }
-                        shadow-color-changed(val) => { root.window-rule-shadow-color-changed(val); }
-                        shadow-inactive-color-changed(val) => { root.window-rule-shadow-inactive-color-changed(val); }
-                        shadow-draw-behind-window-toggled(val) => { root.window-rule-shadow-draw-behind-window-toggled(val); }
-                        // Tab indicator override callbacks
-                        tab-indicator-mode-changed(val) => { root.window-rule-tab-indicator-mode-changed(val); }
-                        tab-indicator-hide-when-single-toggled(val) => { root.window-rule-tab-indicator-hide-when-single-toggled(val); }
-                        tab-indicator-place-within-column-toggled(val) => { root.window-rule-tab-indicator-place-within-column-toggled(val); }
-                        tab-indicator-gap-changed(val) => { root.window-rule-tab-indicator-gap-changed(val); }
-                        tab-indicator-width-changed(val) => { root.window-rule-tab-indicator-width-changed(val); }
-                        tab-indicator-length-changed(val) => { root.window-rule-tab-indicator-length-changed(val); }
-                        tab-indicator-position-changed(val) => { root.window-rule-tab-indicator-position-changed(val); }
-                        tab-indicator-gaps-between-tabs-changed(val) => { root.window-rule-tab-indicator-gaps-between-tabs-changed(val); }
-                        tab-indicator-corner-radius-changed(val) => { root.window-rule-tab-indicator-corner-radius-changed(val); }
-                        tab-indicator-active-color-changed(val) => { root.window-rule-tab-indicator-active-color-changed(val); }
-                        tab-indicator-inactive-color-changed(val) => { root.window-rule-tab-indicator-inactive-color-changed(val); }
+                        add-rule => { root.window-rule-add-dynamic(); }
+                        remove-rule(idx) => { root.window-rule-remove-dynamic(idx); }
+                        select-rule(idx) => { root.window-rule-select-dynamic(idx); }
+                        reorder-rule(from, to) => { root.window-rule-reorder-dynamic(from, to); }
+                        add-match => { root.window-rule-add-match-dynamic(); }
+                        remove-match(idx) => { root.window-rule-remove-match-dynamic(idx); }
+                        select-match(idx) => { root.window-rule-select-match-dynamic(idx); }
+                        refresh-windows => { root.window-rule-refresh-windows-dynamic(); }
+                        select-running-window(idx) => { root.window-rule-select-running-window-dynamic(idx); }
+                        setting-toggle-changed(id, val) => { root.window-rule-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.window-rule-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.window-rule-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.window-rule-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.window-rule-setting-text-changed(id, val); }
                     }
 
                     // ═══════════════════════════════════════════════════════════════
-                    // TRACKPOINT PAGE (category 16)
+                    // TRACKPOINT PAGE (category 16) - Dynamic
                     // ═══════════════════════════════════════════════════════════════
-                    if selected-category == SidebarIndices.trackpoint: TrackpointPage {
-                        off <=> root.trackpoint-off;
-                        accel-speed <=> root.trackpoint-accel-speed;
-                        accel-profile-index <=> root.trackpoint-accel-profile-index;
-                        natural-scroll <=> root.trackpoint-natural-scroll;
-                        left-handed <=> root.trackpoint-left-handed;
-                        scroll-method-index <=> root.trackpoint-scroll-method-index;
-                        scroll-button <=> root.trackpoint-scroll-button;
-                        scroll-button-lock <=> root.trackpoint-scroll-button-lock;
-                        middle-emulation <=> root.trackpoint-middle-emulation;
+                    if selected-category == SidebarIndices.trackpoint: TrackpointDynamicPage {
+                        device-off <=> root.trackpoint-dynamic-device-off;
+                        general-settings <=> root.trackpoint-dynamic-general-settings;
+                        behavior-settings <=> root.trackpoint-dynamic-behavior-settings;
+                        acceleration-settings <=> root.trackpoint-dynamic-acceleration-settings;
+                        scrolling-settings <=> root.trackpoint-dynamic-scrolling-settings;
 
-                        off-toggled(val) => { root.trackpoint-off-toggled(val); }
-                        accel-speed-changed(val) => { root.trackpoint-accel-speed-changed(val); }
-                        accel-profile-changed(idx) => { root.trackpoint-accel-profile-changed(idx); }
-                        natural-scroll-toggled(val) => { root.trackpoint-natural-scroll-toggled(val); }
-                        left-handed-toggled(val) => { root.trackpoint-left-handed-toggled(val); }
-                        scroll-method-changed(idx) => { root.trackpoint-scroll-method-changed(idx); }
-                        scroll-button-changed(val) => { root.trackpoint-scroll-button-changed(val); }
-                        scroll-button-lock-toggled(val) => { root.trackpoint-scroll-button-lock-toggled(val); }
-                        middle-emulation-toggled(val) => { root.trackpoint-middle-emulation-toggled(val); }
+                        setting-toggle-changed(id, val) => { root.trackpoint-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.trackpoint-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.trackpoint-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.trackpoint-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.trackpoint-setting-text-changed(id, val); }
                     }
 
                     // ═══════════════════════════════════════════════════════════════
-                    // TRACKBALL PAGE (category 17)
+                    // TRACKBALL PAGE (category 17) - Dynamic
                     // ═══════════════════════════════════════════════════════════════
-                    if selected-category == SidebarIndices.trackball: TrackballPage {
-                        off <=> root.trackball-off;
-                        accel-speed <=> root.trackball-accel-speed;
-                        accel-profile-index <=> root.trackball-accel-profile-index;
-                        natural-scroll <=> root.trackball-natural-scroll;
-                        left-handed <=> root.trackball-left-handed;
-                        scroll-method-index <=> root.trackball-scroll-method-index;
-                        scroll-button <=> root.trackball-scroll-button;
-                        scroll-button-lock <=> root.trackball-scroll-button-lock;
-                        middle-emulation <=> root.trackball-middle-emulation;
+                    if selected-category == SidebarIndices.trackball: TrackballDynamicPage {
+                        device-off <=> root.trackball-dynamic-device-off;
+                        general-settings <=> root.trackball-dynamic-general-settings;
+                        behavior-settings <=> root.trackball-dynamic-behavior-settings;
+                        acceleration-settings <=> root.trackball-dynamic-acceleration-settings;
+                        scrolling-settings <=> root.trackball-dynamic-scrolling-settings;
 
-                        off-toggled(val) => { root.trackball-off-toggled(val); }
-                        accel-speed-changed(val) => { root.trackball-accel-speed-changed(val); }
-                        accel-profile-changed(idx) => { root.trackball-accel-profile-changed(idx); }
-                        natural-scroll-toggled(val) => { root.trackball-natural-scroll-toggled(val); }
-                        left-handed-toggled(val) => { root.trackball-left-handed-toggled(val); }
-                        scroll-method-changed(idx) => { root.trackball-scroll-method-changed(idx); }
-                        scroll-button-changed(val) => { root.trackball-scroll-button-changed(val); }
-                        scroll-button-lock-toggled(val) => { root.trackball-scroll-button-lock-toggled(val); }
-                        middle-emulation-toggled(val) => { root.trackball-middle-emulation-toggled(val); }
+                        setting-toggle-changed(id, val) => { root.trackball-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.trackball-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.trackball-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.trackball-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.trackball-setting-text-changed(id, val); }
                     }
 
                     // ═══════════════════════════════════════════════════════════════
-                    // TABLET PAGE (category 18)
+                    // TABLET PAGE (category 18) - Dynamic
                     // ═══════════════════════════════════════════════════════════════
-                    if selected-category == SidebarIndices.tablet: TabletPage {
-                        off <=> root.tablet-off;
-                        map-to-output <=> root.tablet-map-to-output;
-                        left-handed <=> root.tablet-left-handed;
-                        has-calibration <=> root.tablet-has-calibration;
-                        cal-m0 <=> root.tablet-cal-m0;
-                        cal-m1 <=> root.tablet-cal-m1;
-                        cal-m2 <=> root.tablet-cal-m2;
-                        cal-m3 <=> root.tablet-cal-m3;
-                        cal-m4 <=> root.tablet-cal-m4;
-                        cal-m5 <=> root.tablet-cal-m5;
+                    if selected-category == SidebarIndices.tablet: TabletDynamicPage {
+                        device-off <=> root.tablet-dynamic-device-off;
+                        general-settings <=> root.tablet-dynamic-general-settings;
+                        mapping-settings <=> root.tablet-dynamic-mapping-settings;
+                        calibration-settings <=> root.tablet-dynamic-calibration-settings;
 
-                        off-toggled(val) => { root.tablet-off-toggled(val); }
-                        map-to-output-changed(val) => { root.tablet-map-to-output-changed(val); }
-                        left-handed-toggled(val) => { root.tablet-left-handed-toggled(val); }
-                        calibration-toggled(val) => { root.tablet-calibration-toggled(val); }
-                        calibration-changed(a, b, c, d, e, f) => { root.tablet-calibration-changed(a, b, c, d, e, f); }
+                        setting-toggle-changed(id, val) => { root.tablet-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.tablet-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.tablet-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.tablet-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.tablet-setting-text-changed(id, val); }
                     }
 
                     // ═══════════════════════════════════════════════════════════════
-                    // TOUCH PAGE (category 19)
+                    // TOUCH PAGE (category 19) - Dynamic
                     // ═══════════════════════════════════════════════════════════════
-                    if selected-category == SidebarIndices.touch: TouchPage {
-                        off <=> root.touch-off;
-                        map-to-output <=> root.touch-map-to-output;
-                        has-calibration <=> root.touch-has-calibration;
-                        cal-m0 <=> root.touch-cal-m0;
-                        cal-m1 <=> root.touch-cal-m1;
-                        cal-m2 <=> root.touch-cal-m2;
-                        cal-m3 <=> root.touch-cal-m3;
-                        cal-m4 <=> root.touch-cal-m4;
-                        cal-m5 <=> root.touch-cal-m5;
+                    if selected-category == SidebarIndices.touch: TouchDynamicPage {
+                        device-off <=> root.touch-dynamic-device-off;
+                        general-settings <=> root.touch-dynamic-general-settings;
+                        mapping-settings <=> root.touch-dynamic-mapping-settings;
+                        calibration-settings <=> root.touch-dynamic-calibration-settings;
 
-                        off-toggled(val) => { root.touch-off-toggled(val); }
-                        map-to-output-changed(val) => { root.touch-map-to-output-changed(val); }
-                        calibration-toggled(val) => { root.touch-calibration-toggled(val); }
-                        calibration-changed(a, b, c, d, e, f) => { root.touch-calibration-changed(a, b, c, d, e, f); }
+                        setting-toggle-changed(id, val) => { root.touch-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.touch-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.touch-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.touch-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.touch-setting-text-changed(id, val); }
                     }
 
-                    if selected-category == SidebarIndices.workspaces: WorkspacesPage {
-                        workspace-list <=> root.workspaces-list;
-                        selected-workspace-index <=> root.selected-workspace-index;
-                        current-workspace-name <=> root.current-workspace-name;
-                        current-open-on-output <=> root.current-workspace-open-on-output;
-                        current-has-layout-override <=> root.current-workspace-has-layout-override;
-                        current-has-gaps-override <=> root.current-workspace-has-gaps-override;
-                        current-gaps-inner <=> root.current-workspace-gaps-inner;
-                        current-gaps-outer <=> root.current-workspace-gaps-outer;
-                        current-has-struts-override <=> root.current-workspace-has-struts-override;
-                        current-strut-left <=> root.current-workspace-strut-left;
-                        current-strut-right <=> root.current-workspace-strut-right;
-                        current-strut-top <=> root.current-workspace-strut-top;
-                        current-strut-bottom <=> root.current-workspace-strut-bottom;
-                        current-has-center-override <=> root.current-workspace-has-center-override;
-                        current-center-focused-column-index <=> root.current-workspace-center-focused-column-index;
-                        current-always-center-single-column <=> root.current-workspace-always-center-single-column;
+                    // Workspaces page (Dynamic)
+                    if selected-category == SidebarIndices.workspaces: WorkspacesDynamicPage {
+                        workspace-list <=> root.workspaces-list-dynamic;
+                        selected-workspace-index <=> root.selected-workspace-index-dynamic;
+                        workspace-identity-settings <=> root.workspace-identity-settings-dynamic;
+                        layout-override-settings <=> root.workspace-layout-override-settings-dynamic;
+                        gaps-settings <=> root.workspace-gaps-settings-dynamic;
+                        struts-settings <=> root.workspace-struts-settings-dynamic;
+                        centering-settings <=> root.workspace-centering-settings-dynamic;
+                        has-layout-override <=> root.workspace-has-layout-override-dynamic;
+                        has-gaps-override <=> root.workspace-has-gaps-override-dynamic;
+                        has-struts-override <=> root.workspace-has-struts-override-dynamic;
+                        has-center-override <=> root.workspace-has-center-override-dynamic;
 
-                        add-workspace => { root.workspace-add(); }
-                        remove-workspace(idx) => { root.workspace-remove(idx); }
-                        select-workspace(idx) => { root.workspace-select(idx); }
-                        workspace-name-changed(val) => { root.workspace-name-changed(val); }
-                        open-on-output-changed(val) => { root.workspace-open-on-output-changed(val); }
-                        layout-override-toggled(val) => { root.workspace-layout-override-toggled(val); }
-                        gaps-override-toggled(val) => { root.workspace-gaps-override-toggled(val); }
-                        gaps-inner-changed(val) => { root.workspace-gaps-inner-changed(val); }
-                        gaps-outer-changed(val) => { root.workspace-gaps-outer-changed(val); }
-                        struts-override-toggled(val) => { root.workspace-struts-override-toggled(val); }
-                        strut-left-changed(val) => { root.workspace-strut-left-changed(val); }
-                        strut-right-changed(val) => { root.workspace-strut-right-changed(val); }
-                        strut-top-changed(val) => { root.workspace-strut-top-changed(val); }
-                        strut-bottom-changed(val) => { root.workspace-strut-bottom-changed(val); }
-                        center-override-toggled(val) => { root.workspace-center-override-toggled(val); }
-                        center-focused-column-changed(idx) => { root.workspace-center-focused-column-changed(idx); }
-                        always-center-single-column-toggled(val) => { root.workspace-always-center-single-column-toggled(val); }
+                        add-workspace => { root.workspace-add-dynamic(); }
+                        remove-workspace(idx) => { root.workspace-remove-dynamic(idx); }
+                        select-workspace(idx) => { root.workspace-select-dynamic(idx); }
+                        reorder-workspace(from, to) => { root.workspace-reorder-dynamic(from, to); }
+
+                        setting-toggle-changed(id, val) => { root.workspace-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.workspace-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.workspace-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.workspace-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.workspace-setting-text-changed(id, val); }
                     }
 
-                    if selected-category == SidebarIndices.layer-rules: LayerRulesPage {
-                        rule-list <=> root.layer-rules-list;
-                        selected-rule-index <=> root.selected-layer-rule-index;
-                        current-rule-name <=> root.current-layer-rule-name;
-                        matches-list <=> root.current-layer-rule-matches-list;
-                        selected-match-index <=> root.selected-layer-rule-match-index;
-                        matches-count <=> root.current-layer-rule-matches-count;
-                        current-match-namespace <=> root.current-layer-rule-match-namespace;
-                        current-match-at-startup <=> root.current-layer-rule-match-at-startup;
-                        current-match-has-at-startup <=> root.current-layer-rule-match-has-at-startup;
-                        current-has-block-out-from <=> root.current-layer-rule-has-block-out-from;
-                        current-block-out-from-index <=> root.current-layer-rule-block-out-from-index;
-                        current-has-opacity <=> root.current-layer-rule-has-opacity;
-                        current-opacity <=> root.current-layer-rule-opacity;
-                        current-has-corner-radius <=> root.current-layer-rule-has-corner-radius;
-                        current-corner-radius <=> root.current-layer-rule-corner-radius;
-                        current-place-within-backdrop <=> root.current-layer-rule-place-within-backdrop;
-                        current-baba-is-float <=> root.current-layer-rule-baba-is-float;
-                        current-has-shadow <=> root.current-layer-rule-has-shadow;
-                        current-shadow-enabled <=> root.current-layer-rule-shadow-enabled;
-                        current-shadow-softness <=> root.current-layer-rule-shadow-softness;
-                        current-shadow-spread <=> root.current-layer-rule-shadow-spread;
-                        current-shadow-offset-x <=> root.current-layer-rule-shadow-offset-x;
-                        current-shadow-offset-y <=> root.current-layer-rule-shadow-offset-y;
-                        current-shadow-draw-behind <=> root.current-layer-rule-shadow-draw-behind;
-                        current-shadow-color <=> root.current-layer-rule-shadow-color;
-                        current-shadow-inactive-color <=> root.current-layer-rule-shadow-inactive-color;
-                        current-shadow-color-hex <=> root.current-layer-rule-shadow-color-hex;
-                        current-shadow-inactive-color-hex <=> root.current-layer-rule-shadow-inactive-color-hex;
+                    // Dynamic Layer Rules page
+                    if selected-category == SidebarIndices.layer-rules: LayerRulesDynamicPage {
+                        rule-list <=> root.layer-rules-list-dynamic;
+                        selected-rule-index <=> root.layer-rules-selected-index;
+                        matches-list <=> root.layer-rules-matches-list;
+                        selected-match-index <=> root.layer-rules-selected-match-index;
+                        matches-count <=> root.layer-rules-matches-count;
 
-                        add-rule => { root.layer-rule-add(); }
-                        remove-rule(idx) => { root.layer-rule-remove(idx); }
-                        select-rule(idx) => { root.layer-rule-select(idx); }
-                        rule-name-changed(val) => { root.layer-rule-name-changed(val); }
-                        reorder-rule(from, to) => { root.layer-rule-reorder(from, to); }
-                        add-match => { root.layer-rule-add-match(); }
-                        remove-match(idx) => { root.layer-rule-remove-match(idx); }
-                        select-match(idx) => { root.layer-rule-select-match(idx); }
-                        match-namespace-changed(val) => { root.layer-rule-match-namespace-changed(val); }
-                        match-at-startup-has-toggled(val) => { root.layer-rule-match-at-startup-has-toggled(val); }
-                        match-at-startup-toggled(val) => { root.layer-rule-match-at-startup-toggled(val); }
-                        block-out-from-toggled(val) => { root.layer-rule-block-out-from-toggled(val); }
-                        block-out-from-changed(idx) => { root.layer-rule-block-out-from-changed(idx); }
-                        opacity-toggled(val) => { root.layer-rule-opacity-toggled(val); }
-                        opacity-changed(val) => { root.layer-rule-opacity-changed(val); }
-                        corner-radius-toggled(val) => { root.layer-rule-corner-radius-toggled(val); }
-                        corner-radius-changed(val) => { root.layer-rule-corner-radius-changed(val); }
-                        place-within-backdrop-toggled(val) => { root.layer-rule-place-within-backdrop-toggled(val); }
-                        baba-is-float-toggled(val) => { root.layer-rule-baba-is-float-toggled(val); }
-                        shadow-toggled(val) => { root.layer-rule-shadow-toggled(val); }
-                        shadow-enabled-toggled(val) => { root.layer-rule-shadow-enabled-toggled(val); }
-                        shadow-softness-changed(val) => { root.layer-rule-shadow-softness-changed(val); }
-                        shadow-spread-changed(val) => { root.layer-rule-shadow-spread-changed(val); }
-                        shadow-offset-x-changed(val) => { root.layer-rule-shadow-offset-x-changed(val); }
-                        shadow-offset-y-changed(val) => { root.layer-rule-shadow-offset-y-changed(val); }
-                        shadow-draw-behind-toggled(val) => { root.layer-rule-shadow-draw-behind-toggled(val); }
-                        shadow-color-changed(col) => { root.layer-rule-shadow-color-changed(col); }
-                        shadow-inactive-color-changed(col) => { root.layer-rule-shadow-inactive-color-changed(col); }
+                        // Dynamic setting models
+                        rule-settings <=> root.layer-rules-rule-settings;
+                        match-settings <=> root.layer-rules-match-settings;
+                        visual-settings <=> root.layer-rules-visual-settings;
+                        shadow-settings <=> root.layer-rules-shadow-settings;
+                        advanced-settings <=> root.layer-rules-advanced-settings;
+
+                        // Rule management callbacks
+                        add-rule => { root.layer-rule-add-dynamic(); }
+                        remove-rule(idx) => { root.layer-rule-remove-dynamic(idx); }
+                        select-rule(idx) => { root.layer-rule-select-dynamic(idx); }
+                        reorder-rule(from, to) => { root.layer-rule-reorder-dynamic(from, to); }
+
+                        // Match management callbacks
+                        add-match => { root.layer-rule-add-match-dynamic(); }
+                        remove-match(idx) => { root.layer-rule-remove-match-dynamic(idx); }
+                        select-match(idx) => { root.layer-rule-select-match-dynamic(idx); }
+
+                        // Generic setting callbacks
+                        setting-toggle-changed(id, val) => { root.layer-rule-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.layer-rule-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.layer-rule-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.layer-rule-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.layer-rule-setting-text-changed(id, val); }
+                        setting-color-changed(id, val) => { root.layer-rule-setting-color-changed(id, val); }
                     }
 
                     // Keybindings page (full editing support)
@@ -2100,90 +2111,59 @@ export component MainWindow inherits Window {
                         overlay-title-changed(val) => { root.keybinding-overlay-title-changed(val); }
                     }
 
-                    // Startup commands page
-                    if selected-category == SidebarIndices.startup: StartupPage {
-                        command-list <=> root.startup-command-list;
-                        selected-command-index <=> root.selected-startup-index;
-                        current-command <=> root.current-startup-command;
+                    // Startup commands page (Dynamic)
+                    if selected-category == SidebarIndices.startup: StartupDynamicPage {
+                        command-list <=> root.startup-dynamic-command-list;
+                        selected-index <=> root.startup-dynamic-selected-index;
+                        current-command <=> root.startup-dynamic-current-command;
 
-                        add-command => { root.startup-add-command(); }
-                        remove-command(idx) => { root.startup-remove-command(idx); }
-                        select-command(idx) => { root.startup-select-command(idx); }
-                        command-changed(val) => { root.startup-command-changed(val); }
-                        reorder-command(from, to) => { root.startup-reorder-command(from, to); }
+                        command-add => { root.startup-dynamic-command-add(); }
+                        command-remove(idx) => { root.startup-dynamic-command-remove(idx); }
+                        command-select(idx) => { root.startup-dynamic-command-select(idx); }
+                        command-changed(val) => { root.startup-dynamic-command-changed(val); }
+                        reorder-command(from, to) => { root.startup-dynamic-reorder-command(from, to); }
                     }
 
-                    // Environment variables page
-                    if selected-category == SidebarIndices.environment: EnvironmentPage {
-                        variable-list <=> root.environment-variable-list;
-                        selected-variable-index <=> root.selected-environment-index;
-                        current-name <=> root.current-env-name;
-                        current-value <=> root.current-env-value;
+                    // Environment variables page (Dynamic)
+                    if selected-category == SidebarIndices.environment: EnvironmentDynamicPage {
+                        variable-list <=> root.environment-dynamic-variable-list;
+                        selected-index <=> root.environment-dynamic-selected-index;
+                        current-name <=> root.environment-dynamic-current-name;
+                        current-value <=> root.environment-dynamic-current-value;
 
-                        add-variable => { root.environment-add-variable(); }
-                        remove-variable(idx) => { root.environment-remove-variable(idx); }
-                        select-variable(idx) => { root.environment-select-variable(idx); }
-                        name-changed(val) => { root.environment-name-changed(val); }
-                        value-changed(val) => { root.environment-value-changed(val); }
-                        reorder-variable(from, to) => { root.environment-reorder-variable(from, to); }
+                        add-variable => { root.environment-dynamic-add-variable(); }
+                        remove-variable(idx) => { root.environment-dynamic-remove-variable(idx); }
+                        select-variable(idx) => { root.environment-dynamic-select-variable(idx); }
+                        name-changed(val) => { root.environment-dynamic-name-changed(val); }
+                        value-changed(val) => { root.environment-dynamic-value-changed(val); }
+                        reorder-variable(from, to) => { root.environment-dynamic-reorder-variable(from, to); }
                     }
 
-                    // Debug settings page
-                    if selected-category == SidebarIndices.debug: DebugPage {
-                        // Niri status info
+                    // Debug settings page (dynamic)
+                    if selected-category == SidebarIndices.debug: DebugDynamicPage {
                         niri-version: root.niri-version;
                         niri-running: root.niri-running;
-                        validate-requested => { root.validate-config-requested(); }
+                        validate-requested => { root.debug-validate-requested(); }
 
                         expert-mode <=> root.debug-expert-mode;
+                        expert-mode-toggled(val) => { root.debug-dynamic-expert-mode-toggled(val); }
 
-                        preview-render <=> root.debug-preview-render;
-                        enable-overlay-planes <=> root.debug-enable-overlay-planes;
-                        disable-cursor-plane <=> root.debug-disable-cursor-plane;
-                        disable-direct-scanout <=> root.debug-disable-direct-scanout;
-                        restrict-primary-scanout-to-matching-format <=> root.debug-restrict-primary-scanout-to-matching-format;
-                        render-drm-device <=> root.debug-render-drm-device;
-                        ignore-drm-devices <=> root.debug-ignore-drm-devices;
-                        wait-for-frame-completion <=> root.debug-wait-for-frame-completion;
-                        disable-resize-throttling <=> root.debug-disable-resize-throttling;
-                        disable-transactions <=> root.debug-disable-transactions;
-                        emulate-zero-presentation-time <=> root.debug-emulate-zero-presentation-time;
-                        skip-cursor-only-updates-during-vrr <=> root.debug-skip-cursor-only-updates-during-vrr;
-                        dbus-interfaces-in-non-session <=> root.debug-dbus-interfaces-in-non-session;
-                        keep-laptop-panel-on-lid-closed <=> root.debug-keep-laptop-panel-on-lid-closed;
-                        disable-monitor-names <=> root.debug-disable-monitor-names;
-                        force-disable-connectors-on-resume <=> root.debug-force-disable-connectors-on-resume;
-                        strict-new-window-focus <=> root.debug-strict-new-window-focus;
-                        honor-xdg-activation-with-invalid-serial <=> root.debug-honor-xdg-activation-with-invalid-serial;
-                        deactivate-unfocused-windows <=> root.debug-deactivate-unfocused-windows;
-                        force-pipewire-invalid-modifier <=> root.debug-force-pipewire-invalid-modifier;
+                        rendering-settings <=> root.debug-rendering-settings;
+                        gpu-settings <=> root.debug-gpu-settings;
+                        frame-timing-settings <=> root.debug-frame-timing-settings;
+                        window-management-settings <=> root.debug-window-management-settings;
+                        system-settings <=> root.debug-system-settings;
+                        screencasting-settings <=> root.debug-screencasting-settings;
 
-                        expert-mode-toggled(val) => { root.debug-expert-mode-toggled(val); }
-
-                        preview-render-toggled(val) => { root.debug-preview-render-toggled(val); }
-                        enable-overlay-planes-toggled(val) => { root.debug-enable-overlay-planes-toggled(val); }
-                        disable-cursor-plane-toggled(val) => { root.debug-disable-cursor-plane-toggled(val); }
-                        disable-direct-scanout-toggled(val) => { root.debug-disable-direct-scanout-toggled(val); }
-                        restrict-primary-scanout-to-matching-format-toggled(val) => { root.debug-restrict-primary-scanout-to-matching-format-toggled(val); }
-                        render-drm-device-changed(val) => { root.debug-render-drm-device-changed(val); }
-                        ignore-drm-devices-changed(val) => { root.debug-ignore-drm-devices-changed(val); }
-                        wait-for-frame-completion-toggled(val) => { root.debug-wait-for-frame-completion-toggled(val); }
-                        disable-resize-throttling-toggled(val) => { root.debug-disable-resize-throttling-toggled(val); }
-                        disable-transactions-toggled(val) => { root.debug-disable-transactions-toggled(val); }
-                        emulate-zero-presentation-time-toggled(val) => { root.debug-emulate-zero-presentation-time-toggled(val); }
-                        skip-cursor-only-updates-during-vrr-toggled(val) => { root.debug-skip-cursor-only-updates-during-vrr-toggled(val); }
-                        dbus-interfaces-in-non-session-toggled(val) => { root.debug-dbus-interfaces-in-non-session-toggled(val); }
-                        keep-laptop-panel-on-lid-closed-toggled(val) => { root.debug-keep-laptop-panel-on-lid-closed-toggled(val); }
-                        disable-monitor-names-toggled(val) => { root.debug-disable-monitor-names-toggled(val); }
-                        force-disable-connectors-on-resume-toggled(val) => { root.debug-force-disable-connectors-on-resume-toggled(val); }
-                        strict-new-window-focus-toggled(val) => { root.debug-strict-new-window-focus-toggled(val); }
-                        honor-xdg-activation-with-invalid-serial-toggled(val) => { root.debug-honor-xdg-activation-with-invalid-serial-toggled(val); }
-                        deactivate-unfocused-windows-toggled(val) => { root.debug-deactivate-unfocused-windows-toggled(val); }
-                        force-pipewire-invalid-modifier-toggled(val) => { root.debug-force-pipewire-invalid-modifier-toggled(val); }
+                        setting-toggle-changed(id, val) => { root.debug-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.debug-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.debug-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.debug-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.debug-setting-text-changed(id, val); }
                     }
 
-                    // Switch events page
-                    if selected-category == SidebarIndices.switch-events: SwitchEventsPage {
+                    // Switch events page (dynamic)
+                    if selected-category == SidebarIndices.switch-events: SwitchEventsDynamicPage {
                         lid-close-commands <=> root.switch-lid-close-commands;
                         lid-close-selected <=> root.switch-lid-close-selected;
                         lid-close-current <=> root.switch-lid-close-current;
@@ -2196,49 +2176,33 @@ export component MainWindow inherits Window {
                         tablet-mode-off-commands <=> root.switch-tablet-mode-off-commands;
                         tablet-mode-off-selected <=> root.switch-tablet-mode-off-selected;
                         tablet-mode-off-current <=> root.switch-tablet-mode-off-current;
+                        general-settings <=> root.switch-events-general-settings;
 
-                        lid-close-add => { root.switch-lid-close-add(); }
-                        lid-close-remove(idx) => { root.switch-lid-close-remove(idx); }
-                        lid-close-select(idx) => { root.switch-lid-close-select(idx); }
-                        lid-close-changed(val) => { root.switch-lid-close-changed(val); }
-                        lid-open-add => { root.switch-lid-open-add(); }
-                        lid-open-remove(idx) => { root.switch-lid-open-remove(idx); }
-                        lid-open-select(idx) => { root.switch-lid-open-select(idx); }
-                        lid-open-changed(val) => { root.switch-lid-open-changed(val); }
-                        tablet-mode-on-add => { root.switch-tablet-mode-on-add(); }
-                        tablet-mode-on-remove(idx) => { root.switch-tablet-mode-on-remove(idx); }
-                        tablet-mode-on-select(idx) => { root.switch-tablet-mode-on-select(idx); }
-                        tablet-mode-on-changed(val) => { root.switch-tablet-mode-on-changed(val); }
-                        tablet-mode-off-add => { root.switch-tablet-mode-off-add(); }
-                        tablet-mode-off-remove(idx) => { root.switch-tablet-mode-off-remove(idx); }
-                        tablet-mode-off-select(idx) => { root.switch-tablet-mode-off-select(idx); }
-                        tablet-mode-off-changed(val) => { root.switch-tablet-mode-off-changed(val); }
+                        command-add(event-id, cmd) => { root.switch-events-command-add(event-id, cmd); }
+                        command-remove(event-id, idx) => { root.switch-events-command-remove(event-id, idx); }
+                        command-select(event-id, idx) => { root.switch-events-command-select(event-id, idx); }
+                        command-text-changed(event-id, val) => { root.switch-events-command-text-changed(event-id, val); }
+
+                        setting-toggle-changed(id, val) => { root.switch-events-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.switch-events-setting-slider-int-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.switch-events-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.switch-events-setting-text-changed(id, val); }
                     }
 
-                    // Recent windows page (v25.05+)
-                    if selected-category == SidebarIndices.recent-windows: RecentWindowsPage {
-                        enabled <=> root.recent-windows-enabled;
-                        debounce-ms <=> root.recent-windows-debounce-ms;
-                        open-delay-ms <=> root.recent-windows-open-delay-ms;
-                        highlight-active-color <=> root.recent-windows-highlight-active-color;
-                        highlight-active-color-hex <=> root.recent-windows-highlight-active-color-hex;
-                        highlight-urgent-color <=> root.recent-windows-highlight-urgent-color;
-                        highlight-urgent-color-hex <=> root.recent-windows-highlight-urgent-color-hex;
-                        highlight-padding <=> root.recent-windows-highlight-padding;
-                        highlight-corner-radius <=> root.recent-windows-highlight-corner-radius;
-                        previews-max-height <=> root.recent-windows-previews-max-height;
-                        previews-max-scale <=> root.recent-windows-previews-max-scale;
+                    // Recent windows page (Dynamic, v25.05+)
+                    if selected-category == SidebarIndices.recent-windows: RecentWindowsDynamicPage {
+                        feature-enabled <=> root.recent-windows-dynamic-feature-enabled;
+                        general-settings <=> root.recent-windows-dynamic-general-settings;
+                        highlight-settings <=> root.recent-windows-dynamic-highlight-settings;
+                        preview-settings <=> root.recent-windows-dynamic-preview-settings;
 
-                        enabled-toggled(val) => { root.recent-windows-enabled-toggled(val); }
-                        debounce-ms-changed(val) => { root.recent-windows-debounce-ms-changed(val); }
-                        open-delay-ms-changed(val) => { root.recent-windows-open-delay-ms-changed(val); }
-                        highlight-active-color-changed(col) => { root.recent-windows-highlight-active-color-changed(col); }
-                        highlight-urgent-color-changed(col) => { root.recent-windows-highlight-urgent-color-changed(col); }
-                        highlight-padding-changed(val) => { root.recent-windows-highlight-padding-changed(val); }
-                        highlight-corner-radius-changed(val) => { root.recent-windows-highlight-corner-radius-changed(val); }
-                        previews-max-height-changed(val) => { root.recent-windows-previews-max-height-changed(val); }
-                        previews-max-scale-changed(val) => { root.recent-windows-previews-max-scale-changed(val); }
-            }
+                        setting-toggle-changed(id, val) => { root.recent-windows-dynamic-setting-toggle-changed(id, val); }
+                        setting-slider-int-changed(id, val) => { root.recent-windows-dynamic-setting-slider-int-changed(id, val); }
+                        setting-slider-float-changed(id, val) => { root.recent-windows-dynamic-setting-slider-float-changed(id, val); }
+                        setting-combo-changed(id, val) => { root.recent-windows-dynamic-setting-combo-changed(id, val); }
+                        setting-text-changed(id, val) => { root.recent-windows-dynamic-setting-text-changed(id, val); }
+                        setting-color-changed(id, col) => { root.recent-windows-dynamic-setting-color-changed(id, col); }
+                    }
 
                     // ═══════════════════════════════════════════════════════════════
                     // TOOLS PAGE (category 26)

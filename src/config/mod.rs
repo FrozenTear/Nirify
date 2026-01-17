@@ -13,6 +13,7 @@ pub mod validation;
 
 pub use crate::types::CenterFocusedColumn;
 pub use category_section::CategorySection;
+pub use consolidation::{analyze_rules, ConsolidationAnalysis, ConsolidationSuggestion};
 pub use dirty::{DirtyTracker, SettingsCategory};
 pub use error::ConfigError;
 pub use loader::{
@@ -29,4 +30,3 @@ pub use registry::ConfigFile;
 pub use replace::{smart_replace_config, SmartReplaceResult};
 pub use storage::{atomic_write, save_dirty, save_settings};
 pub use validation::{validate_string, validate_string_opt};
-pub use consolidation::{analyze_rules, ConsolidationAnalysis, ConsolidationSuggestion};

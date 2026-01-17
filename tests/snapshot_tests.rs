@@ -27,8 +27,7 @@ fn snapshot_appearance_default() {
 #[test]
 fn snapshot_appearance_custom_gaps() {
     let appearance = AppearanceSettings {
-        gaps_inner: 24.0,
-        gaps_outer: 12.0,
+        gaps: 24.0,
         ..Default::default()
     };
     let behavior = BehaviorSettings::default();

@@ -178,10 +178,7 @@ pub fn parse_debug_from_doc(doc: &KdlDocument, settings: &mut Settings) {
             ) {
                 settings.debug.restrict_primary_scanout_to_matching_format = true;
             }
-            if has_flag(
-                debug_children,
-                &["skip-cursor-only-updates-during-vrr"],
-            ) {
+            if has_flag(debug_children, &["skip-cursor-only-updates-during-vrr"]) {
                 settings.debug.skip_cursor_only_updates_during_vrr = true;
             }
             if has_flag(debug_children, &["force-disable-connectors-on-resume"]) {

@@ -437,8 +437,7 @@ pub fn setup_tools_handler(ui: &MainWindow) {
                                     .map(|ws| {
                                         let name = ws.name.as_deref().unwrap_or("(unnamed)");
                                         let output = ws.output.as_deref().unwrap_or("(none)");
-                                        let focused =
-                                            if ws.is_focused { " [FOCUSED]" } else { "" };
+                                        let focused = if ws.is_focused { " [FOCUSED]" } else { "" };
                                         let active = if ws.is_active { " [ACTIVE]" } else { "" };
                                         format!(
                                             "ID: {} (idx: {}){}{}\n  Name: {}\n  Output: {}",

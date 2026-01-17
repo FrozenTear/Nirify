@@ -1,0 +1,531 @@
+// Dynamic Debug settings page
+// Uses model-driven rendering for reduced compile time
+
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, ComboBox, Button, Slider, Switch } from "std-widgets.slint";
+import { SettingsSection } from "../widgets/section.slint";
+import { ConfirmDialog } from "../dialogs/confirm_dialog.slint";
+
+// Universal setting model for debug settings
+export struct DebugSettingModel {
+    id: string,              // Unique identifier for callbacks
+    label: string,           // Display label
+    description: string,     // Help text
+    setting-type: int,       // 0=toggle, 1=slider, 2=combo, 3=text
+
+    // Toggle (type 0)
+    bool-value: bool,
+
+    // Slider (type 1)
+    int-value: int,
+    float-value: float,
+    min-value: float,
+    max-value: float,
+    suffix: string,
+    use-float: bool,         // true = float slider, false = int slider
+
+    // ComboBox (type 2)
+    combo-index: int,
+    combo-options: [string],
+
+    // Text (type 3)
+    text-value: string,
+    placeholder: string,
+
+    // Visibility
+    visible: bool,
+}
+
+// Dynamic row component - renders any setting type
+component DynamicRow inherits Rectangle {
+    in property <DebugSettingModel> setting;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+
+    visible: setting.visible;
+    height: setting.visible ? 52px : 0;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+        padding: Theme.spacing-xs;
+        padding-left: Theme.spacing-md;
+        padding-right: Theme.spacing-md;
+
+        // Label column
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            alignment: center;
+
+            Text {
+                text: setting.label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-sm;
+                font-weight: 500;
+            }
+
+            if setting.description != "": Text {
+                text: setting.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-xs;
+                wrap: word-wrap;
+            }
+        }
+
+        // Control column
+        Rectangle {
+            width: 200px;
+            vertical-stretch: 1;
+
+            // Toggle (type 0)
+            if setting.setting-type == 0: HorizontalLayout {
+                alignment: end;
+                padding-right: Theme.spacing-sm;
+
+                Switch {
+                    checked: setting.bool-value;
+                    toggled => {
+                        root.toggle-changed(setting.id, self.checked);
+                    }
+                }
+            }
+
+            // Slider (type 1)
+            if setting.setting-type == 1: HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: center;
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: setting.min-value;
+                    maximum: setting.max-value;
+                    value: setting.use-float ? setting.float-value : setting.int-value;
+                    changed(val) => {
+                        if (setting.use-float) {
+                            root.slider-float-changed(setting.id, val);
+                        } else {
+                            root.slider-int-changed(setting.id, round(val));
+                        }
+                    }
+                }
+
+                Text {
+                    width: 55px;
+                    text: setting.use-float
+                        ? round(setting.float-value * 100) + setting.suffix
+                        : setting.int-value + setting.suffix;
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+
+            // ComboBox (type 2)
+            if setting.setting-type == 2: HorizontalLayout {
+                alignment: end;
+
+                ComboBox {
+                    width: 140px;
+                    model: setting.combo-options;
+                    current-index: setting.combo-index;
+                    selected(_) => {
+                        root.combo-changed(setting.id, self.current-index);
+                    }
+                }
+            }
+
+            // Text input (type 3)
+            if setting.setting-type == 3: HorizontalLayout {
+                alignment: end;
+
+                LineEdit {
+                    width: 180px;
+                    text: setting.text-value;
+                    placeholder-text: setting.placeholder;
+                    edited(val) => {
+                        root.text-changed(setting.id, val);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Dynamic section component
+component DynamicSection inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle: "";
+    in property <[DebugSettingModel]> settings;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+
+    background: Theme.card-background;
+    border-radius: Theme.radius-md;
+
+    VerticalLayout {
+        padding: Theme.spacing-md;
+        spacing: Theme.spacing-xs;
+
+        // Section header
+        Text {
+            text: title;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-xs;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        // Optional subtitle
+        if subtitle != "": Text {
+            text: subtitle;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-sm;
+            wrap: word-wrap;
+        }
+
+        // Dynamic rows from model
+        for setting in settings: DynamicRow {
+            setting: setting;
+            toggle-changed(id, val) => { root.toggle-changed(id, val); }
+            slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+            slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+            combo-changed(id, val) => { root.combo-changed(id, val); }
+            text-changed(id, val) => { root.text-changed(id, val); }
+        }
+    }
+}
+
+// Main debug page component
+export component DebugDynamicPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Debug settings";
+
+    // Niri info
+    in-out property <string> niri-version: "";
+    in-out property <bool> niri-running: false;
+
+    // Validation callback
+    callback validate-requested();
+
+    // Expert mode - special handling with confirmation dialog
+    in-out property <bool> expert-mode: false;
+    callback expert-mode-toggled(bool);
+
+    // Dynamic settings models for each section
+    in-out property <[DebugSettingModel]> rendering-settings: [];
+    in-out property <[DebugSettingModel]> gpu-settings: [];
+    in-out property <[DebugSettingModel]> frame-timing-settings: [];
+    in-out property <[DebugSettingModel]> window-management-settings: [];
+    in-out property <[DebugSettingModel]> system-settings: [];
+    in-out property <[DebugSettingModel]> screencasting-settings: [];
+
+    // Generic setting callbacks
+    callback setting-toggle-changed(string, bool);
+    callback setting-slider-int-changed(string, int);
+    callback setting-slider-float-changed(string, float);
+    callback setting-combo-changed(string, int);
+    callback setting-text-changed(string, string);
+
+    // Internal state for confirmation dialog
+    property <bool> show-expert-mode-confirm: false;
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Niri Status Section
+            SettingsSection {
+                title: "NIRI STATUS";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-md;
+
+                    HorizontalLayout {
+                        spacing: Theme.spacing-lg;
+                        alignment: start;
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-xs;
+
+                            Text {
+                                text: "Niri Version";
+                                color: Theme.text-secondary;
+                                font-size: Theme.font-size-sm;
+                            }
+
+                            Text {
+                                text: root.niri-version != "" ? root.niri-version : "unknown";
+                                color: root.niri-running ? Theme.text-primary : Theme.text-muted;
+                                font-size: Theme.font-size-md;
+                                font-weight: 500;
+                            }
+                        }
+
+                        VerticalLayout {
+                            spacing: Theme.spacing-xs;
+
+                            Text {
+                                text: "Status";
+                                color: Theme.text-secondary;
+                                font-size: Theme.font-size-sm;
+                            }
+
+                            HorizontalLayout {
+                                spacing: Theme.spacing-xs;
+
+                                Rectangle {
+                                    width: 8px;
+                                    height: 8px;
+                                    border-radius: 4px;
+                                    background: root.niri-running ? Theme.success : Theme.error;
+                                    y: (parent.height - self.height) / 2;
+                                }
+
+                                Text {
+                                    text: root.niri-running ? "Running" : "Not running";
+                                    color: root.niri-running ? Theme.success : Theme.error;
+                                    font-size: Theme.font-size-md;
+                                    font-weight: 500;
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.spacing-md;
+                        alignment: start;
+
+                        Button {
+                            text: "Validate Configuration";
+                            enabled: root.niri-running;
+                            clicked => { root.validate-requested(); }
+                        }
+
+                        Text {
+                            text: !root.niri-running ? "Start niri to validate config" : "";
+                            color: Theme.text-muted;
+                            font-size: Theme.font-size-sm;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            // Expert Mode Section
+            SettingsSection {
+                title: "EXPERT MODE";
+
+                VerticalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    // Expert mode toggle row (custom, not from model)
+                    Rectangle {
+                        height: 52px;
+                        background: transparent;
+
+                        HorizontalLayout {
+                            spacing: Theme.spacing-md;
+                            padding: Theme.spacing-xs;
+                            padding-left: Theme.spacing-md;
+                            padding-right: Theme.spacing-md;
+
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                spacing: 2px;
+                                alignment: center;
+
+                                Text {
+                                    text: "Enable Expert Mode";
+                                    color: Theme.text-primary;
+                                    font-size: Theme.font-size-sm;
+                                    font-weight: 500;
+                                }
+
+                                Text {
+                                    text: "Show dangerous advanced settings that can break your display or system. Use with extreme caution.";
+                                    color: Theme.text-muted;
+                                    font-size: Theme.font-size-xs;
+                                    wrap: word-wrap;
+                                }
+                            }
+
+                            Rectangle {
+                                width: 200px;
+                                vertical-stretch: 1;
+
+                                HorizontalLayout {
+                                    alignment: end;
+                                    padding-right: Theme.spacing-sm;
+
+                                    Switch {
+                                        checked: root.expert-mode;
+                                        toggled => {
+                                            if self.checked {
+                                                // Reset toggle immediately, will enable only on confirm
+                                                root.expert-mode = false;
+                                                root.show-expert-mode-confirm = true;
+                                            } else {
+                                                // Disable immediately without confirmation
+                                                root.expert-mode-toggled(false);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if root.expert-mode: Rectangle {
+                        background: Theme.warning.with-alpha(0.15);
+                        border-radius: Theme.radius-sm;
+                        border-width: 1px;
+                        border-color: Theme.warning.with-alpha(0.3);
+                        height: expert-warn.preferred-height + Theme.spacing-sm * 2;
+
+                        expert-warn := Text {
+                            x: Theme.spacing-sm;
+                            y: Theme.spacing-sm;
+                            width: parent.width - Theme.spacing-sm * 2;
+                            text: "Expert Mode is ON. Dangerous settings like custom monitor modes are now visible in Display settings.";
+                            color: Theme.warning;
+                            font-size: Theme.font-size-sm;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+
+            // Warning banner
+            Rectangle {
+                background: Theme.error.with-alpha(0.15);
+                border-radius: Theme.radius-md;
+                border-width: 1px;
+                border-color: Theme.error.with-alpha(0.3);
+                height: warn-layout.preferred-height + Theme.spacing-md * 2;
+
+                warn-layout := VerticalLayout {
+                    padding: Theme.spacing-md;
+                    spacing: Theme.spacing-xs;
+
+                    Text {
+                        text: "Advanced Debug Options";
+                        color: Theme.error;
+                        font-size: Theme.font-size-lg;
+                        font-weight: 600;
+                    }
+
+                    Text {
+                        text: "These options are intended for developers and troubleshooting. They may cause visual glitches, performance issues, or unexpected behavior. Use with caution.";
+                        color: Theme.error.with-alpha(0.8);
+                        font-size: Theme.font-size-sm;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Rendering Section
+            DynamicSection {
+                title: "RENDERING";
+                settings: root.rendering-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
+            }
+
+            // GPU Section
+            DynamicSection {
+                title: "GPU";
+                settings: root.gpu-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
+            }
+
+            // Frame Timing Section
+            DynamicSection {
+                title: "FRAME TIMING";
+                settings: root.frame-timing-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
+            }
+
+            // Window Management Section
+            DynamicSection {
+                title: "WINDOW MANAGEMENT";
+                settings: root.window-management-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
+            }
+
+            // System Section
+            DynamicSection {
+                title: "SYSTEM";
+                settings: root.system-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
+            }
+
+            // Screencasting Section
+            DynamicSection {
+                title: "SCREENCASTING";
+                settings: root.screencasting-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
+            }
+
+            // Spacer at bottom
+            Rectangle { height: Theme.spacing-lg; }
+        }
+    }
+
+    // Confirmation dialog for Expert Mode
+    ConfirmDialog {
+        show-dialog: root.show-expert-mode-confirm;
+        title: "Enable Expert Mode?";
+        message: "Expert Mode reveals dangerous advanced settings that can break your display or system.";
+        warning: "Incorrect settings can cause your monitor to turn off, display incorrectly, or require manual config file editing to recover. Only enable if you understand the risks.";
+        confirm-text: "Enable Expert Mode";
+        cancel-text: "Cancel";
+
+        confirmed => {
+            root.show-expert-mode-confirm = false;
+            root.expert-mode = true;
+            root.expert-mode-toggled(true);
+        }
+
+        cancelled => {
+            root.show-expert-mode-confirm = false;
+            // Toggle stays off since we didn't confirm
+        }
+    }
+}

@@ -1,0 +1,506 @@
+// Dynamic Animations settings page
+// Uses model-driven rendering for reduced compile time
+
+import { Theme } from "../styles.slint";
+import { ScrollView, ComboBox, Slider, Switch } from "std-widgets.slint";
+
+// Universal setting model for animations
+export struct AnimationSettingModel {
+    id: string,              // Unique identifier for callbacks
+    label: string,           // Display label
+    description: string,     // Help text
+    setting-type: int,       // 0=toggle, 1=slider, 2=combo, 3=text
+
+    // Toggle (type 0)
+    bool-value: bool,
+
+    // Slider (type 1)
+    int-value: int,
+    float-value: float,
+    min-value: float,
+    max-value: float,
+    suffix: string,
+    use-float: bool,         // true = float slider, false = int slider
+
+    // ComboBox (type 2)
+    combo-index: int,
+    combo-options: [string],
+
+    // Text (type 3)
+    text-value: string,
+    placeholder: string,
+
+    // Visibility
+    visible: bool,
+}
+
+// Dynamic row component - renders any setting type
+component DynamicRow inherits Rectangle {
+    in property <AnimationSettingModel> setting;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+
+    visible: setting.visible;
+    height: setting.visible ? 52px : 0;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+        padding: Theme.spacing-xs;
+        padding-left: Theme.spacing-md;
+        padding-right: Theme.spacing-md;
+
+        // Label column
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            alignment: center;
+
+            Text {
+                text: setting.label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-sm;
+                font-weight: 500;
+            }
+
+            if setting.description != "": Text {
+                text: setting.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-xs;
+                wrap: word-wrap;
+            }
+        }
+
+        // Control column
+        Rectangle {
+            width: 200px;
+            vertical-stretch: 1;
+
+            // Toggle (type 0)
+            if setting.setting-type == 0: HorizontalLayout {
+                alignment: end;
+                padding-right: Theme.spacing-sm;
+
+                Switch {
+                    checked: setting.bool-value;
+                    toggled => {
+                        root.toggle-changed(setting.id, self.checked);
+                    }
+                }
+            }
+
+            // Slider (type 1)
+            if setting.setting-type == 1: HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: center;
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: setting.min-value;
+                    maximum: setting.max-value;
+                    value: setting.use-float ? setting.float-value : setting.int-value;
+                    changed(val) => {
+                        if (setting.use-float) {
+                            root.slider-float-changed(setting.id, val);
+                        } else {
+                            root.slider-int-changed(setting.id, round(val));
+                        }
+                    }
+                }
+
+                Text {
+                    width: 55px;
+                    text: setting.use-float
+                        ? round(setting.float-value * 100) / 100 + setting.suffix
+                        : setting.int-value + setting.suffix;
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+
+            // ComboBox (type 2)
+            if setting.setting-type == 2: HorizontalLayout {
+                alignment: end;
+
+                ComboBox {
+                    width: 150px;
+                    model: setting.combo-options;
+                    current-index: setting.combo-index;
+                    selected(_) => {
+                        root.combo-changed(setting.id, self.current-index);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Dynamic section component for grouping settings
+component DynamicSection inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle: "";
+    in property <[AnimationSettingModel]> settings;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+
+    background: Theme.card-background;
+    border-radius: Theme.radius-md;
+
+    VerticalLayout {
+        padding: Theme.spacing-md;
+        spacing: Theme.spacing-xs;
+
+        // Section header
+        Text {
+            text: title;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-xs;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        // Optional subtitle
+        if subtitle != "": Text {
+            text: subtitle;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-sm;
+            wrap: word-wrap;
+        }
+
+        // Dynamic rows from model
+        for setting in settings: DynamicRow {
+            setting: setting;
+            toggle-changed(id, val) => { root.toggle-changed(id, val); }
+            slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+            slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+            combo-changed(id, val) => { root.combo-changed(id, val); }
+        }
+    }
+}
+
+// Individual animation configuration row with expandable parameters
+component AnimationRow inherits Rectangle {
+    in property <AnimationSettingModel> setting;
+    in property <[AnimationSettingModel]> spring-params;
+    in property <[AnimationSettingModel]> easing-params;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+
+    visible: setting.visible;
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.spacing-xs;
+
+        // Main row with label and type selector
+        HorizontalLayout {
+            spacing: Theme.spacing-md;
+            padding: Theme.spacing-xs;
+            padding-left: Theme.spacing-md;
+            padding-right: Theme.spacing-md;
+            height: 52px;
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+
+                Text {
+                    text: setting.label;
+                    color: Theme.text-primary;
+                    font-size: Theme.font-size-md;
+                }
+
+                if setting.description != "": Text {
+                    text: setting.description;
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-sm;
+                }
+            }
+
+            ComboBox {
+                width: 120px;
+                model: setting.combo-options;
+                current-index: setting.combo-index;
+                selected(_) => {
+                    root.combo-changed(setting.id, self.current-index);
+                }
+            }
+        }
+
+        // Spring parameters panel (shown when type is Spring = 2)
+        if setting.combo-index == 2: Rectangle {
+            background: Theme.surface-elevated;
+            border-radius: Theme.radius-sm;
+
+            VerticalLayout {
+                padding: Theme.spacing-sm;
+                spacing: Theme.spacing-xs;
+
+                for param in spring-params: DynamicRow {
+                    setting: param;
+                    toggle-changed(id, val) => { root.toggle-changed(id, val); }
+                    slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+                    slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+                    combo-changed(id, val) => { root.combo-changed(id, val); }
+                }
+            }
+        }
+
+        // Easing parameters panel (shown when type is Easing = 3)
+        if setting.combo-index == 3: Rectangle {
+            background: Theme.surface-elevated;
+            border-radius: Theme.radius-sm;
+
+            VerticalLayout {
+                padding: Theme.spacing-sm;
+                spacing: Theme.spacing-xs;
+
+                for param in easing-params: DynamicRow {
+                    setting: param;
+                    toggle-changed(id, val) => { root.toggle-changed(id, val); }
+                    slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+                    slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+                    combo-changed(id, val) => { root.combo-changed(id, val); }
+                }
+            }
+        }
+    }
+}
+
+// Main page component
+export component AnimationsDynamicPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Animations settings";
+
+    // Global animation settings model
+    in-out property <[AnimationSettingModel]> global-settings: [];
+
+    // Expanded state for advanced section
+    in-out property <bool> advanced-expanded: false;
+
+    // Per-animation settings models (grouped by category)
+    // Each animation has: type selector + spring params + easing params
+    in-out property <[AnimationSettingModel]> workspace-nav-animations: [];
+    in-out property <[AnimationSettingModel]> window-animations: [];
+    in-out property <[AnimationSettingModel]> ui-animations: [];
+
+    // Spring parameter models for each animation (11 total)
+    in-out property <[AnimationSettingModel]> spring-params-0: [];
+    in-out property <[AnimationSettingModel]> spring-params-1: [];
+    in-out property <[AnimationSettingModel]> spring-params-2: [];
+    in-out property <[AnimationSettingModel]> spring-params-3: [];
+    in-out property <[AnimationSettingModel]> spring-params-4: [];
+    in-out property <[AnimationSettingModel]> spring-params-5: [];
+    in-out property <[AnimationSettingModel]> spring-params-6: [];
+    in-out property <[AnimationSettingModel]> spring-params-7: [];
+    in-out property <[AnimationSettingModel]> spring-params-8: [];
+    in-out property <[AnimationSettingModel]> spring-params-9: [];
+    in-out property <[AnimationSettingModel]> spring-params-10: [];
+
+    // Easing parameter models for each animation (11 total)
+    in-out property <[AnimationSettingModel]> easing-params-0: [];
+    in-out property <[AnimationSettingModel]> easing-params-1: [];
+    in-out property <[AnimationSettingModel]> easing-params-2: [];
+    in-out property <[AnimationSettingModel]> easing-params-3: [];
+    in-out property <[AnimationSettingModel]> easing-params-4: [];
+    in-out property <[AnimationSettingModel]> easing-params-5: [];
+    in-out property <[AnimationSettingModel]> easing-params-6: [];
+    in-out property <[AnimationSettingModel]> easing-params-7: [];
+    in-out property <[AnimationSettingModel]> easing-params-8: [];
+    in-out property <[AnimationSettingModel]> easing-params-9: [];
+    in-out property <[AnimationSettingModel]> easing-params-10: [];
+
+    // Animations enabled state (for conditional UI)
+    in-out property <bool> animations-enabled: true;
+
+    // Generic callbacks for all setting changes
+    callback setting-toggle-changed(string, bool);
+    callback setting-slider-int-changed(string, int);
+    callback setting-slider-float-changed(string, float);
+    callback setting-combo-changed(string, int);
+
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            alignment: start;
+            spacing: Theme.spacing-lg;
+            padding-right: Theme.spacing-md;
+
+            // Global Animations Section
+            DynamicSection {
+                title: "ANIMATIONS";
+                subtitle: "Configure global animation behavior";
+                settings: root.global-settings;
+
+                toggle-changed(id, val) => {
+                    root.setting-toggle-changed(id, val);
+                }
+                slider-int-changed(id, val) => {
+                    root.setting-slider-int-changed(id, val);
+                }
+                slider-float-changed(id, val) => {
+                    root.setting-slider-float-changed(id, val);
+                }
+                combo-changed(id, val) => {
+                    root.setting-combo-changed(id, val);
+                }
+            }
+
+            // Expandable Advanced Section
+            if root.animations-enabled: Rectangle {
+                background: Theme.card-background;
+                border-radius: Theme.radius-md;
+
+                VerticalLayout {
+                    padding: Theme.spacing-md;
+                    spacing: Theme.spacing-sm;
+
+                    // Header with expand/collapse
+                    TouchArea {
+                        accessible-role: button;
+                        accessible-label: root.advanced-expanded
+                            ? "Collapse individual animation settings"
+                            : "Expand individual animation settings";
+
+                        clicked => { root.advanced-expanded = !root.advanced-expanded; }
+
+                        HorizontalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            Text {
+                                text: root.advanced-expanded ? "▼" : "▶";
+                                color: Theme.text-secondary;
+                                font-size: Theme.font-size-sm;
+                            }
+
+                            Text {
+                                text: "INDIVIDUAL ANIMATIONS";
+                                color: Theme.text-secondary;
+                                font-size: Theme.font-size-sm;
+                                font-weight: 600;
+                                letter-spacing: 0.5px;
+                            }
+
+                            Rectangle { horizontal-stretch: 1; }
+
+                            Text {
+                                text: "(Advanced)";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                            }
+                        }
+                    }
+
+                    if !root.advanced-expanded: Text {
+                        text: "Customize each animation type separately";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-sm;
+                    }
+
+                    // Expanded content - model-based rendering
+                    if root.advanced-expanded: VerticalLayout {
+                        spacing: Theme.spacing-lg;
+
+                        // Workspace & Navigation group
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            Text {
+                                text: "Workspace & Navigation";
+                                color: Theme.accent;
+                                font-size: Theme.font-size-sm;
+                                font-weight: 600;
+                            }
+
+                            for anim[idx] in root.workspace-nav-animations: AnimationRow {
+                                setting: anim;
+                                spring-params: idx == 0 ? root.spring-params-0 : root.spring-params-1;
+                                easing-params: idx == 0 ? root.easing-params-0 : root.easing-params-1;
+
+                                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                            }
+                        }
+
+                        // Window Animations group
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            Text {
+                                text: "Window Animations";
+                                color: Theme.accent;
+                                font-size: Theme.font-size-sm;
+                                font-weight: 600;
+                            }
+
+                            for anim[idx] in root.window-animations: AnimationRow {
+                                setting: anim;
+                                spring-params: idx == 0 ? root.spring-params-2 :
+                                              idx == 1 ? root.spring-params-3 :
+                                              idx == 2 ? root.spring-params-4 :
+                                              idx == 3 ? root.spring-params-5 :
+                                              root.spring-params-6;
+                                easing-params: idx == 0 ? root.easing-params-2 :
+                                              idx == 1 ? root.easing-params-3 :
+                                              idx == 2 ? root.easing-params-4 :
+                                              idx == 3 ? root.easing-params-5 :
+                                              root.easing-params-6;
+
+                                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                            }
+                        }
+
+                        // UI Animations group
+                        VerticalLayout {
+                            spacing: Theme.spacing-sm;
+
+                            Text {
+                                text: "UI Animations";
+                                color: Theme.accent;
+                                font-size: Theme.font-size-sm;
+                                font-weight: 600;
+                            }
+
+                            for anim[idx] in root.ui-animations: AnimationRow {
+                                setting: anim;
+                                spring-params: idx == 0 ? root.spring-params-7 :
+                                              idx == 1 ? root.spring-params-8 :
+                                              idx == 2 ? root.spring-params-9 :
+                                              root.spring-params-10;
+                                easing-params: idx == 0 ? root.easing-params-7 :
+                                              idx == 1 ? root.easing-params-8 :
+                                              idx == 2 ? root.easing-params-9 :
+                                              root.easing-params-10;
+
+                                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Spacer at bottom
+            Rectangle { height: Theme.spacing-lg; }
+        }
+    }
+}

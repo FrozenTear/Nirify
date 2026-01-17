@@ -105,30 +105,31 @@ pub fn parse_appearance_from_doc(doc: &KdlDocument, settings: &mut Settings) {
 ///
 /// Shared between loader and importer for DRY parsing of layout settings.
 pub fn parse_layout_children(layout_children: &KdlDocument, settings: &mut Settings) {
-    // Gaps - can be either `gaps 16` (single value) or `gaps inner=16 outer=8`
+    // Gaps - niri uses a single value: `gaps 16`
+    // For backwards compatibility, we also handle `gaps inner=X outer=Y` by taking the inner value
     if let Some(gaps_node) = layout_children.get("gaps") {
-        let mut found_named = false;
+        let mut found_value = false;
+
+        // Check for named entries (backwards compatibility with old configs)
         for entry in gaps_node.entries() {
             if let Some(name) = entry.name() {
-                // Named entries like inner=16 outer=8
                 if let Some(val) = entry.value().as_integer() {
-                    match name.value() {
-                        "inner" => settings.appearance.gaps_inner = val as f32,
-                        "outer" => settings.appearance.gaps_outer = val as f32,
-                        _ => {}
+                    // Use inner value if present (for backwards compatibility)
+                    if name.value() == "inner" {
+                        settings.appearance.gaps = val as f32;
+                        found_value = true;
+                        break;
                     }
-                    found_named = true;
                 }
             }
         }
-        // If no named entries, check for a single positional argument
-        if !found_named {
+
+        // Check for a single positional argument (the standard format)
+        if !found_value {
             if let Some(first_entry) = gaps_node.entries().iter().next() {
                 if first_entry.name().is_none() {
                     if let Some(val) = first_entry.value().as_integer() {
-                        // Single value applies to both inner and outer
-                        settings.appearance.gaps_inner = val as f32;
-                        settings.appearance.gaps_outer = val as f32;
+                        settings.appearance.gaps = val as f32;
                     }
                 }
             }

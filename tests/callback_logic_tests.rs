@@ -86,13 +86,13 @@ fn test_save_dirty_single_category() {
 
     // Create initial settings
     let mut settings = Settings::default();
-    settings.appearance.gaps_inner = 24.0;
+    settings.appearance.gaps = 24.0;
 
     // Save all first to create files
     save_settings(&paths, &settings).expect("Initial save failed");
 
     // Modify appearance
-    settings.appearance.gaps_inner = 32.0;
+    settings.appearance.gaps = 32.0;
 
     // Save only appearance
     let mut dirty = HashSet::new();
@@ -103,7 +103,7 @@ fn test_save_dirty_single_category() {
 
     // Verify the change persisted
     let loaded = load_settings(&paths);
-    assert_eq!(loaded.appearance.gaps_inner, 32.0);
+    assert_eq!(loaded.appearance.gaps, 32.0);
 }
 
 /// Test save_dirty with multiple categories
@@ -192,8 +192,7 @@ fn test_settings_validate_clamps_values() {
     let mut settings = Settings::default();
 
     // Set invalid values (simulating corrupted config or manual edit)
-    settings.appearance.gaps_inner = -100.0;
-    settings.appearance.gaps_outer = 1000.0;
+    settings.appearance.gaps = -100.0;
     settings.appearance.focus_ring_width = 0.0;
     settings.keyboard.repeat_delay = 10;
     settings.keyboard.repeat_rate = 500;
@@ -205,8 +204,7 @@ fn test_settings_validate_clamps_values() {
     settings.validate();
 
     // Check all values are clamped to valid ranges
-    assert_eq!(settings.appearance.gaps_inner, GAP_SIZE_MIN);
-    assert_eq!(settings.appearance.gaps_outer, GAP_SIZE_MAX);
+    assert_eq!(settings.appearance.gaps, GAP_SIZE_MIN);
     assert_eq!(settings.appearance.focus_ring_width, FOCUS_RING_WIDTH_MIN);
     assert_eq!(settings.keyboard.repeat_delay, REPEAT_DELAY_MIN);
     assert_eq!(settings.keyboard.repeat_rate, REPEAT_RATE_MAX);
@@ -246,7 +244,7 @@ fn test_full_callback_save_cycle() {
 
     // Simulate rapid-fire callbacks (like dragging a slider)
     for i in 1..=10 {
-        settings.appearance.gaps_inner = i as f32;
+        settings.appearance.gaps = i as f32;
         tracker.mark(SettingsCategory::Appearance);
     }
 
@@ -254,7 +252,7 @@ fn test_full_callback_save_cycle() {
     assert_eq!(tracker.dirty_count(), 1);
 
     // Final value should be 10
-    assert_eq!(settings.appearance.gaps_inner, 10.0);
+    assert_eq!(settings.appearance.gaps, 10.0);
 
     // Save
     let dirty = tracker.take();
@@ -262,5 +260,5 @@ fn test_full_callback_save_cycle() {
 
     // Verify final value persisted
     let loaded = load_settings(&paths);
-    assert_eq!(loaded.appearance.gaps_inner, 10.0);
+    assert_eq!(loaded.appearance.gaps, 10.0);
 }

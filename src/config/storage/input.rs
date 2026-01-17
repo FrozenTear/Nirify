@@ -209,11 +209,12 @@ pub fn generate_keyboard_kdl(settings: &KeyboardSettings) -> String {
         ));
     }
 
+    // Note: Keyboard does not support 'off' flag in niri - keyboards cannot be disabled
     format!(
         r#"// Keyboard settings - managed by niri-settings-rust
 
 input {{
-    keyboard {{{}
+    keyboard {{
         xkb {{
             layout "{}"{}
         }}
@@ -223,7 +224,6 @@ input {{
     }}
 }}
 "#,
-        if settings.off { "\n        off" } else { "" },
         escape_kdl_string(&settings.xkb_layout),
         xkb_extra,
         settings.repeat_delay,

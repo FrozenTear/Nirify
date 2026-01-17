@@ -598,6 +598,11 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
                     rule.focus_ring_inactive = Some(ColorOrGradient::Color(c));
                 }
             }
+            if let Some(hex) = get_string(fr_children, &["urgent-color"]) {
+                if let Some(c) = parse_color(&hex) {
+                    rule.focus_ring_urgent = Some(ColorOrGradient::Color(c));
+                }
+            }
         }
     }
 
@@ -615,6 +620,11 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
             if let Some(hex) = get_string(border_children, &["inactive-color"]) {
                 if let Some(c) = parse_color(&hex) {
                     rule.border_inactive = Some(ColorOrGradient::Color(c));
+                }
+            }
+            if let Some(hex) = get_string(border_children, &["urgent-color"]) {
+                if let Some(c) = parse_color(&hex) {
+                    rule.border_urgent = Some(ColorOrGradient::Color(c));
                 }
             }
         }
@@ -772,12 +782,7 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
 
 /// Load window rules from KDL file
 pub fn load_window_rules(path: &Path, settings: &mut Settings) {
-    let (rules, next_id) = load_rules(
-        path,
-        "window-rule",
-        "Rule",
-        parse_window_rule_node_children,
-    );
+    let (rules, next_id) = load_rules(path, "window-rule", "Rule", parse_window_rule_node_children);
     settings.window_rules.rules = rules;
     settings.window_rules.next_id = next_id;
 }

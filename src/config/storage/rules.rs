@@ -316,6 +316,7 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
             if rule.focus_ring_width.is_some()
                 || rule.focus_ring_active.is_some()
                 || rule.focus_ring_inactive.is_some()
+                || rule.focus_ring_urgent.is_some()
             {
                 content.push_str("    focus-ring {\n");
                 if let Some(width) = rule.focus_ring_width {
@@ -327,6 +328,9 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
                 if let Some(ref color) = rule.focus_ring_inactive {
                     content.push_str(&format!("        inactive-color \"{}\"\n", color.to_hex()));
                 }
+                if let Some(ref color) = rule.focus_ring_urgent {
+                    content.push_str(&format!("        urgent-color \"{}\"\n", color.to_hex()));
+                }
                 content.push_str("    }\n");
             }
 
@@ -334,6 +338,7 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
             if rule.border_width.is_some()
                 || rule.border_active.is_some()
                 || rule.border_inactive.is_some()
+                || rule.border_urgent.is_some()
             {
                 content.push_str("    border {\n");
                 if let Some(width) = rule.border_width {
@@ -345,13 +350,15 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
                 if let Some(ref color) = rule.border_inactive {
                     content.push_str(&format!("        inactive-color \"{}\"\n", color.to_hex()));
                 }
+                if let Some(ref color) = rule.border_urgent {
+                    content.push_str(&format!("        urgent-color \"{}\"\n", color.to_hex()));
+                }
                 content.push_str("    }\n");
             }
 
-            // Variable refresh rate
+            // Variable refresh rate (boolean, not string)
             if let Some(vrr) = rule.variable_refresh_rate {
-                let vrr_str = if vrr { "on" } else { "off" };
-                content.push_str(&format!("    variable-refresh-rate \"{}\"\n", vrr_str));
+                content.push_str(&format!("    variable-refresh-rate {}\n", vrr));
             }
 
             // Default column display
@@ -379,7 +386,7 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
             // Per-window shadow settings
             if let Some(ref shadow) = rule.shadow {
                 if !shadow.enabled {
-                    content.push_str("    shadow { off }\n");
+                    content.push_str("    shadow {\n        off\n    }\n");
                 } else {
                     content.push_str("    shadow {\n");
                     content.push_str("        on\n");
@@ -405,7 +412,7 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
             if let Some(ref ti) = rule.tab_indicator {
                 use crate::config::models::TabIndicatorPosition;
                 if !ti.enabled {
-                    content.push_str("    tab-indicator { off }\n");
+                    content.push_str("    tab-indicator {\n        off\n    }\n");
                 } else {
                     content.push_str("    tab-indicator {\n");
                     content.push_str("        on\n");
@@ -417,7 +424,10 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
                     }
                     content.push_str(&format!("        gap {}\n", ti.gap));
                     content.push_str(&format!("        width {}\n", ti.width));
-                    content.push_str(&format!("        length {{ proportion {:.2}; }}\n", ti.length_proportion));
+                    content.push_str(&format!(
+                        "        length {{ proportion {:.2}; }}\n",
+                        ti.length_proportion
+                    ));
                     let pos_str = match ti.position {
                         TabIndicatorPosition::Left => "left",
                         TabIndicatorPosition::Right => "right",
@@ -425,11 +435,23 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
                         TabIndicatorPosition::Bottom => "bottom",
                     };
                     content.push_str(&format!("        position \"{}\"\n", pos_str));
-                    content.push_str(&format!("        gaps-between-tabs {}\n", ti.gaps_between_tabs));
+                    content.push_str(&format!(
+                        "        gaps-between-tabs {}\n",
+                        ti.gaps_between_tabs
+                    ));
                     content.push_str(&format!("        corner-radius {}\n", ti.corner_radius));
-                    content.push_str(&format!("        active-color \"{}\"\n", ti.active.to_hex()));
-                    content.push_str(&format!("        inactive-color \"{}\"\n", ti.inactive.to_hex()));
-                    content.push_str(&format!("        urgent-color \"{}\"\n", ti.urgent.to_hex()));
+                    content.push_str(&format!(
+                        "        active-color \"{}\"\n",
+                        ti.active.to_hex()
+                    ));
+                    content.push_str(&format!(
+                        "        inactive-color \"{}\"\n",
+                        ti.inactive.to_hex()
+                    ));
+                    content.push_str(&format!(
+                        "        urgent-color \"{}\"\n",
+                        ti.urgent.to_hex()
+                    ));
                     content.push_str("    }\n");
                 }
             }

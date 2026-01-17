@@ -29,8 +29,9 @@ pub fn generate_appearance_kdl(
     let mut kdl = KdlBuilder::with_header("Appearance settings - managed by niri-settings-rust");
 
     kdl.block("layout", |b| {
-        // Gaps - niri uses a single value
-        b.raw(&format!("gaps {}", settings.gaps_inner.round() as i32));
+        // Gaps - single value (niri only supports one gaps value)
+        let gaps = settings.gaps.round() as i32;
+        b.raw(&format!("gaps {}", gaps));
 
         // Focus ring
         if settings.focus_ring_enabled {

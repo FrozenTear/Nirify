@@ -50,7 +50,7 @@ fn test_load_from_unreadable_file() {
 
     // Save valid settings first
     let mut settings = Settings::default();
-    settings.appearance.gaps_inner = 24.0;
+    settings.appearance.gaps = 24.0;
     settings.keyboard.repeat_delay = 400;
     save_settings(&paths, &settings).unwrap();
 
@@ -61,7 +61,7 @@ fn test_load_from_unreadable_file() {
     let loaded = load_settings(&paths);
 
     // Appearance should be defaults (couldn't read)
-    assert_eq!(loaded.appearance.gaps_inner, 16.0);
+    assert_eq!(loaded.appearance.gaps, 16.0);
     // But keyboard should have our value (was readable)
     assert_eq!(loaded.keyboard.repeat_delay, 400);
 
@@ -101,7 +101,7 @@ fn test_load_with_various_corruption_types() {
 
         // Should fall back to defaults
         assert_eq!(
-            loaded.appearance.gaps_inner, 16.0,
+            loaded.appearance.gaps, 16.0,
             "Failed for corruption type: {}",
             name
         );
@@ -133,7 +133,7 @@ fn test_partial_file_corruption() {
     let loaded = load_settings(&paths);
 
     // Corrupted file uses defaults
-    assert_eq!(loaded.appearance.gaps_inner, 16.0);
+    assert_eq!(loaded.appearance.gaps, 16.0);
     assert!(loaded.appearance.focus_ring_enabled);
 
     // Uncorrupted files retain values
@@ -167,7 +167,7 @@ fn test_all_files_corrupted() {
     // Should still load with all defaults
     let loaded = load_settings(&paths);
 
-    assert_eq!(loaded.appearance.gaps_inner, 16.0);
+    assert_eq!(loaded.appearance.gaps, 16.0);
     assert_eq!(loaded.keyboard.xkb_layout, "us");
     assert!(loaded.animations.enabled);
     assert_eq!(loaded.cursor.size, 24);
@@ -299,7 +299,7 @@ fn test_empty_file_handling() {
 
     // Should load with defaults
     let loaded = load_settings(&paths);
-    assert_eq!(loaded.appearance.gaps_inner, 16.0);
+    assert_eq!(loaded.appearance.gaps, 16.0);
     assert_eq!(loaded.keyboard.xkb_layout, "us");
 }
 
@@ -320,7 +320,7 @@ fn test_comments_only_file() {
     .unwrap();
 
     let loaded = load_settings(&paths);
-    assert_eq!(loaded.appearance.gaps_inner, 16.0);
+    assert_eq!(loaded.appearance.gaps, 16.0);
 }
 
 #[test]
@@ -388,8 +388,8 @@ layout {
     let loaded = load_settings(&paths);
 
     use niri_settings::constants::*;
-    assert_eq!(loaded.appearance.gaps_inner, GAP_SIZE_MIN);
-    assert_eq!(loaded.appearance.gaps_outer, GAP_SIZE_MAX);
+    // Note: inner=-999 is read (backwards compat), then clamped to min
+    assert_eq!(loaded.appearance.gaps, GAP_SIZE_MIN);
     assert_eq!(loaded.appearance.focus_ring_width, FOCUS_RING_WIDTH_MAX);
 }
 
@@ -439,7 +439,7 @@ layout {
 
     let loaded = load_settings(&paths);
     // Behavior depends on parser - should not crash either way
-    assert!(loaded.appearance.gaps_inner == 10.0 || loaded.appearance.gaps_inner == 20.0);
+    assert!(loaded.appearance.gaps == 10.0 || loaded.appearance.gaps == 20.0);
 }
 
 // ============================================================================
@@ -482,6 +482,6 @@ fn test_handles_symlink_as_config_file() {
 
         // Should follow symlink and load
         let loaded = load_settings(&paths);
-        assert_eq!(loaded.appearance.gaps_inner, 30.0);
+        assert_eq!(loaded.appearance.gaps, 30.0);
     }
 }

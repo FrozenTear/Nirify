@@ -19,7 +19,9 @@ pub fn generate_misc_kdl(settings: &MiscSettings) -> String {
     kdl.field_string_if_not_empty("screenshot-path", &settings.screenshot_path);
 
     if settings.disable_primary_clipboard {
-        kdl.raw("clipboard { disable-primary }");
+        kdl.block("clipboard", |b| {
+            b.flag("disable-primary");
+        });
     }
 
     // Hotkey overlay settings (v25.08+)
@@ -37,14 +39,17 @@ pub fn generate_misc_kdl(settings: &MiscSettings) -> String {
         },
     );
 
-    // Spawn commands through shell (v25.08+)
-    kdl.optional_flag("spawn-sh-at-startup", settings.spawn_sh_at_startup);
+    // Note: spawn-sh-at-startup requires a command argument, not a flag.
+    // The current boolean model is incorrect - this feature needs redesign.
+    // For now, we don't output it to avoid parsing errors.
 
     // XWayland satellite settings (v25.08+)
     match &settings.xwayland_satellite {
         XWaylandSatelliteConfig::Default => {} // Don't output, use niri defaults
         XWaylandSatelliteConfig::Off => {
-            kdl.raw("xwayland-satellite { off }");
+            kdl.block("xwayland-satellite", |b| {
+                b.flag("off");
+            });
         }
         XWaylandSatelliteConfig::CustomPath(path) => {
             kdl.field_string("xwayland-satellite", path);

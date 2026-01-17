@@ -13,15 +13,36 @@ use super::sync_macros::{
     sync_f64_as_f32_props, sync_i32_props, sync_string_props,
 };
 
-use super::callbacks::layer_rules::{
+use super::callbacks::animations_dynamic::sync_all_animation_models;
+use super::callbacks::appearance_dynamic::sync_all_models as sync_appearance_dynamic_models;
+use super::callbacks::behavior_dynamic::sync_all_models as sync_behavior_dynamic_models;
+use super::callbacks::cursor_dynamic::sync_all_models as sync_cursor_dynamic_models;
+use super::callbacks::debug_dynamic::sync_all_models as sync_debug_dynamic_models;
+use super::callbacks::gestures_dynamic::sync_all_gesture_models;
+use super::callbacks::keyboard_dynamic::sync_keyboard_models;
+use super::callbacks::layer_rules_dynamic::{
     build_matches_model as build_layer_rule_matches_model,
     build_rules_list_model as build_layer_rules_list_model,
+    sync_all_rule_models as sync_layer_rule_models,
 };
+use super::callbacks::layout_extras_dynamic::sync_layout_extras_models;
+use super::callbacks::miscellaneous_dynamic::sync_misc_dynamic_models_auto;
+use super::callbacks::mouse_dynamic::sync_all_models as sync_mouse_dynamic_models;
 use super::callbacks::outputs::{format_mode_for_display, format_mode_for_storage};
-use super::callbacks::window_rules::{
+use super::callbacks::overview_dynamic::sync_overview_models;
+use super::callbacks::switch_events_dynamic::sync_switch_events_ui;
+use super::callbacks::touchpad_dynamic::sync_all_models as sync_touchpad_dynamic_models;
+use super::callbacks::trackpoint_dynamic::sync_all_models as sync_trackpoint_dynamic_models;
+use super::callbacks::trackball_dynamic::sync_all_models as sync_trackball_dynamic_models;
+use super::callbacks::tablet_dynamic::sync_all_models as sync_tablet_dynamic_models;
+use super::callbacks::touch_dynamic::sync_all_models as sync_touch_dynamic_models;
+use super::callbacks::window_rules_dynamic::{
     build_matches_model, build_rules_list_model, get_open_behavior_index,
 };
-use super::callbacks::workspaces::build_workspaces_list_model;
+use super::callbacks::workspaces_dynamic::sync_workspaces_models as sync_workspaces_dynamic_models;
+use super::callbacks::startup_dynamic::sync_startup_ui as sync_startup_dynamic;
+use super::callbacks::environment_dynamic::sync_environment_ui as sync_environment_dynamic;
+use super::callbacks::recent_windows_dynamic::sync_recent_windows_models as sync_recent_windows_dynamic_models;
 use super::converters::{color_to_slint_color, key_parts_to_model, parse_key_combo_parts};
 use super::indices::{
     center_focused_is_enabled, warp_mouse_is_enabled, TRACK_LAYOUT_GLOBAL, TRACK_LAYOUT_WINDOW,
@@ -46,14 +67,35 @@ pub fn sync_ui_from_settings(ui: &MainWindow, settings: &Settings) {
     sync_miscellaneous(ui, settings);
     sync_window_rules(ui, settings);
     sync_input_devices(ui, settings);
-    sync_workspaces(ui, settings);
     sync_layer_rules(ui, settings);
+    sync_layer_rules_dynamic(ui, settings);
+
+    // Sync dynamic page models
+    sync_all_animation_models(ui, &settings.animations);
+    sync_appearance_dynamic_models(ui, &settings.appearance);
+    sync_behavior_dynamic_models(ui, settings);
+    sync_cursor_dynamic_models(ui, settings);
+    sync_debug_dynamic_models(ui, &settings.debug);
+    sync_all_gesture_models(ui, settings);
+    sync_keyboard_models(ui, settings);
+    sync_layout_extras_models(ui, &settings.layout_extras);
+    sync_misc_dynamic_models_auto(ui, settings);
+    sync_mouse_dynamic_models(ui, &settings.mouse);
+    sync_overview_models(ui, settings);
+    sync_switch_events_ui(ui, &settings.switch_events);
+    sync_touchpad_dynamic_models(ui, &settings.touchpad);
+    sync_trackpoint_dynamic_models(ui, &settings.trackpoint);
+    sync_trackball_dynamic_models(ui, &settings.trackball);
+    sync_tablet_dynamic_models(ui, &settings.tablet);
+    sync_touch_dynamic_models(ui, &settings.touch);
+    sync_workspaces_dynamic_models(ui, &settings.workspaces.workspaces, 0);
+    sync_startup_dynamic(ui, settings);
+    sync_environment_dynamic(ui, settings);
+    sync_recent_windows_dynamic_models(ui, &settings.recent_windows);
+
     sync_keybindings(ui, settings);
-    sync_startup(ui, settings);
-    sync_environment(ui, settings);
     sync_debug(ui, settings);
     sync_switch_events(ui, settings);
-    sync_recent_windows(ui, settings);
 }
 
 fn sync_appearance(ui: &MainWindow, settings: &Settings) {
@@ -74,8 +116,7 @@ fn sync_appearance(ui: &MainWindow, settings: &Settings) {
         [
             (focus_ring_width, set_focus_ring_width),
             (border_thickness, set_border_thickness),
-            (gaps_inner, set_gaps_inner),
-            (gaps_outer, set_gaps_outer),
+            (gaps, set_gaps),
             (corner_radius, set_corner_radius),
         ]
     );
@@ -222,8 +263,11 @@ fn sync_animations(ui: &MainWindow, settings: &Settings) {
     .enumerate()
     .map(|(idx, anim_id)| {
         let anim = anim_id.get(anims);
-        let (bezier_x1, bezier_y1, bezier_x2, bezier_y2) =
-            anim.easing.curve.bezier_points().unwrap_or((0.25, 0.1, 0.25, 1.0));
+        let (bezier_x1, bezier_y1, bezier_x2, bezier_y2) = anim
+            .easing
+            .curve
+            .bezier_points()
+            .unwrap_or((0.25, 0.1, 0.25, 1.0));
         crate::AnimationConfig {
             id: anim_id.to_index(),
             name: SharedString::from(anim_id.name()),
@@ -268,8 +312,7 @@ fn sync_overview(ui: &MainWindow, settings: &Settings) {
 fn sync_keyboard(ui: &MainWindow, settings: &Settings) {
     let k = &settings.keyboard;
 
-    // Device enable/disable
-    ui.set_keyboard_off(k.off);
+    // Note: Keyboard cannot be disabled in niri, so we don't sync the "off" property
 
     sync_string_props!(
         ui,
@@ -669,148 +712,13 @@ fn sync_window_rules(ui: &MainWindow, settings: &Settings) {
     }
 }
 
-fn sync_input_devices(ui: &MainWindow, settings: &Settings) {
-    // Trackpoint
-    let tp = &settings.trackpoint;
-    sync_bool_props!(
-        ui,
-        tp,
-        [
-            (off, set_trackpoint_off),
-            (natural_scroll, set_trackpoint_natural_scroll),
-            (left_handed, set_trackpoint_left_handed),
-            (scroll_button_lock, set_trackpoint_scroll_button_lock),
-            (middle_emulation, set_trackpoint_middle_emulation),
-        ]
-    );
-    sync_f64_as_f32_props!(ui, tp, [(accel_speed, set_trackpoint_accel_speed)]);
-    sync_enum_index_props!(
-        ui,
-        tp,
-        [
-            (accel_profile, set_trackpoint_accel_profile_index),
-            (scroll_method, set_trackpoint_scroll_method_index),
-        ]
-    );
-    ui.set_trackpoint_scroll_button(tp.scroll_button.unwrap_or(0));
-
-    // Trackball
-    let tb = &settings.trackball;
-    sync_bool_props!(
-        ui,
-        tb,
-        [
-            (off, set_trackball_off),
-            (natural_scroll, set_trackball_natural_scroll),
-            (left_handed, set_trackball_left_handed),
-            (scroll_button_lock, set_trackball_scroll_button_lock),
-            (middle_emulation, set_trackball_middle_emulation),
-        ]
-    );
-    sync_f64_as_f32_props!(ui, tb, [(accel_speed, set_trackball_accel_speed)]);
-    sync_enum_index_props!(
-        ui,
-        tb,
-        [
-            (accel_profile, set_trackball_accel_profile_index),
-            (scroll_method, set_trackball_scroll_method_index),
-        ]
-    );
-    ui.set_trackball_scroll_button(tb.scroll_button.unwrap_or(0));
-
-    // Tablet
-    let tab = &settings.tablet;
-    sync_bool_props!(
-        ui,
-        tab,
-        [(off, set_tablet_off), (left_handed, set_tablet_left_handed),]
-    );
-    sync_string_props!(ui, tab, [(map_to_output, set_tablet_map_to_output)]);
-    ui.set_tablet_has_calibration(tab.calibration_matrix.is_some());
-    if let Some(ref matrix) = tab.calibration_matrix {
-        ui.set_tablet_cal_m0(matrix[0] as f32);
-        ui.set_tablet_cal_m1(matrix[1] as f32);
-        ui.set_tablet_cal_m2(matrix[2] as f32);
-        ui.set_tablet_cal_m3(matrix[3] as f32);
-        ui.set_tablet_cal_m4(matrix[4] as f32);
-        ui.set_tablet_cal_m5(matrix[5] as f32);
-    }
-
-    // Touch
-    let tch = &settings.touch;
-    sync_bool_props!(ui, tch, [(off, set_touch_off)]);
-    sync_string_props!(ui, tch, [(map_to_output, set_touch_map_to_output)]);
-    ui.set_touch_has_calibration(tch.calibration_matrix.is_some());
-    if let Some(ref matrix) = tch.calibration_matrix {
-        ui.set_touch_cal_m0(matrix[0] as f32);
-        ui.set_touch_cal_m1(matrix[1] as f32);
-        ui.set_touch_cal_m2(matrix[2] as f32);
-        ui.set_touch_cal_m3(matrix[3] as f32);
-        ui.set_touch_cal_m4(matrix[4] as f32);
-        ui.set_touch_cal_m5(matrix[5] as f32);
-    }
-}
-
-fn sync_workspaces(ui: &MainWindow, settings: &Settings) {
-    use crate::types::CenterFocusedColumn;
-
-    // Build workspace list model
-    let workspace_list = build_workspaces_list_model(&settings.workspaces.workspaces);
-    ui.set_workspaces_list(workspace_list);
-
-    // If we have workspaces, select the first one and load its settings
-    if let Some(first_ws) = settings.workspaces.workspaces.first() {
-        ui.set_selected_workspace_index(0);
-        ui.set_current_workspace_name(first_ws.name.as_str().into());
-        ui.set_current_workspace_open_on_output(
-            first_ws
-                .open_on_output
-                .as_deref()
-                .unwrap_or_default()
-                .into(),
-        );
-
-        let has_override = first_ws.layout_override.is_some();
-        ui.set_current_workspace_has_layout_override(has_override);
-
-        if let Some(ref lo) = first_ws.layout_override {
-            // Gaps
-            let has_gaps = lo.gaps_inner.is_some() || lo.gaps_outer.is_some();
-            ui.set_current_workspace_has_gaps_override(has_gaps);
-            ui.set_current_workspace_gaps_inner(lo.gaps_inner.unwrap_or(16.0));
-            ui.set_current_workspace_gaps_outer(lo.gaps_outer.unwrap_or(8.0));
-
-            // Struts
-            let has_struts = lo.strut_left.is_some()
-                || lo.strut_right.is_some()
-                || lo.strut_top.is_some()
-                || lo.strut_bottom.is_some();
-            ui.set_current_workspace_has_struts_override(has_struts);
-            ui.set_current_workspace_strut_left(lo.strut_left.unwrap_or(0.0));
-            ui.set_current_workspace_strut_right(lo.strut_right.unwrap_or(0.0));
-            ui.set_current_workspace_strut_top(lo.strut_top.unwrap_or(0.0));
-            ui.set_current_workspace_strut_bottom(lo.strut_bottom.unwrap_or(0.0));
-
-            // Center
-            let has_center =
-                lo.center_focused_column.is_some() || lo.always_center_single_column.is_some();
-            ui.set_current_workspace_has_center_override(has_center);
-            let center_idx = lo
-                .center_focused_column
-                .unwrap_or(CenterFocusedColumn::Never)
-                .to_index();
-            ui.set_current_workspace_center_focused_column_index(center_idx);
-            ui.set_current_workspace_always_center_single_column(
-                lo.always_center_single_column.unwrap_or(false),
-            );
-        } else {
-            ui.set_current_workspace_has_gaps_override(false);
-            ui.set_current_workspace_has_struts_override(false);
-            ui.set_current_workspace_has_center_override(false);
-        }
-    } else {
-        ui.set_selected_workspace_index(-1);
-    }
+fn sync_input_devices(_ui: &MainWindow, _settings: &Settings) {
+    // All input devices now use dynamic pages:
+    // - trackpoint_dynamic
+    // - trackball_dynamic
+    // - tablet_dynamic
+    // - touch_dynamic
+    // Their sync functions are called from sync_ui_from_settings()
 }
 
 fn sync_layer_rules(ui: &MainWindow, settings: &Settings) {
@@ -891,6 +799,21 @@ fn sync_layer_rules(ui: &MainWindow, settings: &Settings) {
     }
 }
 
+/// Sync dynamic layer rules from settings to UI
+fn sync_layer_rules_dynamic(ui: &MainWindow, settings: &Settings) {
+    // Build and set rule list
+    let rule_list = build_layer_rules_list_model(&settings.layer_rules.rules);
+    ui.set_layer_rules_list_dynamic(rule_list);
+
+    // If we have rules, select the first one and load its models
+    if let Some(first_rule) = settings.layer_rules.rules.first() {
+        ui.set_layer_rules_selected_index(0);
+        sync_layer_rule_models(ui, first_rule, 0);
+    } else {
+        ui.set_layer_rules_selected_index(-1);
+    }
+}
+
 /// Sync keybindings from settings to UI
 pub fn sync_keybindings(ui: &MainWindow, settings: &Settings) {
     use crate::config::models::KeybindAction;
@@ -940,41 +863,6 @@ pub fn sync_keybindings(ui: &MainWindow, settings: &Settings) {
 
     // Reset selection
     ui.set_selected_keybinding_index(-1);
-}
-
-/// Sync startup commands from settings to UI
-fn sync_startup(ui: &MainWindow, settings: &Settings) {
-    use slint::{ModelRc, SharedString, VecModel};
-
-    // Build command list
-    let commands: Vec<SharedString> = settings
-        .startup
-        .commands
-        .iter()
-        .map(|cmd| SharedString::from(cmd.display()))
-        .collect();
-
-    ui.set_startup_command_list(ModelRc::new(VecModel::from(commands)));
-    ui.set_selected_startup_index(-1);
-    ui.set_current_startup_command(SharedString::default());
-}
-
-/// Sync environment variables from settings to UI
-fn sync_environment(ui: &MainWindow, settings: &Settings) {
-    use slint::{ModelRc, SharedString, VecModel};
-
-    // Build variable list (display as NAME=value)
-    let variables: Vec<SharedString> = settings
-        .environment
-        .variables
-        .iter()
-        .map(|var| SharedString::from(format!("{}={}", var.name, var.value)))
-        .collect();
-
-    ui.set_environment_variable_list(ModelRc::new(VecModel::from(variables)));
-    ui.set_selected_environment_index(-1);
-    ui.set_current_env_name(SharedString::default());
-    ui.set_current_env_value(SharedString::default());
 }
 
 /// Sync debug settings from settings to UI
@@ -1079,54 +967,3 @@ fn sync_switch_events(ui: &MainWindow, settings: &Settings) {
     ui.set_switch_tablet_mode_off_current(SharedString::default());
 }
 
-/// Sync recent windows settings from settings to UI (v25.05+)
-fn sync_recent_windows(ui: &MainWindow, settings: &Settings) {
-    let rw = &settings.recent_windows;
-
-    // Enable/disable (inverted: off in settings = disabled in UI)
-    ui.set_recent_windows_enabled(!rw.off);
-
-    // Timing
-    sync_i32_props!(
-        ui,
-        rw,
-        [
-            (debounce_ms, set_recent_windows_debounce_ms),
-            (open_delay_ms, set_recent_windows_open_delay_ms),
-        ]
-    );
-
-    // Highlight colors
-    let hl = &rw.highlight;
-    sync_color_props!(
-        ui,
-        hl,
-        [
-            (active_color, set_recent_windows_highlight_active_color),
-            (urgent_color, set_recent_windows_highlight_urgent_color),
-        ]
-    );
-    sync_color_hex_props!(
-        ui,
-        hl,
-        [
-            (active_color, set_recent_windows_highlight_active_color_hex),
-            (urgent_color, set_recent_windows_highlight_urgent_color_hex),
-        ]
-    );
-
-    // Highlight dimensions
-    sync_i32_props!(
-        ui,
-        hl,
-        [
-            (padding, set_recent_windows_highlight_padding),
-            (corner_radius, set_recent_windows_highlight_corner_radius),
-        ]
-    );
-
-    // Previews
-    let pv = &rw.previews;
-    ui.set_recent_windows_previews_max_height(pv.max_height);
-    ui.set_recent_windows_previews_max_scale(pv.max_scale as f32);
-}

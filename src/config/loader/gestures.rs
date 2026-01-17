@@ -12,9 +12,20 @@ use std::path::Path;
 /// Parse gestures from a document
 ///
 /// Shared parsing logic used by both file loader and import.
+/// Looks for settings inside a `gestures { }` block.
 pub fn parse_gestures_from_doc(doc: &KdlDocument, settings: &mut Settings) {
+    // All gesture settings are inside the gestures block
+    if let Some(gestures) = doc.get("gestures") {
+        if let Some(children) = gestures.children() {
+            parse_gestures_from_children(children, settings);
+        }
+    }
+}
+
+/// Parse gesture settings from children of a gestures block
+fn parse_gestures_from_children(children: &KdlDocument, settings: &mut Settings) {
     // Hot corners
-    if let Some(hc) = doc.get("hot-corners") {
+    if let Some(hc) = children.get("hot-corners") {
         settings.gestures.hot_corners.enabled = true;
         if let Some(hc_children) = hc.children() {
             settings.gestures.hot_corners.top_left = has_flag(hc_children, &["top-left"]);
@@ -24,46 +35,41 @@ pub fn parse_gestures_from_doc(doc: &KdlDocument, settings: &mut Settings) {
         }
     }
 
-    // DND settings
-    if let Some(dnd) = doc.get("dnd") {
-        if let Some(dnd_children) = dnd.children() {
-            // Edge view scroll
-            if let Some(evs) = dnd_children.get("edge-view-scroll") {
-                if let Some(evs_children) = evs.children() {
-                    if has_flag(evs_children, &["off"]) {
-                        settings.gestures.dnd_edge_view_scroll.enabled = false;
-                    } else {
-                        settings.gestures.dnd_edge_view_scroll.enabled = true;
-                        if let Some(v) = get_i64(evs_children, &["trigger-width"]) {
-                            settings.gestures.dnd_edge_view_scroll.trigger_size = v as i32;
-                        }
-                        if let Some(v) = get_i64(evs_children, &["delay-ms"]) {
-                            settings.gestures.dnd_edge_view_scroll.delay_ms = v as i32;
-                        }
-                        if let Some(v) = get_i64(evs_children, &["max-speed"]) {
-                            settings.gestures.dnd_edge_view_scroll.max_speed = v as i32;
-                        }
-                    }
+    // DND edge view scroll (inside gestures block as dnd-edge-view-scroll)
+    if let Some(evs) = children.get("dnd-edge-view-scroll") {
+        if let Some(evs_children) = evs.children() {
+            if has_flag(evs_children, &["off"]) {
+                settings.gestures.dnd_edge_view_scroll.enabled = false;
+            } else {
+                settings.gestures.dnd_edge_view_scroll.enabled = true;
+                if let Some(v) = get_i64(evs_children, &["trigger-width"]) {
+                    settings.gestures.dnd_edge_view_scroll.trigger_size = v as i32;
+                }
+                if let Some(v) = get_i64(evs_children, &["delay-ms"]) {
+                    settings.gestures.dnd_edge_view_scroll.delay_ms = v as i32;
+                }
+                if let Some(v) = get_i64(evs_children, &["max-speed"]) {
+                    settings.gestures.dnd_edge_view_scroll.max_speed = v as i32;
                 }
             }
+        }
+    }
 
-            // Edge workspace switch
-            if let Some(ews) = dnd_children.get("edge-workspace-switch") {
-                if let Some(ews_children) = ews.children() {
-                    if has_flag(ews_children, &["off"]) {
-                        settings.gestures.dnd_edge_workspace_switch.enabled = false;
-                    } else {
-                        settings.gestures.dnd_edge_workspace_switch.enabled = true;
-                        if let Some(v) = get_i64(ews_children, &["trigger-height"]) {
-                            settings.gestures.dnd_edge_workspace_switch.trigger_size = v as i32;
-                        }
-                        if let Some(v) = get_i64(ews_children, &["delay-ms"]) {
-                            settings.gestures.dnd_edge_workspace_switch.delay_ms = v as i32;
-                        }
-                        if let Some(v) = get_i64(ews_children, &["max-speed"]) {
-                            settings.gestures.dnd_edge_workspace_switch.max_speed = v as i32;
-                        }
-                    }
+    // DND edge workspace switch (inside gestures block as dnd-edge-workspace-switch)
+    if let Some(ews) = children.get("dnd-edge-workspace-switch") {
+        if let Some(ews_children) = ews.children() {
+            if has_flag(ews_children, &["off"]) {
+                settings.gestures.dnd_edge_workspace_switch.enabled = false;
+            } else {
+                settings.gestures.dnd_edge_workspace_switch.enabled = true;
+                if let Some(v) = get_i64(ews_children, &["trigger-height"]) {
+                    settings.gestures.dnd_edge_workspace_switch.trigger_size = v as i32;
+                }
+                if let Some(v) = get_i64(ews_children, &["delay-ms"]) {
+                    settings.gestures.dnd_edge_workspace_switch.delay_ms = v as i32;
+                }
+                if let Some(v) = get_i64(ews_children, &["max-speed"]) {
+                    settings.gestures.dnd_edge_workspace_switch.max_speed = v as i32;
                 }
             }
         }

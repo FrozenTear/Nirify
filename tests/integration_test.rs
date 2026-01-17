@@ -27,7 +27,7 @@ fn test_fresh_start_uses_defaults() {
 
     // Verify defaults are used
     assert!(settings.appearance.focus_ring_enabled);
-    assert_eq!(settings.appearance.gaps_inner, 16.0);
+    assert_eq!(settings.appearance.gaps, 16.0);
     assert!(settings.animations.enabled);
     assert_eq!(settings.keyboard.xkb_layout, "us");
 }
@@ -39,8 +39,7 @@ fn test_full_lifecycle_save_load_modify() {
 
     // Step 1: Create initial settings with custom values
     let mut settings = Settings::default();
-    settings.appearance.gaps_inner = 24.0;
-    // Note: gaps_outer is ignored in output since niri uses single gap value
+    settings.appearance.gaps = 24.0;
     settings.appearance.focus_ring_width = 6.0;
     settings.appearance.corner_radius = 16.0;
     settings.keyboard.repeat_delay = 400;
@@ -64,9 +63,7 @@ fn test_full_lifecycle_save_load_modify() {
     let loaded = load_settings(&paths);
 
     // Step 4: Verify all values match
-    // Note: niri uses a single gap value, so inner and outer become the same
-    assert_eq!(loaded.appearance.gaps_inner, 24.0);
-    assert_eq!(loaded.appearance.gaps_outer, 24.0);
+    assert_eq!(loaded.appearance.gaps, 24.0);
     assert_eq!(loaded.appearance.focus_ring_width, 6.0);
     assert_eq!(loaded.appearance.corner_radius, 16.0);
     assert_eq!(loaded.keyboard.repeat_delay, 400);
@@ -79,7 +76,7 @@ fn test_full_lifecycle_save_load_modify() {
 
     // Step 5: Modify settings
     let mut modified = loaded.clone();
-    modified.appearance.gaps_inner = 32.0;
+    modified.appearance.gaps = 32.0;
     modified.keyboard.repeat_delay = 500;
     modified.touchpad.tap = true;
     modified.touchpad.natural_scroll = false;
@@ -89,7 +86,7 @@ fn test_full_lifecycle_save_load_modify() {
 
     // Step 7: Load again and verify modifications persisted
     let reloaded = load_settings(&paths);
-    assert_eq!(reloaded.appearance.gaps_inner, 32.0);
+    assert_eq!(reloaded.appearance.gaps, 32.0);
     assert_eq!(reloaded.keyboard.repeat_delay, 500);
     assert!(reloaded.touchpad.tap);
     assert!(!reloaded.touchpad.natural_scroll);
@@ -123,8 +120,8 @@ layout {
     let settings = load_settings(&paths);
 
     // Appearance should have custom values
-    assert_eq!(settings.appearance.gaps_inner, 20.0);
-    assert_eq!(settings.appearance.gaps_outer, 10.0);
+    // Note: inner=20 outer=10 config will use inner value since niri uses single gaps
+    assert_eq!(settings.appearance.gaps, 20.0);
     assert_eq!(settings.appearance.focus_ring_width, 8.0);
 
     // Other settings should be defaults
@@ -140,7 +137,7 @@ fn test_corrupted_file_recovery() {
 
     // First, save valid settings
     let mut settings = Settings::default();
-    settings.appearance.gaps_inner = 24.0;
+    settings.appearance.gaps = 24.0;
     settings.keyboard.repeat_delay = 400;
     save_settings(&paths, &settings).expect("Failed to save settings");
 
@@ -151,7 +148,7 @@ fn test_corrupted_file_recovery() {
     let loaded = load_settings(&paths);
 
     // Corrupted file (appearance) should have defaults
-    assert_eq!(loaded.appearance.gaps_inner, 16.0); // Default, not 24.0
+    assert_eq!(loaded.appearance.gaps, 16.0); // Default, not 24.0
     assert!(loaded.appearance.focus_ring_enabled); // Default
 
     // Other files should still load correctly
@@ -181,8 +178,8 @@ layout {
     let settings = load_settings(&paths);
 
     // Values should be clamped to valid ranges
-    assert_eq!(settings.appearance.gaps_inner, 0.0); // GAP_SIZE_MIN
-    assert_eq!(settings.appearance.gaps_outer, 64.0); // GAP_SIZE_MAX
+    // Note: inner=-50 outer=999 - the loader reads inner first, which gets clamped to 0
+    assert_eq!(settings.appearance.gaps, 0.0); // GAP_SIZE_MIN (from clamping -50)
     assert_eq!(settings.appearance.focus_ring_width, 16.0); // FOCUS_RING_WIDTH_MAX
 }
 
@@ -361,7 +358,7 @@ fn test_repair_corrupted_configs() {
     let loaded = load_settings(&paths);
 
     // Appearance should have defaults, but keyboard/mouse should have our values
-    assert_eq!(loaded.appearance.gaps_inner, 16.0); // Default
+    assert_eq!(loaded.appearance.gaps, 16.0); // Default
     assert_eq!(loaded.keyboard.repeat_delay, 400); // Our value preserved
     assert!((loaded.mouse.accel_speed - 0.5).abs() < 0.01); // Our value preserved
 

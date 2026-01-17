@@ -1,28 +1,35 @@
 //! UI callback modules
 //!
 //! Each module handles callbacks for a specific settings category.
+//! Dynamic modules use model-driven UI with generic callbacks.
 
-pub mod animations;
-pub mod appearance;
+// Dynamic callback modules (model-driven)
+pub mod animations_dynamic;
+pub mod appearance_dynamic;
+pub mod behavior_dynamic;
+pub mod cursor_dynamic;
+pub mod debug_dynamic;
+pub mod environment_dynamic;
+pub mod gestures_dynamic;
+pub mod keyboard_dynamic;
+pub mod layout_extras_dynamic;
+pub mod layer_rules_dynamic;
+pub mod miscellaneous_dynamic;
+pub mod mouse_dynamic;
+pub mod overview_dynamic;
+pub mod recent_windows_dynamic;
+pub mod startup_dynamic;
+pub mod switch_events_dynamic;
+pub mod tablet_dynamic;
+pub mod touch_dynamic;
+pub mod touchpad_dynamic;
+pub mod trackball_dynamic;
+pub mod trackpoint_dynamic;
+pub mod window_rules_dynamic;
+pub mod workspaces_dynamic;
+
+// Static callback modules (complex UIs that don't fit dynamic pattern)
 pub mod backups;
-pub mod behavior;
-pub mod cursor;
-pub mod debug;
-pub mod environment;
-pub mod gestures;
-pub mod input_devices;
 pub mod keybindings;
-pub mod keyboard;
-pub mod layer_rules;
-pub mod layout_extras;
-pub mod miscellaneous;
-pub mod mouse;
 pub mod outputs;
-pub mod overview;
-pub mod recent_windows;
 pub mod rules_common;
-pub mod startup;
-pub mod switch_events;
-pub mod touchpad;
-pub mod window_rules;
-pub mod workspaces;

@@ -1,0 +1,566 @@
+// Dynamic Workspaces settings page
+// Uses model-driven rendering for reduced compile time
+
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, ComboBox, Button, Slider, Switch } from "std-widgets.slint";
+
+// Universal setting model for workspace settings
+export struct WorkspaceSettingModel {
+    id: string,              // Unique identifier for callbacks
+    label: string,           // Display label
+    description: string,     // Help text
+    setting-type: int,       // 0=toggle, 1=slider, 2=combo, 3=text
+
+    // Toggle (type 0)
+    bool-value: bool,
+
+    // Slider (type 1)
+    int-value: int,
+    float-value: float,
+    min-value: float,
+    max-value: float,
+    suffix: string,
+    use-float: bool,         // true = float slider, false = int slider
+
+    // ComboBox (type 2)
+    combo-index: int,
+    combo-options: [string],
+
+    // Text (type 3)
+    text-value: string,
+    placeholder: string,
+
+    // Visibility
+    visible: bool,
+}
+
+// Dynamic row component - renders any setting type
+component DynamicRow inherits Rectangle {
+    in property <WorkspaceSettingModel> setting;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+
+    visible: setting.visible;
+    height: setting.visible ? 52px : 0;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+        padding: Theme.spacing-xs;
+        padding-left: Theme.spacing-md;
+        padding-right: Theme.spacing-md;
+
+        // Label column
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            alignment: center;
+
+            Text {
+                text: setting.label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-sm;
+                font-weight: 500;
+            }
+
+            if setting.description != "": Text {
+                text: setting.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-xs;
+                wrap: word-wrap;
+            }
+        }
+
+        // Control column
+        Rectangle {
+            width: 200px;
+            vertical-stretch: 1;
+
+            // Toggle (type 0)
+            if setting.setting-type == 0: HorizontalLayout {
+                alignment: end;
+                padding-right: Theme.spacing-sm;
+
+                Switch {
+                    checked: setting.bool-value;
+                    toggled => {
+                        root.toggle-changed(setting.id, self.checked);
+                    }
+                }
+            }
+
+            // Slider (type 1)
+            if setting.setting-type == 1: HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: center;
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: setting.min-value;
+                    maximum: setting.max-value;
+                    value: setting.use-float ? setting.float-value : setting.int-value;
+                    changed(val) => {
+                        if (setting.use-float) {
+                            root.slider-float-changed(setting.id, val);
+                        } else {
+                            root.slider-int-changed(setting.id, round(val));
+                        }
+                    }
+                }
+
+                Text {
+                    width: 55px;
+                    text: setting.use-float
+                        ? round(setting.float-value * 100) / 100 + setting.suffix
+                        : setting.int-value + setting.suffix;
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+
+            // ComboBox (type 2)
+            if setting.setting-type == 2: HorizontalLayout {
+                alignment: end;
+
+                ComboBox {
+                    width: 160px;
+                    model: setting.combo-options;
+                    current-index: setting.combo-index;
+                    selected(_) => {
+                        root.combo-changed(setting.id, self.current-index);
+                    }
+                }
+            }
+
+            // Text input (type 3)
+            if setting.setting-type == 3: HorizontalLayout {
+                alignment: end;
+
+                LineEdit {
+                    width: 180px;
+                    text: setting.text-value;
+                    placeholder-text: setting.placeholder;
+                    edited(val) => {
+                        root.text-changed(setting.id, val);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Dynamic section component
+component DynamicSection inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle: "";
+    in property <[WorkspaceSettingModel]> settings;
+    in property <bool> section-visible: true;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+
+    visible: section-visible;
+    background: Theme.card-background;
+    border-radius: Theme.radius-md;
+
+    VerticalLayout {
+        padding: Theme.spacing-md;
+        spacing: Theme.spacing-xs;
+
+        // Section header
+        Text {
+            text: title;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-xs;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        // Optional subtitle
+        if subtitle != "": Text {
+            text: subtitle;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-sm;
+            wrap: word-wrap;
+        }
+
+        // Dynamic rows from model
+        for setting in settings: DynamicRow {
+            setting: setting;
+            toggle-changed(id, val) => { root.toggle-changed(id, val); }
+            slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+            slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+            combo-changed(id, val) => { root.combo-changed(id, val); }
+            text-changed(id, val) => { root.text-changed(id, val); }
+        }
+    }
+}
+
+// Main page component
+export component WorkspacesDynamicPage inherits Rectangle {
+    accessible-role: none;
+    accessible-label: "Workspaces settings";
+
+    // Workspace list (as model array of names)
+    in-out property <[string]> workspace-list: [];
+    in-out property <int> selected-workspace-index: -1;
+
+    // Dynamic settings models for each section
+    in-out property <[WorkspaceSettingModel]> workspace-identity-settings: [];
+    in-out property <[WorkspaceSettingModel]> layout-override-settings: [];
+    in-out property <[WorkspaceSettingModel]> gaps-settings: [];
+    in-out property <[WorkspaceSettingModel]> struts-settings: [];
+    in-out property <[WorkspaceSettingModel]> centering-settings: [];
+
+    // Visibility flags for conditional sections
+    in-out property <bool> has-layout-override: false;
+    in-out property <bool> has-gaps-override: false;
+    in-out property <bool> has-struts-override: false;
+    in-out property <bool> has-center-override: false;
+
+    // Workspace list callbacks
+    callback add-workspace();
+    callback remove-workspace(int);
+    callback select-workspace(int);
+    callback reorder-workspace(int, int);
+
+    // Generic setting callbacks
+    callback setting-toggle-changed(string, bool);
+    callback setting-slider-int-changed(string, int);
+    callback setting-slider-float-changed(string, float);
+    callback setting-combo-changed(string, int);
+    callback setting-text-changed(string, string);
+
+    background: transparent;
+
+    // Keyboard focus index for workspaces list
+    property <int> focused-workspace-index: -1;
+
+    // Drag state
+    property <bool> is-dragging: false;
+    property <int> drag-from-index: -1;
+    property <int> drag-target-index: -1;
+    property <length> drag-current-y: 0;
+    property <length> item-height: 40px;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+
+        // Workspaces list panel
+        Rectangle {
+            width: Theme.panel-width-narrow;
+            background: Theme.card-background;
+            border-radius: Theme.radius-md;
+
+            VerticalLayout {
+                padding: Theme.spacing-sm;
+                spacing: Theme.spacing-sm;
+
+                // Header
+                HorizontalLayout {
+                    spacing: Theme.spacing-sm;
+
+                    Text {
+                        text: "Named Workspaces";
+                        color: Theme.text-primary;
+                        font-size: Theme.font-size-md;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+
+                    Button {
+                        text: "+";
+                        accessible-label: "Add new named workspace";
+                        clicked => { root.add-workspace(); }
+                    }
+                }
+
+                // Workspaces list with keyboard navigation
+                workspaces-focus := FocusScope {
+                    vertical-stretch: 1;
+
+                    accessible-role: list;
+                    accessible-label: "Named workspaces list";
+
+                    key-pressed(event) => {
+                        if (event.text == Key.DownArrow) {
+                            if (root.focused-workspace-index < root.workspace-list.length - 1) {
+                                root.focused-workspace-index = root.focused-workspace-index + 1;
+                            }
+                            accept
+                        } else if (event.text == Key.UpArrow) {
+                            if (root.focused-workspace-index > 0) {
+                                root.focused-workspace-index = root.focused-workspace-index - 1;
+                            } else if (root.focused-workspace-index == -1 && root.workspace-list.length > 0) {
+                                root.focused-workspace-index = 0;
+                            }
+                            accept
+                        } else if (event.text == Key.Return || event.text == " ") {
+                            if (root.focused-workspace-index >= 0) {
+                                root.selected-workspace-index = root.focused-workspace-index;
+                                root.select-workspace(root.focused-workspace-index);
+                            }
+                            accept
+                        } else if (event.text == Key.Delete) {
+                            if (root.focused-workspace-index >= 0 && root.focused-workspace-index == root.selected-workspace-index) {
+                                root.remove-workspace(root.focused-workspace-index);
+                            }
+                            accept
+                        }
+                        reject
+                    }
+
+                    focus-changed-event => {
+                        if (self.has-focus && root.focused-workspace-index == -1 && root.workspace-list.length > 0) {
+                            root.focused-workspace-index = root.selected-workspace-index >= 0 ? root.selected-workspace-index : 0;
+                        }
+                    }
+
+                    ScrollView {
+                        list-container := VerticalLayout {
+                            spacing: Theme.spacing-xs;
+
+                            for workspace[index] in root.workspace-list : VerticalLayout {
+                                spacing: 0;
+
+                                // Drop indicator
+                                Rectangle {
+                                    height: root.is-dragging && root.drag-target-index == index ? 3px : 0;
+                                    background: Theme.accent;
+                                    border-radius: 1.5px;
+                                }
+
+                                Rectangle {
+                                    height: root.item-height;
+                                    background: root.is-dragging && root.drag-from-index == index
+                                        ? Theme.card-background.with-alpha(0.3)
+                                        : index == root.selected-workspace-index
+                                            ? Theme.accent.with-alpha(0.2) : transparent;
+                                    border-radius: Theme.radius-sm;
+                                    border-width: index == root.focused-workspace-index && workspaces-focus.has-focus ? 2px : 0px;
+                                    border-color: Theme.accent;
+                                    opacity: root.is-dragging && root.drag-from-index == index ? 0.5 : 1.0;
+
+                                    touch := TouchArea {
+                                        property <length> press-start-y: 0;
+                                        property <bool> drag-started: false;
+
+                                        pointer-event(event) => {
+                                            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                                                self.press-start-y = self.mouse-y;
+                                                self.drag-started = false;
+                                            } else if (event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel) {
+                                                if (root.is-dragging) {
+                                                    if (root.drag-target-index >= 0 && root.drag-target-index != root.drag-from-index) {
+                                                        root.reorder-workspace(root.drag-from-index, root.drag-target-index);
+                                                    }
+                                                    root.is-dragging = false;
+                                                    root.drag-from-index = -1;
+                                                    root.drag-target-index = -1;
+                                                } else if (!self.drag-started) {
+                                                    root.focused-workspace-index = index;
+                                                    root.selected-workspace-index = index;
+                                                    root.select-workspace(index);
+                                                    workspaces-focus.focus();
+                                                }
+                                                self.drag-started = false;
+                                            }
+                                        }
+
+                                        moved => {
+                                            if (self.pressed) {
+                                                if (!self.drag-started && abs(self.mouse-y - self.press-start-y) > 5px) {
+                                                    self.drag-started = true;
+                                                    root.is-dragging = true;
+                                                    root.drag-from-index = index;
+                                                }
+                                                if (root.is-dragging) {
+                                                    root.drag-current-y = self.mouse-y + index * (root.item-height + Theme.spacing-xs);
+                                                    root.drag-target-index = clamp(
+                                                        round(root.drag-current-y / (root.item-height + Theme.spacing-xs)),
+                                                        0, root.workspace-list.length
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: Theme.spacing-sm;
+                                        padding-right: Theme.spacing-sm;
+
+                                        Text {
+                                            text: workspace;
+                                            color: index == root.selected-workspace-index ? Theme.accent : Theme.text-primary;
+                                            font-size: Theme.font-size-sm;
+                                            vertical-alignment: center;
+                                            horizontal-stretch: 1;
+                                            overflow: elide;
+                                        }
+
+                                        Button {
+                                            visible: index == root.selected-workspace-index && !root.is-dragging;
+                                            text: "x";
+                                            accessible-label: "Remove workspace";
+                                            clicked => { root.remove-workspace(index); }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Drop indicator at end
+                            Rectangle {
+                                height: root.is-dragging && root.drag-target-index == root.workspace-list.length ? 3px : 0;
+                                background: Theme.accent;
+                                border-radius: 1.5px;
+                            }
+
+                            if root.workspace-list.length == 0: Text {
+                                text: "No named workspaces.\nClick + to add one.";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-sm;
+                                horizontal-alignment: center;
+                            }
+                        }
+
+                        // Ghost item while dragging
+                        if root.is-dragging && root.drag-from-index >= 0 && root.drag-from-index < root.workspace-list.length: Rectangle {
+                            x: Theme.spacing-sm;
+                            y: root.drag-current-y - root.item-height / 2;
+                            width: list-container.width - Theme.spacing-md;
+                            height: root.item-height;
+                            background: Theme.card-background;
+                            border-radius: Theme.radius-sm;
+                            border-width: 2px;
+                            border-color: Theme.accent;
+                            opacity: 0.9;
+
+                            HorizontalLayout {
+                                padding-left: Theme.spacing-sm;
+                                Text {
+                                    text: root.workspace-list[root.drag-from-index];
+                                    color: Theme.accent;
+                                    font-size: Theme.font-size-sm;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Workspace editor panel
+        if root.selected-workspace-index >= 0: Rectangle {
+            horizontal-stretch: 1;
+
+            ScrollView {
+                VerticalLayout {
+                    alignment: start;
+                    spacing: Theme.spacing-lg;
+                    padding-right: Theme.spacing-md;
+
+                    // Workspace identity section
+                    DynamicSection {
+                        title: "WORKSPACE SETTINGS";
+                        settings: root.workspace-identity-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
+                    }
+
+                    // Layout override section
+                    DynamicSection {
+                        title: "LAYOUT OVERRIDE";
+                        subtitle: "Override global layout settings for this workspace only";
+                        settings: root.layout-override-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
+                    }
+
+                    // Gaps section (visible when layout override enabled)
+                    DynamicSection {
+                        title: "GAPS";
+                        settings: root.gaps-settings;
+                        section-visible: root.has-layout-override;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
+                    }
+
+                    // Struts section (visible when layout override enabled)
+                    DynamicSection {
+                        title: "STRUTS";
+                        subtitle: "Reserved screen edge space";
+                        settings: root.struts-settings;
+                        section-visible: root.has-layout-override;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
+                    }
+
+                    // Centering section (visible when layout override enabled)
+                    DynamicSection {
+                        title: "CENTERING BEHAVIOR";
+                        settings: root.centering-settings;
+                        section-visible: root.has-layout-override;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
+                    }
+
+                    // Spacer at bottom
+                    Rectangle {
+                        height: Theme.spacing-lg;
+                    }
+                }
+            }
+        }
+
+        // No selection message
+        if root.selected-workspace-index < 0: Rectangle {
+            horizontal-stretch: 1;
+            background: Theme.card-background;
+            border-radius: Theme.radius-md;
+
+            VerticalLayout {
+                alignment: center;
+
+                Text {
+                    text: "Select a workspace to edit";
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-md;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: "Or click + to create a new workspace";
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+}

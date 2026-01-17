@@ -44,13 +44,23 @@ impl ConsolidationAnalysis {
 
     /// Total number of rules that could be consolidated
     pub fn total_affected_rules(&self) -> usize {
-        self.window_suggestions.iter().map(|s| s.rule_ids.len()).sum::<usize>()
-            + self.layer_suggestions.iter().map(|s| s.rule_ids.len()).sum::<usize>()
+        self.window_suggestions
+            .iter()
+            .map(|s| s.rule_ids.len())
+            .sum::<usize>()
+            + self
+                .layer_suggestions
+                .iter()
+                .map(|s| s.rule_ids.len())
+                .sum::<usize>()
     }
 }
 
 /// Analyze window and layer rules for consolidation opportunities
-pub fn analyze_rules(window_rules: &[WindowRule], layer_rules: &[LayerRule]) -> ConsolidationAnalysis {
+pub fn analyze_rules(
+    window_rules: &[WindowRule],
+    layer_rules: &[LayerRule],
+) -> ConsolidationAnalysis {
     ConsolidationAnalysis {
         window_suggestions: analyze_window_rules(window_rules),
         layer_suggestions: analyze_layer_rules(layer_rules),
@@ -79,18 +89,13 @@ fn analyze_window_rules(rules: &[WindowRule]) -> Vec<ConsolidationSuggestion> {
         .map(|(key, group)| {
             let patterns: Vec<String> = group
                 .iter()
-                .filter_map(|r| {
-                    r.matches.first().and_then(|m| m.app_id.clone())
-                })
+                .filter_map(|r| r.matches.first().and_then(|m| m.app_id.clone()))
                 .collect();
 
             let merged = create_merged_regex(&patterns);
 
             ConsolidationSuggestion {
-                description: format!(
-                    "{} window rules with same settings",
-                    group.len()
-                ),
+                description: format!("{} window rules with same settings", group.len()),
                 rule_ids: group.iter().map(|r| r.id).collect(),
                 patterns: patterns.clone(),
                 merged_pattern: merged,
@@ -122,18 +127,13 @@ fn analyze_layer_rules(rules: &[LayerRule]) -> Vec<ConsolidationSuggestion> {
         .map(|(key, group)| {
             let patterns: Vec<String> = group
                 .iter()
-                .filter_map(|r| {
-                    r.matches.first().and_then(|m| m.namespace.clone())
-                })
+                .filter_map(|r| r.matches.first().and_then(|m| m.namespace.clone()))
                 .collect();
 
             let merged = create_merged_regex(&patterns);
 
             ConsolidationSuggestion {
-                description: format!(
-                    "{} layer rules with same settings",
-                    group.len()
-                ),
+                description: format!("{} layer rules with same settings", group.len()),
                 rule_ids: group.iter().map(|r| r.id).collect(),
                 patterns: patterns.clone(),
                 merged_pattern: merged,
@@ -192,11 +192,7 @@ fn create_merged_regex(patterns: &[String]) -> String {
         // Strip existing anchors and combine
         let cleaned: Vec<String> = patterns
             .iter()
-            .map(|p| {
-                p.trim_start_matches('^')
-                    .trim_end_matches('$')
-                    .to_string()
-            })
+            .map(|p| p.trim_start_matches('^').trim_end_matches('$').to_string())
             .collect();
         format!("^({})$", cleaned.join("|"))
     }
@@ -362,10 +358,7 @@ mod tests {
 
     #[test]
     fn test_create_merged_regex_existing_anchors() {
-        let patterns = vec![
-            "^steam$".to_string(),
-            "^lutris$".to_string(),
-        ];
+        let patterns = vec!["^steam$".to_string(), "^lutris$".to_string()];
         assert_eq!(create_merged_regex(&patterns), "^(steam|lutris)$");
     }
 
