@@ -3,6 +3,7 @@
 //! Contains shared utilities for loading settings from KDL documents.
 
 use super::super::parser::get_string;
+use crate::constants::MAX_CONFIG_FILE_SIZE;
 use crate::types::*;
 use kdl::KdlDocument;
 use log::{debug, warn};
@@ -57,6 +58,34 @@ impl FileLoadStatus {
 pub fn read_kdl_file_with_status(path: &Path) -> FileLoadStatus {
     use super::super::parser::parse_document;
 
+    // Check file size before reading to prevent OOM from malformed/malicious files
+    match fs::metadata(path) {
+        Ok(metadata) => {
+            let size = metadata.len();
+            if size > MAX_CONFIG_FILE_SIZE {
+                let msg = format!(
+                    "File too large: {} bytes (max {})",
+                    size, MAX_CONFIG_FILE_SIZE
+                );
+                warn!("Config file {:?} is too large: {}", path, msg);
+                return FileLoadStatus::ReadError(msg);
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            debug!("Config file not found: {:?}", path);
+            return FileLoadStatus::Missing;
+        }
+        Err(e) => {
+            let msg = format!("{}", e);
+            warn!(
+                "Cannot read config metadata {:?}: {} (falling back to defaults)",
+                path, e
+            );
+            return FileLoadStatus::ReadError(msg);
+        }
+    }
+
+    // Size check passed, now read and parse the file
     match fs::read_to_string(path) {
         Ok(content) => match parse_document(&content) {
             Ok(doc) => FileLoadStatus::Loaded(doc),
@@ -69,10 +98,6 @@ pub fn read_kdl_file_with_status(path: &Path) -> FileLoadStatus {
                 FileLoadStatus::ParseError(msg)
             }
         },
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            debug!("Config file not found: {:?}", path);
-            FileLoadStatus::Missing
-        }
         Err(e) => {
             let msg = format!("{}", e);
             warn!(

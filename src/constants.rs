@@ -180,6 +180,13 @@ pub const STATUS_AUTO_HIDE_SECS: u64 = 3;
 /// Maximum length for user-input strings (prevents memory issues)
 pub const MAX_STRING_LENGTH: usize = 1024;
 
+/// Maximum config file size in bytes (10MB, prevents OOM from malformed files)
+///
+/// Config files larger than this are rejected before reading into memory.
+/// This matches the IPC response size limit and prevents denial of service
+/// from gigabyte-sized config files (malformed or malicious).
+pub const MAX_CONFIG_FILE_SIZE: u64 = 10 * 1024 * 1024;
+
 /// Maximum number of window rules
 pub const MAX_WINDOW_RULES: usize = 100;
 
