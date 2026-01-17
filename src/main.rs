@@ -109,11 +109,12 @@ fn save_and_reload() {
 // Navigation
 // ============================================================================
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Category {
-    // Appearance
+    // Appearance group
     Appearance,
-    // Input devices
+    Cursor,
+    // Input group
     Keyboard,
     Mouse,
     Touchpad,
@@ -121,27 +122,24 @@ enum Category {
     Trackball,
     Tablet,
     Touch,
-    // Displays
-    Outputs,
-    // Visuals
+    // Visuals group
     Animations,
-    Cursor,
     Overview,
     RecentWindows,
-    // Layout
+    // Layout group
     Layout,
     LayoutExtras,
     Workspaces,
-    // Advanced
+    // Rules group
     WindowRules,
     LayerRules,
     Gestures,
-    // Automation
+    // System group
+    Outputs,
     Keybindings,
     Startup,
     Environment,
     SwitchEvents,
-    // System
     Miscellaneous,
     Debug,
 }
@@ -149,7 +147,8 @@ enum Category {
 impl Category {
     fn label(&self) -> &'static str {
         match self {
-            Category::Appearance => "Appearance",
+            Category::Appearance => "Windows",
+            Category::Cursor => "Cursor",
             Category::Keyboard => "Keyboard",
             Category::Mouse => "Mouse",
             Category::Touchpad => "Touchpad",
@@ -157,17 +156,16 @@ impl Category {
             Category::Trackball => "Trackball",
             Category::Tablet => "Tablet",
             Category::Touch => "Touch",
-            Category::Outputs => "Displays",
             Category::Animations => "Animations",
-            Category::Cursor => "Cursor",
             Category::Overview => "Overview",
             Category::RecentWindows => "Recent Windows",
-            Category::Layout => "Layout",
-            Category::LayoutExtras => "Layout Extras",
+            Category::Layout => "Gaps",
+            Category::LayoutExtras => "Extras",
             Category::Workspaces => "Workspaces",
-            Category::WindowRules => "Window Rules",
-            Category::LayerRules => "Layer Rules",
+            Category::WindowRules => "Windows",
+            Category::LayerRules => "Layers",
             Category::Gestures => "Gestures",
+            Category::Outputs => "Displays",
             Category::Keybindings => "Keybindings",
             Category::Startup => "Startup",
             Category::Environment => "Environment",
@@ -176,35 +174,92 @@ impl Category {
             Category::Debug => "Debug",
         }
     }
+}
 
-    fn all() -> &'static [Category] {
+/// Primary navigation groups (top bar tabs)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum NavGroup {
+    Appearance,
+    Input,
+    Visuals,
+    Layout,
+    Rules,
+    System,
+}
+
+impl NavGroup {
+    fn label(&self) -> &'static str {
+        match self {
+            NavGroup::Appearance => "Appearance",
+            NavGroup::Input => "Input",
+            NavGroup::Visuals => "Visuals",
+            NavGroup::Layout => "Layout",
+            NavGroup::Rules => "Rules",
+            NavGroup::System => "System",
+        }
+    }
+
+    fn categories(&self) -> &'static [Category] {
+        match self {
+            NavGroup::Appearance => &[Category::Appearance, Category::Cursor],
+            NavGroup::Input => &[
+                Category::Keyboard,
+                Category::Mouse,
+                Category::Touchpad,
+                Category::Trackpoint,
+                Category::Trackball,
+                Category::Tablet,
+                Category::Touch,
+            ],
+            NavGroup::Visuals => &[
+                Category::Animations,
+                Category::Overview,
+                Category::RecentWindows,
+            ],
+            NavGroup::Layout => &[
+                Category::Layout,
+                Category::LayoutExtras,
+                Category::Workspaces,
+            ],
+            NavGroup::Rules => &[
+                Category::WindowRules,
+                Category::LayerRules,
+                Category::Gestures,
+            ],
+            NavGroup::System => &[
+                Category::Outputs,
+                Category::Keybindings,
+                Category::Startup,
+                Category::Environment,
+                Category::SwitchEvents,
+                Category::Miscellaneous,
+                Category::Debug,
+            ],
+        }
+    }
+
+    fn default_category(&self) -> Category {
+        self.categories()[0]
+    }
+
+    fn all() -> &'static [NavGroup] {
         &[
-            Category::Appearance,
-            Category::Keyboard,
-            Category::Mouse,
-            Category::Touchpad,
-            Category::Trackpoint,
-            Category::Trackball,
-            Category::Tablet,
-            Category::Touch,
-            Category::Outputs,
-            Category::Animations,
-            Category::Cursor,
-            Category::Overview,
-            Category::RecentWindows,
-            Category::Layout,
-            Category::LayoutExtras,
-            Category::Workspaces,
-            Category::WindowRules,
-            Category::LayerRules,
-            Category::Gestures,
-            Category::Keybindings,
-            Category::Startup,
-            Category::Environment,
-            Category::SwitchEvents,
-            Category::Miscellaneous,
-            Category::Debug,
+            NavGroup::Appearance,
+            NavGroup::Input,
+            NavGroup::Visuals,
+            NavGroup::Layout,
+            NavGroup::Rules,
+            NavGroup::System,
         ]
+    }
+
+    fn for_category(cat: Category) -> NavGroup {
+        for group in Self::all() {
+            if group.categories().contains(&cat) {
+                return *group;
+            }
+        }
+        NavGroup::Appearance
     }
 }
 
@@ -215,6 +270,7 @@ impl Category {
 #[component]
 fn App() -> Element {
     let selected = use_signal(|| Category::Appearance);
+    let search_query = use_signal(|| String::new());
 
     // Initialize all settings signals from the loaded config
     let s = SETTINGS.read().unwrap();
@@ -248,32 +304,74 @@ fn App() -> Element {
     rsx! {
         style { {include_str!("styles.css")} }
         div { class: "app",
-            Sidebar { selected }
-            PageContent {
-                selected: selected(),
-                appearance, behavior, keyboard, mouse, touchpad, trackpoint, trackball,
-                tablet, touch, outputs, animations, cursor, overview, recent_windows,
-                layout_extras, workspaces, window_rules, layer_rules, gestures,
-                keybindings, startup, environment, switch_events, miscellaneous, debug,
+            Header { selected, search_query }
+            main { class: "content",
+                PageContent {
+                    selected: selected(),
+                    appearance, behavior, keyboard, mouse, touchpad, trackpoint, trackball,
+                    tablet, touch, outputs, animations, cursor, overview, recent_windows,
+                    layout_extras, workspaces, window_rules, layer_rules, gestures,
+                    keybindings, startup, environment, switch_events, miscellaneous, debug,
+                }
+            }
+            Footer {}
+        }
+    }
+}
+
+#[component]
+fn Header(selected: Signal<Category>, search_query: Signal<String>) -> Element {
+    let current_group = NavGroup::for_category(selected());
+
+    rsx! {
+        header { class: "header",
+            // App title
+            div { class: "header-title", "niri settings" }
+
+            // Primary navigation (groups)
+            nav { class: "nav-primary",
+                for group in NavGroup::all() {
+                    button {
+                        class: if current_group == *group { "nav-tab active" } else { "nav-tab" },
+                        onclick: move |_| selected.set(group.default_category()),
+                        "{group.label()}"
+                    }
+                }
+            }
+
+            // Secondary navigation (categories within group)
+            nav { class: "nav-secondary",
+                for category in current_group.categories() {
+                    button {
+                        class: if selected() == *category { "nav-subtab active" } else { "nav-subtab" },
+                        onclick: move |_| selected.set(*category),
+                        "{category.label()}"
+                    }
+                }
+            }
+
+            // Search bar row
+            div { class: "search-row",
+                div { class: "search-container",
+                    span { class: "search-icon", "⌕" }
+                    input {
+                        r#type: "text",
+                        class: "search-input",
+                        placeholder: "Search settings...",
+                        value: "{search_query()}",
+                        oninput: move |e| search_query.set(e.value()),
+                    }
+                }
             }
         }
     }
 }
 
 #[component]
-fn Sidebar(selected: Signal<Category>) -> Element {
+fn Footer() -> Element {
     rsx! {
-        nav { class: "sidebar",
-            h2 { "Settings" }
-            ul {
-                for category in Category::all() {
-                    li {
-                        class: if selected() == *category { "active" } else { "" },
-                        onclick: move |_| selected.set(*category),
-                        "{category.label()}"
-                    }
-                }
-            }
+        footer { class: "footer",
+            span { class: "footer-status", "Changes saved automatically" }
         }
     }
 }
@@ -307,36 +405,32 @@ fn PageContent(
     miscellaneous: Signal<MiscSettings>,
     debug: Signal<DebugSettings>,
 ) -> Element {
-    rsx! {
-        main { class: "content",
-            match selected {
-                Category::Appearance => rsx! { AppearancePage { settings: appearance } },
-                Category::Keyboard => rsx! { KeyboardPage { settings: keyboard } },
-                Category::Mouse => rsx! { MousePage { settings: mouse } },
-                Category::Touchpad => rsx! { TouchpadPage { settings: touchpad } },
-                Category::Trackpoint => rsx! { TrackpointPage { settings: trackpoint } },
-                Category::Trackball => rsx! { TrackballPage { settings: trackball } },
-                Category::Tablet => rsx! { TabletPage { settings: tablet } },
-                Category::Touch => rsx! { TouchPage { settings: touch } },
-                Category::Outputs => rsx! { OutputsPage { settings: outputs } },
-                Category::Animations => rsx! { AnimationsPage { settings: animations } },
-                Category::Cursor => rsx! { CursorPage { settings: cursor } },
-                Category::Overview => rsx! { OverviewPage { settings: overview } },
-                Category::RecentWindows => rsx! { RecentWindowsPage { settings: recent_windows } },
-                Category::Layout => rsx! { LayoutPage { settings: behavior } },
-                Category::LayoutExtras => rsx! { LayoutExtrasPage { settings: layout_extras } },
-                Category::Workspaces => rsx! { WorkspacesPage { settings: workspaces } },
-                Category::WindowRules => rsx! { WindowRulesPage { settings: window_rules } },
-                Category::LayerRules => rsx! { LayerRulesPage { settings: layer_rules } },
-                Category::Gestures => rsx! { GesturesPage { settings: gestures } },
-                Category::Keybindings => rsx! { KeybindingsPage { settings: keybindings } },
-                Category::Startup => rsx! { StartupPage { settings: startup } },
-                Category::Environment => rsx! { EnvironmentPage { settings: environment } },
-                Category::SwitchEvents => rsx! { SwitchEventsPage { settings: switch_events } },
-                Category::Miscellaneous => rsx! { MiscellaneousPage { settings: miscellaneous } },
-                Category::Debug => rsx! { DebugPage { settings: debug } },
-            }
-        }
+    match selected {
+        Category::Appearance => rsx! { AppearancePage { settings: appearance } },
+        Category::Keyboard => rsx! { KeyboardPage { settings: keyboard } },
+        Category::Mouse => rsx! { MousePage { settings: mouse } },
+        Category::Touchpad => rsx! { TouchpadPage { settings: touchpad } },
+        Category::Trackpoint => rsx! { TrackpointPage { settings: trackpoint } },
+        Category::Trackball => rsx! { TrackballPage { settings: trackball } },
+        Category::Tablet => rsx! { TabletPage { settings: tablet } },
+        Category::Touch => rsx! { TouchPage { settings: touch } },
+        Category::Outputs => rsx! { OutputsPage { settings: outputs } },
+        Category::Animations => rsx! { AnimationsPage { settings: animations } },
+        Category::Cursor => rsx! { CursorPage { settings: cursor } },
+        Category::Overview => rsx! { OverviewPage { settings: overview } },
+        Category::RecentWindows => rsx! { RecentWindowsPage { settings: recent_windows } },
+        Category::Layout => rsx! { LayoutPage { settings: behavior } },
+        Category::LayoutExtras => rsx! { LayoutExtrasPage { settings: layout_extras } },
+        Category::Workspaces => rsx! { WorkspacesPage { settings: workspaces } },
+        Category::WindowRules => rsx! { WindowRulesPage { settings: window_rules } },
+        Category::LayerRules => rsx! { LayerRulesPage { settings: layer_rules } },
+        Category::Gestures => rsx! { GesturesPage { settings: gestures } },
+        Category::Keybindings => rsx! { KeybindingsPage { settings: keybindings } },
+        Category::Startup => rsx! { StartupPage { settings: startup } },
+        Category::Environment => rsx! { EnvironmentPage { settings: environment } },
+        Category::SwitchEvents => rsx! { SwitchEventsPage { settings: switch_events } },
+        Category::Miscellaneous => rsx! { MiscellaneousPage { settings: miscellaneous } },
+        Category::Debug => rsx! { DebugPage { settings: debug } },
     }
 }
 
