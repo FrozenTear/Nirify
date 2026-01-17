@@ -9,9 +9,10 @@
 //!
 //! # Threading
 //!
-//! File I/O runs on the UI thread via timer callback, but IPC reload runs
-//! on a background thread via [`ipc::async_ops::reload_config_async`] to
-//! prevent UI freezes when niri is slow or unresponsive.
+//! File I/O runs on a background thread (spawned from the timer callback) to
+//! prevent UI freezes on slow storage (network mounts, spinning HDDs, etc.).
+//! IPC reload also runs on a background thread via [`ipc::async_ops::reload_config_async`]
+//! to prevent UI freezes when niri is slow or unresponsive.
 
 use crate::config::{save_dirty, ConfigPaths, DirtyTracker, Settings, SettingsCategory};
 use crate::constants::{SAVE_DEBOUNCE_MS, TOAST_DISMISS_MS};
@@ -97,26 +98,38 @@ impl SaveManager {
                 let category_names: Vec<&str> = dirty.iter().map(|c| c.name()).collect();
                 debug!("Saving {} categories: {:?}", dirty.len(), category_names);
 
-                match save_dirty(&paths, &settings_copy, &dirty) {
-                    Ok(files_written) => {
-                        debug!(
-                            "Settings auto-saved after debounce ({} files written)",
-                            files_written
-                        );
+                // Perform file I/O on background thread to prevent UI freezes on slow storage
+                // (e.g., network-mounted home directories, spinning HDDs with high latency)
+                let paths_for_thread = Arc::clone(&paths);
+                let ui_for_thread = ui_for_save.clone();
 
-                        // Try to reload niri config if running (async to prevent UI freeze)
-                        if ipc::is_niri_running() {
-                            ipc::async_ops::reload_config_async(move |result| match result {
-                                Ok(()) => info!("Niri config reloaded"),
-                                Err(e) => debug!("Could not reload niri config: {}", e),
-                            });
+                std::thread::spawn(move || {
+                    let save_result = save_dirty(&paths_for_thread, &settings_copy, &dirty);
+
+                    // Use invoke_from_event_loop to show toast and trigger IPC on UI thread
+                    slint::invoke_from_event_loop(move || {
+                        match save_result {
+                            Ok(files_written) => {
+                                debug!(
+                                    "Settings auto-saved after debounce ({} files written)",
+                                    files_written
+                                );
+
+                                // Try to reload niri config if running (async to prevent UI freeze)
+                                if ipc::is_niri_running() {
+                                    ipc::async_ops::reload_config_async(move |result| match result {
+                                        Ok(()) => info!("Niri config reloaded"),
+                                        Err(e) => debug!("Could not reload niri config: {}", e),
+                                    });
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Auto-save failed: {}", e);
+                                show_error_toast(&ui_for_thread, "Failed to save settings");
+                            }
                         }
-                    }
-                    Err(e) => {
-                        warn!("Auto-save failed: {}", e);
-                        show_error_toast(&ui_for_save, "Failed to save settings");
-                    }
-                }
+                    }).ok(); // Ignore error if event loop is gone
+                });
             },
         );
 
