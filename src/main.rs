@@ -17,16 +17,20 @@ fn main() -> Result<()> {
 
     let settings = init_settings(&paths, is_first_run);
 
-    info!(
-        "Starting niri-settings (first_run: {}, {} outputs, {} window rules, {} keybindings)",
-        is_first_run,
-        settings.lock().unwrap().outputs.outputs.len(),
-        settings.lock().unwrap().window_rules.rules.len(),
-        settings.lock().unwrap().keybindings.bindings.len()
-    );
+    {
+        let s = settings.lock().unwrap();
+        info!(
+            "Starting niri-settings (first_run: {}, {} outputs, {} window rules, {} keybindings)",
+            is_first_run,
+            s.outputs.outputs.len(),
+            s.window_rules.rules.len(),
+            s.keybindings.bindings.len()
+        );
+    }
 
     // Launch Dioxus app
     dioxus_native::launch(App);
+    println!("Dioxus app exited");
 
     Ok(())
 }
