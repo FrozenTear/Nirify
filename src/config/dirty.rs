@@ -335,7 +335,14 @@ mod tests {
 
     #[test]
     fn test_category_all_count() {
-        // Ensure we have all 25 categories
-        assert_eq!(SettingsCategory::all().len(), 25);
+        // Ensure all categories are accounted for
+        // If this test fails after adding a new category, update SettingsCategory::all()
+        const EXPECTED_COUNT: usize = 25;
+        assert_eq!(
+            SettingsCategory::all().len(),
+            EXPECTED_COUNT,
+            "SettingsCategory::all() should return all {} categories",
+            EXPECTED_COUNT
+        );
     }
 }

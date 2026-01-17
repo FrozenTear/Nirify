@@ -5,7 +5,7 @@
 //!
 //! Settings changes are batched and saved after a debounce delay.
 //! Only categories that have been marked as dirty are saved, reducing
-//! disk I/O from 25 files to typically 1-3 per change.
+//! disk I/O from ~20 files to typically 1-3 per change.
 //!
 //! # Threading
 //!
