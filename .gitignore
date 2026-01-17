@@ -7,3 +7,4 @@
 # Review files (internal only)
 *review*.md
 *REVIEW*.md
+.backup-slint/
