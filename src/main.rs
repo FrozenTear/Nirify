@@ -18,6 +18,7 @@ use niri_settings::config::models::{
 };
 use niri_settings::constants::*;
 use niri_settings::ipc;
+use niri_settings::types::{Color, ColorOrGradient};
 
 /// Global config paths - initialized once at startup
 static CONFIG_PATHS: LazyLock<config::ConfigPaths> = LazyLock::new(|| {
@@ -419,7 +420,7 @@ fn PageContent(
         Category::Cursor => rsx! { CursorPage { settings: cursor } },
         Category::Overview => rsx! { OverviewPage { settings: overview } },
         Category::RecentWindows => rsx! { RecentWindowsPage { settings: recent_windows } },
-        Category::Layout => rsx! { LayoutPage { settings: behavior } },
+        Category::Layout => rsx! { LayoutPage { behavior: behavior, appearance: appearance } },
         Category::LayoutExtras => rsx! { LayoutExtrasPage { settings: layout_extras } },
         Category::Workspaces => rsx! { WorkspacesPage { settings: workspaces } },
         Category::WindowRules => rsx! { WindowRulesPage { settings: window_rules } },
@@ -470,6 +471,7 @@ fn ToggleRow(label: &'static str, description: Option<&'static str>, value: bool
 #[component]
 fn SliderRow(
     label: &'static str,
+    description: Option<&'static str>,
     value: f32,
     min: f32,
     max: f32,
@@ -481,6 +483,9 @@ fn SliderRow(
         div { class: "setting-row",
             div { class: "setting-info",
                 span { class: "setting-label", "{label}" }
+                if let Some(desc) = description {
+                    span { class: "setting-description", "{desc}" }
+                }
             }
             div { class: "slider-control",
                 button {
@@ -499,6 +504,82 @@ fn SliderRow(
                         on_change.call(new_val);
                     },
                     "+"
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn ColorRow(
+    label: &'static str,
+    description: Option<&'static str>,
+    color: ColorOrGradient,
+    on_change: EventHandler<Color>,
+) -> Element {
+    let hex = color.to_hex();
+    let primary = color.primary_color();
+    let bg_style = format!("background-color: rgb({}, {}, {})", primary.r, primary.g, primary.b);
+
+    rsx! {
+        div { class: "setting-row",
+            div { class: "setting-info",
+                span { class: "setting-label", "{label}" }
+                if let Some(desc) = description {
+                    span { class: "setting-description", "{desc}" }
+                }
+            }
+            div { class: "color-picker",
+                div {
+                    class: "color-preview",
+                    style: "{bg_style}",
+                    onclick: move |_| {
+                        // TODO: Open color picker dialog
+                    }
+                }
+                span { class: "color-hex", "{hex}" }
+            }
+        }
+    }
+}
+
+#[component]
+fn OptionalColorRow(
+    label: &'static str,
+    description: Option<&'static str>,
+    color: Option<Color>,
+    on_change: EventHandler<Option<Color>>,
+) -> Element {
+    let has_color = color.is_some();
+    let hex = color.as_ref().map(|c| c.to_hex()).unwrap_or_else(|| "#1e1e2e".to_string());
+    let primary = color.as_ref().cloned().unwrap_or_else(|| Color { r: 30, g: 30, b: 46, a: 255 });
+    let bg_style = format!("background-color: rgb({}, {}, {})", primary.r, primary.g, primary.b);
+
+    rsx! {
+        div { class: "setting-row",
+            div { class: "setting-info",
+                span { class: "setting-label", "{label}" }
+                if let Some(desc) = description {
+                    span { class: "setting-description", "{desc}" }
+                }
+            }
+            div { class: "color-picker",
+                button {
+                    class: if has_color { "toggle-btn on" } else { "toggle-btn off" },
+                    onclick: move |_| {
+                        if has_color {
+                            on_change.call(None);
+                        } else {
+                            on_change.call(Some(Color { r: 30, g: 30, b: 46, a: 255 }));
+                        }
+                    },
+                }
+                if has_color {
+                    div {
+                        class: "color-preview",
+                        style: "{bg_style}",
+                    }
+                    span { class: "color-hex", "{hex}" }
                 }
             }
         }
@@ -563,8 +644,6 @@ fn AppearancePage(settings: Signal<AppearanceSettings>) -> Element {
     let mut settings = settings;
 
     rsx! {
-        h1 { "Appearance" }
-
         Section { title: "Focus Ring",
             ToggleRow {
                 label: "Enable focus ring",
@@ -578,7 +657,8 @@ fn AppearancePage(settings: Signal<AppearanceSettings>) -> Element {
 
             if s.focus_ring_enabled {
                 SliderRow {
-                    label: "Width",
+                    label: "Ring width",
+                    description: Some("Thickness of the focus ring in pixels"),
                     value: s.focus_ring_width,
                     min: FOCUS_RING_WIDTH_MIN,
                     max: FOCUS_RING_WIDTH_MAX,
@@ -589,59 +669,58 @@ fn AppearancePage(settings: Signal<AppearanceSettings>) -> Element {
                         sync_appearance(&settings());
                     }
                 }
-            }
-        }
 
-        Section { title: "Window Border",
-            ToggleRow {
-                label: "Enable window border",
-                description: Some("Draw a border around windows"),
-                value: s.border_enabled,
-                on_change: move |v| {
-                    settings.write().border_enabled = v;
-                    sync_appearance(&settings());
+                ColorRow {
+                    label: "Active color",
+                    description: Some("Color when window is focused"),
+                    color: s.focus_ring_active.clone(),
+                    on_change: move |c| {
+                        settings.write().focus_ring_active = ColorOrGradient::Color(c);
+                        sync_appearance(&settings());
+                    }
                 }
-            }
 
-            if s.border_enabled {
-                SliderRow {
-                    label: "Thickness",
-                    value: s.border_thickness,
-                    min: BORDER_THICKNESS_MIN,
-                    max: BORDER_THICKNESS_MAX,
-                    step: 0.5,
-                    unit: "px",
-                    on_change: move |v| {
-                        settings.write().border_thickness = v;
+                ColorRow {
+                    label: "Inactive color",
+                    description: Some("Color when window is not focused"),
+                    color: s.focus_ring_inactive.clone(),
+                    on_change: move |c| {
+                        settings.write().focus_ring_inactive = ColorOrGradient::Color(c);
+                        sync_appearance(&settings());
+                    }
+                }
+
+                ColorRow {
+                    label: "Urgent color",
+                    description: Some("Color when window needs attention"),
+                    color: s.focus_ring_urgent.clone(),
+                    on_change: move |c| {
+                        settings.write().focus_ring_urgent = ColorOrGradient::Color(c);
                         sync_appearance(&settings());
                     }
                 }
             }
         }
 
-        Section { title: "Layout",
-            SliderRow {
-                label: "Window gaps",
-                value: s.gaps,
-                min: GAP_SIZE_MIN,
-                max: GAP_SIZE_MAX,
-                step: 1.0,
-                unit: "px",
+        Section { title: "Window Border",
+            ToggleRow {
+                label: "Enable window border",
+                description: Some("Show a border around windows (inside the focus ring)"),
+                value: s.border_enabled,
                 on_change: move |v| {
-                    settings.write().gaps = v;
+                    settings.write().border_enabled = v;
                     sync_appearance(&settings());
                 }
             }
+        }
 
-            SliderRow {
-                label: "Corner radius",
-                value: s.corner_radius,
-                min: CORNER_RADIUS_MIN,
-                max: CORNER_RADIUS_MAX,
-                step: 1.0,
-                unit: "px",
-                on_change: move |v| {
-                    settings.write().corner_radius = v;
+        Section { title: "Background",
+            OptionalColorRow {
+                label: "Window background",
+                description: Some("Default background color for windows"),
+                color: s.background_color.clone(),
+                on_change: move |c| {
+                    settings.write().background_color = c;
                     sync_appearance(&settings());
                 }
             }
@@ -654,31 +733,61 @@ fn AppearancePage(settings: Signal<AppearanceSettings>) -> Element {
 // ============================================================================
 
 #[component]
-fn LayoutPage(settings: Signal<BehaviorSettings>) -> Element {
-    let s = settings();
-    let mut settings = settings;
+fn LayoutPage(behavior: Signal<BehaviorSettings>, appearance: Signal<AppearanceSettings>) -> Element {
+    let b = behavior();
+    let a = appearance();
+    let mut behavior = behavior;
+    let mut appearance = appearance;
 
     rsx! {
-        h1 { "Layout" }
+        Section { title: "Gaps",
+            SliderRow {
+                label: "Window gaps",
+                description: Some("Space between windows"),
+                value: a.gaps,
+                min: GAP_SIZE_MIN,
+                max: GAP_SIZE_MAX,
+                step: 1.0,
+                unit: "px",
+                on_change: move |v| {
+                    appearance.write().gaps = v;
+                    sync_appearance(&appearance());
+                }
+            }
+
+            SliderRow {
+                label: "Corner radius",
+                description: Some("Rounded corners on windows"),
+                value: a.corner_radius,
+                min: CORNER_RADIUS_MIN,
+                max: CORNER_RADIUS_MAX,
+                step: 1.0,
+                unit: "px",
+                on_change: move |v| {
+                    appearance.write().corner_radius = v;
+                    sync_appearance(&appearance());
+                }
+            }
+        }
 
         Section { title: "Focus Behavior",
             ToggleRow {
                 label: "Focus follows mouse",
                 description: Some("Windows gain focus when the mouse hovers over them"),
-                value: s.focus_follows_mouse,
+                value: b.focus_follows_mouse,
                 on_change: move |v| {
-                    settings.write().focus_follows_mouse = v;
-                    sync_behavior(&settings());
+                    behavior.write().focus_follows_mouse = v;
+                    sync_behavior(&behavior());
                 }
             }
 
             ToggleRow {
                 label: "Workspace auto back-and-forth",
                 description: Some("Switching to current workspace goes to previous"),
-                value: s.workspace_auto_back_and_forth,
+                value: b.workspace_auto_back_and_forth,
                 on_change: move |v| {
-                    settings.write().workspace_auto_back_and_forth = v;
-                    sync_behavior(&settings());
+                    behavior.write().workspace_auto_back_and_forth = v;
+                    sync_behavior(&behavior());
                 }
             }
         }
@@ -687,20 +796,20 @@ fn LayoutPage(settings: Signal<BehaviorSettings>) -> Element {
             ToggleRow {
                 label: "Always center single column",
                 description: Some("Center the column when there's only one on screen"),
-                value: s.always_center_single_column,
+                value: b.always_center_single_column,
                 on_change: move |v| {
-                    settings.write().always_center_single_column = v;
-                    sync_behavior(&settings());
+                    behavior.write().always_center_single_column = v;
+                    sync_behavior(&behavior());
                 }
             }
 
             ToggleRow {
                 label: "Empty workspace above first",
                 description: Some("Always keep an empty workspace above the first one"),
-                value: s.empty_workspace_above_first,
+                value: b.empty_workspace_above_first,
                 on_change: move |v| {
-                    settings.write().empty_workspace_above_first = v;
-                    sync_behavior(&settings());
+                    behavior.write().empty_workspace_above_first = v;
+                    sync_behavior(&behavior());
                 }
             }
         }
@@ -708,53 +817,53 @@ fn LayoutPage(settings: Signal<BehaviorSettings>) -> Element {
         Section { title: "Screen Edge Margins (Struts)",
             SliderRow {
                 label: "Left margin",
-                value: s.strut_left,
+                value: b.strut_left,
                 min: STRUT_SIZE_MIN,
                 max: STRUT_SIZE_MAX,
                 step: 5.0,
                 unit: "px",
                 on_change: move |v| {
-                    settings.write().strut_left = v;
-                    sync_behavior(&settings());
+                    behavior.write().strut_left = v;
+                    sync_behavior(&behavior());
                 }
             }
 
             SliderRow {
                 label: "Right margin",
-                value: s.strut_right,
+                value: b.strut_right,
                 min: STRUT_SIZE_MIN,
                 max: STRUT_SIZE_MAX,
                 step: 5.0,
                 unit: "px",
                 on_change: move |v| {
-                    settings.write().strut_right = v;
-                    sync_behavior(&settings());
+                    behavior.write().strut_right = v;
+                    sync_behavior(&behavior());
                 }
             }
 
             SliderRow {
                 label: "Top margin",
-                value: s.strut_top,
+                value: b.strut_top,
                 min: STRUT_SIZE_MIN,
                 max: STRUT_SIZE_MAX,
                 step: 5.0,
                 unit: "px",
                 on_change: move |v| {
-                    settings.write().strut_top = v;
-                    sync_behavior(&settings());
+                    behavior.write().strut_top = v;
+                    sync_behavior(&behavior());
                 }
             }
 
             SliderRow {
                 label: "Bottom margin",
-                value: s.strut_bottom,
+                value: b.strut_bottom,
                 min: STRUT_SIZE_MIN,
                 max: STRUT_SIZE_MAX,
                 step: 5.0,
                 unit: "px",
                 on_change: move |v| {
-                    settings.write().strut_bottom = v;
-                    sync_behavior(&settings());
+                    behavior.write().strut_bottom = v;
+                    sync_behavior(&behavior());
                 }
             }
         }
