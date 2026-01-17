@@ -1,31 +1,220 @@
-import { Theme } from "../styles.slint";
-import { ScrollView, LineEdit } from "std-widgets.slint";
-import { SettingsSection, SettingRow } from "../widgets/section.slint";
-import { ToggleRow } from "../widgets/toggle_row.slint";
-import { SliderRow } from "../widgets/slider_row.slint";
+// Dynamic Cursor settings page
+// Uses model-driven rendering for reduced compile time
 
-// Cursor settings page for niri
-export component CursorPage inherits Rectangle {
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, Slider, Switch } from "std-widgets.slint";
+import { SettingsSection } from "../widgets/section.slint";
+
+// Universal setting model for cursor settings
+export struct CursorSettingModel {
+    id: string,              // Unique identifier for callbacks
+    label: string,           // Display label
+    description: string,     // Help text
+    setting-type: int,       // 0=toggle, 1=slider, 2=combo, 3=text
+
+    // Toggle (type 0)
+    bool-value: bool,
+
+    // Slider (type 1)
+    int-value: int,
+    float-value: float,
+    min-value: float,
+    max-value: float,
+    suffix: string,
+    use-float: bool,         // true = float slider, false = int slider
+
+    // ComboBox (type 2)
+    combo-index: int,
+    combo-options: [string],
+
+    // Text (type 3)
+    text-value: string,
+    placeholder: string,
+
+    // Visibility
+    visible: bool,
+}
+
+// Dynamic row component - renders any setting type
+component DynamicRow inherits Rectangle {
+    in property <CursorSettingModel> setting;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+
+    visible: setting.visible;
+    height: setting.visible ? 52px : 0;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+        padding: Theme.spacing-xs;
+        padding-left: Theme.spacing-md;
+        padding-right: Theme.spacing-md;
+
+        // Label column
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            alignment: center;
+
+            Text {
+                text: setting.label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-sm;
+                font-weight: 500;
+            }
+
+            if setting.description != "": Text {
+                text: setting.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-xs;
+                wrap: word-wrap;
+            }
+        }
+
+        // Control column
+        Rectangle {
+            width: 200px;
+            vertical-stretch: 1;
+
+            // Toggle (type 0)
+            if setting.setting-type == 0: HorizontalLayout {
+                alignment: end;
+                padding-right: Theme.spacing-sm;
+
+                Switch {
+                    checked: setting.bool-value;
+                    toggled => {
+                        root.toggle-changed(setting.id, self.checked);
+                    }
+                }
+            }
+
+            // Slider (type 1)
+            if setting.setting-type == 1: HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: center;
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: setting.min-value;
+                    maximum: setting.max-value;
+                    value: setting.use-float ? setting.float-value : setting.int-value;
+                    changed(val) => {
+                        if (setting.use-float) {
+                            root.slider-float-changed(setting.id, val);
+                        } else {
+                            root.slider-int-changed(setting.id, round(val));
+                        }
+                    }
+                }
+
+                Text {
+                    width: 55px;
+                    text: setting.use-float
+                        ? round(setting.float-value * 100) + setting.suffix
+                        : setting.int-value + setting.suffix;
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+
+            // ComboBox (type 2) - not used for cursor but included for completeness
+            if setting.setting-type == 2: HorizontalLayout {
+                alignment: end;
+
+                // Would use ComboBox here if needed
+                Text {
+                    text: "ComboBox placeholder";
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-sm;
+                }
+            }
+
+            // Text input (type 3)
+            if setting.setting-type == 3: HorizontalLayout {
+                alignment: end;
+
+                LineEdit {
+                    width: 180px;
+                    text: setting.text-value;
+                    placeholder-text: setting.placeholder;
+                    edited(val) => {
+                        root.text-changed(setting.id, val);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Dynamic section component
+component DynamicSection inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle: "";
+    in property <[CursorSettingModel]> settings;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+
+    background: Theme.card-background;
+    border-radius: Theme.radius-md;
+
+    VerticalLayout {
+        padding: Theme.spacing-md;
+        spacing: Theme.spacing-xs;
+
+        // Section header
+        Text {
+            text: title;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-xs;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        // Optional subtitle
+        if subtitle != "": Text {
+            text: subtitle;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-sm;
+            wrap: word-wrap;
+        }
+
+        // Dynamic rows from model
+        for setting in settings: DynamicRow {
+            setting: setting;
+            toggle-changed(id, val) => { root.toggle-changed(id, val); }
+            slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+            slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+            combo-changed(id, val) => { root.combo-changed(id, val); }
+            text-changed(id, val) => { root.text-changed(id, val); }
+        }
+    }
+}
+
+// Main page component
+export component CursorDynamicPage inherits Rectangle {
     accessible-role: none;
     accessible-label: "Cursor settings";
 
-    // Cursor theme
-    in-out property <string> cursor-theme: "";
+    // Dynamic settings models
+    in-out property <[CursorSettingModel]> theme-settings: [];
+    in-out property <[CursorSettingModel]> visibility-settings: [];
 
-    // Cursor size
-    in-out property <int> cursor-size: 24;
-
-    // Hide cursor options
-    in-out property <bool> hide-when-typing: false;
-    in-out property <bool> hide-after-inactive-enabled: false;
-    in-out property <int> hide-after-inactive-ms: 1000;
-
-    // Callbacks
-    callback cursor-theme-changed(string);
-    callback cursor-size-changed(int);
-    callback hide-when-typing-toggled(bool);
-    callback hide-after-inactive-toggled(bool);
-    callback hide-after-inactive-ms-changed(int);
+    // Generic setting callbacks
+    callback setting-toggle-changed(string, bool);
+    callback setting-slider-int-changed(string, int);
+    callback setting-text-changed(string, string);
 
     background: transparent;
 
@@ -36,95 +225,22 @@ export component CursorPage inherits Rectangle {
             padding-right: Theme.spacing-md;
 
             // Cursor Theme Section
-            SettingsSection {
+            DynamicSection {
                 title: "CURSOR THEME";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    SettingRow {
-                        label: "Theme name";
-                        description: "XCursor theme (leave empty for system default)";
-
-                        LineEdit {
-                            width: Theme.input-width-wide;
-                            text: root.cursor-theme;
-                            placeholder-text: "System default";
-
-                            accessible-role: text-input;
-                            accessible-label: "Cursor theme name";
-                            accessible-description: "Enter the name of an installed cursor theme";
-
-                            edited(value) => {
-                                root.cursor-theme = value;
-                                root.cursor-theme-changed(value);
-                            }
-                        }
-                    }
-
-                    SliderRow {
-                        label: "Cursor size";
-                        description: "Size of the cursor in pixels";
-                        suffix: "px";
-                        minimum: 16;
-                        maximum: 64;
-                        value: root.cursor-size;
-                        changed(val) => {
-                            root.cursor-size = round(val);
-                            root.cursor-size-changed(round(val));
-                        }
-                    }
-                }
+                settings: root.theme-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
             }
 
             // Cursor Visibility Section
-            SettingsSection {
+            DynamicSection {
                 title: "CURSOR VISIBILITY";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    Text {
-                        text: "Control when the cursor is automatically hidden";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                        accessible-role: text;
-                    }
-
-                    ToggleRow {
-                        label: "Hide when typing";
-                        description: "Hide cursor while pressing keyboard keys";
-                        checked: root.hide-when-typing;
-                        toggled(val) => {
-                            root.hide-when-typing = val;
-                            root.hide-when-typing-toggled(val);
-                        }
-                    }
-
-                    ToggleRow {
-                        label: "Hide after inactivity";
-                        description: "Automatically hide cursor after a period of no movement";
-                        checked: root.hide-after-inactive-enabled;
-                        toggled(val) => {
-                            root.hide-after-inactive-enabled = val;
-                            root.hide-after-inactive-toggled(val);
-                        }
-                    }
-
-                    if root.hide-after-inactive-enabled: SliderRow {
-                        label: "Inactivity timeout";
-                        description: "Time before cursor hides";
-                        suffix: "ms";
-                        minimum: 100;
-                        maximum: 10000;
-                        value: root.hide-after-inactive-ms;
-                        changed(val) => {
-                            root.hide-after-inactive-ms = round(val);
-                            root.hide-after-inactive-ms-changed(round(val));
-                        }
-                    }
-                }
+                subtitle: "Control when the cursor is automatically hidden";
+                settings: root.visibility-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
             }
 
             // Spacer at bottom

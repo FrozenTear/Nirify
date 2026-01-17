@@ -1,49 +1,280 @@
-import { Theme } from "../styles.slint";
-import { ScrollView, LineEdit } from "std-widgets.slint";
-import { SettingsSection, SettingRow } from "../widgets/section.slint";
-import { ToggleRow } from "../widgets/toggle_row.slint";
-import { ComboBoxRow } from "../widgets/combobox_row.slint";
+// Dynamic Miscellaneous settings page
+// Uses model-driven rendering for reduced compile time
 
-// Miscellaneous settings page for niri
-export component MiscellaneousPage inherits Rectangle {
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, ComboBox, Switch, Slider } from "std-widgets.slint";
+import { SettingsSection } from "../widgets/section.slint";
+
+// Universal setting model for miscellaneous settings
+export struct MiscSettingModel {
+    id: string,              // Unique identifier for callbacks
+    label: string,           // Display label
+    description: string,     // Help text
+    setting-type: int,       // 0=toggle, 1=slider, 2=combo, 3=text
+
+    // Toggle (type 0)
+    bool-value: bool,
+
+    // Slider (type 1)
+    int-value: int,
+    float-value: float,
+    min-value: float,
+    max-value: float,
+    suffix: string,
+    use-float: bool,         // true = float slider, false = int slider
+
+    // ComboBox (type 2)
+    combo-index: int,
+    combo-options: [string],
+
+    // Text (type 3)
+    text-value: string,
+    placeholder: string,
+
+    // Visibility
+    visible: bool,
+}
+
+// Dynamic row component - renders any setting type
+component DynamicRow inherits Rectangle {
+    in property <MiscSettingModel> setting;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+
+    visible: setting.visible;
+    height: setting.visible ? (setting.setting-type == 3 ? 72px : 52px) : 0;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+        padding: Theme.spacing-xs;
+        padding-left: Theme.spacing-md;
+        padding-right: Theme.spacing-md;
+
+        // Label column
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            alignment: center;
+
+            Text {
+                text: setting.label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-sm;
+                font-weight: 500;
+            }
+
+            if setting.description != "": Text {
+                text: setting.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-xs;
+                wrap: word-wrap;
+            }
+        }
+
+        // Control column
+        Rectangle {
+            width: 200px;
+            vertical-stretch: 1;
+
+            // Toggle (type 0)
+            if setting.setting-type == 0: HorizontalLayout {
+                alignment: end;
+                padding-right: Theme.spacing-sm;
+
+                Switch {
+                    checked: setting.bool-value;
+                    toggled => {
+                        root.toggle-changed(setting.id, self.checked);
+                    }
+                }
+            }
+
+            // Slider (type 1)
+            if setting.setting-type == 1: HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: center;
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: setting.min-value;
+                    maximum: setting.max-value;
+                    value: setting.use-float ? setting.float-value : setting.int-value;
+                    changed(val) => {
+                        if (setting.use-float) {
+                            root.slider-float-changed(setting.id, val);
+                        } else {
+                            root.slider-int-changed(setting.id, round(val));
+                        }
+                    }
+                }
+
+                Text {
+                    width: 55px;
+                    text: setting.use-float
+                        ? round(setting.float-value * 100) + setting.suffix
+                        : setting.int-value + setting.suffix;
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+
+            // ComboBox (type 2)
+            if setting.setting-type == 2: HorizontalLayout {
+                alignment: end;
+
+                ComboBox {
+                    width: 140px;
+                    model: setting.combo-options;
+                    current-index: setting.combo-index;
+                    selected(_) => {
+                        root.combo-changed(setting.id, self.current-index);
+                    }
+                }
+            }
+
+            // Text input (type 3)
+            if setting.setting-type == 3: HorizontalLayout {
+                alignment: end;
+
+                LineEdit {
+                    width: 180px;
+                    text: setting.text-value;
+                    placeholder-text: setting.placeholder;
+                    edited(val) => {
+                        root.text-changed(setting.id, val);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Text row with full-width input (for paths/long text)
+component DynamicTextRow inherits Rectangle {
+    in property <MiscSettingModel> setting;
+
+    callback text-changed(string, string);
+
+    visible: setting.visible;
+    height: setting.visible ? 90px : 0;
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.spacing-xs;
+        padding: Theme.spacing-xs;
+        padding-left: Theme.spacing-md;
+        padding-right: Theme.spacing-md;
+
+        Text {
+            text: setting.label;
+            color: Theme.text-primary;
+            font-size: Theme.font-size-sm;
+            font-weight: 500;
+        }
+
+        if setting.description != "": Text {
+            text: setting.description;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-xs;
+            wrap: word-wrap;
+        }
+
+        LineEdit {
+            text: setting.text-value;
+            placeholder-text: setting.placeholder;
+            edited(val) => {
+                root.text-changed(setting.id, val);
+            }
+        }
+    }
+}
+
+// Dynamic section component
+component DynamicSection inherits Rectangle {
+    in property <string> title;
+    in property <string> note: "";
+    in property <[MiscSettingModel]> settings;
+    in property <bool> has-full-width-text: false;
+    in property <MiscSettingModel> full-width-text-setting;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+
+    background: Theme.card-background;
+    border-radius: Theme.radius-md;
+
+    VerticalLayout {
+        padding: Theme.spacing-md;
+        spacing: Theme.spacing-xs;
+
+        // Section header
+        Text {
+            text: title;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-xs;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        // Dynamic rows from model
+        for setting in settings: DynamicRow {
+            setting: setting;
+            toggle-changed(id, val) => { root.toggle-changed(id, val); }
+            slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+            slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+            combo-changed(id, val) => { root.combo-changed(id, val); }
+            text-changed(id, val) => { root.text-changed(id, val); }
+        }
+
+        // Full-width text input (if configured)
+        if has-full-width-text && full-width-text-setting.visible: DynamicTextRow {
+            setting: full-width-text-setting;
+            text-changed(id, val) => { root.text-changed(id, val); }
+        }
+
+        // Optional note at the bottom
+        if note != "": Text {
+            text: note;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-sm;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// Main page component
+export component MiscellaneousDynamicPage inherits Rectangle {
     accessible-role: none;
     accessible-label: "Miscellaneous settings";
 
-    // Settings
-    in-out property <bool> prefer-no-csd: false;
-    in-out property <string> screenshot-path: "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png";
-    in-out property <bool> disable-primary-clipboard: false;
-    in-out property <bool> hotkey-overlay-skip: false;
+    // Dynamic settings models for each section
+    in-out property <[MiscSettingModel]> decorations-settings: [];
+    in-out property <[MiscSettingModel]> screenshots-settings: [];
+    in-out property <MiscSettingModel> screenshot-path-setting;
+    in-out property <[MiscSettingModel]> clipboard-settings: [];
+    in-out property <[MiscSettingModel]> hotkey-overlay-settings: [];
+    in-out property <[MiscSettingModel]> config-notification-settings: [];
+    in-out property <[MiscSettingModel]> startup-settings: [];
+    in-out property <[MiscSettingModel]> xwayland-settings: [];
+    in-out property <MiscSettingModel> xwayland-path-setting;
+    in-out property <[MiscSettingModel]> developer-settings: [];
 
-    // Phase 8: New settings
-    in-out property <bool> hotkey-overlay-hide-not-bound: false;
-    in-out property <bool> config-notification-disable-failed: false;
-
-    // New misc settings (v25.08+)
-    in-out property <bool> spawn-sh-at-startup: false;
-    in-out property <int> xwayland-satellite-index: 0;  // 0=Default, 1=Off, 2=Custom
-    in-out property <string> xwayland-satellite-path: "";
-
-    // Developer options
-    in-out property <bool> show-debug-options: false;
-
-    // Callbacks
-    callback prefer-no-csd-toggled(bool);
-    callback screenshot-path-changed(string);
-    callback disable-primary-clipboard-toggled(bool);
-    callback hotkey-overlay-skip-toggled(bool);
-
-    // Phase 8 callbacks
-    callback hotkey-overlay-hide-not-bound-toggled(bool);
-    callback config-notification-disable-failed-toggled(bool);
-
-    // New callbacks
-    callback spawn-sh-at-startup-toggled(bool);
-    callback xwayland-satellite-mode-changed(int);
-    callback xwayland-satellite-path-changed(string);
-
-    // Developer callbacks
-    callback show-debug-options-toggled(bool);
+    // Generic setting callbacks
+    callback setting-toggle-changed(string, bool);
+    callback setting-slider-int-changed(string, int);
+    callback setting-slider-float-changed(string, float);
+    callback setting-combo-changed(string, int);
+    callback setting-text-changed(string, string);
 
     background: transparent;
 
@@ -54,259 +285,103 @@ export component MiscellaneousPage inherits Rectangle {
             padding-right: Theme.spacing-md;
 
             // Window Decorations Section
-            SettingsSection {
+            DynamicSection {
                 title: "WINDOW DECORATIONS";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    ToggleRow {
-                        label: "Prefer server-side decorations";
-                        description: "Niri draws window borders instead of letting apps draw their own title bars";
-                        checked: root.prefer-no-csd;
-                        toggled(val) => {
-                            root.prefer-no-csd = val;
-                            root.prefer-no-csd-toggled(val);
-                        }
-                    }
-
-                    Text {
-                        text: "Some applications ignore this preference. Server-side decorations may be used instead.";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                    }
-                }
+                note: "Some applications ignore this preference. Server-side decorations may be used instead.";
+                settings: root.decorations-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
             }
 
             // Screenshots Section
-            SettingsSection {
+            DynamicSection {
                 title: "SCREENSHOTS";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    // Full-width layout for path input
-                    VerticalLayout {
-                        spacing: Theme.spacing-xs;
-
-                        Text {
-                            text: "Save path";
-                            color: Theme.text-primary;
-                            font-size: Theme.font-size-md;
-                        }
-
-                        Text {
-                            text: "Where to save screenshots (supports strftime format)";
-                            color: Theme.text-muted;
-                            font-size: Theme.font-size-sm;
-                        }
-
-                        LineEdit {
-                            text: root.screenshot-path;
-                            placeholder-text: "~/Pictures/Screenshots/...";
-
-                            edited(value) => {
-                                root.screenshot-path = value;
-                                root.screenshot-path-changed(value);
-                            }
-                        }
-                    }
-
-                    Text {
-                        text: "Use strftime codes: %Y (year), %m (month), %d (day), %H (hour), %M (minute), %S (second)";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                    }
-                }
+                note: "Use strftime codes: %Y (year), %m (month), %d (day), %H (hour), %M (minute), %S (second)";
+                settings: root.screenshots-settings;
+                has-full-width-text: true;
+                full-width-text-setting: root.screenshot-path-setting;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
             }
 
             // Clipboard Section
-            SettingsSection {
+            DynamicSection {
                 title: "CLIPBOARD";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    ToggleRow {
-                        label: "Disable primary clipboard";
-                        description: "Disable middle-click paste functionality";
-                        checked: root.disable-primary-clipboard;
-                        toggled(val) => {
-                            root.disable-primary-clipboard = val;
-                            root.disable-primary-clipboard-toggled(val);
-                        }
-                    }
-
-                    Text {
-                        text: "Primary clipboard is the selection-based clipboard used by middle-click paste. Regular Ctrl+C/V clipboard is not affected.";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                    }
-                }
+                note: "Primary clipboard is the selection-based clipboard used by middle-click paste. Regular Ctrl+C/V clipboard is not affected.";
+                settings: root.clipboard-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
             }
 
             // Hotkey Overlay Section
-            SettingsSection {
+            DynamicSection {
                 title: "HOTKEY OVERLAY";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    ToggleRow {
-                        label: "Skip at startup";
-                        description: "Don't show hotkey help when niri starts";
-                        checked: root.hotkey-overlay-skip;
-                        toggled(val) => {
-                            root.hotkey-overlay-skip = val;
-                            root.hotkey-overlay-skip-toggled(val);
-                        }
-                    }
-
-                    ToggleRow {
-                        label: "Hide unbound actions";
-                        description: "Only show actions that have keybindings assigned";
-                        checked: root.hotkey-overlay-hide-not-bound;
-                        toggled(val) => {
-                            root.hotkey-overlay-hide-not-bound = val;
-                            root.hotkey-overlay-hide-not-bound-toggled(val);
-                        }
-                    }
-
-                    Text {
-                        text: "The hotkey overlay shows available keyboard shortcuts. You can still access it with the configured keybinding.";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                    }
-                }
+                note: "The hotkey overlay shows available keyboard shortcuts. You can still access it with the configured keybinding.";
+                settings: root.hotkey-overlay-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
             }
 
-            // Config Notification Section (Phase 8)
-            SettingsSection {
+            // Config Notifications Section
+            DynamicSection {
                 title: "CONFIG NOTIFICATIONS";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    ToggleRow {
-                        label: "Disable failed config notifications";
-                        description: "Suppress notifications when config reload fails";
-                        checked: root.config-notification-disable-failed;
-                        toggled(val) => {
-                            root.config-notification-disable-failed = val;
-                            root.config-notification-disable-failed-toggled(val);
-                        }
-                    }
-
-                    Text {
-                        text: "When enabled, niri won't show a notification if a configuration reload fails due to errors.";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                    }
-                }
+                note: "When enabled, niri won't show a notification if a configuration reload fails due to errors.";
+                settings: root.config-notification-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
             }
 
-            // Startup Section (v25.08+)
-            SettingsSection {
+            // Startup Section
+            DynamicSection {
                 title: "STARTUP";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    ToggleRow {
-                        label: "Use shell for spawn commands";
-                        description: "Execute spawn-at-startup commands through a shell";
-                        checked: root.spawn-sh-at-startup;
-                        toggled(val) => {
-                            root.spawn-sh-at-startup = val;
-                            root.spawn-sh-at-startup-toggled(val);
-                        }
-                    }
-
-                    Text {
-                        text: "When enabled, startup commands run through sh -c allowing shell features like pipes and redirects.";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                    }
-                }
+                note: "When enabled, startup commands run through sh -c allowing shell features like pipes and redirects.";
+                settings: root.startup-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
             }
 
-            // XWayland Section (v25.08+)
-            SettingsSection {
+            // XWayland Section
+            DynamicSection {
                 title: "XWAYLAND";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    ComboBoxRow {
-                        label: "XWayland satellite";
-                        description: "XWayland compatibility layer for X11 apps";
-                        model: ["Default", "Disabled", "Custom path"];
-                        current-index: root.xwayland-satellite-index;
-                        selected(idx) => {
-                            root.xwayland-satellite-index = idx;
-                            root.xwayland-satellite-mode-changed(idx);
-                        }
-                    }
-
-                    if root.xwayland-satellite-index == 2: VerticalLayout {
-                        spacing: Theme.spacing-xs;
-
-                        Text {
-                            text: "Custom binary path";
-                            color: Theme.text-primary;
-                            font-size: Theme.font-size-md;
-                        }
-
-                        LineEdit {
-                            text: root.xwayland-satellite-path;
-                            placeholder-text: "/usr/bin/xwayland-satellite";
-
-                            edited(value) => {
-                                root.xwayland-satellite-path = value;
-                                root.xwayland-satellite-path-changed(value);
-                            }
-                        }
-                    }
-
-                    Text {
-                        text: "XWayland satellite provides compatibility for X11 applications. Disable if you don't use X11 apps.";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                    }
-                }
+                note: "XWayland satellite provides compatibility for X11 applications. Disable if you don't use X11 apps.";
+                settings: root.xwayland-settings;
+                has-full-width-text: true;
+                full-width-text-setting: root.xwayland-path-setting;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
             }
 
             // Developer Options Section
-            SettingsSection {
+            DynamicSection {
                 title: "DEVELOPER OPTIONS";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    ToggleRow {
-                        label: "Show debug options";
-                        description: "Show the Debug page in the System navigation";
-                        checked: root.show-debug-options;
-                        toggled(val) => {
-                            root.show-debug-options = val;
-                            root.show-debug-options-toggled(val);
-                        }
-                    }
-
-                    Text {
-                        text: "Debug options are advanced settings for developers and troubleshooting. Most users don't need these.";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                    }
-                }
+                note: "Debug options are advanced settings for developers and troubleshooting. Most users don't need these.";
+                settings: root.developer-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
             }
 
             // Spacer at bottom

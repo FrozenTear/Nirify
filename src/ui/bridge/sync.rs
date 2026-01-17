@@ -13,36 +13,36 @@ use super::sync_macros::{
     sync_f64_as_f32_props, sync_i32_props, sync_string_props,
 };
 
-use super::callbacks::animations_dynamic::sync_all_animation_models;
-use super::callbacks::appearance_dynamic::sync_all_models as sync_appearance_dynamic_models;
-use super::callbacks::behavior_dynamic::sync_all_models as sync_behavior_dynamic_models;
-use super::callbacks::cursor_dynamic::sync_all_models as sync_cursor_dynamic_models;
-use super::callbacks::debug_dynamic::sync_all_models as sync_debug_dynamic_models;
-use super::callbacks::gestures_dynamic::sync_all_gesture_models;
-use super::callbacks::keyboard_dynamic::sync_keyboard_models;
-use super::callbacks::layer_rules_dynamic::{
+use super::callbacks::animations::sync_all_animation_models;
+use super::callbacks::appearance::sync_all_models as sync_appearance_dynamic_models;
+use super::callbacks::behavior::sync_all_models as sync_behavior_dynamic_models;
+use super::callbacks::cursor::sync_all_models as sync_cursor_dynamic_models;
+use super::callbacks::debug::sync_all_models as sync_debug_dynamic_models;
+use super::callbacks::gestures::sync_all_gesture_models;
+use super::callbacks::keyboard::sync_keyboard_models;
+use super::callbacks::layer_rules::{
     build_matches_model as build_layer_rule_matches_model,
     build_rules_list_model as build_layer_rules_list_model,
     sync_all_rule_models as sync_layer_rule_models,
 };
-use super::callbacks::layout_extras_dynamic::sync_layout_extras_models;
-use super::callbacks::miscellaneous_dynamic::sync_misc_dynamic_models_auto;
-use super::callbacks::mouse_dynamic::sync_all_models as sync_mouse_dynamic_models;
+use super::callbacks::layout_extras::sync_layout_extras_models;
+use super::callbacks::miscellaneous::sync_misc_dynamic_models_auto;
+use super::callbacks::mouse::sync_all_models as sync_mouse_dynamic_models;
 use super::callbacks::outputs::{format_mode_for_display, format_mode_for_storage};
-use super::callbacks::overview_dynamic::sync_overview_models;
-use super::callbacks::switch_events_dynamic::sync_switch_events_ui;
-use super::callbacks::touchpad_dynamic::sync_all_models as sync_touchpad_dynamic_models;
-use super::callbacks::trackpoint_dynamic::sync_all_models as sync_trackpoint_dynamic_models;
-use super::callbacks::trackball_dynamic::sync_all_models as sync_trackball_dynamic_models;
-use super::callbacks::tablet_dynamic::sync_all_models as sync_tablet_dynamic_models;
-use super::callbacks::touch_dynamic::sync_all_models as sync_touch_dynamic_models;
-use super::callbacks::window_rules_dynamic::{
+use super::callbacks::overview::sync_overview_models;
+use super::callbacks::switch_events::sync_switch_events_ui;
+use super::callbacks::touchpad::sync_all_models as sync_touchpad_dynamic_models;
+use super::callbacks::trackpoint::sync_all_models as sync_trackpoint_dynamic_models;
+use super::callbacks::trackball::sync_all_models as sync_trackball_dynamic_models;
+use super::callbacks::tablet::sync_all_models as sync_tablet_dynamic_models;
+use super::callbacks::touch::sync_all_models as sync_touch_dynamic_models;
+use super::callbacks::window_rules::{
     build_matches_model, build_rules_list_model, get_open_behavior_index,
 };
-use super::callbacks::workspaces_dynamic::sync_workspaces_models as sync_workspaces_dynamic_models;
-use super::callbacks::startup_dynamic::sync_startup_ui as sync_startup_dynamic;
-use super::callbacks::environment_dynamic::sync_environment_ui as sync_environment_dynamic;
-use super::callbacks::recent_windows_dynamic::sync_recent_windows_models as sync_recent_windows_dynamic_models;
+use super::callbacks::workspaces::sync_workspaces_models as sync_workspaces_dynamic_models;
+use super::callbacks::startup::sync_startup_ui as sync_startup_dynamic;
+use super::callbacks::environment::sync_environment_ui as sync_environment_dynamic;
+use super::callbacks::recent_windows::sync_recent_windows_models as sync_recent_windows_dynamic_models;
 use super::converters::{color_to_slint_color, key_parts_to_model, parse_key_combo_parts};
 use super::indices::{
     center_focused_is_enabled, warp_mouse_is_enabled, TRACK_LAYOUT_GLOBAL, TRACK_LAYOUT_WINDOW,

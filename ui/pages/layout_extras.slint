@@ -1,75 +1,253 @@
-import { Theme } from "../styles.slint";
-import { ScrollView } from "std-widgets.slint";
-import { SettingsSection, SettingRow } from "../widgets/section.slint";
-import { ToggleRow } from "../widgets/toggle_row.slint";
-import { SliderRow } from "../widgets/slider_row.slint";
-import { ColorPicker } from "../widgets/color_picker.slint";
-import { ComboBoxRow } from "../widgets/combobox_row.slint";
+// Dynamic Layout Extras settings page
+// Uses model-driven rendering for reduced compile time
 
-// Layout extras settings page for niri
-export component LayoutExtrasPage inherits Rectangle {
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, ComboBox, Button, Slider, Switch } from "std-widgets.slint";
+import { SettingsSection } from "../widgets/section.slint";
+
+// Universal setting model for layout extras
+export struct LayoutSettingModel {
+    id: string,              // Unique identifier for callbacks
+    label: string,           // Display label
+    description: string,     // Help text
+    setting-type: int,       // 0=toggle, 1=slider, 2=combo, 3=text, 4=color
+
+    // Toggle (type 0)
+    bool-value: bool,
+
+    // Slider (type 1)
+    int-value: int,
+    float-value: float,
+    min-value: float,
+    max-value: float,
+    suffix: string,
+    use-float: bool,         // true = float slider, false = int slider
+
+    // ComboBox (type 2)
+    combo-index: int,
+    combo-options: [string],
+
+    // Text/Color (type 3, 4)
+    text-value: string,
+    placeholder: string,
+
+    // Visibility
+    visible: bool,
+}
+
+// Dynamic row component - renders any setting type
+component DynamicRow inherits Rectangle {
+    in property <LayoutSettingModel> setting;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+    callback color-changed(string, string);
+
+    visible: setting.visible;
+    height: setting.visible ? 52px : 0;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+        padding: Theme.spacing-xs;
+        padding-left: Theme.spacing-md;
+        padding-right: Theme.spacing-md;
+
+        // Label column
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            alignment: center;
+
+            Text {
+                text: setting.label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-sm;
+                font-weight: 500;
+            }
+
+            if setting.description != "": Text {
+                text: setting.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-xs;
+                wrap: word-wrap;
+            }
+        }
+
+        // Control column
+        Rectangle {
+            width: 200px;
+            vertical-stretch: 1;
+
+            // Toggle (type 0)
+            if setting.setting-type == 0: HorizontalLayout {
+                alignment: end;
+                padding-right: Theme.spacing-sm;
+
+                Switch {
+                    checked: setting.bool-value;
+                    toggled => {
+                        root.toggle-changed(setting.id, self.checked);
+                    }
+                }
+            }
+
+            // Slider (type 1)
+            if setting.setting-type == 1: HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: center;
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: setting.min-value;
+                    maximum: setting.max-value;
+                    value: setting.use-float ? setting.float-value : setting.int-value;
+                    changed(val) => {
+                        if (setting.use-float) {
+                            root.slider-float-changed(setting.id, val);
+                        } else {
+                            root.slider-int-changed(setting.id, round(val));
+                        }
+                    }
+                }
+
+                Text {
+                    width: 55px;
+                    text: setting.use-float
+                        ? round(setting.float-value * 100) + setting.suffix
+                        : setting.int-value + setting.suffix;
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+
+            // ComboBox (type 2)
+            if setting.setting-type == 2: HorizontalLayout {
+                alignment: end;
+
+                ComboBox {
+                    width: 140px;
+                    model: setting.combo-options;
+                    current-index: setting.combo-index;
+                    selected(_) => {
+                        root.combo-changed(setting.id, self.current-index);
+                    }
+                }
+            }
+
+            // Text input (type 3)
+            if setting.setting-type == 3: HorizontalLayout {
+                alignment: end;
+
+                LineEdit {
+                    width: 180px;
+                    text: setting.text-value;
+                    placeholder-text: setting.placeholder;
+                    edited(val) => {
+                        root.text-changed(setting.id, val);
+                    }
+                }
+            }
+
+            // Color input (type 4)
+            if setting.setting-type == 4: HorizontalLayout {
+                alignment: end;
+                spacing: Theme.spacing-xs;
+
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 4px;
+                    background: Theme.accent;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                }
+
+                LineEdit {
+                    width: 120px;
+                    text: setting.text-value;
+                    placeholder-text: "#RRGGBBAA";
+                    edited(val) => {
+                        root.color-changed(setting.id, val);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Dynamic section component
+component DynamicSection inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle: "";
+    in property <[LayoutSettingModel]> settings;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+    callback color-changed(string, string);
+
+    background: Theme.card-background;
+    border-radius: Theme.radius-md;
+
+    VerticalLayout {
+        padding: Theme.spacing-md;
+        spacing: Theme.spacing-xs;
+
+        // Section header
+        Text {
+            text: title;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-xs;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        // Optional subtitle
+        if subtitle != "": Text {
+            text: subtitle;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-sm;
+            wrap: word-wrap;
+        }
+
+        // Dynamic rows from model
+        for setting in settings: DynamicRow {
+            setting: setting;
+            toggle-changed(id, val) => { root.toggle-changed(id, val); }
+            slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+            slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+            combo-changed(id, val) => { root.combo-changed(id, val); }
+            text-changed(id, val) => { root.text-changed(id, val); }
+            color-changed(id, val) => { root.color-changed(id, val); }
+        }
+    }
+}
+
+// Main page component
+export component LayoutExtrasDynamicPage inherits Rectangle {
     accessible-role: none;
     accessible-label: "Layout extras settings";
 
-    // Shadow settings
-    in-out property <bool> shadow-enabled: true;
-    in-out property <int> shadow-softness: 30;
-    in-out property <int> shadow-spread: 5;
-    in-out property <int> shadow-offset-x: 0;
-    in-out property <int> shadow-offset-y: 5;
-    in-out property <bool> shadow-draw-behind: false;
-    in-out property <color> shadow-color: #00000070;
-    in-out property <color> shadow-inactive-color: #00000050;
-    in-out property <string> shadow-color-hex: "#00000070";
-    in-out property <string> shadow-inactive-color-hex: "#00000050";
+    // Dynamic settings models for each section
+    in-out property <[LayoutSettingModel]> shadow-settings: [];
+    in-out property <[LayoutSettingModel]> tab-indicator-settings: [];
+    in-out property <[LayoutSettingModel]> insert-hint-settings: [];
 
-    // Tab indicator settings
-    in-out property <bool> tab-indicator-enabled: true;
-    in-out property <bool> tab-indicator-hide-single: false;
-    in-out property <bool> tab-indicator-within-column: false;
-    in-out property <int> tab-indicator-gap: 5;
-    in-out property <int> tab-indicator-width: 4;
-    in-out property <int> tab-indicator-position-index: 0;
-    in-out property <int> tab-indicator-corner-radius: 8;
-    in-out property <int> tab-indicator-gaps-between: 2;
-    in-out property <color> tab-indicator-active-color: #7fc8ff;
-    in-out property <color> tab-indicator-inactive-color: #505050;
-    in-out property <color> tab-indicator-urgent-color: #eb6f92;
-    in-out property <string> tab-indicator-active-hex: "#7fc8ff";
-    in-out property <string> tab-indicator-inactive-hex: "#505050";
-    in-out property <string> tab-indicator-urgent-hex: "#eb6f92";
-
-    // Insert hint settings
-    in-out property <bool> insert-hint-enabled: true;
-    in-out property <color> insert-hint-color: #ffc87f80;
-    in-out property <string> insert-hint-color-hex: "#ffc87f80";
-
-    // Callbacks - Shadow
-    callback shadow-toggled(bool);
-    callback shadow-softness-changed(int);
-    callback shadow-spread-changed(int);
-    callback shadow-offset-x-changed(int);
-    callback shadow-offset-y-changed(int);
-    callback shadow-draw-behind-toggled(bool);
-    callback shadow-color-changed(color);
-    callback shadow-inactive-color-changed(color);
-
-    // Callbacks - Tab indicator
-    callback tab-indicator-toggled(bool);
-    callback tab-indicator-hide-single-toggled(bool);
-    callback tab-indicator-within-column-toggled(bool);
-    callback tab-indicator-gap-changed(int);
-    callback tab-indicator-width-changed(int);
-    callback tab-indicator-position-changed(int);
-    callback tab-indicator-corner-radius-changed(int);
-    callback tab-indicator-gaps-between-changed(int);
-    callback tab-indicator-active-color-changed(color);
-    callback tab-indicator-inactive-color-changed(color);
-    callback tab-indicator-urgent-color-changed(color);
-
-    // Callbacks - Insert hint
-    callback insert-hint-toggled(bool);
-    callback insert-hint-color-changed(color);
+    // Generic setting callbacks
+    callback setting-toggle-changed(string, bool);
+    callback setting-slider-int-changed(string, int);
+    callback setting-slider-float-changed(string, float);
+    callback setting-combo-changed(string, int);
+    callback setting-text-changed(string, string);
+    callback setting-color-changed(string, string);
 
     background: transparent;
 
@@ -80,275 +258,41 @@ export component LayoutExtrasPage inherits Rectangle {
             padding-right: Theme.spacing-md;
 
             // Shadow Section
-            SettingsSection {
+            DynamicSection {
                 title: "WINDOW SHADOWS";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    ToggleRow {
-                        label: "Enable shadows";
-                        description: "Draw shadows behind windows";
-                        checked: root.shadow-enabled;
-                        toggled(val) => { root.shadow-enabled = val; root.shadow-toggled(val); }
-                    }
-
-                    if root.shadow-enabled: VerticalLayout {
-                        spacing: Theme.spacing-sm;
-
-                        SliderRow {
-                            label: "Softness";
-                            description: "Blur amount for shadow edges";
-                            suffix: "px";
-                            minimum: 0;
-                            maximum: 100;
-                            value: root.shadow-softness;
-                            changed(val) => {
-                                root.shadow-softness = round(val);
-                                root.shadow-softness-changed(round(val));
-                            }
-                        }
-
-                        SliderRow {
-                            label: "Spread";
-                            description: "How far shadow extends from window";
-                            suffix: "px";
-                            minimum: 0;
-                            maximum: 50;
-                            value: root.shadow-spread;
-                            changed(val) => {
-                                root.shadow-spread = round(val);
-                                root.shadow-spread-changed(round(val));
-                            }
-                        }
-
-                        SliderRow {
-                            label: "Offset X";
-                            description: "Horizontal shadow offset";
-                            suffix: "px";
-                            minimum: -50;
-                            maximum: 50;
-                            value: root.shadow-offset-x;
-                            changed(val) => {
-                                root.shadow-offset-x = round(val);
-                                root.shadow-offset-x-changed(round(val));
-                            }
-                        }
-
-                        SliderRow {
-                            label: "Offset Y";
-                            description: "Vertical shadow offset";
-                            suffix: "px";
-                            minimum: -50;
-                            maximum: 50;
-                            value: root.shadow-offset-y;
-                            changed(val) => {
-                                root.shadow-offset-y = round(val);
-                                root.shadow-offset-y-changed(round(val));
-                            }
-                        }
-
-                        ToggleRow {
-                            label: "Draw behind window";
-                            description: "Draw shadow behind transparent windows";
-                            checked: root.shadow-draw-behind;
-                            toggled(val) => { root.shadow-draw-behind = val; root.shadow-draw-behind-toggled(val); }
-                        }
-
-                        SettingRow {
-                            label: "Shadow color";
-                            description: "Color for focused window shadow";
-
-                            ColorPicker {
-                                selected-color: root.shadow-color;
-                                hex-value: root.shadow-color-hex;
-                                changed(col) => { root.shadow-color = col; root.shadow-color-changed(col); }
-                            }
-                        }
-
-                        SettingRow {
-                            label: "Inactive shadow";
-                            description: "Color for unfocused window shadow";
-
-                            ColorPicker {
-                                selected-color: root.shadow-inactive-color;
-                                hex-value: root.shadow-inactive-color-hex;
-                                changed(col) => { root.shadow-inactive-color = col; root.shadow-inactive-color-changed(col); }
-                            }
-                        }
-                    }
-                }
+                settings: root.shadow-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
+                color-changed(id, val) => { root.setting-color-changed(id, val); }
             }
 
             // Tab Indicator Section
-            SettingsSection {
+            DynamicSection {
                 title: "TAB INDICATOR";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    Text {
-                        text: "Visual indicator for stacked/tabbed windows";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                    }
-
-                    ToggleRow {
-                        label: "Enable tab indicator";
-                        description: "Show indicator for tabbed windows";
-                        checked: root.tab-indicator-enabled;
-                        toggled(val) => { root.tab-indicator-enabled = val; root.tab-indicator-toggled(val); }
-                    }
-
-                    if root.tab-indicator-enabled: VerticalLayout {
-                        spacing: Theme.spacing-sm;
-
-                        ToggleRow {
-                            label: "Hide when single tab";
-                            description: "Only show when multiple tabs exist";
-                            checked: root.tab-indicator-hide-single;
-                            toggled(val) => { root.tab-indicator-hide-single = val; root.tab-indicator-hide-single-toggled(val); }
-                        }
-
-                        ToggleRow {
-                            label: "Place within column";
-                            description: "Draw indicator inside the window column";
-                            checked: root.tab-indicator-within-column;
-                            toggled(val) => { root.tab-indicator-within-column = val; root.tab-indicator-within-column-toggled(val); }
-                        }
-
-                        ComboBoxRow {
-                            label: "Position";
-                            description: "Which side to show the indicator";
-                            model: ["Left", "Right", "Top", "Bottom"];
-                            current-index: root.tab-indicator-position-index;
-                            selected(idx) => {
-                                root.tab-indicator-position-index = idx;
-                                root.tab-indicator-position-changed(idx);
-                            }
-                        }
-
-                        SliderRow {
-                            label: "Width";
-                            description: "Thickness of the indicator bar";
-                            suffix: "px";
-                            minimum: 1;
-                            maximum: 20;
-                            value: root.tab-indicator-width;
-                            changed(val) => {
-                                root.tab-indicator-width = round(val);
-                                root.tab-indicator-width-changed(round(val));
-                            }
-                        }
-
-                        SliderRow {
-                            label: "Gap";
-                            description: "Space between indicator and window";
-                            suffix: "px";
-                            minimum: 0;
-                            maximum: 20;
-                            value: root.tab-indicator-gap;
-                            changed(val) => {
-                                root.tab-indicator-gap = round(val);
-                                root.tab-indicator-gap-changed(round(val));
-                            }
-                        }
-
-                        SliderRow {
-                            label: "Corner radius";
-                            description: "Rounded corners for the indicator";
-                            suffix: "px";
-                            minimum: 0;
-                            maximum: 20;
-                            value: root.tab-indicator-corner-radius;
-                            changed(val) => {
-                                root.tab-indicator-corner-radius = round(val);
-                                root.tab-indicator-corner-radius-changed(round(val));
-                            }
-                        }
-
-                        SliderRow {
-                            label: "Gaps between tabs";
-                            description: "Space between individual tab indicators";
-                            suffix: "px";
-                            minimum: 0;
-                            maximum: 20;
-                            value: root.tab-indicator-gaps-between;
-                            changed(val) => {
-                                root.tab-indicator-gaps-between = round(val);
-                                root.tab-indicator-gaps-between-changed(round(val));
-                            }
-                        }
-
-                        SettingRow {
-                            label: "Active color";
-                            description: "Color for the active tab indicator";
-
-                            ColorPicker {
-                                selected-color: root.tab-indicator-active-color;
-                                hex-value: root.tab-indicator-active-hex;
-                                changed(col) => { root.tab-indicator-active-color = col; root.tab-indicator-active-color-changed(col); }
-                            }
-                        }
-
-                        SettingRow {
-                            label: "Inactive color";
-                            description: "Color for inactive tab indicators";
-
-                            ColorPicker {
-                                selected-color: root.tab-indicator-inactive-color;
-                                hex-value: root.tab-indicator-inactive-hex;
-                                changed(col) => { root.tab-indicator-inactive-color = col; root.tab-indicator-inactive-color-changed(col); }
-                            }
-                        }
-
-                        SettingRow {
-                            label: "Urgent color";
-                            description: "Color for tab indicator when window is urgent";
-
-                            ColorPicker {
-                                selected-color: root.tab-indicator-urgent-color;
-                                hex-value: root.tab-indicator-urgent-hex;
-                                changed(col) => { root.tab-indicator-urgent-color = col; root.tab-indicator-urgent-color-changed(col); }
-                            }
-                        }
-                    }
-                }
+                subtitle: "Visual indicator for stacked/tabbed windows";
+                settings: root.tab-indicator-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
+                color-changed(id, val) => { root.setting-color-changed(id, val); }
             }
 
             // Insert Hint Section
-            SettingsSection {
+            DynamicSection {
                 title: "INSERT HINT";
-
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    Text {
-                        text: "Visual hint shown when inserting windows";
-                        color: Theme.text-muted;
-                        font-size: Theme.font-size-sm;
-                        wrap: word-wrap;
-                    }
-
-                    ToggleRow {
-                        label: "Enable insert hint";
-                        description: "Show visual feedback when positioning windows";
-                        checked: root.insert-hint-enabled;
-                        toggled(val) => { root.insert-hint-enabled = val; root.insert-hint-toggled(val); }
-                    }
-
-                    if root.insert-hint-enabled: SettingRow {
-                        label: "Hint color";
-                        description: "Color for the insert hint overlay";
-
-                        ColorPicker {
-                            selected-color: root.insert-hint-color;
-                            hex-value: root.insert-hint-color-hex;
-                            changed(col) => { root.insert-hint-color = col; root.insert-hint-color-changed(col); }
-                        }
-                    }
-                }
+                subtitle: "Visual hint shown when inserting windows";
+                settings: root.insert-hint-settings;
+                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                text-changed(id, val) => { root.setting-text-changed(id, val); }
+                color-changed(id, val) => { root.setting-color-changed(id, val); }
             }
 
             // Spacer at bottom

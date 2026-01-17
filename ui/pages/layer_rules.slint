@@ -1,89 +1,276 @@
+// Dynamic Layer Rules settings page
+// Uses model-driven rendering for reduced compile time
+
 import { Theme } from "../styles.slint";
-import { ScrollView, LineEdit, ComboBox, Button, CheckBox } from "std-widgets.slint";
-import { SettingsSection, SettingRow } from "../widgets/section.slint";
-import { ToggleRow } from "../widgets/toggle_row.slint";
-import { SliderRow } from "../widgets/slider_row.slint";
+import { ScrollView, LineEdit, ComboBox, Button, Slider, Switch } from "std-widgets.slint";
+import { SettingsSection } from "../widgets/section.slint";
 import { ColorPicker } from "../widgets/color_picker.slint";
 
-// Layer Rules settings page for niri
-// Layer rules apply to layer-shell surfaces like panels, notifications, etc.
-export component LayerRulesPage inherits Rectangle {
+// Universal setting model for layer rules
+export struct LayerRuleSettingModel {
+    id: string,              // Unique identifier for callbacks
+    label: string,           // Display label
+    description: string,     // Help text
+    setting-type: int,       // 0=toggle, 1=slider, 2=combo, 3=text, 4=color
+
+    // Toggle (type 0)
+    bool-value: bool,
+
+    // Slider (type 1)
+    int-value: int,
+    float-value: float,
+    min-value: float,
+    max-value: float,
+    suffix: string,
+    use-float: bool,         // true = float slider, false = int slider
+
+    // ComboBox (type 2)
+    combo-index: int,
+    combo-options: [string],
+
+    // Text/Color (type 3, 4)
+    text-value: string,
+    placeholder: string,
+
+    // Visibility
+    visible: bool,
+}
+
+// Dynamic row component - renders any setting type
+component DynamicRow inherits Rectangle {
+    in property <LayerRuleSettingModel> setting;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+    callback color-changed(string, color);
+
+    visible: setting.visible;
+    height: setting.visible ? 52px : 0;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+        padding: Theme.spacing-xs;
+        padding-left: Theme.spacing-md;
+        padding-right: Theme.spacing-md;
+
+        // Label column
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            alignment: center;
+
+            Text {
+                text: setting.label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-sm;
+                font-weight: 500;
+            }
+
+            if setting.description != "": Text {
+                text: setting.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-xs;
+                wrap: word-wrap;
+            }
+        }
+
+        // Control column
+        Rectangle {
+            width: 200px;
+            vertical-stretch: 1;
+
+            // Toggle (type 0)
+            if setting.setting-type == 0: HorizontalLayout {
+                alignment: end;
+                padding-right: Theme.spacing-sm;
+
+                Switch {
+                    checked: setting.bool-value;
+                    toggled => {
+                        root.toggle-changed(setting.id, self.checked);
+                    }
+                }
+            }
+
+            // Slider (type 1)
+            if setting.setting-type == 1: HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: center;
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: setting.min-value;
+                    maximum: setting.max-value;
+                    value: setting.use-float ? setting.float-value : setting.int-value;
+                    changed(val) => {
+                        if (setting.use-float) {
+                            root.slider-float-changed(setting.id, val);
+                        } else {
+                            root.slider-int-changed(setting.id, round(val));
+                        }
+                    }
+                }
+
+                Text {
+                    width: 55px;
+                    text: setting.use-float
+                        ? round(setting.float-value * 100) + setting.suffix
+                        : setting.int-value + setting.suffix;
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+
+            // ComboBox (type 2)
+            if setting.setting-type == 2: HorizontalLayout {
+                alignment: end;
+
+                ComboBox {
+                    width: 140px;
+                    model: setting.combo-options;
+                    current-index: setting.combo-index;
+                    selected(_) => {
+                        root.combo-changed(setting.id, self.current-index);
+                    }
+                }
+            }
+
+            // Text input (type 3)
+            if setting.setting-type == 3: HorizontalLayout {
+                alignment: end;
+
+                LineEdit {
+                    width: 180px;
+                    text: setting.text-value;
+                    placeholder-text: setting.placeholder;
+                    edited(val) => {
+                        root.text-changed(setting.id, val);
+                    }
+                }
+            }
+
+            // Color input (type 4)
+            if setting.setting-type == 4: HorizontalLayout {
+                alignment: end;
+                spacing: Theme.spacing-xs;
+
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 4px;
+                    background: Theme.accent;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                }
+
+                LineEdit {
+                    width: 120px;
+                    text: setting.text-value;
+                    placeholder-text: "#RRGGBBAA";
+                    edited(val) => {
+                        root.text-changed(setting.id, val);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Dynamic section component
+component DynamicSection inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle: "";
+    in property <[LayerRuleSettingModel]> settings;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+    callback color-changed(string, color);
+
+    background: Theme.card-background;
+    border-radius: Theme.radius-md;
+
+    VerticalLayout {
+        padding: Theme.spacing-md;
+        spacing: Theme.spacing-xs;
+
+        // Section header
+        Text {
+            text: title;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-xs;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        // Optional subtitle
+        if subtitle != "": Text {
+            text: subtitle;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-sm;
+            wrap: word-wrap;
+        }
+
+        // Dynamic rows from model
+        for setting in settings: DynamicRow {
+            setting: setting;
+            toggle-changed(id, val) => { root.toggle-changed(id, val); }
+            slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+            slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+            combo-changed(id, val) => { root.combo-changed(id, val); }
+            text-changed(id, val) => { root.text-changed(id, val); }
+            color-changed(id, val) => { root.color-changed(id, val); }
+        }
+    }
+}
+
+// Main page component
+export component LayerRulesDynamicPage inherits Rectangle {
     accessible-role: none;
     accessible-label: "Layer rules";
 
-    // Rule list (as model array of names)
+    // Rule list
     in-out property <[string]> rule-list: [];
     in-out property <int> selected-rule-index: -1;
 
-    // Current rule properties (when a rule is selected)
-    in-out property <string> current-rule-name: "";
-
-    // Match criteria
+    // Match criteria list
     in-out property <[string]> matches-list: [];
     in-out property <int> selected-match-index: 0;
     in-out property <int> matches-count: 0;
-    in-out property <string> current-match-namespace: "";
-    in-out property <bool> current-match-at-startup: false;
-    in-out property <bool> current-match-has-at-startup: false;
 
-    // Rule effects
-    in-out property <bool> current-has-block-out-from: false;
-    in-out property <int> current-block-out-from-index: 0;
-    in-out property <bool> current-has-opacity: false;
-    in-out property <float> current-opacity: 1.0;
-    in-out property <bool> current-has-corner-radius: false;
-    in-out property <int> current-corner-radius: 12;
-    in-out property <bool> current-place-within-backdrop: false;
-    in-out property <bool> current-baba-is-float: false;
+    // Dynamic settings models
+    in-out property <[LayerRuleSettingModel]> rule-settings: [];
+    in-out property <[LayerRuleSettingModel]> match-settings: [];
+    in-out property <[LayerRuleSettingModel]> visual-settings: [];
+    in-out property <[LayerRuleSettingModel]> shadow-settings: [];
+    in-out property <[LayerRuleSettingModel]> advanced-settings: [];
 
-    // Shadow settings
-    in-out property <bool> current-has-shadow: false;
-    in-out property <bool> current-shadow-enabled: true;
-    in-out property <int> current-shadow-softness: 30;
-    in-out property <int> current-shadow-spread: 5;
-    in-out property <int> current-shadow-offset-x: 0;
-    in-out property <int> current-shadow-offset-y: 5;
-    in-out property <bool> current-shadow-draw-behind: false;
-    in-out property <color> current-shadow-color: #00000070;
-    in-out property <color> current-shadow-inactive-color: #00000050;
-    in-out property <string> current-shadow-color-hex: "#00000070";
-    in-out property <string> current-shadow-inactive-color-hex: "#00000050";
-
-    // Callbacks
+    // Rule management callbacks
     callback add-rule();
     callback remove-rule(int);
     callback select-rule(int);
-    callback rule-name-changed(string);
-    callback reorder-rule(int, int);  // from-index, to-index
+    callback reorder-rule(int, int);
 
-    // Match callbacks
+    // Match management callbacks
     callback add-match();
     callback remove-match(int);
     callback select-match(int);
-    callback match-namespace-changed(string);
-    callback match-at-startup-has-toggled(bool);
-    callback match-at-startup-toggled(bool);
 
-    // Effect callbacks
-    callback block-out-from-toggled(bool);
-    callback block-out-from-changed(int);
-    callback opacity-toggled(bool);
-    callback opacity-changed(float);
-    callback corner-radius-toggled(bool);
-    callback corner-radius-changed(int);
-    callback place-within-backdrop-toggled(bool);
-    callback baba-is-float-toggled(bool);
-
-    // Shadow callbacks
-    callback shadow-toggled(bool);
-    callback shadow-enabled-toggled(bool);
-    callback shadow-softness-changed(int);
-    callback shadow-spread-changed(int);
-    callback shadow-offset-x-changed(int);
-    callback shadow-offset-y-changed(int);
-    callback shadow-draw-behind-toggled(bool);
-    callback shadow-color-changed(color);
-    callback shadow-inactive-color-changed(color);
+    // Generic setting callbacks
+    callback setting-toggle-changed(string, bool);
+    callback setting-slider-int-changed(string, int);
+    callback setting-slider-float-changed(string, float);
+    callback setting-combo-changed(string, int);
+    callback setting-text-changed(string, string);
+    callback setting-color-changed(string, color);
 
     background: transparent;
 
@@ -178,7 +365,7 @@ export component LayerRulesPage inherits Rectangle {
                             for rule[index] in root.rule-list : VerticalLayout {
                                 spacing: 0;
 
-                                // Drop indicator - shows above this item when dragging
+                                // Drop indicator
                                 Rectangle {
                                     height: root.is-dragging && root.drag-target-index == index ? 3px : 0;
                                     background: Theme.accent;
@@ -210,7 +397,6 @@ export component LayerRulesPage inherits Rectangle {
                                                 self.drag-started = false;
                                             } else if (event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel) {
                                                 if (root.is-dragging) {
-                                                    // Complete the drag
                                                     if (root.drag-target-index >= 0 && root.drag-target-index != root.drag-from-index) {
                                                         root.reorder-rule(root.drag-from-index, root.drag-target-index);
                                                     }
@@ -218,7 +404,6 @@ export component LayerRulesPage inherits Rectangle {
                                                     root.drag-from-index = -1;
                                                     root.drag-target-index = -1;
                                                 } else if (!self.drag-started) {
-                                                    // Normal click - select item
                                                     root.focused-rule-index = index;
                                                     root.selected-rule-index = index;
                                                     root.select-rule(index);
@@ -230,7 +415,6 @@ export component LayerRulesPage inherits Rectangle {
 
                                         moved => {
                                             if (self.pressed) {
-                                                // Check drag threshold (5px)
                                                 if (!self.drag-started && abs(self.mouse-y - self.press-start-y) > 5px) {
                                                     self.drag-started = true;
                                                     root.is-dragging = true;
@@ -238,10 +422,7 @@ export component LayerRulesPage inherits Rectangle {
                                                 }
 
                                                 if (root.is-dragging) {
-                                                    // Update drag position for ghost
                                                     root.drag-current-y = self.mouse-y + index * (root.item-height + Theme.spacing-xs);
-
-                                                    // Calculate target index based on Y position
                                                     root.drag-target-index = clamp(
                                                         round(root.drag-current-y / (root.item-height + Theme.spacing-xs)),
                                                         0,
@@ -275,7 +456,7 @@ export component LayerRulesPage inherits Rectangle {
                                 }
                             }
 
-                            // Drop indicator at end of list
+                            // Drop indicator at end
                             Rectangle {
                                 height: root.is-dragging && root.drag-target-index == root.rule-list.length ? 3px : 0;
                                 background: Theme.accent;
@@ -327,38 +508,37 @@ export component LayerRulesPage inherits Rectangle {
             ScrollView {
                 VerticalLayout {
                     alignment: start;
-            spacing: Theme.spacing-lg;
+                    spacing: Theme.spacing-lg;
                     padding-right: Theme.spacing-md;
 
-                    // Rule name
-                    SettingsSection {
+                    // Rule Settings Section
+                    DynamicSection {
                         title: "RULE SETTINGS";
-
-                        VerticalLayout {
-                            spacing: Theme.spacing-sm;
-
-                            SettingRow {
-                                label: "Rule name";
-                                description: "Display name for this rule";
-
-                                LineEdit {
-                                    width: 200px;
-                                    text: root.current-rule-name;
-                                    edited(value) => {
-                                        root.current-rule-name = value;
-                                        root.rule-name-changed(value);
-                                    }
-                                }
-                            }
-                        }
+                        settings: root.rule-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
+                        color-changed(id, val) => { root.setting-color-changed(id, val); }
                     }
 
-                    // Match criteria
-                    SettingsSection {
-                        title: "MATCH CRITERIA";
+                    // Match Criteria Section
+                    Rectangle {
+                        background: Theme.card-background;
+                        border-radius: Theme.radius-md;
 
                         VerticalLayout {
+                            padding: Theme.spacing-md;
                             spacing: Theme.spacing-sm;
+
+                            Text {
+                                text: "MATCH CRITERIA";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-xs;
+                                font-weight: 600;
+                                letter-spacing: 0.5px;
+                            }
 
                             Text {
                                 text: "Rule applies if ANY match criteria is satisfied";
@@ -367,7 +547,7 @@ export component LayerRulesPage inherits Rectangle {
                                 wrap: word-wrap;
                             }
 
-                            // Match list with add/remove
+                            // Match list controls
                             HorizontalLayout {
                                 spacing: Theme.spacing-sm;
                                 height: 28px;
@@ -394,7 +574,7 @@ export component LayerRulesPage inherits Rectangle {
                                 }
                             }
 
-                            // Match selector (show as small clickable chips/buttons)
+                            // Match selector chips
                             if root.matches-count > 0: HorizontalLayout {
                                 spacing: Theme.spacing-xs;
 
@@ -431,272 +611,53 @@ export component LayerRulesPage inherits Rectangle {
                                 }
                             }
 
-                            // Current match fields
-                            SettingRow {
-                                label: "Namespace";
-                                description: "Layer-shell namespace (regex supported)";
-
-                                LineEdit {
-                                    width: 200px;
-                                    text: root.current-match-namespace;
-                                    placeholder-text: "e.g., waybar";
-                                    edited(value) => {
-                                        root.current-match-namespace = value;
-                                        root.match-namespace-changed(value);
-                                    }
-                                }
-                            }
-
-                            ToggleRow {
-                                label: "Filter by startup state";
-                                description: "Only match layers at startup or after";
-                                checked: root.current-match-has-at-startup;
-                                toggled(val) => {
-                                    root.current-match-has-at-startup = val;
-                                    root.match-at-startup-has-toggled(val);
-                                }
-                            }
-
-                            if root.current-match-has-at-startup: ToggleRow {
-                                label: "At startup";
-                                description: "Match only layers created at compositor startup";
-                                checked: root.current-match-at-startup;
-                                toggled(val) => {
-                                    root.current-match-at-startup = val;
-                                    root.match-at-startup-toggled(val);
-                                }
+                            // Dynamic match settings
+                            for setting in root.match-settings: DynamicRow {
+                                setting: setting;
+                                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                                text-changed(id, val) => { root.setting-text-changed(id, val); }
+                                color-changed(id, val) => { root.setting-color-changed(id, val); }
                             }
                         }
                     }
 
-                    // Visual properties
-                    SettingsSection {
+                    // Visual Properties Section
+                    DynamicSection {
                         title: "VISUAL PROPERTIES";
-
-                        VerticalLayout {
-                            spacing: Theme.spacing-sm;
-
-                            ToggleRow {
-                                label: "Custom opacity";
-                                description: "Set layer transparency";
-                                checked: root.current-has-opacity;
-                                toggled(val) => {
-                                    root.current-has-opacity = val;
-                                    root.opacity-toggled(val);
-                                }
-                            }
-
-                            if root.current-has-opacity: SliderRow {
-                                label: "Opacity";
-                                description: "Layer transparency level";
-                                suffix: "%";
-                                minimum: 0;
-                                maximum: 100;
-                                value: root.current-opacity * 100;
-                                changed(val) => {
-                                    root.current-opacity = val / 100;
-                                    root.opacity-changed(val / 100);
-                                }
-                            }
-
-                            ToggleRow {
-                                label: "Geometry corner radius";
-                                description: "Round layer surface corners";
-                                checked: root.current-has-corner-radius;
-                                toggled(val) => {
-                                    root.current-has-corner-radius = val;
-                                    root.corner-radius-toggled(val);
-                                }
-                            }
-
-                            if root.current-has-corner-radius: SliderRow {
-                                label: "Radius";
-                                description: "Corner radius in logical pixels";
-                                suffix: "px";
-                                minimum: 0;
-                                maximum: 32;
-                                value: root.current-corner-radius;
-                                changed(val) => {
-                                    root.current-corner-radius = round(val);
-                                    root.corner-radius-changed(round(val));
-                                }
-                            }
-
-                            ToggleRow {
-                                label: "Block from screen capture";
-                                description: "Hide this layer in screen recordings";
-                                checked: root.current-has-block-out-from;
-                                toggled(val) => {
-                                    root.current-has-block-out-from = val;
-                                    root.block-out-from-toggled(val);
-                                }
-                            }
-
-                            if root.current-has-block-out-from: SettingRow {
-                                label: "Block from";
-                                description: "What to block the layer from";
-
-                                ComboBox {
-                                    width: Theme.combobox-width;
-                                    model: ["Screencast", "Screen Capture"];
-                                    current-index: root.current-block-out-from-index;
-                                    selected(text) => {
-                                        root.current-block-out-from-index = self.current-index;
-                                        root.block-out-from-changed(self.current-index);
-                                    }
-                                }
-                            }
-                        }
+                        settings: root.visual-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
+                        color-changed(id, val) => { root.setting-color-changed(id, val); }
                     }
 
-                    // Shadow settings
-                    SettingsSection {
+                    // Shadow Section
+                    DynamicSection {
                         title: "SHADOW";
-
-                        VerticalLayout {
-                            spacing: Theme.spacing-sm;
-
-                            ToggleRow {
-                                label: "Custom shadow";
-                                description: "Override shadow settings for this layer";
-                                checked: root.current-has-shadow;
-                                toggled(val) => {
-                                    root.current-has-shadow = val;
-                                    root.shadow-toggled(val);
-                                }
-                            }
-
-                            if root.current-has-shadow: VerticalLayout {
-                                spacing: Theme.spacing-sm;
-
-                                ToggleRow {
-                                    label: "Shadow enabled";
-                                    description: "Draw shadow for this layer";
-                                    checked: root.current-shadow-enabled;
-                                    toggled(val) => {
-                                        root.current-shadow-enabled = val;
-                                        root.shadow-enabled-toggled(val);
-                                    }
-                                }
-
-                                if root.current-shadow-enabled: VerticalLayout {
-                                    spacing: Theme.spacing-sm;
-
-                                    SliderRow {
-                                        label: "Softness";
-                                        description: "Shadow blur amount";
-                                        suffix: "";
-                                        minimum: 0;
-                                        maximum: 100;
-                                        value: root.current-shadow-softness;
-                                        changed(val) => {
-                                            root.current-shadow-softness = round(val);
-                                            root.shadow-softness-changed(round(val));
-                                        }
-                                    }
-
-                                    SliderRow {
-                                        label: "Spread";
-                                        description: "Shadow expansion";
-                                        suffix: "";
-                                        minimum: 0;
-                                        maximum: 50;
-                                        value: root.current-shadow-spread;
-                                        changed(val) => {
-                                            root.current-shadow-spread = round(val);
-                                            root.shadow-spread-changed(round(val));
-                                        }
-                                    }
-
-                                    SliderRow {
-                                        label: "Offset X";
-                                        description: "Horizontal shadow offset";
-                                        suffix: "";
-                                        minimum: -50;
-                                        maximum: 50;
-                                        value: root.current-shadow-offset-x;
-                                        changed(val) => {
-                                            root.current-shadow-offset-x = round(val);
-                                            root.shadow-offset-x-changed(round(val));
-                                        }
-                                    }
-
-                                    SliderRow {
-                                        label: "Offset Y";
-                                        description: "Vertical shadow offset";
-                                        suffix: "";
-                                        minimum: -50;
-                                        maximum: 50;
-                                        value: root.current-shadow-offset-y;
-                                        changed(val) => {
-                                            root.current-shadow-offset-y = round(val);
-                                            root.shadow-offset-y-changed(round(val));
-                                        }
-                                    }
-
-                                    ToggleRow {
-                                        label: "Draw behind window";
-                                        description: "Render shadow behind transparent windows";
-                                        checked: root.current-shadow-draw-behind;
-                                        toggled(val) => {
-                                            root.current-shadow-draw-behind = val;
-                                            root.shadow-draw-behind-toggled(val);
-                                        }
-                                    }
-
-                                    ColorPicker {
-                                        label: "Shadow color";
-                                        description: "Active layer shadow color";
-                                        selected-color: root.current-shadow-color;
-                                        hex-value: root.current-shadow-color-hex;
-                                        changed(col) => {
-                                            root.current-shadow-color = col;
-                                            root.shadow-color-changed(col);
-                                        }
-                                    }
-
-                                    ColorPicker {
-                                        label: "Inactive shadow color";
-                                        description: "Inactive layer shadow color";
-                                        selected-color: root.current-shadow-inactive-color;
-                                        hex-value: root.current-shadow-inactive-color-hex;
-                                        changed(col) => {
-                                            root.current-shadow-inactive-color = col;
-                                            root.shadow-inactive-color-changed(col);
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        settings: root.shadow-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
+                        color-changed(id, val) => { root.setting-color-changed(id, val); }
                     }
 
-                    // Advanced options
-                    SettingsSection {
+                    // Advanced Section
+                    DynamicSection {
                         title: "ADVANCED";
-
-                        VerticalLayout {
-                            spacing: Theme.spacing-sm;
-
-                            ToggleRow {
-                                label: "Place within backdrop";
-                                description: "Position layer within the overview backdrop";
-                                checked: root.current-place-within-backdrop;
-                                toggled(val) => {
-                                    root.current-place-within-backdrop = val;
-                                    root.place-within-backdrop-toggled(val);
-                                }
-                            }
-
-                            ToggleRow {
-                                label: "Baba is float";
-                                description: "Treat this layer as floating (special behavior)";
-                                checked: root.current-baba-is-float;
-                                toggled(val) => {
-                                    root.current-baba-is-float = val;
-                                    root.baba-is-float-toggled(val);
-                                }
-                            }
-                        }
+                        settings: root.advanced-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
+                        color-changed(id, val) => { root.setting-color-changed(id, val); }
                     }
 
                     // Spacer at bottom

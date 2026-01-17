@@ -1,214 +1,138 @@
-import { Theme, AnimationConfig } from "../styles.slint";
-import { ScrollView, ComboBox } from "std-widgets.slint";
-import { SettingsSection, SettingRow } from "../widgets/section.slint";
-import { ToggleRow } from "../widgets/toggle_row.slint";
-import { SliderRow } from "../widgets/slider_row.slint";
+// Dynamic Animations settings page
+// Uses model-driven rendering for reduced compile time
 
-// Animation type options
-global AnimationTypes {
-    out property <[string]> types: ["Default", "Off", "Spring", "Easing"];
-    out property <[string]> curves: ["Ease Out Quad", "Ease Out Cubic", "Ease Out Expo", "Linear", "Custom (Cubic Bezier)"];
+import { Theme } from "../styles.slint";
+import { ScrollView, ComboBox, Slider, Switch } from "std-widgets.slint";
+
+// Universal setting model for animations
+export struct AnimationSettingModel {
+    id: string,              // Unique identifier for callbacks
+    label: string,           // Display label
+    description: string,     // Help text
+    setting-type: int,       // 0=toggle, 1=slider, 2=combo, 3=text
+
+    // Toggle (type 0)
+    bool-value: bool,
+
+    // Slider (type 1)
+    int-value: int,
+    float-value: float,
+    min-value: float,
+    max-value: float,
+    suffix: string,
+    use-float: bool,         // true = float slider, false = int slider
+
+    // ComboBox (type 2)
+    combo-index: int,
+    combo-options: [string],
+
+    // Text (type 3)
+    text-value: string,
+    placeholder: string,
+
+    // Visibility
+    visible: bool,
 }
 
-// Single animation configuration row - now receives config from model
-component AnimationConfigRow inherits VerticalLayout {
-    in property <AnimationConfig> config;
+// Dynamic row component - renders any setting type
+component DynamicRow inherits Rectangle {
+    in property <AnimationSettingModel> setting;
 
-    // Callbacks with animation ID
-    callback type-changed(int /* id */, int /* type */);
-    callback damping-changed(int /* id */, float);
-    callback stiffness-changed(int /* id */, int);
-    callback epsilon-changed(int /* id */, float);
-    callback duration-changed(int /* id */, int);
-    callback curve-changed(int /* id */, int);
-    // Cubic-bezier control point callbacks
-    callback bezier-x1-changed(int /* id */, float);
-    callback bezier-y1-changed(int /* id */, float);
-    callback bezier-x2-changed(int /* id */, float);
-    callback bezier-y2-changed(int /* id */, float);
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
 
-    spacing: Theme.spacing-xs;
+    visible: setting.visible;
+    height: setting.visible ? 52px : 0;
+    background: transparent;
 
-    // Main row with label and type selector
     HorizontalLayout {
         spacing: Theme.spacing-md;
+        padding: Theme.spacing-xs;
+        padding-left: Theme.spacing-md;
+        padding-right: Theme.spacing-md;
 
+        // Label column
         VerticalLayout {
             horizontal-stretch: 1;
+            spacing: 2px;
             alignment: center;
 
             Text {
-                text: config.name;
+                text: setting.label;
                 color: Theme.text-primary;
-                font-size: Theme.font-size-md;
-            }
-
-            Text {
-                text: config.description;
-                color: Theme.text-muted;
                 font-size: Theme.font-size-sm;
+                font-weight: 500;
+            }
+
+            if setting.description != "": Text {
+                text: setting.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-xs;
+                wrap: word-wrap;
             }
         }
 
-        ComboBox {
-            width: 120px;
-            model: AnimationTypes.types;
-            current-index: config.anim-type;
-            selected(text) => {
-                root.type-changed(config.id, self.current-index);
-            }
-        }
-    }
+        // Control column
+        Rectangle {
+            width: 200px;
+            vertical-stretch: 1;
 
-    // Spring parameters (shown when type is Spring = 2)
-    if config.anim-type == 2: Rectangle {
-        background: Theme.surface-elevated;
-        border-radius: Theme.radius-sm;
+            // Toggle (type 0)
+            if setting.setting-type == 0: HorizontalLayout {
+                alignment: end;
+                padding-right: Theme.spacing-sm;
 
-        VerticalLayout {
-            padding: Theme.spacing-sm;
-            spacing: Theme.spacing-xs;
-
-            SliderRow {
-                label: "Damping ratio";
-                description: "1.0 = smooth stop, <1.0 = bouncy";
-                minimum: 0.1;
-                maximum: 3.0;
-                value: config.damping;
-                changed(val) => {
-                    root.damping-changed(config.id, val);
-                }
-            }
-
-            SliderRow {
-                label: "Stiffness";
-                description: "Higher = faster/stiffer";
-                minimum: 50;
-                maximum: 2000;
-                value: config.stiffness;
-                changed(val) => {
-                    root.stiffness-changed(config.id, round(val));
-                }
-            }
-
-            SliderRow {
-                label: "Epsilon";
-                description: "Animation end threshold";
-                minimum: 0.00001;
-                maximum: 0.01;
-                value: config.epsilon;
-                changed(val) => {
-                    root.epsilon-changed(config.id, val);
-                }
-            }
-        }
-    }
-
-    // Easing parameters (shown when type is Easing = 3)
-    if config.anim-type == 3: Rectangle {
-        background: Theme.surface-elevated;
-        border-radius: Theme.radius-sm;
-
-        VerticalLayout {
-            padding: Theme.spacing-sm;
-            spacing: Theme.spacing-xs;
-
-            SliderRow {
-                label: "Duration";
-                description: "Animation duration in milliseconds";
-                suffix: "ms";
-                minimum: 50;
-                maximum: 1000;
-                value: config.duration;
-                changed(val) => {
-                    root.duration-changed(config.id, round(val));
-                }
-            }
-
-            HorizontalLayout {
-                spacing: Theme.spacing-md;
-
-                Text {
-                    text: "Easing curve";
-                    color: Theme.text-primary;
-                    font-size: Theme.font-size-md;
-                    vertical-alignment: center;
-                }
-
-                ComboBox {
-                    width: 180px;
-                    model: AnimationTypes.curves;
-                    current-index: config.curve;
-                    selected(text) => {
-                        root.curve-changed(config.id, self.current-index);
+                Switch {
+                    checked: setting.bool-value;
+                    toggled => {
+                        root.toggle-changed(setting.id, self.checked);
                     }
                 }
             }
 
-            // Cubic-bezier control points (shown when curve is Custom = 4)
-            if config.curve == 4: VerticalLayout {
-                spacing: Theme.spacing-xs;
-                padding-top: Theme.spacing-xs;
+            // Slider (type 1)
+            if setting.setting-type == 1: HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: center;
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: setting.min-value;
+                    maximum: setting.max-value;
+                    value: setting.use-float ? setting.float-value : setting.int-value;
+                    changed(val) => {
+                        if (setting.use-float) {
+                            root.slider-float-changed(setting.id, val);
+                        } else {
+                            root.slider-int-changed(setting.id, round(val));
+                        }
+                    }
+                }
 
                 Text {
-                    text: "Bezier Control Points";
+                    width: 55px;
+                    text: setting.use-float
+                        ? round(setting.float-value * 100) / 100 + setting.suffix
+                        : setting.int-value + setting.suffix;
                     color: Theme.text-secondary;
                     font-size: Theme.font-size-sm;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
                 }
+            }
 
-                HorizontalLayout {
-                    spacing: Theme.spacing-md;
+            // ComboBox (type 2)
+            if setting.setting-type == 2: HorizontalLayout {
+                alignment: end;
 
-                    SliderRow {
-                        horizontal-stretch: 1;
-                        label: "X1";
-                        description: "First control point X";
-                        minimum: 0.0;
-                        maximum: 1.0;
-                        value: config.bezier-x1;
-                        changed(val) => {
-                            root.bezier-x1-changed(config.id, val);
-                        }
-                    }
-
-                    SliderRow {
-                        horizontal-stretch: 1;
-                        label: "Y1";
-                        description: "First control point Y";
-                        minimum: -1.0;
-                        maximum: 2.0;
-                        value: config.bezier-y1;
-                        changed(val) => {
-                            root.bezier-y1-changed(config.id, val);
-                        }
-                    }
-                }
-
-                HorizontalLayout {
-                    spacing: Theme.spacing-md;
-
-                    SliderRow {
-                        horizontal-stretch: 1;
-                        label: "X2";
-                        description: "Second control point X";
-                        minimum: 0.0;
-                        maximum: 1.0;
-                        value: config.bezier-x2;
-                        changed(val) => {
-                            root.bezier-x2-changed(config.id, val);
-                        }
-                    }
-
-                    SliderRow {
-                        horizontal-stretch: 1;
-                        label: "Y2";
-                        description: "Second control point Y";
-                        minimum: -1.0;
-                        maximum: 2.0;
-                        value: config.bezier-y2;
-                        changed(val) => {
-                            root.bezier-y2-changed(config.id, val);
-                        }
+                ComboBox {
+                    width: 150px;
+                    model: setting.combo-options;
+                    current-index: setting.combo-index;
+                    selected(_) => {
+                        root.combo-changed(setting.id, self.current-index);
                     }
                 }
             }
@@ -216,37 +140,195 @@ component AnimationConfigRow inherits VerticalLayout {
     }
 }
 
-// Animations settings page for niri - now model-based
-export component AnimationsPage inherits Rectangle {
+// Dynamic section component for grouping settings
+component DynamicSection inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle: "";
+    in property <[AnimationSettingModel]> settings;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+
+    background: Theme.card-background;
+    border-radius: Theme.radius-md;
+
+    VerticalLayout {
+        padding: Theme.spacing-md;
+        spacing: Theme.spacing-xs;
+
+        // Section header
+        Text {
+            text: title;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-xs;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        // Optional subtitle
+        if subtitle != "": Text {
+            text: subtitle;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-sm;
+            wrap: word-wrap;
+        }
+
+        // Dynamic rows from model
+        for setting in settings: DynamicRow {
+            setting: setting;
+            toggle-changed(id, val) => { root.toggle-changed(id, val); }
+            slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+            slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+            combo-changed(id, val) => { root.combo-changed(id, val); }
+        }
+    }
+}
+
+// Individual animation configuration row with expandable parameters
+component AnimationRow inherits Rectangle {
+    in property <AnimationSettingModel> setting;
+    in property <[AnimationSettingModel]> spring-params;
+    in property <[AnimationSettingModel]> easing-params;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+
+    visible: setting.visible;
+    background: transparent;
+
+    VerticalLayout {
+        spacing: Theme.spacing-xs;
+
+        // Main row with label and type selector
+        HorizontalLayout {
+            spacing: Theme.spacing-md;
+            padding: Theme.spacing-xs;
+            padding-left: Theme.spacing-md;
+            padding-right: Theme.spacing-md;
+            height: 52px;
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+
+                Text {
+                    text: setting.label;
+                    color: Theme.text-primary;
+                    font-size: Theme.font-size-md;
+                }
+
+                if setting.description != "": Text {
+                    text: setting.description;
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-sm;
+                }
+            }
+
+            ComboBox {
+                width: 120px;
+                model: setting.combo-options;
+                current-index: setting.combo-index;
+                selected(_) => {
+                    root.combo-changed(setting.id, self.current-index);
+                }
+            }
+        }
+
+        // Spring parameters panel (shown when type is Spring = 2)
+        if setting.combo-index == 2: Rectangle {
+            background: Theme.surface-elevated;
+            border-radius: Theme.radius-sm;
+
+            VerticalLayout {
+                padding: Theme.spacing-sm;
+                spacing: Theme.spacing-xs;
+
+                for param in spring-params: DynamicRow {
+                    setting: param;
+                    toggle-changed(id, val) => { root.toggle-changed(id, val); }
+                    slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+                    slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+                    combo-changed(id, val) => { root.combo-changed(id, val); }
+                }
+            }
+        }
+
+        // Easing parameters panel (shown when type is Easing = 3)
+        if setting.combo-index == 3: Rectangle {
+            background: Theme.surface-elevated;
+            border-radius: Theme.radius-sm;
+
+            VerticalLayout {
+                padding: Theme.spacing-sm;
+                spacing: Theme.spacing-xs;
+
+                for param in easing-params: DynamicRow {
+                    setting: param;
+                    toggle-changed(id, val) => { root.toggle-changed(id, val); }
+                    slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+                    slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+                    combo-changed(id, val) => { root.combo-changed(id, val); }
+                }
+            }
+        }
+    }
+}
+
+// Main page component
+export component AnimationsDynamicPage inherits Rectangle {
     accessible-role: none;
     accessible-label: "Animations settings";
 
-    // Global animation settings
-    in-out property <bool> animations-enabled: true;
-    in-out property <float> slowdown: 1.0;
+    // Global animation settings model
+    in-out property <[AnimationSettingModel]> global-settings: [];
 
     // Expanded state for advanced section
     in-out property <bool> advanced-expanded: false;
 
-    // Animation configurations as a model (11 animations)
-    in property <[AnimationConfig]> animations-model;
+    // Per-animation settings models (grouped by category)
+    // Each animation has: type selector + spring params + easing params
+    in-out property <[AnimationSettingModel]> workspace-nav-animations: [];
+    in-out property <[AnimationSettingModel]> window-animations: [];
+    in-out property <[AnimationSettingModel]> ui-animations: [];
 
-    // Global callbacks
-    callback animations-toggled(bool);
-    callback slowdown-changed(float);
+    // Spring parameter models for each animation (11 total)
+    in-out property <[AnimationSettingModel]> spring-params-0: [];
+    in-out property <[AnimationSettingModel]> spring-params-1: [];
+    in-out property <[AnimationSettingModel]> spring-params-2: [];
+    in-out property <[AnimationSettingModel]> spring-params-3: [];
+    in-out property <[AnimationSettingModel]> spring-params-4: [];
+    in-out property <[AnimationSettingModel]> spring-params-5: [];
+    in-out property <[AnimationSettingModel]> spring-params-6: [];
+    in-out property <[AnimationSettingModel]> spring-params-7: [];
+    in-out property <[AnimationSettingModel]> spring-params-8: [];
+    in-out property <[AnimationSettingModel]> spring-params-9: [];
+    in-out property <[AnimationSettingModel]> spring-params-10: [];
 
-    // Indexed callbacks for animation properties
-    callback animation-type-changed(int /* id */, int /* type */);
-    callback animation-damping-changed(int /* id */, float);
-    callback animation-stiffness-changed(int /* id */, int);
-    callback animation-epsilon-changed(int /* id */, float);
-    callback animation-duration-changed(int /* id */, int);
-    callback animation-curve-changed(int /* id */, int);
-    // Cubic-bezier control point callbacks
-    callback animation-bezier-x1-changed(int /* id */, float);
-    callback animation-bezier-y1-changed(int /* id */, float);
-    callback animation-bezier-x2-changed(int /* id */, float);
-    callback animation-bezier-y2-changed(int /* id */, float);
+    // Easing parameter models for each animation (11 total)
+    in-out property <[AnimationSettingModel]> easing-params-0: [];
+    in-out property <[AnimationSettingModel]> easing-params-1: [];
+    in-out property <[AnimationSettingModel]> easing-params-2: [];
+    in-out property <[AnimationSettingModel]> easing-params-3: [];
+    in-out property <[AnimationSettingModel]> easing-params-4: [];
+    in-out property <[AnimationSettingModel]> easing-params-5: [];
+    in-out property <[AnimationSettingModel]> easing-params-6: [];
+    in-out property <[AnimationSettingModel]> easing-params-7: [];
+    in-out property <[AnimationSettingModel]> easing-params-8: [];
+    in-out property <[AnimationSettingModel]> easing-params-9: [];
+    in-out property <[AnimationSettingModel]> easing-params-10: [];
+
+    // Animations enabled state (for conditional UI)
+    in-out property <bool> animations-enabled: true;
+
+    // Generic callbacks for all setting changes
+    callback setting-toggle-changed(string, bool);
+    callback setting-slider-int-changed(string, int);
+    callback setting-slider-float-changed(string, float);
+    callback setting-combo-changed(string, int);
 
     background: transparent;
 
@@ -257,34 +339,22 @@ export component AnimationsPage inherits Rectangle {
             padding-right: Theme.spacing-md;
 
             // Global Animations Section
-            SettingsSection {
+            DynamicSection {
                 title: "ANIMATIONS";
+                subtitle: "Configure global animation behavior";
+                settings: root.global-settings;
 
-                VerticalLayout {
-                    spacing: Theme.spacing-sm;
-
-                    ToggleRow {
-                        label: "Enable animations";
-                        description: "Animate window movements, workspace switches, and other transitions";
-                        checked: root.animations-enabled;
-                        toggled(val) => {
-                            root.animations-enabled = val;
-                            root.animations-toggled(val);
-                        }
-                    }
-
-                    if root.animations-enabled: SliderRow {
-                        label: "Animation speed";
-                        description: "Slowdown factor (1.0 = normal, higher = slower)";
-                        suffix: "x";
-                        minimum: 0.1;
-                        maximum: 10.0;
-                        value: root.slowdown;
-                        changed(val) => {
-                            root.slowdown = val;
-                            root.slowdown-changed(val);
-                        }
-                    }
+                toggle-changed(id, val) => {
+                    root.setting-toggle-changed(id, val);
+                }
+                slider-int-changed(id, val) => {
+                    root.setting-slider-int-changed(id, val);
+                }
+                slider-float-changed(id, val) => {
+                    root.setting-slider-float-changed(id, val);
+                }
+                combo-changed(id, val) => {
+                    root.setting-combo-changed(id, val);
                 }
             }
 
@@ -343,7 +413,7 @@ export component AnimationsPage inherits Rectangle {
                     if root.advanced-expanded: VerticalLayout {
                         spacing: Theme.spacing-lg;
 
-                        // Workspace & Navigation group (IDs 0-1)
+                        // Workspace & Navigation group
                         VerticalLayout {
                             spacing: Theme.spacing-sm;
 
@@ -354,27 +424,19 @@ export component AnimationsPage inherits Rectangle {
                                 font-weight: 600;
                             }
 
-                            for anim in root.animations-model: Rectangle {
-                                visible: anim.id <= 1;
-                                height: self.visible ? config-row.preferred-height : 0;
+                            for anim[idx] in root.workspace-nav-animations: AnimationRow {
+                                setting: anim;
+                                spring-params: idx == 0 ? root.spring-params-0 : root.spring-params-1;
+                                easing-params: idx == 0 ? root.easing-params-0 : root.easing-params-1;
 
-                                config-row := AnimationConfigRow {
-                                    config: anim;
-                                    type-changed(id, val) => { root.animation-type-changed(id, val); }
-                                    damping-changed(id, val) => { root.animation-damping-changed(id, val); }
-                                    stiffness-changed(id, val) => { root.animation-stiffness-changed(id, val); }
-                                    epsilon-changed(id, val) => { root.animation-epsilon-changed(id, val); }
-                                    duration-changed(id, val) => { root.animation-duration-changed(id, val); }
-                                    curve-changed(id, val) => { root.animation-curve-changed(id, val); }
-                                    bezier-x1-changed(id, val) => { root.animation-bezier-x1-changed(id, val); }
-                                    bezier-y1-changed(id, val) => { root.animation-bezier-y1-changed(id, val); }
-                                    bezier-x2-changed(id, val) => { root.animation-bezier-x2-changed(id, val); }
-                                    bezier-y2-changed(id, val) => { root.animation-bezier-y2-changed(id, val); }
-                                }
+                                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
                             }
                         }
 
-                        // Window Animations group (IDs 2-6)
+                        // Window Animations group
                         VerticalLayout {
                             spacing: Theme.spacing-sm;
 
@@ -385,27 +447,27 @@ export component AnimationsPage inherits Rectangle {
                                 font-weight: 600;
                             }
 
-                            for anim in root.animations-model: Rectangle {
-                                visible: anim.id >= 2 && anim.id <= 6;
-                                height: self.visible ? config-row2.preferred-height : 0;
+                            for anim[idx] in root.window-animations: AnimationRow {
+                                setting: anim;
+                                spring-params: idx == 0 ? root.spring-params-2 :
+                                              idx == 1 ? root.spring-params-3 :
+                                              idx == 2 ? root.spring-params-4 :
+                                              idx == 3 ? root.spring-params-5 :
+                                              root.spring-params-6;
+                                easing-params: idx == 0 ? root.easing-params-2 :
+                                              idx == 1 ? root.easing-params-3 :
+                                              idx == 2 ? root.easing-params-4 :
+                                              idx == 3 ? root.easing-params-5 :
+                                              root.easing-params-6;
 
-                                config-row2 := AnimationConfigRow {
-                                    config: anim;
-                                    type-changed(id, val) => { root.animation-type-changed(id, val); }
-                                    damping-changed(id, val) => { root.animation-damping-changed(id, val); }
-                                    stiffness-changed(id, val) => { root.animation-stiffness-changed(id, val); }
-                                    epsilon-changed(id, val) => { root.animation-epsilon-changed(id, val); }
-                                    duration-changed(id, val) => { root.animation-duration-changed(id, val); }
-                                    curve-changed(id, val) => { root.animation-curve-changed(id, val); }
-                                    bezier-x1-changed(id, val) => { root.animation-bezier-x1-changed(id, val); }
-                                    bezier-y1-changed(id, val) => { root.animation-bezier-y1-changed(id, val); }
-                                    bezier-x2-changed(id, val) => { root.animation-bezier-x2-changed(id, val); }
-                                    bezier-y2-changed(id, val) => { root.animation-bezier-y2-changed(id, val); }
-                                }
+                                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
                             }
                         }
 
-                        // UI Animations group (IDs 7-10)
+                        // UI Animations group
                         VerticalLayout {
                             spacing: Theme.spacing-sm;
 
@@ -416,23 +478,21 @@ export component AnimationsPage inherits Rectangle {
                                 font-weight: 600;
                             }
 
-                            for anim in root.animations-model: Rectangle {
-                                visible: anim.id >= 7;
-                                height: self.visible ? config-row3.preferred-height : 0;
+                            for anim[idx] in root.ui-animations: AnimationRow {
+                                setting: anim;
+                                spring-params: idx == 0 ? root.spring-params-7 :
+                                              idx == 1 ? root.spring-params-8 :
+                                              idx == 2 ? root.spring-params-9 :
+                                              root.spring-params-10;
+                                easing-params: idx == 0 ? root.easing-params-7 :
+                                              idx == 1 ? root.easing-params-8 :
+                                              idx == 2 ? root.easing-params-9 :
+                                              root.easing-params-10;
 
-                                config-row3 := AnimationConfigRow {
-                                    config: anim;
-                                    type-changed(id, val) => { root.animation-type-changed(id, val); }
-                                    damping-changed(id, val) => { root.animation-damping-changed(id, val); }
-                                    stiffness-changed(id, val) => { root.animation-stiffness-changed(id, val); }
-                                    epsilon-changed(id, val) => { root.animation-epsilon-changed(id, val); }
-                                    duration-changed(id, val) => { root.animation-duration-changed(id, val); }
-                                    curve-changed(id, val) => { root.animation-curve-changed(id, val); }
-                                    bezier-x1-changed(id, val) => { root.animation-bezier-x1-changed(id, val); }
-                                    bezier-y1-changed(id, val) => { root.animation-bezier-y1-changed(id, val); }
-                                    bezier-x2-changed(id, val) => { root.animation-bezier-x2-changed(id, val); }
-                                    bezier-y2-changed(id, val) => { root.animation-bezier-y2-changed(id, val); }
-                                }
+                                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
                             }
                         }
                     }
@@ -440,9 +500,7 @@ export component AnimationsPage inherits Rectangle {
             }
 
             // Spacer at bottom
-            Rectangle {
-                height: Theme.spacing-lg;
-            }
+            Rectangle { height: Theme.spacing-lg; }
         }
     }
 }

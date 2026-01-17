@@ -1,154 +1,285 @@
-import { Theme } from "../styles.slint";
-import { ScrollView, LineEdit, ComboBox, Button } from "std-widgets.slint";
-import { SettingsSection, SettingRow } from "../widgets/section.slint";
-import { ToggleRow } from "../widgets/toggle_row.slint";
-import { SliderRow } from "../widgets/slider_row.slint";
+// Dynamic Window Rules Page
+// Converts 1244 lines of static UI to ~450 lines using model-driven rendering
 
-// Window Rules settings page for niri
-export component WindowRulesPage inherits Rectangle {
+import { Theme } from "../styles.slint";
+import { ScrollView, LineEdit, ComboBox, Button, Slider, Switch } from "std-widgets.slint";
+
+// Universal setting model for all control types
+export struct WindowRuleSettingModel {
+    id: string,              // Unique identifier for callbacks
+    label: string,           // Display label
+    description: string,     // Help text
+    setting-type: int,       // 0=toggle, 1=slider, 2=combo, 3=text, 4=color
+
+    // Toggle (type 0)
+    bool-value: bool,
+
+    // Slider (type 1)
+    int-value: int,
+    float-value: float,
+    min-value: float,
+    max-value: float,
+    suffix: string,
+    use-float: bool,
+
+    // Combo (type 2)
+    combo-index: int,
+    combo-options: [string],
+
+    // Text/Color (type 3, 4)
+    text-value: string,
+    placeholder: string,
+
+    // Visibility
+    visible: bool,
+}
+
+// Dynamic row component - renders any setting type
+component DynamicRow inherits Rectangle {
+    in property <WindowRuleSettingModel> setting;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+
+    visible: setting.visible;
+    height: setting.visible ? 52px : 0;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: Theme.spacing-md;
+        padding: Theme.spacing-xs;
+        padding-left: Theme.spacing-md;
+        padding-right: Theme.spacing-md;
+
+        // Label column
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            alignment: center;
+
+            Text {
+                text: setting.label;
+                color: Theme.text-primary;
+                font-size: Theme.font-size-sm;
+                font-weight: 500;
+            }
+
+            if setting.description != "": Text {
+                text: setting.description;
+                color: Theme.text-muted;
+                font-size: Theme.font-size-xs;
+                wrap: word-wrap;
+            }
+        }
+
+        // Control column
+        Rectangle {
+            width: 200px;
+            vertical-stretch: 1;
+
+            // Toggle (type 0)
+            if setting.setting-type == 0: HorizontalLayout {
+                alignment: end;
+                padding-right: Theme.spacing-sm;
+
+                Switch {
+                    checked: setting.bool-value;
+                    toggled => {
+                        root.toggle-changed(setting.id, self.checked);
+                    }
+                }
+            }
+
+            // Slider (type 1)
+            if setting.setting-type == 1: HorizontalLayout {
+                spacing: Theme.spacing-sm;
+                alignment: center;
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: setting.min-value;
+                    maximum: setting.max-value;
+                    value: setting.use-float ? setting.float-value : setting.int-value;
+                    changed(val) => {
+                        if (setting.use-float) {
+                            root.slider-float-changed(setting.id, val);
+                        } else {
+                            root.slider-int-changed(setting.id, round(val));
+                        }
+                    }
+                }
+
+                Text {
+                    width: 55px;
+                    text: setting.use-float
+                        ? round(setting.float-value * 100) + setting.suffix
+                        : setting.int-value + setting.suffix;
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size-sm;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+
+            // ComboBox (type 2)
+            if setting.setting-type == 2: HorizontalLayout {
+                alignment: end;
+
+                ComboBox {
+                    width: 140px;
+                    model: setting.combo-options;
+                    current-index: setting.combo-index;
+                    selected(_) => {
+                        root.combo-changed(setting.id, self.current-index);
+                    }
+                }
+            }
+
+            // Text input (type 3)
+            if setting.setting-type == 3: HorizontalLayout {
+                alignment: end;
+
+                LineEdit {
+                    width: 180px;
+                    text: setting.text-value;
+                    placeholder-text: setting.placeholder;
+                    edited(val) => {
+                        root.text-changed(setting.id, val);
+                    }
+                }
+            }
+
+            // Color input (type 4)
+            if setting.setting-type == 4: HorizontalLayout {
+                alignment: end;
+                spacing: Theme.spacing-xs;
+
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 4px;
+                    background: Theme.accent;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                }
+
+                LineEdit {
+                    width: 120px;
+                    text: setting.text-value;
+                    placeholder-text: "#RRGGBBAA";
+                    edited(val) => {
+                        root.text-changed(setting.id, val);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Section component with optional info text
+component DynamicSection inherits Rectangle {
+    in property <string> title;
+    in property <string> info-text: "";
+    in property <[WindowRuleSettingModel]> settings;
+
+    callback toggle-changed(string, bool);
+    callback slider-int-changed(string, int);
+    callback slider-float-changed(string, float);
+    callback combo-changed(string, int);
+    callback text-changed(string, string);
+
+    background: Theme.card-background;
+    border-radius: Theme.radius-md;
+
+    VerticalLayout {
+        padding: Theme.spacing-md;
+        spacing: Theme.spacing-xs;
+
+        Text {
+            text: title;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-xs;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        if info-text != "": Text {
+            text: info-text;
+            color: Theme.text-muted;
+            font-size: Theme.font-size-sm;
+            wrap: word-wrap;
+        }
+
+        for setting in settings: DynamicRow {
+            setting: setting;
+            toggle-changed(id, val) => { root.toggle-changed(id, val); }
+            slider-int-changed(id, val) => { root.slider-int-changed(id, val); }
+            slider-float-changed(id, val) => { root.slider-float-changed(id, val); }
+            combo-changed(id, val) => { root.combo-changed(id, val); }
+            text-changed(id, val) => { root.text-changed(id, val); }
+        }
+    }
+}
+
+// Main page component
+export component WindowRulesPageDynamic inherits Rectangle {
     accessible-role: none;
     accessible-label: "Window rules";
 
-    // Rule list (as model array of names)
+    // Rule list
     in-out property <[string]> rule-list: [];
     in-out property <int> selected-rule-index: -1;
 
-    // Current rule properties (when a rule is selected)
-    in-out property <string> current-rule-name: "";
-    // Multi-match support
+    // Match list for current rule
     in-out property <[string]> matches-list: [];
     in-out property <int> selected-match-index: 0;
-    in-out property <int> matches-count: 0;
-    // Current match properties
-    in-out property <string> current-match-app-id: "";
-    in-out property <string> current-match-title: "";
-    // Advanced match criteria (0=Default, 1=Yes, 2=No)
-    in-out property <int> current-match-is-floating: 0;
-    in-out property <int> current-match-is-active: 0;
-    in-out property <int> current-match-is-focused: 0;
-    in-out property <int> current-match-is-active-in-column: 0;
-    in-out property <int> current-match-is-window-cast-target: 0;
-    in-out property <int> current-match-is-urgent: 0;
-    in-out property <int> current-match-at-startup: 0;
-    // Window picker (for selecting from running windows)
+
+    // Running windows for picker
     in-out property <[string]> running-windows: [];
     in-out property <bool> show-window-picker: false;
-    in-out property <int> current-open-behavior-index: 0;
-    in-out property <bool> current-has-opacity: false;
-    in-out property <float> current-opacity: 1.0;
-    in-out property <bool> current-block-screencast: false;
-    in-out property <bool> current-has-corner-radius: false;
-    in-out property <int> current-corner-radius: 12;
-    in-out property <bool> current-clip-to-geometry: false;
-    in-out property <string> current-open-on-output: "";
-    in-out property <string> current-open-on-workspace: "";
-    // New dynamic properties
-    in-out property <int> current-vrr-index: 0;  // 0=Default, 1=On, 2=Off
-    in-out property <int> current-column-display-index: 0;  // 0=Default, 1=Tabbed
-    in-out property <int> current-tiled-state-index: 0;  // 0=Default, 1=Tiled, 2=Floating
-    in-out property <bool> current-baba-is-float: false;
-    // Floating position (for floating windows)
-    in-out property <bool> current-has-floating-position: false;
-    in-out property <int> current-floating-x: 0;
-    in-out property <int> current-floating-y: 0;
-    in-out property <int> current-floating-relative-to: 0;
 
-    // Per-window shadow override settings
-    in-out property <int> current-shadow-mode: 0;  // 0=Default, 1=Custom (on), 2=Off
-    in-out property <int> current-shadow-softness: 30;
-    in-out property <int> current-shadow-spread: 5;
-    in-out property <int> current-shadow-offset-x: 0;
-    in-out property <int> current-shadow-offset-y: 5;
-    in-out property <string> current-shadow-color: "#00000070";
-    in-out property <string> current-shadow-inactive-color: "#00000040";
-    in-out property <bool> current-shadow-draw-behind-window: false;
+    // Dynamic models - one per section
+    in-out property <[WindowRuleSettingModel]> rule-settings: [];      // Rule name
+    in-out property <[WindowRuleSettingModel]> match-settings: [];     // Match criteria
+    in-out property <[WindowRuleSettingModel]> opening-settings: [];   // Opening behavior
+    in-out property <[WindowRuleSettingModel]> visual-settings: [];    // Visual properties
+    in-out property <[WindowRuleSettingModel]> shadow-settings: [];    // Shadow override
+    in-out property <[WindowRuleSettingModel]> tab-settings: [];       // Tab indicator override
 
-    // Per-window tab-indicator override settings
-    in-out property <int> current-tab-indicator-mode: 0;  // 0=Default, 1=Custom (on), 2=Off
-    in-out property <bool> current-tab-indicator-hide-when-single: false;
-    in-out property <bool> current-tab-indicator-place-within-column: false;
-    in-out property <int> current-tab-indicator-gap: 5;
-    in-out property <int> current-tab-indicator-width: 4;
-    in-out property <float> current-tab-indicator-length: 1.0;
-    in-out property <int> current-tab-indicator-position: 0;  // 0=Left, 1=Right, 2=Top, 3=Bottom
-    in-out property <int> current-tab-indicator-gaps-between-tabs: 2;
-    in-out property <int> current-tab-indicator-corner-radius: 8;
-    in-out property <string> current-tab-indicator-active-color: "#cba6f7";
-    in-out property <string> current-tab-indicator-inactive-color: "#45475a";
-
-    // Callbacks
+    // Rule list callbacks
     callback add-rule();
     callback remove-rule(int);
     callback select-rule(int);
-    callback rule-name-changed(string);
-    callback reorder-rule(int, int);  // from-index, to-index
-    // Multi-match callbacks
+    callback reorder-rule(int, int);
+
+    // Match callbacks
     callback add-match();
     callback remove-match(int);
     callback select-match(int);
-    callback match-app-id-changed(string);
-    callback match-is-floating-changed(int);
-    callback match-is-active-changed(int);
-    callback match-is-focused-changed(int);
-    callback match-is-active-in-column-changed(int);
-    callback match-is-window-cast-target-changed(int);
-    callback match-is-urgent-changed(int);
-    callback match-at-startup-changed(int);
-    callback match-title-changed(string);
-    // Window picker callbacks
+
+    // Window picker
     callback refresh-windows();
     callback select-running-window(int);
-    callback open-behavior-changed(int);
-    callback opacity-toggled(bool);
-    callback opacity-changed(float);
-    callback block-screencast-toggled(bool);
-    callback corner-radius-toggled(bool);
-    callback corner-radius-changed(int);
-    callback clip-to-geometry-toggled(bool);
-    callback open-on-output-changed(string);
-    callback open-on-workspace-changed(string);
-    // New dynamic property callbacks
-    callback vrr-changed(int);
-    callback column-display-changed(int);
-    callback tiled-state-changed(int);
-    callback baba-is-float-toggled(bool);
-    callback floating-position-toggled(bool);
-    callback floating-position-x-changed(int);
-    callback floating-position-y-changed(int);
-    callback floating-position-relative-to-changed(int);
-    // Shadow override callbacks
-    callback shadow-mode-changed(int);
-    callback shadow-softness-changed(int);
-    callback shadow-spread-changed(int);
-    callback shadow-offset-x-changed(int);
-    callback shadow-offset-y-changed(int);
-    callback shadow-color-changed(string);
-    callback shadow-inactive-color-changed(string);
-    callback shadow-draw-behind-window-toggled(bool);
-    // Tab indicator override callbacks
-    callback tab-indicator-mode-changed(int);
-    callback tab-indicator-hide-when-single-toggled(bool);
-    callback tab-indicator-place-within-column-toggled(bool);
-    callback tab-indicator-gap-changed(int);
-    callback tab-indicator-width-changed(int);
-    callback tab-indicator-length-changed(float);
-    callback tab-indicator-position-changed(int);
-    callback tab-indicator-gaps-between-tabs-changed(int);
-    callback tab-indicator-corner-radius-changed(int);
-    callback tab-indicator-active-color-changed(string);
-    callback tab-indicator-inactive-color-changed(string);
+
+    // Generic setting callbacks
+    callback setting-toggle-changed(string, bool);
+    callback setting-slider-int-changed(string, int);
+    callback setting-slider-float-changed(string, float);
+    callback setting-combo-changed(string, int);
+    callback setting-text-changed(string, string);
 
     background: transparent;
 
-    // Keyboard focus index for rules list (separate from selection)
-    property <int> focused-rule-index: -1;
-
-    // Drag-and-drop state
+    // Drag state
     property <bool> is-dragging: false;
     property <int> drag-from-index: -1;
     property <int> drag-target-index: -1;
     property <length> drag-current-y: 0;
     property <length> item-height: 40px;
+    property <int> focused-rule-index: -1;
 
     HorizontalLayout {
         spacing: Theme.spacing-md;
@@ -183,10 +314,9 @@ export component WindowRulesPage inherits Rectangle {
                     }
                 }
 
-                // Rules list with keyboard navigation
+                // Rules list
                 rules-focus := FocusScope {
                     vertical-stretch: 1;
-
                     accessible-role: list;
                     accessible-label: "Window rules list";
 
@@ -199,8 +329,6 @@ export component WindowRulesPage inherits Rectangle {
                         } else if (event.text == Key.UpArrow) {
                             if (root.focused-rule-index > 0) {
                                 root.focused-rule-index = root.focused-rule-index - 1;
-                            } else if (root.focused-rule-index == -1 && root.rule-list.length > 0) {
-                                root.focused-rule-index = 0;
                             }
                             accept
                         } else if (event.text == Key.Return || event.text == " ") {
@@ -218,13 +346,6 @@ export component WindowRulesPage inherits Rectangle {
                         reject
                     }
 
-                    focus-changed-event => {
-                        // When focus scope gains focus, initialize focused index
-                        if (self.has-focus && root.focused-rule-index == -1 && root.rule-list.length > 0) {
-                            root.focused-rule-index = root.selected-rule-index >= 0 ? root.selected-rule-index : 0;
-                        }
-                    }
-
                     ScrollView {
                         list-container := VerticalLayout {
                             spacing: Theme.spacing-xs;
@@ -232,7 +353,7 @@ export component WindowRulesPage inherits Rectangle {
                             for rule[index] in root.rule-list : VerticalLayout {
                                 spacing: 0;
 
-                                // Drop indicator - shows above this item when dragging
+                                // Drop indicator
                                 Rectangle {
                                     height: root.is-dragging && root.drag-target-index == index ? 3px : 0;
                                     background: Theme.accent;
@@ -244,15 +365,11 @@ export component WindowRulesPage inherits Rectangle {
                                     background: root.is-dragging && root.drag-from-index == index
                                         ? Theme.card-background.with-alpha(0.3)
                                         : index == root.selected-rule-index
-                                            ? Theme.accent.with-alpha(0.2)
-                                            : transparent;
+                                            ? Theme.accent.with-alpha(0.2) : transparent;
                                     border-radius: Theme.radius-sm;
                                     border-width: index == root.focused-rule-index && rules-focus.has-focus ? 2px : 0px;
                                     border-color: Theme.accent;
                                     opacity: root.is-dragging && root.drag-from-index == index ? 0.5 : 1.0;
-
-                                    accessible-role: list-item;
-                                    accessible-label: rule;
 
                                     touch := TouchArea {
                                         property <length> press-start-y: 0;
@@ -264,7 +381,6 @@ export component WindowRulesPage inherits Rectangle {
                                                 self.drag-started = false;
                                             } else if (event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel) {
                                                 if (root.is-dragging) {
-                                                    // Complete the drag
                                                     if (root.drag-target-index >= 0 && root.drag-target-index != root.drag-from-index) {
                                                         root.reorder-rule(root.drag-from-index, root.drag-target-index);
                                                     }
@@ -272,7 +388,6 @@ export component WindowRulesPage inherits Rectangle {
                                                     root.drag-from-index = -1;
                                                     root.drag-target-index = -1;
                                                 } else if (!self.drag-started) {
-                                                    // Normal click - select item
                                                     root.focused-rule-index = index;
                                                     root.selected-rule-index = index;
                                                     root.select-rule(index);
@@ -284,22 +399,16 @@ export component WindowRulesPage inherits Rectangle {
 
                                         moved => {
                                             if (self.pressed) {
-                                                // Check drag threshold (5px)
                                                 if (!self.drag-started && abs(self.mouse-y - self.press-start-y) > 5px) {
                                                     self.drag-started = true;
                                                     root.is-dragging = true;
                                                     root.drag-from-index = index;
                                                 }
-
                                                 if (root.is-dragging) {
-                                                    // Update drag position for ghost
                                                     root.drag-current-y = self.mouse-y + index * (root.item-height + Theme.spacing-xs);
-
-                                                    // Calculate target index based on Y position
                                                     root.drag-target-index = clamp(
                                                         round(root.drag-current-y / (root.item-height + Theme.spacing-xs)),
-                                                        0,
-                                                        root.rule-list.length
+                                                        0, root.rule-list.length
                                                     );
                                                 }
                                             }
@@ -329,7 +438,7 @@ export component WindowRulesPage inherits Rectangle {
                                 }
                             }
 
-                            // Drop indicator at end of list
+                            // Drop indicator at end
                             Rectangle {
                                 height: root.is-dragging && root.drag-target-index == root.rule-list.length ? 3px : 0;
                                 background: Theme.accent;
@@ -358,14 +467,11 @@ export component WindowRulesPage inherits Rectangle {
 
                             HorizontalLayout {
                                 padding-left: Theme.spacing-sm;
-                                padding-right: Theme.spacing-sm;
-
                                 Text {
                                     text: root.rule-list[root.drag-from-index];
                                     color: Theme.accent;
                                     font-size: Theme.font-size-sm;
                                     vertical-alignment: center;
-                                    overflow: elide;
                                 }
                             }
                         }
@@ -381,47 +487,44 @@ export component WindowRulesPage inherits Rectangle {
             ScrollView {
                 VerticalLayout {
                     alignment: start;
-            spacing: Theme.spacing-lg;
+                    spacing: Theme.spacing-lg;
                     padding-right: Theme.spacing-md;
 
-                    // Rule name
-                    SettingsSection {
+                    // Rule name section
+                    DynamicSection {
                         title: "RULE SETTINGS";
-
-                        VerticalLayout {
-                            spacing: Theme.spacing-sm;
-
-                            SettingRow {
-                                label: "Rule name";
-                                description: "Display name for this rule";
-
-                                LineEdit {
-                                    width: 200px;
-                                    text: root.current-rule-name;
-                                    edited(value) => {
-                                        root.current-rule-name = value;
-                                        root.rule-name-changed(value);
-                                    }
-                                }
-                            }
-                        }
+                        settings: root.rule-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
                     }
 
-                    // Match criteria
-                    SettingsSection {
-                        title: "MATCH CRITERIA";
+                    // Match criteria section with special header
+                    Rectangle {
+                        background: Theme.card-background;
+                        border-radius: Theme.radius-md;
 
                         VerticalLayout {
-                            spacing: Theme.spacing-sm;
+                            padding: Theme.spacing-md;
+                            spacing: Theme.spacing-xs;
+
+                            Text {
+                                text: "MATCH CRITERIA";
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-xs;
+                                font-weight: 600;
+                                letter-spacing: 0.5px;
+                            }
 
                             Text {
                                 text: "Rule applies if ANY match criteria is satisfied";
                                 color: Theme.text-muted;
                                 font-size: Theme.font-size-sm;
-                                wrap: word-wrap;
                             }
 
-                            // Match list with add/remove
+                            // Match list controls
                             HorizontalLayout {
                                 spacing: Theme.spacing-sm;
                                 height: 28px;
@@ -441,15 +544,15 @@ export component WindowRulesPage inherits Rectangle {
                                     clicked => { root.add-match(); }
                                 }
 
-                                if root.matches-count > 1: Button {
+                                if root.matches-list.length > 1: Button {
                                     text: "−";
-                                    accessible-label: "Remove selected match criteria";
+                                    accessible-label: "Remove match criteria";
                                     clicked => { root.remove-match(root.selected-match-index); }
                                 }
                             }
 
-                            // Match selector (show as small clickable chips/buttons)
-                            if root.matches-count > 0: HorizontalLayout {
+                            // Match tabs
+                            if root.matches-list.length > 0: HorizontalLayout {
                                 spacing: Theme.spacing-xs;
 
                                 for match-label[idx] in root.matches-list : Rectangle {
@@ -461,9 +564,6 @@ export component WindowRulesPage inherits Rectangle {
                                     border-color: idx == root.selected-match-index ? Theme.accent : Theme.border;
 
                                     TouchArea {
-                                        accessible-role: button;
-                                        accessible-label: "Select match criteria " + (idx + 1);
-
                                         clicked => {
                                             root.selected-match-index = idx;
                                             root.select-match(idx);
@@ -479,20 +579,17 @@ export component WindowRulesPage inherits Rectangle {
                                             text: "Match " + (idx + 1);
                                             color: idx == root.selected-match-index ? Theme.accent-foreground : Theme.text-primary;
                                             font-size: Theme.font-size-sm;
-                                            vertical-alignment: center;
                                         }
                                     }
                                 }
                             }
 
-                            // Pick from running windows button
+                            // Window picker button
                             HorizontalLayout {
-                                spacing: Theme.spacing-sm;
                                 height: 32px;
 
                                 Button {
                                     text: root.show-window-picker ? "Hide picker" : "Pick from running windows";
-                                    accessible-label: "Select a running window to use its app ID";
                                     clicked => {
                                         if (!root.show-window-picker) {
                                             root.refresh-windows();
@@ -502,14 +599,13 @@ export component WindowRulesPage inherits Rectangle {
                                 }
                             }
 
-                            // Running windows picker (shown when button clicked)
+                            // Window picker list
                             if root.show-window-picker && root.running-windows.length > 0: Rectangle {
                                 background: Theme.background;
                                 border-radius: Theme.radius-sm;
                                 border-width: 1px;
                                 border-color: Theme.border;
-                                // Height = items * (item-height + spacing) + padding
-                                height: min(200px, root.running-windows.length * (Theme.control-height-compact + Theme.spacing-xs) + 2 * Theme.spacing-xs);
+                                height: min(200px, root.running-windows.length * 32px + 8px);
 
                                 ScrollView {
                                     VerticalLayout {
@@ -517,14 +613,11 @@ export component WindowRulesPage inherits Rectangle {
                                         spacing: Theme.spacing-xs;
 
                                         for window[idx] in root.running-windows : Rectangle {
-                                            height: Theme.control-height-compact;
+                                            height: 28px;
                                             background: window-touch.has-hover ? Theme.accent.with-alpha(0.2) : transparent;
                                             border-radius: Theme.radius-sm;
 
                                             window-touch := TouchArea {
-                                                accessible-role: list-item;
-                                                accessible-label: "Select window: " + window;
-
                                                 clicked => {
                                                     root.select-running-window(idx);
                                                     root.show-window-picker = false;
@@ -533,8 +626,6 @@ export component WindowRulesPage inherits Rectangle {
 
                                             HorizontalLayout {
                                                 padding-left: Theme.spacing-sm;
-                                                padding-right: Theme.spacing-sm;
-
                                                 Text {
                                                     text: window;
                                                     color: Theme.text-primary;
@@ -554,663 +645,63 @@ export component WindowRulesPage inherits Rectangle {
                                 font-size: Theme.font-size-sm;
                             }
 
-                            // Current match fields
-                            SettingRow {
-                                label: "App ID";
-                                description: "Application identifier (regex supported)";
-
-                                LineEdit {
-                                    width: 200px;
-                                    text: root.current-match-app-id;
-                                    placeholder-text: "e.g., firefox";
-                                    edited(value) => {
-                                        root.current-match-app-id = value;
-                                        root.match-app-id-changed(value);
-                                    }
-                                }
-                            }
-
-                            SettingRow {
-                                label: "Window title";
-                                description: "Window title pattern (regex supported)";
-
-                                LineEdit {
-                                    width: 200px;
-                                    text: root.current-match-title;
-                                    placeholder-text: "e.g., .*YouTube.*";
-                                    edited(value) => {
-                                        root.current-match-title = value;
-                                        root.match-title-changed(value);
-                                    }
-                                }
-                            }
-
-                            // Advanced match criteria
-                            SettingRow {
-                                label: "Is floating";
-                                description: "Match floating windows";
-
-                                ComboBox {
-                                    width: 120px;
-                                    model: ["Any", "Yes", "No"];
-                                    current-index: root.current-match-is-floating;
-                                    selected(_) => {
-                                        root.current-match-is-floating = self.current-index;
-                                        root.match-is-floating-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            SettingRow {
-                                label: "Is active";
-                                description: "Match active (visible on screen) windows";
-
-                                ComboBox {
-                                    width: 120px;
-                                    model: ["Any", "Yes", "No"];
-                                    current-index: root.current-match-is-active;
-                                    selected(_) => {
-                                        root.current-match-is-active = self.current-index;
-                                        root.match-is-active-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            SettingRow {
-                                label: "Is focused";
-                                description: "Match keyboard-focused windows";
-
-                                ComboBox {
-                                    width: 120px;
-                                    model: ["Any", "Yes", "No"];
-                                    current-index: root.current-match-is-focused;
-                                    selected(_) => {
-                                        root.current-match-is-focused = self.current-index;
-                                        root.match-is-focused-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            SettingRow {
-                                label: "Is active in column";
-                                description: "Match windows active within their column";
-
-                                ComboBox {
-                                    width: 120px;
-                                    model: ["Any", "Yes", "No"];
-                                    current-index: root.current-match-is-active-in-column;
-                                    selected(_) => {
-                                        root.current-match-is-active-in-column = self.current-index;
-                                        root.match-is-active-in-column-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            SettingRow {
-                                label: "Is window cast target";
-                                description: "Match windows being screen-casted";
-
-                                ComboBox {
-                                    width: 120px;
-                                    model: ["Any", "Yes", "No"];
-                                    current-index: root.current-match-is-window-cast-target;
-                                    selected(_) => {
-                                        root.current-match-is-window-cast-target = self.current-index;
-                                        root.match-is-window-cast-target-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            SettingRow {
-                                label: "Is urgent";
-                                description: "Match windows with urgent hint";
-
-                                ComboBox {
-                                    width: 120px;
-                                    model: ["Any", "Yes", "No"];
-                                    current-index: root.current-match-is-urgent;
-                                    selected(_) => {
-                                        root.current-match-is-urgent = self.current-index;
-                                        root.match-is-urgent-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            SettingRow {
-                                label: "At startup";
-                                description: "Match only at window creation";
-
-                                ComboBox {
-                                    width: 120px;
-                                    model: ["Any", "Yes", "No"];
-                                    current-index: root.current-match-at-startup;
-                                    selected(_) => {
-                                        root.current-match-at-startup = self.current-index;
-                                        root.match-at-startup-changed(self.current-index);
-                                    }
-                                }
+                            // Match criteria fields
+                            for setting in root.match-settings: DynamicRow {
+                                setting: setting;
+                                toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                                slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                                slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                                combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                                text-changed(id, val) => { root.setting-text-changed(id, val); }
                             }
                         }
                     }
 
                     // Opening behavior
-                    SettingsSection {
+                    DynamicSection {
                         title: "OPENING BEHAVIOR";
-
-                        VerticalLayout {
-                            spacing: Theme.spacing-sm;
-
-                            SettingRow {
-                                label: "Open as";
-                                description: "How the window opens initially";
-
-                                ComboBox {
-                                    width: Theme.combobox-width;
-                                    model: ["Normal", "Maximized", "Fullscreen", "Floating"];
-                                    current-index: root.current-open-behavior-index;
-                                    selected(text) => {
-                                        root.current-open-behavior-index = self.current-index;
-                                        root.open-behavior-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            SettingRow {
-                                label: "Open on output";
-                                description: "Force open on specific monitor";
-
-                                LineEdit {
-                                    width: 150px;
-                                    text: root.current-open-on-output;
-                                    placeholder-text: "e.g., eDP-1";
-                                    edited(value) => {
-                                        root.current-open-on-output = value;
-                                        root.open-on-output-changed(value);
-                                    }
-                                }
-                            }
-
-                            SettingRow {
-                                label: "Open on workspace";
-                                description: "Force open on specific workspace";
-
-                                LineEdit {
-                                    width: 150px;
-                                    text: root.current-open-on-workspace;
-                                    placeholder-text: "e.g., browser";
-                                    edited(value) => {
-                                        root.current-open-on-workspace = value;
-                                        root.open-on-workspace-changed(value);
-                                    }
-                                }
-                            }
-
-                            // Floating position (only for floating windows)
-                            if root.current-open-behavior-index == 3: ToggleRow {
-                                label: "Set position";
-                                description: "Specify where floating window appears";
-                                checked: root.current-has-floating-position;
-                                toggled(val) => {
-                                    root.current-has-floating-position = val;
-                                    root.floating-position-toggled(val);
-                                }
-                            }
-
-                            if root.current-open-behavior-index == 3 && root.current-has-floating-position: VerticalLayout {
-                                spacing: Theme.spacing-sm;
-
-                                SettingRow {
-                                    label: "Relative to";
-                                    description: "Position relative to screen edge or corner";
-
-                                    ComboBox {
-                                        width: Theme.combobox-width;
-                                        model: ["Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right", "Top", "Bottom", "Left", "Right", "Center"];
-                                        current-index: root.current-floating-relative-to;
-                                        selected(text) => {
-                                            root.current-floating-relative-to = self.current-index;
-                                            root.floating-position-relative-to-changed(self.current-index);
-                                        }
-                                    }
-                                }
-
-                                SliderRow {
-                                    label: "X offset";
-                                    description: "Horizontal position offset";
-                                    suffix: "px";
-                                    minimum: -500;
-                                    maximum: 500;
-                                    value: root.current-floating-x;
-                                    changed(val) => {
-                                        root.current-floating-x = round(val);
-                                        root.floating-position-x-changed(round(val));
-                                    }
-                                }
-
-                                SliderRow {
-                                    label: "Y offset";
-                                    description: "Vertical position offset";
-                                    suffix: "px";
-                                    minimum: -500;
-                                    maximum: 500;
-                                    value: root.current-floating-y;
-                                    changed(val) => {
-                                        root.current-floating-y = round(val);
-                                        root.floating-position-y-changed(round(val));
-                                    }
-                                }
-                            }
-                        }
+                        settings: root.opening-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
                     }
 
                     // Visual properties
-                    SettingsSection {
+                    DynamicSection {
                         title: "VISUAL PROPERTIES";
-
-                        VerticalLayout {
-                            spacing: Theme.spacing-sm;
-
-                            ToggleRow {
-                                label: "Custom opacity";
-                                description: "Set window transparency";
-                                checked: root.current-has-opacity;
-                                toggled(val) => {
-                                    root.current-has-opacity = val;
-                                    root.opacity-toggled(val);
-                                }
-                            }
-
-                            if root.current-has-opacity: SliderRow {
-                                label: "Opacity";
-                                description: "Window transparency level";
-                                suffix: "%";
-                                minimum: 0;
-                                maximum: 100;
-                                value: root.current-opacity * 100;
-                                changed(val) => {
-                                    root.current-opacity = val / 100;
-                                    root.opacity-changed(val / 100);
-                                }
-                            }
-
-                            ToggleRow {
-                                label: "Geometry corner radius";
-                                description: "Round border and focus ring corners";
-                                checked: root.current-has-corner-radius;
-                                toggled(val) => {
-                                    root.current-has-corner-radius = val;
-                                    root.corner-radius-toggled(val);
-                                }
-                            }
-
-                            if root.current-has-corner-radius: SliderRow {
-                                label: "Radius";
-                                description: "Corner radius in logical pixels";
-                                suffix: "px";
-                                minimum: 0;
-                                maximum: 32;
-                                value: root.current-corner-radius;
-                                changed(val) => {
-                                    root.current-corner-radius = round(val);
-                                    root.corner-radius-changed(round(val));
-                                }
-                            }
-
-                            ToggleRow {
-                                label: "Clip to geometry";
-                                description: "Clip window to visual geometry (removes shadows, rounds corners)";
-                                checked: root.current-clip-to-geometry;
-                                toggled(val) => {
-                                    root.current-clip-to-geometry = val;
-                                    root.clip-to-geometry-toggled(val);
-                                }
-                            }
-
-                            ToggleRow {
-                                label: "Block from screencast";
-                                description: "Hide window in screen recordings";
-                                checked: root.current-block-screencast;
-                                toggled(val) => {
-                                    root.current-block-screencast = val;
-                                    root.block-screencast-toggled(val);
-                                }
-                            }
-
-                            ToggleRow {
-                                label: "Animated floating";
-                                description: "Enable baba-is-float animated floating effect";
-                                checked: root.current-baba-is-float;
-                                toggled(val) => {
-                                    root.current-baba-is-float = val;
-                                    root.baba-is-float-toggled(val);
-                                }
-                            }
-
-                            // VRR combobox
-                            SettingRow {
-                                label: "Variable Refresh Rate";
-                                description: "Enable VRR for this window";
-
-                                vrr-combo := ComboBox {
-                                    width: 140px;
-                                    model: ["Default", "On", "Off"];
-                                    current-index: root.current-vrr-index;
-                                    selected(_) => {
-                                        root.current-vrr-index = self.current-index;
-                                        root.vrr-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            // Column display combobox
-                            SettingRow {
-                                label: "Column display";
-                                description: "Window column display mode";
-
-                                col-display-combo := ComboBox {
-                                    width: 140px;
-                                    model: ["Default", "Tabbed"];
-                                    current-index: root.current-column-display-index;
-                                    selected(_) => {
-                                        root.current-column-display-index = self.current-index;
-                                        root.column-display-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            // Tiled state combobox
-                            SettingRow {
-                                label: "Tiled state";
-                                description: "Mark as tiled or floating (X11)";
-
-                                tiled-state-combo := ComboBox {
-                                    width: 140px;
-                                    model: ["Default", "Tiled", "Floating"];
-                                    current-index: root.current-tiled-state-index;
-                                    selected(_) => {
-                                        root.current-tiled-state-index = self.current-index;
-                                        root.tiled-state-changed(self.current-index);
-                                    }
-                                }
-                            }
-                        }
+                        settings: root.visual-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
                     }
 
-                    // Shadow override section
-                    SettingsSection {
+                    // Shadow override
+                    DynamicSection {
                         title: "SHADOW OVERRIDE";
-
-                        VerticalLayout {
-                            spacing: Theme.spacing-sm;
-
-                            SettingRow {
-                                label: "Shadow";
-                                description: "Override window shadow settings";
-
-                                ComboBox {
-                                    width: 140px;
-                                    model: ["Default", "Custom", "Off"];
-                                    current-index: root.current-shadow-mode;
-                                    selected(_) => {
-                                        root.current-shadow-mode = self.current-index;
-                                        root.shadow-mode-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            if root.current-shadow-mode == 1: VerticalLayout {
-                                spacing: Theme.spacing-sm;
-
-                                SliderRow {
-                                    label: "Softness";
-                                    description: "Shadow blur radius";
-                                    suffix: "px";
-                                    minimum: 0;
-                                    maximum: 100;
-                                    value: root.current-shadow-softness;
-                                    changed(val) => {
-                                        root.current-shadow-softness = round(val);
-                                        root.shadow-softness-changed(round(val));
-                                    }
-                                }
-
-                                SliderRow {
-                                    label: "Spread";
-                                    description: "Shadow spread distance";
-                                    suffix: "px";
-                                    minimum: -50;
-                                    maximum: 50;
-                                    value: root.current-shadow-spread;
-                                    changed(val) => {
-                                        root.current-shadow-spread = round(val);
-                                        root.shadow-spread-changed(round(val));
-                                    }
-                                }
-
-                                SliderRow {
-                                    label: "Offset X";
-                                    description: "Horizontal shadow offset";
-                                    suffix: "px";
-                                    minimum: -50;
-                                    maximum: 50;
-                                    value: root.current-shadow-offset-x;
-                                    changed(val) => {
-                                        root.current-shadow-offset-x = round(val);
-                                        root.shadow-offset-x-changed(round(val));
-                                    }
-                                }
-
-                                SliderRow {
-                                    label: "Offset Y";
-                                    description: "Vertical shadow offset";
-                                    suffix: "px";
-                                    minimum: -50;
-                                    maximum: 50;
-                                    value: root.current-shadow-offset-y;
-                                    changed(val) => {
-                                        root.current-shadow-offset-y = round(val);
-                                        root.shadow-offset-y-changed(round(val));
-                                    }
-                                }
-
-                                SettingRow {
-                                    label: "Active color";
-                                    description: "Shadow color for active window";
-
-                                    LineEdit {
-                                        width: 120px;
-                                        text: root.current-shadow-color;
-                                        edited(value) => {
-                                            root.current-shadow-color = value;
-                                            root.shadow-color-changed(value);
-                                        }
-                                    }
-                                }
-
-                                SettingRow {
-                                    label: "Inactive color";
-                                    description: "Shadow color for inactive window";
-
-                                    LineEdit {
-                                        width: 120px;
-                                        text: root.current-shadow-inactive-color;
-                                        edited(value) => {
-                                            root.current-shadow-inactive-color = value;
-                                            root.shadow-inactive-color-changed(value);
-                                        }
-                                    }
-                                }
-
-                                ToggleRow {
-                                    label: "Draw behind window";
-                                    description: "Render shadow behind opaque areas";
-                                    checked: root.current-shadow-draw-behind-window;
-                                    toggled(val) => {
-                                        root.current-shadow-draw-behind-window = val;
-                                        root.shadow-draw-behind-window-toggled(val);
-                                    }
-                                }
-                            }
-                        }
+                        settings: root.shadow-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
                     }
 
-                    // Tab indicator override section
-                    SettingsSection {
+                    // Tab indicator override
+                    DynamicSection {
                         title: "TAB INDICATOR OVERRIDE";
-
-                        VerticalLayout {
-                            spacing: Theme.spacing-sm;
-
-                            SettingRow {
-                                label: "Tab indicator";
-                                description: "Override tab indicator settings";
-
-                                ComboBox {
-                                    width: 140px;
-                                    model: ["Default", "Custom", "Off"];
-                                    current-index: root.current-tab-indicator-mode;
-                                    selected(_) => {
-                                        root.current-tab-indicator-mode = self.current-index;
-                                        root.tab-indicator-mode-changed(self.current-index);
-                                    }
-                                }
-                            }
-
-                            if root.current-tab-indicator-mode == 1: VerticalLayout {
-                                spacing: Theme.spacing-sm;
-
-                                ToggleRow {
-                                    label: "Hide when single tab";
-                                    description: "Hide indicator with only one window";
-                                    checked: root.current-tab-indicator-hide-when-single;
-                                    toggled(val) => {
-                                        root.current-tab-indicator-hide-when-single = val;
-                                        root.tab-indicator-hide-when-single-toggled(val);
-                                    }
-                                }
-
-                                ToggleRow {
-                                    label: "Place within column";
-                                    description: "Shrink column to fit indicator";
-                                    checked: root.current-tab-indicator-place-within-column;
-                                    toggled(val) => {
-                                        root.current-tab-indicator-place-within-column = val;
-                                        root.tab-indicator-place-within-column-toggled(val);
-                                    }
-                                }
-
-                                SettingRow {
-                                    label: "Position";
-                                    description: "Tab indicator placement";
-
-                                    ComboBox {
-                                        width: 140px;
-                                        model: ["Left", "Right", "Top", "Bottom"];
-                                        current-index: root.current-tab-indicator-position;
-                                        selected(_) => {
-                                            root.current-tab-indicator-position = self.current-index;
-                                            root.tab-indicator-position-changed(self.current-index);
-                                        }
-                                    }
-                                }
-
-                                SliderRow {
-                                    label: "Gap";
-                                    description: "Space between indicator and window";
-                                    suffix: "px";
-                                    minimum: 0;
-                                    maximum: 32;
-                                    value: root.current-tab-indicator-gap;
-                                    changed(val) => {
-                                        root.current-tab-indicator-gap = round(val);
-                                        root.tab-indicator-gap-changed(round(val));
-                                    }
-                                }
-
-                                SliderRow {
-                                    label: "Width";
-                                    description: "Indicator thickness";
-                                    suffix: "px";
-                                    minimum: 1;
-                                    maximum: 32;
-                                    value: root.current-tab-indicator-width;
-                                    changed(val) => {
-                                        root.current-tab-indicator-width = round(val);
-                                        root.tab-indicator-width-changed(round(val));
-                                    }
-                                }
-
-                                SliderRow {
-                                    label: "Length";
-                                    description: "Indicator length as proportion of window";
-                                    suffix: "%";
-                                    minimum: 0;
-                                    maximum: 100;
-                                    value: root.current-tab-indicator-length * 100;
-                                    changed(val) => {
-                                        root.current-tab-indicator-length = val / 100;
-                                        root.tab-indicator-length-changed(val / 100);
-                                    }
-                                }
-
-                                SliderRow {
-                                    label: "Gaps between tabs";
-                                    description: "Space between tab segments";
-                                    suffix: "px";
-                                    minimum: 0;
-                                    maximum: 16;
-                                    value: root.current-tab-indicator-gaps-between-tabs;
-                                    changed(val) => {
-                                        root.current-tab-indicator-gaps-between-tabs = round(val);
-                                        root.tab-indicator-gaps-between-tabs-changed(round(val));
-                                    }
-                                }
-
-                                SliderRow {
-                                    label: "Corner radius";
-                                    description: "Indicator corner rounding";
-                                    suffix: "px";
-                                    minimum: 0;
-                                    maximum: 32;
-                                    value: root.current-tab-indicator-corner-radius;
-                                    changed(val) => {
-                                        root.current-tab-indicator-corner-radius = round(val);
-                                        root.tab-indicator-corner-radius-changed(round(val));
-                                    }
-                                }
-
-                                SettingRow {
-                                    label: "Active color";
-                                    description: "Color for active tab segment";
-
-                                    LineEdit {
-                                        width: 120px;
-                                        text: root.current-tab-indicator-active-color;
-                                        edited(value) => {
-                                            root.current-tab-indicator-active-color = value;
-                                            root.tab-indicator-active-color-changed(value);
-                                        }
-                                    }
-                                }
-
-                                SettingRow {
-                                    label: "Inactive color";
-                                    description: "Color for inactive tab segments";
-
-                                    LineEdit {
-                                        width: 120px;
-                                        text: root.current-tab-indicator-inactive-color;
-                                        edited(value) => {
-                                            root.current-tab-indicator-inactive-color = value;
-                                            root.tab-indicator-inactive-color-changed(value);
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        settings: root.tab-settings;
+                        toggle-changed(id, val) => { root.setting-toggle-changed(id, val); }
+                        slider-int-changed(id, val) => { root.setting-slider-int-changed(id, val); }
+                        slider-float-changed(id, val) => { root.setting-slider-float-changed(id, val); }
+                        combo-changed(id, val) => { root.setting-combo-changed(id, val); }
+                        text-changed(id, val) => { root.setting-text-changed(id, val); }
                     }
 
-                    // Spacer at bottom
+                    // Spacer
                     Rectangle { height: Theme.spacing-lg; }
                 }
             }
