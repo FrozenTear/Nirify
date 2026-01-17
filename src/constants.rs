@@ -173,6 +173,13 @@ pub const TOAST_DISMISS_MS: u64 = 3000;
 /// Status message auto-hide delay (seconds)
 pub const STATUS_AUTO_HIDE_SECS: u64 = 3;
 
+/// IPC reload throttle period (milliseconds)
+///
+/// Minimum time between niri config reload requests. This prevents
+/// overwhelming niri with reload requests during rapid setting changes.
+/// Set to 1 second to allow immediate feedback while avoiding excessive IPC traffic.
+pub const IPC_RELOAD_THROTTLE_MS: u64 = 1000;
+
 // ============================================================================
 // STRING AND COLLECTION SIZE LIMITS (Task 12.1 & 12.2)
 // ============================================================================

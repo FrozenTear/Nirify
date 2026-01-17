@@ -14,13 +14,15 @@
 //! prevent UI freezes when niri is slow or unresponsive.
 
 use crate::config::{save_dirty, ConfigPaths, DirtyTracker, Settings, SettingsCategory};
-use crate::constants::{SAVE_DEBOUNCE_MS, TOAST_DISMISS_MS};
+use crate::constants::{IPC_RELOAD_THROTTLE_MS, SAVE_DEBOUNCE_MS, TOAST_DISMISS_MS};
 use crate::ipc;
 use crate::MainWindow;
 use log::{debug, info, warn};
 use slint::{Timer, TimerMode, Weak};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 /// Manages debounced saving of settings
 ///
@@ -38,6 +40,8 @@ pub struct SaveManager {
     ui_weak: Weak<MainWindow>,
     toast_timer: Timer,
     dirty_tracker: Arc<DirtyTracker>,
+    /// Tracks when the last IPC reload was sent to throttle requests
+    last_reload_time: Rc<RefCell<Option<Instant>>>,
 }
 
 impl SaveManager {
@@ -57,11 +61,14 @@ impl SaveManager {
     ) -> Rc<Self> {
         let timer = Timer::default();
         let toast_timer = Timer::default();
+        let last_reload_time = Rc::new(RefCell::new(None));
 
         // Clone ui_weak for the save timer callback
         let ui_for_save = ui_weak.clone();
         // Clone dirty_tracker for the save timer callback
         let tracker_for_save = Arc::clone(&dirty_tracker);
+        // Clone last_reload_time for the save timer callback
+        let last_reload_for_closure = Rc::clone(&last_reload_time);
 
         timer.start(
             TimerMode::SingleShot,
@@ -105,11 +112,39 @@ impl SaveManager {
                         );
 
                         // Try to reload niri config if running (async to prevent UI freeze)
+                        // Throttle reloads to prevent overwhelming niri with requests
                         if ipc::is_niri_running() {
-                            ipc::async_ops::reload_config_async(move |result| match result {
-                                Ok(()) => info!("Niri config reloaded"),
-                                Err(e) => debug!("Could not reload niri config: {}", e),
-                            });
+                            let now = Instant::now();
+                            let should_reload = {
+                                let mut last_reload = last_reload_for_closure.borrow_mut();
+                                match *last_reload {
+                                    Some(last_time) => {
+                                        let elapsed = now.duration_since(last_time);
+                                        if elapsed >= Duration::from_millis(IPC_RELOAD_THROTTLE_MS) {
+                                            *last_reload = Some(now);
+                                            true
+                                        } else {
+                                            debug!(
+                                                "Throttling IPC reload ({}ms since last reload, {}ms required)",
+                                                elapsed.as_millis(),
+                                                IPC_RELOAD_THROTTLE_MS
+                                            );
+                                            false
+                                        }
+                                    }
+                                    None => {
+                                        *last_reload = Some(now);
+                                        true
+                                    }
+                                }
+                            };
+
+                            if should_reload {
+                                ipc::async_ops::reload_config_async(move |result| match result {
+                                    Ok(()) => info!("Niri config reloaded"),
+                                    Err(e) => debug!("Could not reload niri config: {}", e),
+                                });
+                            }
                         }
                     }
                     Err(e) => {
@@ -133,6 +168,7 @@ impl SaveManager {
             ui_weak,
             toast_timer,
             dirty_tracker,
+            last_reload_time,
         })
     }
 
