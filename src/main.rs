@@ -64,40 +64,93 @@ fn init_settings(
     Arc::new(Mutex::new(loaded_settings))
 }
 
+/// Navigation categories
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Category {
+    Appearance,
+    Layout,
+    Animations,
+    Keyboard,
+    Mouse,
+    Touchpad,
+    WindowRules,
+    Keybindings,
+    Outputs,
+    Startup,
+}
+
+impl Category {
+    fn label(&self) -> &'static str {
+        match self {
+            Category::Appearance => "Appearance",
+            Category::Layout => "Layout",
+            Category::Animations => "Animations",
+            Category::Keyboard => "Keyboard",
+            Category::Mouse => "Mouse",
+            Category::Touchpad => "Touchpad",
+            Category::WindowRules => "Window Rules",
+            Category::Keybindings => "Keybindings",
+            Category::Outputs => "Outputs",
+            Category::Startup => "Startup",
+        }
+    }
+
+    fn all() -> &'static [Category] {
+        &[
+            Category::Appearance,
+            Category::Layout,
+            Category::Animations,
+            Category::Keyboard,
+            Category::Mouse,
+            Category::Touchpad,
+            Category::WindowRules,
+            Category::Keybindings,
+            Category::Outputs,
+            Category::Startup,
+        ]
+    }
+}
+
 /// Root application component
 #[component]
 fn App() -> Element {
+    let selected = use_signal(|| Category::Appearance);
+
     rsx! {
         style { {include_str!("styles.css")} }
         div { class: "app",
-            Sidebar {}
-            main { class: "content",
-                h1 { "niri settings" }
-                p { "Dioxus migration in progress..." }
-                p { "The core config loading is working. UI components coming soon." }
-            }
+            Sidebar { selected }
+            PageContent { selected: selected() }
         }
     }
 }
 
 /// Sidebar navigation component
 #[component]
-fn Sidebar() -> Element {
+fn Sidebar(selected: Signal<Category>) -> Element {
     rsx! {
         nav { class: "sidebar",
             h2 { "Settings" }
             ul {
-                li { class: "active", "Appearance" }
-                li { "Layout" }
-                li { "Animations" }
-                li { "Keyboard" }
-                li { "Mouse" }
-                li { "Touchpad" }
-                li { "Window Rules" }
-                li { "Keybindings" }
-                li { "Outputs" }
-                li { "Startup" }
+                for category in Category::all() {
+                    li {
+                        class: if selected() == *category { "active" } else { "" },
+                        onclick: move |_| selected.set(*category),
+                        "{category.label()}"
+                    }
+                }
             }
+        }
+    }
+}
+
+/// Main content area - shows the selected page
+#[component]
+fn PageContent(selected: Category) -> Element {
+    rsx! {
+        main { class: "content",
+            h1 { "{selected.label()}" }
+            p { class: "placeholder", "Settings for {selected.label()} will appear here." }
         }
     }
 }
