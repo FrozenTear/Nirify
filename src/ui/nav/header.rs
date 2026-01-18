@@ -1,4 +1,6 @@
-//! Header navigation component with tab groups
+//! Header navigation component
+//!
+//! Layout: Centered title at top, primary nav tabs below
 
 use floem::prelude::*;
 use floem::reactive::RwSignal;
@@ -6,20 +8,21 @@ use floem::views::{Button, Label, Stack};
 
 use crate::ui::state::{Category, NavGroup};
 use crate::ui::theme::{
-    ACCENT, BG_BASE, BG_DEEP, BG_ELEVATED, BORDER, SPACING_LG, SPACING_MD, SPACING_SM,
-    TEXT_PRIMARY, TEXT_SECONDARY,
+    nav_tab_selected_style, nav_tab_style, ACCENT, BG_DEEP, BORDER, SPACING_LG, SPACING_MD,
+    SPACING_SM, TEXT_MUTED, TEXT_SECONDARY,
 };
 
-/// Create the header navigation bar
-pub fn header(
-    nav_group: RwSignal<NavGroup>,
-    category: RwSignal<Category>,
-) -> impl IntoView {
-    Stack::horizontal((
-        // App title
-        Label::derived(|| "niri settings".to_string())
-            .style(|s| s.font_size(18.0).font_bold().color(TEXT_PRIMARY)),
-        // Nav group tabs
+/// Create the header with title and primary nav tabs
+pub fn header(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> impl IntoView {
+    Stack::vertical((
+        // App title (centered)
+        Label::derived(|| "niri settings".to_string()).style(|s| {
+            s.font_size(14.0)
+                .color(TEXT_MUTED)
+                .padding_top(SPACING_LG)
+                .padding_bottom(SPACING_MD)
+        }),
+        // Primary nav tabs (centered row)
         Stack::horizontal(
             NavGroup::all()
                 .iter()
@@ -29,16 +32,10 @@ pub fn header(
 
                     Button::new(group.label())
                         .style(move |s| {
-                            let base = s
-                                .padding_horiz(SPACING_MD)
-                                .padding_vert(SPACING_SM)
-                                .border_radius(6.0)
-                                .margin_right(SPACING_SM);
-
                             if is_selected() {
-                                base.background(ACCENT).color(BG_DEEP)
+                                nav_tab_selected_style(s)
                             } else {
-                                base.background(BG_ELEVATED).color(TEXT_SECONDARY)
+                                nav_tab_style(s)
                             }
                         })
                         .action(move || {
@@ -51,12 +48,10 @@ pub fn header(
                 })
                 .collect::<Vec<_>>(),
         )
-        .style(|s| s.margin_left(SPACING_LG)),
+        .style(|s| s.gap(SPACING_SM).padding_bottom(SPACING_MD)),
     ))
     .style(|s| {
         s.width_full()
-            .height(56.0)
-            .padding_horiz(SPACING_LG)
             .items_center()
             .background(BG_DEEP)
             .border_bottom(1.0)
