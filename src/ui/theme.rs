@@ -1,43 +1,67 @@
 //! Theme colors and styling helpers for the niri-settings UI
 //!
-//! Dark theme inspired by Catppuccin Mocha with purple accent.
+//! Catppuccin Mocha color palette
 
 use floem::peniko::Color;
 use floem::style::Style;
 
 // ============================================================================
-// Color Palette
+// Catppuccin Mocha Palette
 // ============================================================================
 
-/// Deep background (main app background)
-pub const BG_DEEP: Color = Color::from_rgb8(0x11, 0x11, 0x14);
+// Base colors
+pub const CRUST: Color = Color::from_rgb8(0x11, 0x11, 0x1b);
+pub const MANTLE: Color = Color::from_rgb8(0x18, 0x18, 0x25);
+pub const BASE: Color = Color::from_rgb8(0x1e, 0x1e, 0x2e);
 
-/// Base background (content area)
-pub const BG_BASE: Color = Color::from_rgb8(0x18, 0x18, 0x1c);
+// Surface colors
+pub const SURFACE0: Color = Color::from_rgb8(0x31, 0x32, 0x44);
+pub const SURFACE1: Color = Color::from_rgb8(0x45, 0x47, 0x5a);
+pub const SURFACE2: Color = Color::from_rgb8(0x58, 0x5b, 0x70);
 
-/// Surface background (cards, sections)
-pub const BG_SURFACE: Color = Color::from_rgb8(0x1e, 0x1e, 0x24);
+// Overlay colors
+pub const OVERLAY0: Color = Color::from_rgb8(0x6c, 0x70, 0x86);
+pub const OVERLAY1: Color = Color::from_rgb8(0x7f, 0x84, 0x9c);
+pub const OVERLAY2: Color = Color::from_rgb8(0x93, 0x99, 0xb2);
 
-/// Elevated surface (inputs, buttons)
-pub const BG_ELEVATED: Color = Color::from_rgb8(0x28, 0x28, 0x30);
+// Text colors
+pub const SUBTEXT0: Color = Color::from_rgb8(0xa6, 0xad, 0xc8);
+pub const SUBTEXT1: Color = Color::from_rgb8(0xba, 0xc2, 0xde);
+pub const TEXT: Color = Color::from_rgb8(0xcd, 0xd6, 0xf4);
 
-/// Primary accent color (selected tabs, toggles)
-pub const ACCENT: Color = Color::from_rgb8(0x95, 0x80, 0xff);
+// Accent colors
+pub const LAVENDER: Color = Color::from_rgb8(0xb4, 0xbe, 0xfe);
+pub const BLUE: Color = Color::from_rgb8(0x89, 0xb4, 0xfa);
+pub const SAPPHIRE: Color = Color::from_rgb8(0x74, 0xc7, 0xec);
+pub const SKY: Color = Color::from_rgb8(0x89, 0xdc, 0xeb);
+pub const TEAL: Color = Color::from_rgb8(0x94, 0xe2, 0xd5);
+pub const GREEN: Color = Color::from_rgb8(0xa6, 0xe3, 0xa1);
+pub const YELLOW: Color = Color::from_rgb8(0xf9, 0xe2, 0xaf);
+pub const PEACH: Color = Color::from_rgb8(0xfa, 0xb3, 0x87);
+pub const MAROON: Color = Color::from_rgb8(0xeb, 0xa0, 0xac);
+pub const RED: Color = Color::from_rgb8(0xf3, 0x8b, 0xa8);
+pub const MAUVE: Color = Color::from_rgb8(0xcb, 0xa6, 0xf7);
+pub const PINK: Color = Color::from_rgb8(0xf5, 0xc2, 0xe7);
+pub const FLAMINGO: Color = Color::from_rgb8(0xf2, 0xcd, 0xcd);
+pub const ROSEWATER: Color = Color::from_rgb8(0xf5, 0xe0, 0xdc);
 
-/// Accent dimmed (for hover states)
-pub const ACCENT_DIM: Color = Color::from_rgb8(0x7a, 0x68, 0xd9);
+// ============================================================================
+// Semantic Aliases (for easier use)
+// ============================================================================
 
-/// Primary text color
-pub const TEXT_PRIMARY: Color = Color::from_rgb8(0xe8, 0xe8, 0xf0);
+pub const BG_DEEP: Color = CRUST;
+pub const BG_BASE: Color = BASE;
+pub const BG_SURFACE: Color = SURFACE0;
+pub const BG_ELEVATED: Color = SURFACE1;
 
-/// Secondary text color (descriptions)
-pub const TEXT_SECONDARY: Color = Color::from_rgb8(0x88, 0x88, 0x98);
+pub const ACCENT: Color = MAUVE;
+pub const ACCENT_DIM: Color = LAVENDER;
 
-/// Muted text color (placeholders)
-pub const TEXT_MUTED: Color = Color::from_rgb8(0x58, 0x58, 0x68);
+pub const TEXT_PRIMARY: Color = TEXT;
+pub const TEXT_SECONDARY: Color = SUBTEXT1;
+pub const TEXT_MUTED: Color = OVERLAY1;
 
-/// Border color
-pub const BORDER: Color = Color::from_rgb8(0x30, 0x30, 0x3a);
+pub const BORDER: Color = SURFACE1;
 
 // ============================================================================
 // Spacing Constants
@@ -79,7 +103,7 @@ pub fn nav_tab_style(s: Style) -> Style {
     s.padding_horiz(SPACING_LG)
         .padding_vert(SPACING_SM)
         .border_radius(BORDER_RADIUS_LG)
-        .color(TEXT_SECONDARY)
+        .color(SUBTEXT0)
 }
 
 /// Apply nav tab styling (selected)
@@ -88,7 +112,7 @@ pub fn nav_tab_selected_style(s: Style) -> Style {
         .padding_vert(SPACING_SM)
         .border_radius(BORDER_RADIUS_LG)
         .background(ACCENT)
-        .color(BG_DEEP)
+        .color(CRUST)
 }
 
 /// Apply secondary nav styling (subcategory bar)
@@ -98,7 +122,7 @@ pub fn secondary_nav_style(s: Style) -> Style {
         .padding_vert(SPACING_SM)
         .gap(SPACING_MD)
         .border_bottom(1.0)
-        .border_color(BORDER)
+        .border_color(SURFACE0)
 }
 
 /// Apply search bar container styling
@@ -109,7 +133,7 @@ pub fn search_bar_style(s: Style) -> Style {
         .items_center()
         .gap(SPACING_MD)
         .border_bottom(1.0)
-        .border_color(BORDER)
+        .border_color(SURFACE0)
 }
 
 /// Apply main content area styling
@@ -128,5 +152,5 @@ pub fn footer_style(s: Style) -> Style {
         .items_center()
         .justify_between()
         .border_top(1.0)
-        .border_color(BORDER)
+        .border_color(SURFACE0)
 }

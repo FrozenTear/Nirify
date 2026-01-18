@@ -13,7 +13,7 @@ use floem::views::{dyn_view, Scroll, Stack};
 use crate::ui::nav::{footer, header, search_bar, sidebar};
 use crate::ui::pages::{appearance_page, placeholder_page};
 use crate::ui::state::{AppState, Category};
-use crate::ui::theme::{content_style, BG_BASE, BG_DEEP};
+use crate::ui::theme::{content_style, BG_DEEP};
 
 /// Create the main application view
 pub fn app_view(state: AppState) -> impl IntoView {

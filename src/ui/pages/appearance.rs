@@ -2,11 +2,11 @@
 
 use floem::prelude::*;
 use floem::reactive::RwSignal;
-use floem::views::{Label, Stack};
+use floem::views::Stack;
 
 use crate::ui::components::{color_row, section, slider_row, toggle_row};
 use crate::ui::state::AppState;
-use crate::ui::theme::{TEXT_PRIMARY, SPACING_LG};
+use crate::ui::theme::SPACING_LG;
 
 /// Create the appearance settings page
 pub fn appearance_page(state: AppState) -> impl IntoView {
@@ -65,11 +65,22 @@ pub fn appearance_page(state: AppState) -> impl IntoView {
         // Window Border section
         section(
             "Window Border",
-            Stack::vertical((toggle_row(
-                "Enable window border",
-                Some("Show a border around windows (inside the focus ring)"),
-                border_enabled,
-            ),)),
+            Stack::vertical((
+                toggle_row(
+                    "Enable window border",
+                    Some("Show a border around windows (inside the focus ring)"),
+                    border_enabled,
+                ),
+                slider_row(
+                    "Border thickness",
+                    Some("Thickness of the window border in pixels"),
+                    border_thickness,
+                    1.0,
+                    5.0,
+                    1.0,
+                    "px",
+                ),
+            )),
         ),
         // Gaps section
         section(

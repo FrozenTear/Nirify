@@ -4,12 +4,10 @@
 
 use floem::prelude::*;
 use floem::reactive::RwSignal;
-use floem::views::{Button, Label, Stack};
+use floem::views::Button;
 
 use crate::ui::state::{Category, NavGroup};
-use crate::ui::theme::{
-    secondary_nav_style, ACCENT, BG_DEEP, SPACING_MD, SPACING_SM, TEXT_PRIMARY, TEXT_SECONDARY,
-};
+use crate::ui::theme::{secondary_nav_style, LAVENDER, SPACING_MD, SPACING_SM, SUBTEXT0};
 
 /// Create the secondary nav showing subcategories for the current group
 pub fn sidebar(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> impl IntoView {
@@ -27,9 +25,9 @@ pub fn sidebar(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> i
                         .border_radius(4.0);
 
                     if is_selected() {
-                        base.color(ACCENT)
+                        base.color(LAVENDER)
                     } else {
-                        base.color(TEXT_SECONDARY)
+                        base.color(SUBTEXT0)
                     }
                 })
                 .action(move || {

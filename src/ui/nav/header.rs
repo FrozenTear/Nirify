@@ -8,8 +8,8 @@ use floem::views::{Button, Label, Stack};
 
 use crate::ui::state::{Category, NavGroup};
 use crate::ui::theme::{
-    nav_tab_selected_style, nav_tab_style, ACCENT, BG_DEEP, BORDER, SPACING_LG, SPACING_MD,
-    SPACING_SM, TEXT_MUTED, TEXT_SECONDARY,
+    nav_tab_selected_style, nav_tab_style, MANTLE, OVERLAY0, SPACING_LG, SPACING_MD, SPACING_SM,
+    SURFACE0,
 };
 
 /// Create the header with title and primary nav tabs
@@ -18,7 +18,7 @@ pub fn header(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> im
         // App title (centered)
         Label::derived(|| "niri settings".to_string()).style(|s| {
             s.font_size(14.0)
-                .color(TEXT_MUTED)
+                .color(OVERLAY0)
                 .padding_top(SPACING_LG)
                 .padding_bottom(SPACING_MD)
         }),
@@ -53,8 +53,8 @@ pub fn header(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> im
     .style(|s| {
         s.width_full()
             .items_center()
-            .background(BG_DEEP)
+            .background(MANTLE)
             .border_bottom(1.0)
-            .border_color(BORDER)
+            .border_color(SURFACE0)
     })
 }

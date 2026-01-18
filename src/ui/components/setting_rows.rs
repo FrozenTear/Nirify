@@ -4,11 +4,11 @@
 
 use floem::prelude::*;
 use floem::reactive::RwSignal;
-use floem::views::{empty, text_input, Button, Checkbox, Container, Label, Stack};
+use floem::views::{text_input, Button, Checkbox, Container, Empty, Label, Stack};
 
 use crate::ui::theme::{
-    setting_row_style, BG_ELEVATED, BORDER, BORDER_RADIUS_SM, SPACING_MD, SPACING_SM, SPACING_XS,
-    TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY,
+    setting_row_style, BORDER_RADIUS_SM, OVERLAY0, SPACING_MD, SPACING_SM, SPACING_XS, SUBTEXT0,
+    SUBTEXT1, SURFACE0, SURFACE1, TEXT,
 };
 
 /// A row with a toggle switch
@@ -20,12 +20,12 @@ pub fn toggle_row(
     Stack::horizontal((
         // Left side: label + description
         Stack::vertical((
-            Label::derived(move || label_text.to_string()).style(|s| s.color(TEXT_PRIMARY)),
+            Label::derived(move || label_text.to_string()).style(|s| s.color(TEXT)),
             match description {
                 Some(desc) => Label::derived(move || desc.to_string())
-                    .style(|s| s.font_size(12.0).color(TEXT_SECONDARY))
+                    .style(|s| s.font_size(12.0).color(SUBTEXT0))
                     .into_any(),
-                None => empty().into_any(),
+                None => Empty::new().into_any(),
             },
         ))
         .style(|s| s.flex_grow(1.0)),
@@ -48,12 +48,12 @@ pub fn slider_row(
     Stack::horizontal((
         // Left side: label + description
         Stack::vertical((
-            Label::derived(move || label_text.to_string()).style(|s| s.color(TEXT_PRIMARY)),
+            Label::derived(move || label_text.to_string()).style(|s| s.color(TEXT)),
             match description {
                 Some(desc) => Label::derived(move || desc.to_string())
-                    .style(|s| s.font_size(12.0).color(TEXT_SECONDARY))
+                    .style(|s| s.font_size(12.0).color(SUBTEXT0))
                     .into_any(),
-                None => empty().into_any(),
+                None => Empty::new().into_any(),
             },
         ))
         .style(|s| s.flex_grow(1.0)),
@@ -61,7 +61,7 @@ pub fn slider_row(
         Stack::horizontal((
             // Simple slider representation (a styled button for now)
             Button::new("●")
-                .style(|s| s.color(TEXT_MUTED).padding(SPACING_XS))
+                .style(|s| s.color(OVERLAY0).padding(SPACING_XS))
                 .action(move || {
                     // Cycle through some values for demo
                     let current = value.get();
@@ -74,7 +74,7 @@ pub fn slider_row(
                 }),
             // Value display
             Label::derived(move || format!("{}{}", value.get() as i32, unit))
-                .style(|s| s.color(TEXT_SECONDARY).min_width(40.0)),
+                .style(|s| s.color(SUBTEXT1).min_width(40.0)),
         ))
         .style(|s| s.items_center().gap(SPACING_SM)),
     ))
@@ -90,19 +90,19 @@ pub fn color_row(
     Stack::horizontal((
         // Left side: label + description
         Stack::vertical((
-            Label::derived(move || label_text.to_string()).style(|s| s.color(TEXT_PRIMARY)),
+            Label::derived(move || label_text.to_string()).style(|s| s.color(TEXT)),
             match description {
                 Some(desc) => Label::derived(move || desc.to_string())
-                    .style(|s| s.font_size(12.0).color(TEXT_SECONDARY))
+                    .style(|s| s.font_size(12.0).color(SUBTEXT0))
                     .into_any(),
-                None => empty().into_any(),
+                None => Empty::new().into_any(),
             },
         ))
         .style(|s| s.flex_grow(1.0)),
         // Right side: color swatch + hex input
         Stack::horizontal((
             // Color swatch
-            Container::new(empty()).style(move |s| {
+            Container::new(Empty::new()).style(move |s| {
                 let hex = value.get();
                 let color = parse_hex_color(&hex);
                 s.width(24.0)
@@ -115,17 +115,16 @@ pub fn color_row(
                 text_input(value).style(|s| {
                     s.width(80.0)
                         .padding(SPACING_XS)
-                        .background(BG_ELEVATED)
+                        .background(SURFACE0)
                         .border_radius(BORDER_RADIUS_SM)
-                        .color(TEXT_PRIMARY)
+                        .color(TEXT)
                         .font_size(12.0)
                 }),
                 // Clear/reset button
-                Button::new("✕")
-                    .style(|s| s.color(TEXT_MUTED).padding(SPACING_XS).font_size(10.0)),
+                Button::new("✕").style(|s| s.color(OVERLAY0).padding(SPACING_XS).font_size(10.0)),
             ))
             .style(|s| {
-                s.background(BG_ELEVATED)
+                s.background(SURFACE1)
                     .border_radius(BORDER_RADIUS_SM)
                     .padding_left(SPACING_SM)
                     .items_center()
@@ -145,12 +144,12 @@ pub fn text_row(
 ) -> impl IntoView {
     Stack::horizontal((
         Stack::vertical((
-            Label::derived(move || label_text.to_string()).style(|s| s.color(TEXT_PRIMARY)),
+            Label::derived(move || label_text.to_string()).style(|s| s.color(TEXT)),
             match description {
                 Some(desc) => Label::derived(move || desc.to_string())
-                    .style(|s| s.font_size(12.0).color(TEXT_SECONDARY))
+                    .style(|s| s.font_size(12.0).color(SUBTEXT0))
                     .into_any(),
-                None => empty().into_any(),
+                None => Empty::new().into_any(),
             },
         ))
         .style(|s| s.flex_grow(1.0)),
@@ -159,11 +158,9 @@ pub fn text_row(
             .style(|s| {
                 s.width(200.0)
                     .padding(SPACING_SM)
-                    .background(BG_ELEVATED)
+                    .background(SURFACE0)
                     .border_radius(BORDER_RADIUS_SM)
-                    .border(1.0)
-                    .border_color(BORDER)
-                    .color(TEXT_PRIMARY)
+                    .color(TEXT)
             }),
     ))
     .style(setting_row_style)
@@ -180,12 +177,12 @@ pub fn dropdown_row<T: Clone + PartialEq + 'static>(
 
     Stack::horizontal((
         Stack::vertical((
-            Label::derived(move || label_text.to_string()).style(|s| s.color(TEXT_PRIMARY)),
+            Label::derived(move || label_text.to_string()).style(|s| s.color(TEXT)),
             match description {
                 Some(desc) => Label::derived(move || desc.to_string())
-                    .style(|s| s.font_size(12.0).color(TEXT_SECONDARY))
+                    .style(|s| s.font_size(12.0).color(SUBTEXT0))
                     .into_any(),
-                None => empty().into_any(),
+                None => Empty::new().into_any(),
             },
         ))
         .style(|s| s.flex_grow(1.0)),
@@ -200,12 +197,10 @@ pub fn dropdown_row<T: Clone + PartialEq + 'static>(
         .style(|s| {
             s.padding_horiz(SPACING_MD)
                 .padding_vert(SPACING_SM)
-                .background(BG_ELEVATED)
+                .background(SURFACE1)
                 .border_radius(BORDER_RADIUS_SM)
-                .border(1.0)
-                .border_color(BORDER)
                 .min_width(150.0)
-                .color(TEXT_PRIMARY)
+                .color(TEXT)
         }),
     ))
     .style(setting_row_style)
