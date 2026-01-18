@@ -20,14 +20,16 @@ pub fn animations_page(state: AppState) -> impl IntoView {
     let slowdown = RwSignal::new(animations.slowdown);
 
     // Per-animation enabled states
-    let workspace_switch =
-        RwSignal::new(animations.per_animation.workspace_switch.animation_type != AnimationType::Off);
+    let workspace_switch = RwSignal::new(
+        animations.per_animation.workspace_switch.animation_type != AnimationType::Off,
+    );
     let window_open =
         RwSignal::new(animations.per_animation.window_open.animation_type != AnimationType::Off);
     let window_close =
         RwSignal::new(animations.per_animation.window_close.animation_type != AnimationType::Off);
-    let window_movement =
-        RwSignal::new(animations.per_animation.window_movement.animation_type != AnimationType::Off);
+    let window_movement = RwSignal::new(
+        animations.per_animation.window_movement.animation_type != AnimationType::Off,
+    );
     let window_resize =
         RwSignal::new(animations.per_animation.window_resize.animation_type != AnimationType::Off);
 

@@ -20,15 +20,20 @@ pub fn tablet_page(state: AppState) -> impl IntoView {
     let map_to_output = RwSignal::new(tablet.map_to_output);
 
     // Callbacks
-    let on_left_handed = { let state = state.clone(); Rc::new(move |val: bool| {
-        state.update_settings(|s| s.tablet.left_handed = val);
-        state.mark_dirty_and_save(SettingsCategory::Tablet);
-    })};
+    let on_left_handed = {
+        let state = state.clone();
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.tablet.left_handed = val);
+            state.mark_dirty_and_save(SettingsCategory::Tablet);
+        })
+    };
 
-    let on_off = { Rc::new(move |val: bool| {
-        state.update_settings(|s| s.tablet.off = val);
-        state.mark_dirty_and_save(SettingsCategory::Tablet);
-    })};
+    let on_off = {
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.tablet.off = val);
+            state.mark_dirty_and_save(SettingsCategory::Tablet);
+        })
+    };
 
     Stack::vertical((
         section(
@@ -43,8 +48,18 @@ pub fn tablet_page(state: AppState) -> impl IntoView {
         section(
             "Options",
             Stack::vertical((
-                toggle_row_with_callback("Left-handed mode", Some("Flip tablet orientation"), left_handed, Some(on_left_handed)),
-                toggle_row_with_callback("Disable tablet", Some("Turn off tablet input"), off, Some(on_off)),
+                toggle_row_with_callback(
+                    "Left-handed mode",
+                    Some("Flip tablet orientation"),
+                    left_handed,
+                    Some(on_left_handed),
+                ),
+                toggle_row_with_callback(
+                    "Disable tablet",
+                    Some("Turn off tablet input"),
+                    off,
+                    Some(on_off),
+                ),
             )),
         ),
     ))

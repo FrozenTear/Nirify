@@ -340,9 +340,7 @@ pub fn slider_track_style(s: Style) -> Style {
 
 /// Slider track fill (active portion)
 pub fn slider_fill_style(s: Style) -> Style {
-    s.height(4.0)
-        .border_radius(RADIUS_FULL)
-        .background(ACCENT)
+    s.height(4.0).border_radius(RADIUS_FULL).background(ACCENT)
 }
 
 /// Slider thumb

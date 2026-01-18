@@ -22,30 +22,44 @@ pub fn debug_page(state: AppState) -> impl IntoView {
     let disable_transactions = RwSignal::new(debug.disable_transactions);
 
     // Callbacks
-    let on_preview_render = { let state = state.clone(); Rc::new(move |val: bool| {
-        state.update_settings(|s| s.debug.preview_render = val);
-        state.mark_dirty_and_save(SettingsCategory::Debug);
-    })};
+    let on_preview_render = {
+        let state = state.clone();
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.debug.preview_render = val);
+            state.mark_dirty_and_save(SettingsCategory::Debug);
+        })
+    };
 
-    let on_disable_cursor_plane = { let state = state.clone(); Rc::new(move |val: bool| {
-        state.update_settings(|s| s.debug.disable_cursor_plane = val);
-        state.mark_dirty_and_save(SettingsCategory::Debug);
-    })};
+    let on_disable_cursor_plane = {
+        let state = state.clone();
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.debug.disable_cursor_plane = val);
+            state.mark_dirty_and_save(SettingsCategory::Debug);
+        })
+    };
 
-    let on_disable_direct_scanout = { let state = state.clone(); Rc::new(move |val: bool| {
-        state.update_settings(|s| s.debug.disable_direct_scanout = val);
-        state.mark_dirty_and_save(SettingsCategory::Debug);
-    })};
+    let on_disable_direct_scanout = {
+        let state = state.clone();
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.debug.disable_direct_scanout = val);
+            state.mark_dirty_and_save(SettingsCategory::Debug);
+        })
+    };
 
-    let on_disable_resize_throttling = { let state = state.clone(); Rc::new(move |val: bool| {
-        state.update_settings(|s| s.debug.disable_resize_throttling = val);
-        state.mark_dirty_and_save(SettingsCategory::Debug);
-    })};
+    let on_disable_resize_throttling = {
+        let state = state.clone();
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.debug.disable_resize_throttling = val);
+            state.mark_dirty_and_save(SettingsCategory::Debug);
+        })
+    };
 
-    let on_disable_transactions = { Rc::new(move |val: bool| {
-        state.update_settings(|s| s.debug.disable_transactions = val);
-        state.mark_dirty_and_save(SettingsCategory::Debug);
-    })};
+    let on_disable_transactions = {
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.debug.disable_transactions = val);
+            state.mark_dirty_and_save(SettingsCategory::Debug);
+        })
+    };
 
     Stack::vertical((
         section(
@@ -60,16 +74,41 @@ pub fn debug_page(state: AppState) -> impl IntoView {
         section(
             "Rendering",
             Stack::vertical((
-                toggle_row_with_callback("Preview render", Some("Render monitors like screencast"), preview_render, Some(on_preview_render)),
-                toggle_row_with_callback("Disable cursor plane", Some("Force cursor through compositor"), disable_cursor_plane, Some(on_disable_cursor_plane)),
-                toggle_row_with_callback("Disable direct scanout", Some("Always composite fullscreen windows"), disable_direct_scanout, Some(on_disable_direct_scanout)),
+                toggle_row_with_callback(
+                    "Preview render",
+                    Some("Render monitors like screencast"),
+                    preview_render,
+                    Some(on_preview_render),
+                ),
+                toggle_row_with_callback(
+                    "Disable cursor plane",
+                    Some("Force cursor through compositor"),
+                    disable_cursor_plane,
+                    Some(on_disable_cursor_plane),
+                ),
+                toggle_row_with_callback(
+                    "Disable direct scanout",
+                    Some("Always composite fullscreen windows"),
+                    disable_direct_scanout,
+                    Some(on_disable_direct_scanout),
+                ),
             )),
         ),
         section(
             "Window Management",
             Stack::vertical((
-                toggle_row_with_callback("Disable resize throttling", Some("Send resize events immediately"), disable_resize_throttling, Some(on_disable_resize_throttling)),
-                toggle_row_with_callback("Disable transactions", Some("Don't wait for synchronized resizing"), disable_transactions, Some(on_disable_transactions)),
+                toggle_row_with_callback(
+                    "Disable resize throttling",
+                    Some("Send resize events immediately"),
+                    disable_resize_throttling,
+                    Some(on_disable_resize_throttling),
+                ),
+                toggle_row_with_callback(
+                    "Disable transactions",
+                    Some("Don't wait for synchronized resizing"),
+                    disable_transactions,
+                    Some(on_disable_transactions),
+                ),
             )),
         ),
         section(

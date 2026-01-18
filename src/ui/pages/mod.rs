@@ -5,15 +5,15 @@
 // Input devices
 mod keyboard;
 mod mouse;
-mod touchpad;
-mod trackpoint;
-mod trackball;
 mod tablet;
 mod touch;
+mod touchpad;
+mod trackball;
+mod trackpoint;
 
 // Appearance & Visuals
-mod appearance;
 mod animations;
+mod appearance;
 mod cursor;
 mod overview;
 mod recent_windows;
@@ -24,17 +24,17 @@ mod layout_extras;
 mod workspaces;
 
 // Rules
-mod window_rules;
-mod layer_rules;
 mod gestures;
+mod layer_rules;
+mod window_rules;
 
 // System
-mod keybindings;
-mod startup;
-mod environment;
-mod switch_events;
-mod miscellaneous;
 mod debug;
+mod environment;
+mod keybindings;
+mod miscellaneous;
+mod startup;
+mod switch_events;
 
 // Outputs
 mod outputs;
@@ -49,11 +49,11 @@ pub use placeholder::placeholder_page;
 // Input devices
 pub use keyboard::keyboard_page;
 pub use mouse::mouse_page;
-pub use touchpad::touchpad_page;
-pub use trackpoint::trackpoint_page;
-pub use trackball::trackball_page;
 pub use tablet::tablet_page;
 pub use touch::touch_page;
+pub use touchpad::touchpad_page;
+pub use trackball::trackball_page;
+pub use trackpoint::trackpoint_page;
 
 // Visuals
 pub use animations::animations_page;
@@ -67,17 +67,17 @@ pub use layout_extras::layout_extras_page;
 pub use workspaces::workspaces_page;
 
 // Rules
-pub use window_rules::window_rules_page;
-pub use layer_rules::layer_rules_page;
 pub use gestures::gestures_page;
+pub use layer_rules::layer_rules_page;
+pub use window_rules::window_rules_page;
 
 // System
-pub use keybindings::keybindings_page;
-pub use startup::startup_page;
-pub use environment::environment_page;
-pub use switch_events::switch_events_page;
-pub use miscellaneous::miscellaneous_page;
 pub use debug::debug_page;
+pub use environment::environment_page;
+pub use keybindings::keybindings_page;
+pub use miscellaneous::miscellaneous_page;
+pub use startup::startup_page;
+pub use switch_events::switch_events_page;
 
 // Outputs
 pub use outputs::outputs_page;

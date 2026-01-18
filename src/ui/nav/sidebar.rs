@@ -7,9 +7,7 @@ use floem::reactive::RwSignal;
 use floem::views::Label;
 
 use crate::ui::state::{Category, NavGroup};
-use crate::ui::theme::{
-    secondary_nav_style, secondary_tab_selected_style, secondary_tab_style,
-};
+use crate::ui::theme::{secondary_nav_style, secondary_tab_selected_style, secondary_tab_style};
 
 /// Create the secondary nav showing subcategories for the current group
 pub fn sidebar(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> impl IntoView {

@@ -6,7 +6,9 @@ use floem::views::Stack;
 use std::rc::Rc;
 
 use crate::config::SettingsCategory;
-use crate::ui::components::{section, slider_row_with_callback, text_row, toggle_row_with_callback};
+use crate::ui::components::{
+    section, slider_row_with_callback, text_row_with_callback, toggle_row_with_callback,
+};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
@@ -23,7 +25,32 @@ pub fn keyboard_page(state: AppState) -> impl IntoView {
     let repeat_rate = RwSignal::new(keyboard.repeat_rate as f64);
     let numlock = RwSignal::new(keyboard.numlock);
 
-    // Callbacks
+    // XKB Callbacks
+    let on_xkb_layout = {
+        let state = state.clone();
+        Rc::new(move |val: String| {
+            state.update_settings(|s| s.keyboard.xkb_layout = val);
+            state.mark_dirty_and_save(SettingsCategory::Keyboard);
+        })
+    };
+
+    let on_xkb_variant = {
+        let state = state.clone();
+        Rc::new(move |val: String| {
+            state.update_settings(|s| s.keyboard.xkb_variant = val);
+            state.mark_dirty_and_save(SettingsCategory::Keyboard);
+        })
+    };
+
+    let on_xkb_options = {
+        let state = state.clone();
+        Rc::new(move |val: String| {
+            state.update_settings(|s| s.keyboard.xkb_options = val);
+            state.mark_dirty_and_save(SettingsCategory::Keyboard);
+        })
+    };
+
+    // Repeat Callbacks
     let on_repeat_delay = {
         let state = state.clone();
         Rc::new(move |val: f64| {
@@ -55,31 +82,31 @@ pub fn keyboard_page(state: AppState) -> impl IntoView {
         })
     };
 
-    // Note: text_row doesn't have callback variant yet, so XKB settings won't auto-save
-    // TODO: Add text_row_with_callback for XKB settings
-
     Stack::vertical((
         // XKB Settings section
         section(
             "Layout",
             Stack::vertical((
-                text_row(
+                text_row_with_callback(
                     "Keyboard layout",
                     Some("XKB layout code (e.g., us, de, fr)"),
                     xkb_layout,
                     "us",
+                    Some(on_xkb_layout),
                 ),
-                text_row(
+                text_row_with_callback(
                     "Layout variant",
                     Some("Layout variant (e.g., dvorak, colemak)"),
                     xkb_variant,
                     "",
+                    Some(on_xkb_variant),
                 ),
-                text_row(
+                text_row_with_callback(
                     "XKB options",
                     Some("Additional options (e.g., compose:ralt)"),
                     xkb_options,
                     "",
+                    Some(on_xkb_options),
                 ),
             )),
         ),

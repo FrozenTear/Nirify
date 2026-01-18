@@ -32,8 +32,7 @@ fn bench_settings_validate(c: &mut Criterion) {
     group.bench_function("needs_clamping", |b| {
         b.iter(|| {
             let mut settings = Settings::default();
-            settings.appearance.gaps_inner = -100.0;
-            settings.appearance.gaps_outer = 1000.0;
+            settings.appearance.gaps = -100.0; // Niri uses a single gaps value
             settings.appearance.focus_ring_width = 100.0;
             settings.keyboard.repeat_delay = 10000;
             settings.keyboard.repeat_rate = -50;

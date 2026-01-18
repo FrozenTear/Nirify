@@ -148,7 +148,7 @@ mod tests {
 
         // The callback should be called on the background thread
         match rx.recv_timeout(Duration::from_secs(5)) {
-            Ok(_) => (), // Callback was called
+            Ok(_) => (),  // Callback was called
             Err(_) => (), // IPC may fail if niri isn't running, that's fine
         }
     }

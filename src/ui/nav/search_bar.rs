@@ -6,9 +6,7 @@ use floem::prelude::*;
 use floem::reactive::RwSignal;
 use floem::views::{text_input, Label, Stack};
 
-use crate::ui::theme::{
-    button_secondary_style, search_bar_style, search_input_style, TEXT_MUTED,
-};
+use crate::ui::theme::{button_secondary_style, search_bar_style, search_input_style, TEXT_MUTED};
 
 /// Create the search bar with "Review Changes" button
 pub fn search_bar(search_query: RwSignal<String>) -> impl IntoView {

@@ -1,10 +1,10 @@
 # Niri Settings
 
-A native settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor, built with Rust and [Slint](https://slint.dev/).
+A native settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor, built with Rust and [Floem](https://github.com/lapce/floem).
 
 ## Features
 
-- **Native Performance**: Built in Rust with Slint UI for minimal resource usage
+- **Native Performance**: Built in Rust with Floem UI for minimal resource usage
 - **Live Preview**: Changes apply immediately with auto-save (no Apply button needed)
 - **Safe Setup**: Automatically backs up your config before making changes
 - **Smart Config Management**: Preserves your custom settings while managing common options
@@ -144,5 +144,5 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 ## Acknowledgments
 
 - [niri](https://github.com/YaLTeR/niri) - The scrollable-tiling Wayland compositor
-- [Slint](https://slint.dev/) - Native GUI toolkit for Rust
+- [Floem](https://github.com/lapce/floem) - Native GUI toolkit for Rust
 - [niri-settings](https://github.com/stefonarch/niri-settings) - Original Python/Qt implementation (inspiration)

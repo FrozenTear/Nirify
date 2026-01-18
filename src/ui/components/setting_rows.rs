@@ -15,9 +15,9 @@ use std::rc::Rc;
 
 use crate::ui::theme::{
     color_input_container_style, color_swatch_style, icon_button_style, parse_hex_color,
-    setting_row_style, text_input_style, ACCENT, BG_ELEVATED, BORDER,
-    BORDER_SUBTLE, FONT_SIZE_BASE, FONT_SIZE_SM, RADIUS_FULL, RADIUS_SM, SPACING_MD, SPACING_SM,
-    SPACING_XS, SURFACE1, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
+    setting_row_style, text_input_style, ACCENT, BG_ELEVATED, BORDER, BORDER_SUBTLE,
+    FONT_SIZE_BASE, FONT_SIZE_SM, RADIUS_FULL, RADIUS_SM, SPACING_MD, SPACING_SM, SPACING_XS,
+    SURFACE1, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
 };
 
 /// Callback type for value changes
@@ -112,6 +112,29 @@ pub fn slider_row(
     slider_row_with_callback(label_text, description, value, min, max, step, unit, None)
 }
 
+/// Determine decimal precision from step size
+fn precision_from_step(step: f64) -> usize {
+    if step >= 1.0 {
+        0
+    } else if step >= 0.1 {
+        1
+    } else if step >= 0.01 {
+        2
+    } else {
+        3
+    }
+}
+
+/// Format a value with appropriate precision based on step size
+fn format_value(value: f64, step: f64) -> String {
+    let precision = precision_from_step(step);
+    if precision == 0 {
+        format!("{}", value as i64)
+    } else {
+        format!("{:.prec$}", value, prec = precision)
+    }
+}
+
 /// A setting row with a slider, editable value input, and change callback
 #[allow(clippy::too_many_arguments)]
 pub fn slider_row_with_callback(
@@ -125,15 +148,22 @@ pub fn slider_row_with_callback(
     on_change: OnChange<f64>,
 ) -> impl IntoView {
     // Create a string signal for the text input, synced with the value
-    let text_value = RwSignal::new(format!("{}", value.get() as i32));
+    let text_value = RwSignal::new(format_value(value.get(), step));
 
     // Keep text in sync when value changes from slider
     floem::reactive::Effect::new(move |_| {
         let v = value.get();
-        text_value.set(format!("{}", v as i32));
+        text_value.set(format_value(v, step));
     });
 
     let on_change_input = on_change.clone();
+
+    // Calculate input width based on expected value range
+    let input_width = if step >= 1.0 && max <= 9999.0 {
+        45.0
+    } else {
+        60.0 // Wider for decimal values
+    };
 
     Stack::horizontal((
         // Left side: label + description
@@ -148,20 +178,20 @@ pub fn slider_row_with_callback(
                     .on_event_stop(EventListener::FocusLost, move |_| {
                         // Parse and apply the value on blur
                         if let Ok(v) = text_value.get().parse::<f64>() {
-                            // Allow extended range beyond slider, clamped to reasonable max
-                            let clamped = v.clamp(min.min(0.0), max.max(200.0));
+                            // Clamp to the defined range
+                            let clamped = v.clamp(min, max);
                             value.set(clamped);
-                            text_value.set(format!("{}", clamped as i32));
+                            text_value.set(format_value(clamped, step));
                             if let Some(ref cb) = on_change_input {
                                 cb(clamped);
                             }
                         } else {
                             // Reset to current value if parse fails
-                            text_value.set(format!("{}", value.get() as i32));
+                            text_value.set(format_value(value.get(), step));
                         }
                     })
-                    .style(|s| {
-                        s.width(45.0)
+                    .style(move |s| {
+                        s.width(input_width)
                             .padding_vert(SPACING_XS)
                             .padding_horiz(SPACING_SM)
                             .background(BG_ELEVATED)
@@ -225,15 +255,13 @@ fn slider_control_with_callback(
         // Left padding spacer
         Empty::new().style(|s| s.width(SLIDER_PADDING)),
         // Track with fill
-        Container::new(
-            Container::new(Empty::new()).style(move |s| {
-                let pct = percentage();
-                s.width(pct * SLIDER_TRACK_WIDTH)
-                    .height(SLIDER_TRACK_HEIGHT)
-                    .border_radius(RADIUS_FULL)
-                    .background(ACCENT)
-            }),
-        )
+        Container::new(Container::new(Empty::new()).style(move |s| {
+            let pct = percentage();
+            s.width(pct * SLIDER_TRACK_WIDTH)
+                .height(SLIDER_TRACK_HEIGHT)
+                .border_radius(RADIUS_FULL)
+                .background(ACCENT)
+        }))
         .style(|s| {
             s.width(SLIDER_TRACK_WIDTH)
                 .height(SLIDER_TRACK_HEIGHT)
@@ -378,10 +406,26 @@ pub fn text_row(
     value: RwSignal<String>,
     placeholder: &'static str,
 ) -> impl IntoView {
+    text_row_with_callback(label_text, description, value, placeholder, None)
+}
+
+/// A setting row with a text input field and change callback
+pub fn text_row_with_callback(
+    label_text: &'static str,
+    description: Option<&'static str>,
+    value: RwSignal<String>,
+    placeholder: &'static str,
+    on_change: OnChange<String>,
+) -> impl IntoView {
     Stack::horizontal((
         setting_label(label_text, description),
         text_input(value)
             .placeholder(placeholder)
+            .on_event_stop(EventListener::FocusLost, move |_| {
+                if let Some(ref cb) = on_change {
+                    cb(value.get());
+                }
+            })
             .style(|s| text_input_style(s).width(200.0)),
     ))
     .style(setting_row_style)
@@ -440,10 +484,8 @@ pub fn dropdown_row<T: Clone + PartialEq + 'static>(
 /// Create the label + description column for setting rows
 fn setting_label(label_text: &'static str, description: Option<&'static str>) -> impl IntoView {
     Stack::vertical((
-        Label::derived(move || label_text.to_string()).style(|s| {
-            s.color(TEXT_PRIMARY)
-                .font_size(FONT_SIZE_BASE)
-        }),
+        Label::derived(move || label_text.to_string())
+            .style(|s| s.color(TEXT_PRIMARY).font_size(FONT_SIZE_BASE)),
         match description {
             Some(desc) => Label::derived(move || desc.to_string())
                 .style(|s| {

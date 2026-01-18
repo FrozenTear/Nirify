@@ -52,7 +52,9 @@ pub fn appearance_page(state: AppState) -> impl IntoView {
         let state = state.clone();
         Rc::new(move |val: String| {
             if let Some(color) = Color::from_hex(&val) {
-                state.update_settings(|s| s.appearance.focus_ring_active = ColorOrGradient::Color(color));
+                state.update_settings(|s| {
+                    s.appearance.focus_ring_active = ColorOrGradient::Color(color)
+                });
                 state.mark_dirty_and_save(SettingsCategory::Appearance);
             }
         })
@@ -62,7 +64,9 @@ pub fn appearance_page(state: AppState) -> impl IntoView {
         let state = state.clone();
         Rc::new(move |val: String| {
             if let Some(color) = Color::from_hex(&val) {
-                state.update_settings(|s| s.appearance.focus_ring_inactive = ColorOrGradient::Color(color));
+                state.update_settings(|s| {
+                    s.appearance.focus_ring_inactive = ColorOrGradient::Color(color)
+                });
                 state.mark_dirty_and_save(SettingsCategory::Appearance);
             }
         })
@@ -72,7 +76,9 @@ pub fn appearance_page(state: AppState) -> impl IntoView {
         let state = state.clone();
         Rc::new(move |val: String| {
             if let Some(color) = Color::from_hex(&val) {
-                state.update_settings(|s| s.appearance.focus_ring_urgent = ColorOrGradient::Color(color));
+                state.update_settings(|s| {
+                    s.appearance.focus_ring_urgent = ColorOrGradient::Color(color)
+                });
                 state.mark_dirty_and_save(SettingsCategory::Appearance);
             }
         })

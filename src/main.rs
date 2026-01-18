@@ -39,10 +39,7 @@ fn init_logging() {
 }
 
 /// Load settings from config files
-fn init_settings(
-    paths: &config::ConfigPaths,
-    is_first_run: bool,
-) -> Arc<Mutex<config::Settings>> {
+fn init_settings(paths: &config::ConfigPaths, is_first_run: bool) -> Arc<Mutex<config::Settings>> {
     let loaded_settings = if is_first_run {
         // First run: import from user's existing niri config
         info!("First run - importing settings from existing niri config");

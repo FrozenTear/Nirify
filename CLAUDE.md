@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Native Rust settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor. Uses Slint for UI and manages KDL config files without modifying the user's main config directly.
+Native Rust settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor. Uses Floem for UI and manages KDL config files without modifying the user's main config directly.
 
 **Target users**: Non-technical users who don't want to edit KDL config files manually.
 
@@ -33,71 +33,64 @@ The app doesn't edit `config.kdl` directly. Instead:
 
 ```
 src/
-├── main.rs                    # App initialization, wizard, close handling
-├── lib.rs                     # Library exports (re-exports MainWindow from Slint)
+├── main.rs                    # App initialization, Floem launch
+├── lib.rs                     # Library exports
 ├── constants.rs               # Value bounds (MIN/MAX), defaults
 ├── types.rs                   # Shared enums (AccelProfile, ModKey, Color, etc.)
 ├── config/
-│   ├── models.rs              # Settings struct hierarchy (Settings -> AppearanceSettings, etc.)
+│   ├── models/                # Settings struct hierarchy (Settings -> AppearanceSettings, etc.)
 │   ├── paths.rs               # XDG path resolution, include line detection
 │   ├── parser.rs              # KDL parsing utilities
 │   ├── loader/                # Load settings from KDL files (one file per category)
 │   └── storage/               # Save settings to KDL files (one file per category)
 ├── ui/
-│   ├── window.rs              # Window state management
-│   ├── search.rs              # Search keyword -> category mapping
-│   └── bridge/
-│       ├── mod.rs             # setup_callbacks() entry point
-│       ├── callbacks/         # UI event handlers (one file per settings page)
-│       ├── sync.rs            # sync_ui_from_settings() - populate UI from Settings
-│       ├── converters.rs      # Slint <-> Rust type conversions
-│       ├── indices.rs         # Enum <-> combobox index mappings
-│       ├── macros.rs          # Callback registration helpers
-│       └── save_manager.rs    # 300ms debounced auto-save
+│   ├── app.rs                 # Main app composition, page routing
+│   ├── state.rs               # AppState with RwSignal-based reactivity
+│   ├── theme.rs               # Theme colors (Catppuccin Mocha), styling helpers
+│   ├── components/            # Reusable UI components
+│   │   ├── setting_rows.rs    # toggle_row, slider_row, color_row, text_row
+│   │   └── section.rs         # Section container with header
+│   ├── pages/                 # One .rs file per settings page
+│   └── nav/                   # Navigation components
+│       ├── sidebar.rs         # Category sidebar navigation
+│       ├── header.rs          # App title header
+│       ├── footer.rs          # Status bar and close button
+│       └── search_bar.rs      # Search input
 └── ipc/
     └── mod.rs                 # Niri socket communication (reload_config)
-
-ui/                            # Slint UI files
-├── main.slint                 # Main window, sidebar navigation
-├── styles.slint               # Theme colors (Catppuccin Mocha)
-├── pages/                     # One .slint file per settings page
-├── widgets/                   # Reusable components (ToggleRow, SliderRow, etc.)
-└── dialogs/                   # First-run wizard, error dialog
 ```
 
 ### Key Patterns
 
-**Settings flow**: `config/loader/` reads KDL → `Settings` struct → `bridge/sync.rs` populates UI → user changes trigger callbacks → `bridge/callbacks/` updates Settings → `SaveManager` debounces → `config/storage/` writes KDL
+**Settings flow**: `config/loader/` reads KDL → `Settings` struct → `AppState` wraps in `Arc<Mutex<>>` → UI pages read via `state.get_settings()` → user changes trigger callbacks → `state.update_settings()` modifies Settings → `state.mark_dirty_and_save()` triggers auto-save → `config/storage/` writes KDL
 
-**Callback macros** (in `bridge/macros.rs`): Use these to reduce boilerplate:
-- `register_bool_callback!` - Toggle switches
-- `register_clamped_callback!` - Sliders with min/max
-- `register_string_callback!` - Text inputs
-- `register_color_callback!` - Color pickers
+**Reactive UI** (Floem signals):
+- `RwSignal<T>` for local UI state that needs reactivity
+- `AppState` provides `get_settings()` and `update_settings()` for config access
+- Use `*_with_callback` variants (e.g., `toggle_row_with_callback`) to wire auto-save
 
 **Adding a new setting**:
-1. Add field to appropriate struct in `config/models.rs`
+1. Add field to appropriate struct in `config/models/<category>.rs`
 2. Add loader in `config/loader/<category>.rs`
 3. Add storage in `config/storage/<category>.rs`
-4. Add UI in `ui/pages/<category>.slint`
-5. Add callback in `ui/bridge/callbacks/<category>.rs`
-6. Add sync in `ui/bridge/sync.rs`
+4. Add UI in `src/ui/pages/<category>.rs` using setting row components
+5. Wire callback to `state.update_settings()` and `state.mark_dirty_and_save()`
 
 ## Conventions
 
-### Slint
+### Floem
 
-- Uses `cosmic-dark` style (set in `build.rs`)
-- Two-way bindings with `<=>` for settings
-- Callbacks use kebab-case (`on-value-changed`)
-- Slint uses `i32` for integers, not `i64`
-- All `.slint` files compiled via `build.rs`
+- Uses custom Catppuccin Mocha theme (defined in `ui/theme.rs`)
+- Reactive state via `RwSignal<T>` from `floem::reactive`
+- Components return `impl IntoView`
+- Styling via `.style()` method chains
+- Event handling via `.on_click_stop()`, `.on_event_stop()`, etc.
 
-### Rust-Slint Bridge
+### State Management
 
-- Settings stored in `Arc<Mutex<Settings>>`
-- Callbacks clone Arc and lock when needed
-- Use `Rc<SaveManager>` for debounced saves (not `Arc` - Slint is single-threaded)
+- Settings stored in `Arc<Mutex<Settings>>` inside `AppState`
+- `AppState` is cloned into each page (cheap - uses `Arc` internally)
+- Use `Rc<dyn Fn()>` for callbacks (Floem is single-threaded)
 
 ### KDL
 
@@ -122,7 +115,7 @@ ui/                            # Slint UI files
 
 | Crate | Purpose |
 |-------|---------|
-| slint 1.14 | UI framework |
+| floem | UI framework (reactive, GPU-accelerated) |
 | kdl 6.5 | KDL config parsing |
 | dirs 6.0 | XDG paths |
 | anyhow | Error handling |
@@ -133,5 +126,5 @@ ui/                            # Slint UI files
 ## Links
 
 - [Niri](https://github.com/YaLTeR/niri)
-- [Slint Docs](https://slint.dev/docs)
+- [Floem](https://github.com/lapce/floem) - UI framework
 - [KDL Spec](https://kdl.dev)

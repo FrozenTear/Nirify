@@ -6,7 +6,9 @@ use floem::views::Stack;
 use std::rc::Rc;
 
 use crate::config::SettingsCategory;
-use crate::ui::components::{section, slider_row_with_callback, text_row, toggle_row_with_callback};
+use crate::ui::components::{
+    section, slider_row_with_callback, text_row, toggle_row_with_callback,
+};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
@@ -22,29 +24,44 @@ pub fn cursor_page(state: AppState) -> impl IntoView {
     let auto_hide_enabled = RwSignal::new(cursor.hide_after_inactive_ms.is_some());
 
     // Callbacks
-    let on_size = { let state = state.clone(); Rc::new(move |val: f64| {
-        state.update_settings(|s| s.cursor.size = val as i32);
-        state.mark_dirty_and_save(SettingsCategory::Cursor);
-    })};
-
-    let on_hide_when_typing = { let state = state.clone(); Rc::new(move |val: bool| {
-        state.update_settings(|s| s.cursor.hide_when_typing = val);
-        state.mark_dirty_and_save(SettingsCategory::Cursor);
-    })};
-
-    let on_auto_hide_enabled = { let state = state.clone(); Rc::new(move |val: bool| {
-        state.update_settings(|s| {
-            s.cursor.hide_after_inactive_ms = if val { Some(hide_after_inactive.get() as i32) } else { None };
-        });
-        state.mark_dirty_and_save(SettingsCategory::Cursor);
-    })};
-
-    let on_hide_after_inactive = { Rc::new(move |val: f64| {
-        if auto_hide_enabled.get() {
-            state.update_settings(|s| s.cursor.hide_after_inactive_ms = Some(val as i32));
+    let on_size = {
+        let state = state.clone();
+        Rc::new(move |val: f64| {
+            state.update_settings(|s| s.cursor.size = val as i32);
             state.mark_dirty_and_save(SettingsCategory::Cursor);
-        }
-    })};
+        })
+    };
+
+    let on_hide_when_typing = {
+        let state = state.clone();
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.cursor.hide_when_typing = val);
+            state.mark_dirty_and_save(SettingsCategory::Cursor);
+        })
+    };
+
+    let on_auto_hide_enabled = {
+        let state = state.clone();
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| {
+                s.cursor.hide_after_inactive_ms = if val {
+                    Some(hide_after_inactive.get() as i32)
+                } else {
+                    None
+                };
+            });
+            state.mark_dirty_and_save(SettingsCategory::Cursor);
+        })
+    };
+
+    let on_hide_after_inactive = {
+        Rc::new(move |val: f64| {
+            if auto_hide_enabled.get() {
+                state.update_settings(|s| s.cursor.hide_after_inactive_ms = Some(val as i32));
+                state.mark_dirty_and_save(SettingsCategory::Cursor);
+            }
+        })
+    };
 
     Stack::vertical((
         section(

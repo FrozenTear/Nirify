@@ -19,10 +19,12 @@ pub fn touch_page(state: AppState) -> impl IntoView {
     let map_to_output = RwSignal::new(touch.map_to_output);
 
     // Callbacks
-    let on_off = { Rc::new(move |val: bool| {
-        state.update_settings(|s| s.touch.off = val);
-        state.mark_dirty_and_save(SettingsCategory::Touch);
-    })};
+    let on_off = {
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.touch.off = val);
+            state.mark_dirty_and_save(SettingsCategory::Touch);
+        })
+    };
 
     Stack::vertical((
         section(
@@ -36,9 +38,12 @@ pub fn touch_page(state: AppState) -> impl IntoView {
         ),
         section(
             "Device",
-            Stack::vertical((
-                toggle_row_with_callback("Disable touch", Some("Turn off touch input"), off, Some(on_off)),
-            )),
+            Stack::vertical((toggle_row_with_callback(
+                "Disable touch",
+                Some("Turn off touch input"),
+                off,
+                Some(on_off),
+            ),)),
         ),
     ))
     .style(|s| s.width_full().gap(SPACING_LG))

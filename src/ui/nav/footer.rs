@@ -5,9 +5,7 @@
 use floem::prelude::*;
 use floem::views::{Label, Stack};
 
-use crate::ui::theme::{
-    button_secondary_style, footer_style, FONT_SIZE_SM, SUCCESS, TEXT_GHOST,
-};
+use crate::ui::theme::{button_secondary_style, footer_style, FONT_SIZE_SM, SUCCESS, TEXT_GHOST};
 
 /// Create the footer with status indicator and close button
 pub fn footer() -> impl IntoView {
@@ -25,8 +23,8 @@ pub fn footer() -> impl IntoView {
         Label::derived(|| "Close".to_string())
             .style(button_secondary_style)
             .on_click_stop(|_| {
-                // TODO: Close application
-                std::process::exit(0);
+                // Use Floem's proper quit mechanism for graceful shutdown
+                floem::quit_app();
             }),
     ))
     .style(footer_style)
