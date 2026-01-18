@@ -3,8 +3,10 @@
 use floem::prelude::*;
 use floem::reactive::RwSignal;
 use floem::views::Stack;
+use std::rc::Rc;
 
-use crate::ui::components::{section, text_row, toggle_row};
+use crate::config::SettingsCategory;
+use crate::ui::components::{section, text_row, toggle_row_with_callback};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
@@ -15,6 +17,12 @@ pub fn touch_page(state: AppState) -> impl IntoView {
 
     let off = RwSignal::new(touch.off);
     let map_to_output = RwSignal::new(touch.map_to_output);
+
+    // Callbacks
+    let on_off = { Rc::new(move |val: bool| {
+        state.update_settings(|s| s.touch.off = val);
+        state.mark_dirty_and_save(SettingsCategory::Touch);
+    })};
 
     Stack::vertical((
         section(
@@ -28,11 +36,9 @@ pub fn touch_page(state: AppState) -> impl IntoView {
         ),
         section(
             "Device",
-            Stack::vertical((toggle_row(
-                "Disable touch",
-                Some("Turn off touch input"),
-                off,
-            ),)),
+            Stack::vertical((
+                toggle_row_with_callback("Disable touch", Some("Turn off touch input"), off, Some(on_off)),
+            )),
         ),
     ))
     .style(|s| s.width_full().gap(SPACING_LG))

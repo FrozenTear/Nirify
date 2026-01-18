@@ -3,8 +3,10 @@
 use floem::prelude::*;
 use floem::reactive::RwSignal;
 use floem::views::Stack;
+use std::rc::Rc;
 
-use crate::ui::components::{section, slider_row, text_row, toggle_row};
+use crate::config::SettingsCategory;
+use crate::ui::components::{section, slider_row_with_callback, text_row, toggle_row_with_callback};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
@@ -20,6 +22,41 @@ pub fn keyboard_page(state: AppState) -> impl IntoView {
     let repeat_delay = RwSignal::new(keyboard.repeat_delay as f64);
     let repeat_rate = RwSignal::new(keyboard.repeat_rate as f64);
     let numlock = RwSignal::new(keyboard.numlock);
+
+    // Callbacks
+    let on_repeat_delay = {
+        let state = state.clone();
+        Rc::new(move |val: f64| {
+            state.update_settings(|s| s.keyboard.repeat_delay = val as i32);
+            state.mark_dirty_and_save(SettingsCategory::Keyboard);
+        })
+    };
+
+    let on_repeat_rate = {
+        let state = state.clone();
+        Rc::new(move |val: f64| {
+            state.update_settings(|s| s.keyboard.repeat_rate = val as i32);
+            state.mark_dirty_and_save(SettingsCategory::Keyboard);
+        })
+    };
+
+    let on_numlock = {
+        let state = state.clone();
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.keyboard.numlock = val);
+            state.mark_dirty_and_save(SettingsCategory::Keyboard);
+        })
+    };
+
+    let on_off = {
+        Rc::new(move |val: bool| {
+            state.update_settings(|s| s.keyboard.off = val);
+            state.mark_dirty_and_save(SettingsCategory::Keyboard);
+        })
+    };
+
+    // Note: text_row doesn't have callback variant yet, so XKB settings won't auto-save
+    // TODO: Add text_row_with_callback for XKB settings
 
     Stack::vertical((
         // XKB Settings section
@@ -50,23 +87,25 @@ pub fn keyboard_page(state: AppState) -> impl IntoView {
         section(
             "Key Repeat",
             Stack::vertical((
-                slider_row(
+                slider_row_with_callback(
                     "Repeat delay",
                     Some("Delay before key repeat starts"),
                     repeat_delay,
-                    25.0,
+                    100.0,
                     1000.0,
                     25.0,
                     "ms",
+                    Some(on_repeat_delay),
                 ),
-                slider_row(
+                slider_row_with_callback(
                     "Repeat rate",
                     Some("Characters per second when held"),
                     repeat_rate,
-                    7.0,
-                    300.0,
+                    10.0,
+                    100.0,
                     5.0,
                     "/s",
+                    Some(on_repeat_rate),
                 ),
             )),
         ),
@@ -74,11 +113,17 @@ pub fn keyboard_page(state: AppState) -> impl IntoView {
         section(
             "Options",
             Stack::vertical((
-                toggle_row("Enable NumLock", Some("Turn on NumLock at startup"), numlock),
-                toggle_row(
+                toggle_row_with_callback(
+                    "Enable NumLock",
+                    Some("Turn on NumLock at startup"),
+                    numlock,
+                    Some(on_numlock),
+                ),
+                toggle_row_with_callback(
                     "Disable keyboard",
                     Some("WARNING: This can lock you out!"),
                     off,
+                    Some(on_off),
                 ),
             )),
         ),
