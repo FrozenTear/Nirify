@@ -10,12 +10,16 @@ use std::sync::{LazyLock, Mutex, RwLock};
 use niri_settings::config;
 use niri_settings::config::models::{
     AnimationSettings, AppearanceSettings, BehaviorSettings, CursorSettings, DebugSettings,
-    EnvironmentSettings, GestureSettings, KeyboardSettings, KeybindingsSettings,
-    LayerRulesSettings, LayoutExtrasSettings, MiscSettings, MouseSettings, OutputSettings,
-    OverviewSettings, RecentWindowsSettings, Settings, StartupSettings, SwitchEventsSettings,
-    TabletSettings, TouchSettings, TouchpadSettings, TrackballSettings, TrackpointSettings,
-    WindowRulesSettings, WorkspacesSettings,
+    EnvironmentSettings, EnvironmentVariable, GestureSettings, Keybinding, KeybindAction,
+    KeyboardSettings, KeybindingsSettings, LayerRule, LayerRuleMatch, LayerRulesSettings,
+    LayoutExtrasSettings, MiscSettings, MouseSettings, NamedWorkspace, OutputConfig,
+    OutputSettings, OverviewSettings, RecentWindowsSettings, Settings, StartupCommand,
+    StartupSettings, SwitchEventsSettings, TabletSettings, TouchSettings, TouchpadSettings,
+    TrackballSettings, TrackpointSettings, WindowRule, WindowRuleMatch, WindowRulesSettings,
+    WorkspacesSettings,
 };
+use niri_settings::ipc::get_full_outputs;
+use niri_settings::types::{Transform, VrrMode};
 use niri_settings::constants::*;
 use niri_settings::ipc;
 use niri_settings::types::{Color, ColorOrGradient};
@@ -261,6 +265,62 @@ impl NavGroup {
             }
         }
         NavGroup::Appearance
+    }
+}
+
+// ============================================================================
+// Custom Dropdown Component (select elements not supported in Blitz)
+// Renders inline and pushes content down (z-index doesn't work in Blitz)
+// ============================================================================
+
+/// A single option for the Dropdown component
+#[derive(Clone, PartialEq)]
+struct DropdownOption {
+    value: String,
+    label: String,
+}
+
+/// Custom dropdown component using buttons (since <select> is not supported in Blitz)
+#[component]
+fn Dropdown(
+    options: Vec<DropdownOption>,
+    selected_value: String,
+    on_change: EventHandler<String>,
+) -> Element {
+    let mut is_open = use_signal(|| false);
+
+    let selected_label = options
+        .iter()
+        .find(|o| o.value == selected_value)
+        .map(|o| o.label.clone())
+        .unwrap_or_else(|| selected_value.clone());
+
+    rsx! {
+        div { class: "dropdown",
+            button {
+                class: if is_open() { "dropdown-trigger open" } else { "dropdown-trigger" },
+                onclick: move |_| { is_open.set(!is_open()); },
+                "{selected_label}"
+                span { class: "dropdown-arrow", if is_open() { "▲" } else { "▼" } }
+            }
+            if is_open() {
+                div { class: "dropdown-menu",
+                    for opt in options.iter() {
+                        button {
+                            class: if opt.value == selected_value { "dropdown-item selected" } else { "dropdown-item" },
+                            onclick: {
+                                let value = opt.value.clone();
+                                move |_| {
+                                    on_change.call(value.clone());
+                                    is_open.set(false);
+                                }
+                            },
+                            "{opt.label}"
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -642,6 +702,86 @@ fn sync_mouse(local: &MouseSettings) {
 fn sync_touchpad(local: &TouchpadSettings) {
     if let Ok(mut global) = SETTINGS.write() {
         global.touchpad = local.clone();
+    }
+    save_and_reload();
+}
+
+/// Sync keybindings to global settings and save
+fn sync_keybindings(local: &KeybindingsSettings) {
+    if let Ok(mut global) = SETTINGS.write() {
+        global.keybindings = local.clone();
+    }
+    save_and_reload();
+}
+
+/// Sync outputs to global settings and save
+fn sync_outputs(local: &OutputSettings) {
+    if let Ok(mut global) = SETTINGS.write() {
+        global.outputs = local.clone();
+    }
+    save_and_reload();
+}
+
+/// Sync startup commands to global settings and save
+fn sync_startup(local: &StartupSettings) {
+    if let Ok(mut global) = SETTINGS.write() {
+        global.startup = local.clone();
+    }
+    save_and_reload();
+}
+
+/// Sync environment variables to global settings and save
+fn sync_environment(local: &EnvironmentSettings) {
+    if let Ok(mut global) = SETTINGS.write() {
+        global.environment = local.clone();
+    }
+    save_and_reload();
+}
+
+/// Sync workspaces to global settings and save
+fn sync_workspaces(local: &WorkspacesSettings) {
+    if let Ok(mut global) = SETTINGS.write() {
+        global.workspaces = local.clone();
+    }
+    save_and_reload();
+}
+
+/// Sync switch events to global settings and save
+fn sync_switch_events(local: &SwitchEventsSettings) {
+    if let Ok(mut global) = SETTINGS.write() {
+        global.switch_events = local.clone();
+    }
+    save_and_reload();
+}
+
+/// Sync recent windows to global settings and save
+fn sync_recent_windows(local: &RecentWindowsSettings) {
+    if let Ok(mut global) = SETTINGS.write() {
+        global.recent_windows = local.clone();
+    }
+    save_and_reload();
+}
+
+/// Sync layout extras to global settings and save
+fn sync_layout_extras(local: &LayoutExtrasSettings) {
+    if let Ok(mut global) = SETTINGS.write() {
+        global.layout_extras = local.clone();
+    }
+    save_and_reload();
+}
+
+/// Sync layer rules to global settings and save
+fn sync_layer_rules(local: &LayerRulesSettings) {
+    if let Ok(mut global) = SETTINGS.write() {
+        global.layer_rules = local.clone();
+    }
+    save_and_reload();
+}
+
+/// Sync window rules to global settings and save
+fn sync_window_rules(local: &WindowRulesSettings) {
+    if let Ok(mut global) = SETTINGS.write() {
+        global.window_rules = local.clone();
     }
     save_and_reload();
 }
@@ -1204,15 +1344,35 @@ fn TouchpadPage(settings: Signal<TouchpadSettings>) -> Element {
 }
 
 // ============================================================================
-// Window Rules Page (Read-only list view)
+// Window Rules Page (Full editor)
 // ============================================================================
+
+use niri_settings::config::models::OpenBehavior;
+
+fn next_window_rule_id(settings: &WindowRulesSettings) -> u32 {
+    settings.rules.iter().map(|r| r.id).max().unwrap_or(0) + 1
+}
 
 #[component]
 fn WindowRulesPage(settings: Signal<WindowRulesSettings>) -> Element {
     let s = settings();
+    let mut settings = settings;
+    let mut editing_id: Signal<Option<u32>> = use_signal(|| None);
 
     rsx! {
         h1 { "Window Rules" }
+
+        button {
+            class: "btn-add-startup",
+            onclick: move |_| {
+                let next_id = next_window_rule_id(&settings());
+                let new_rule = WindowRule { id: next_id, name: format!("Rule {}", next_id), ..Default::default() };
+                settings.write().rules.push(new_rule);
+                editing_id.set(Some(next_id));
+                sync_window_rules(&settings());
+            },
+            "+ Add Window Rule"
+        }
 
         Section { title: "Configured Rules",
             if s.rules.is_empty() {
@@ -1221,47 +1381,226 @@ fn WindowRulesPage(settings: Signal<WindowRulesSettings>) -> Element {
                 }
             } else {
                 for rule in s.rules.iter() {
-                    div { class: "setting-row",
-                        div { class: "setting-info",
-                            span { class: "setting-label", "{rule.name}" }
-                            span { class: "setting-description",
-                                if let Some(ref m) = rule.matches.first() {
-                                    if let Some(ref app_id) = m.app_id {
-                                        "app-id: {app_id}"
-                                    } else if let Some(ref title) = m.title {
-                                        "title: {title}"
-                                    } else {
-                                        "No match criteria"
-                                    }
-                                } else {
-                                    "No match criteria"
-                                }
+                    WindowRuleRow {
+                        rule: rule.clone(),
+                        is_editing: editing_id() == Some(rule.id),
+                        on_expand: move |id| editing_id.set(Some(id)),
+                        on_collapse: move |_| editing_id.set(None),
+                        on_update: move |updated: WindowRule| {
+                            if let Some(pos) = settings().rules.iter().position(|r| r.id == updated.id) {
+                                settings.write().rules[pos] = updated;
+                                sync_window_rules(&settings());
                             }
-                        }
-                        span { class: "setting-value",
-                            match rule.open_behavior {
-                                niri_settings::config::models::OpenBehavior::Normal => "Normal",
-                                niri_settings::config::models::OpenBehavior::Maximized => "Maximized",
-                                niri_settings::config::models::OpenBehavior::Fullscreen => "Fullscreen",
-                                niri_settings::config::models::OpenBehavior::Floating => "Floating",
-                            }
-                        }
+                        },
+                        on_delete: move |id| {
+                            settings.write().rules.retain(|r| r.id != id);
+                            editing_id.set(None);
+                            sync_window_rules(&settings());
+                        },
                     }
                 }
             }
         }
+    }
+}
 
-        p { class: "placeholder", "Edit window rules in ~/.config/niri/niri-settings/window-rules.kdl" }
+fn open_behavior_label(b: OpenBehavior) -> &'static str {
+    match b {
+        OpenBehavior::Normal => "Normal",
+        OpenBehavior::Maximized => "Maximized",
+        OpenBehavior::Fullscreen => "Fullscreen",
+        OpenBehavior::Floating => "Floating",
+    }
+}
+
+#[component]
+fn WindowRuleRow(
+    rule: WindowRule,
+    is_editing: bool,
+    on_expand: EventHandler<u32>,
+    on_collapse: EventHandler<()>,
+    on_update: EventHandler<WindowRule>,
+    on_delete: EventHandler<u32>,
+) -> Element {
+    let id = rule.id;
+    let rule_for_editor = rule.clone();
+    let match_desc = rule.matches.first().map(|m| {
+        if let Some(ref app_id) = m.app_id {
+            format!("app-id: {}", app_id)
+        } else if let Some(ref title) = m.title {
+            format!("title: {}", title)
+        } else {
+            "No match".to_string()
+        }
+    }).unwrap_or_else(|| "No match".to_string());
+
+    rsx! {
+        div { class: "startup-row",
+            div {
+                class: "startup-collapsed",
+                onclick: move |_| {
+                    if is_editing { on_collapse.call(()); } else { on_expand.call(id); }
+                },
+                span { class: "startup-command",
+                    "{rule.name} ({match_desc}) - {open_behavior_label(rule.open_behavior)}"
+                }
+            }
+
+            if is_editing {
+                WindowRuleEditor {
+                    rule: rule_for_editor,
+                    on_update: on_update,
+                    on_delete: on_delete,
+                    on_done: on_collapse,
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn WindowRuleEditor(
+    rule: WindowRule,
+    on_update: EventHandler<WindowRule>,
+    on_delete: EventHandler<u32>,
+    on_done: EventHandler<()>,
+) -> Element {
+    let id = rule.id;
+    let mut local_rule = use_signal(|| rule.clone());
+    let mut app_id_text = use_signal(|| rule.matches.first().and_then(|m| m.app_id.clone()).unwrap_or_default());
+    let mut title_text = use_signal(|| rule.matches.first().and_then(|m| m.title.clone()).unwrap_or_default());
+
+    let behavior_idx = match local_rule().open_behavior {
+        OpenBehavior::Normal => 0,
+        OpenBehavior::Maximized => 1,
+        OpenBehavior::Fullscreen => 2,
+        OpenBehavior::Floating => 3,
+    };
+
+    rsx! {
+        div { class: "startup-editor",
+            div { class: "startup-editor-grid",
+                div { class: "editor-field",
+                    label { "Rule Name" }
+                    input {
+                        r#type: "text",
+                        value: "{local_rule().name}",
+                        placeholder: "Rule name",
+                        oninput: move |e| { local_rule.write().name = e.value(); },
+                        onblur: move |_| { on_update.call(local_rule()); }
+                    }
+                }
+
+                div { class: "editor-row",
+                    div { class: "editor-field",
+                        label { "App ID (regex)" }
+                        input {
+                            r#type: "text",
+                            value: "{app_id_text()}",
+                            placeholder: "e.g., firefox, org.kde.*",
+                            oninput: move |e| { app_id_text.set(e.value()); },
+                            onblur: move |_| {
+                                if local_rule().matches.is_empty() {
+                                    local_rule.write().matches.push(WindowRuleMatch::default());
+                                }
+                                let val = app_id_text();
+                                local_rule.write().matches[0].app_id = if val.is_empty() { None } else { Some(val) };
+                                on_update.call(local_rule());
+                            }
+                        }
+                    }
+                    div { class: "editor-field",
+                        label { "Title (regex)" }
+                        input {
+                            r#type: "text",
+                            value: "{title_text()}",
+                            placeholder: "e.g., .*YouTube.*",
+                            oninput: move |e| { title_text.set(e.value()); },
+                            onblur: move |_| {
+                                if local_rule().matches.is_empty() {
+                                    local_rule.write().matches.push(WindowRuleMatch::default());
+                                }
+                                let val = title_text();
+                                local_rule.write().matches[0].title = if val.is_empty() { None } else { Some(val) };
+                                on_update.call(local_rule());
+                            }
+                        }
+                    }
+                }
+
+                div { class: "editor-field",
+                    label { "Open Behavior" }
+                    Dropdown {
+                        options: vec![
+                            DropdownOption { value: "0".into(), label: "Normal".into() },
+                            DropdownOption { value: "1".into(), label: "Maximized".into() },
+                            DropdownOption { value: "2".into(), label: "Fullscreen".into() },
+                            DropdownOption { value: "3".into(), label: "Floating".into() },
+                        ],
+                        selected_value: behavior_idx.to_string(),
+                        on_change: move |val: String| {
+                            let idx: i32 = val.parse().unwrap_or(0);
+                            local_rule.write().open_behavior = match idx {
+                                0 => OpenBehavior::Normal,
+                                1 => OpenBehavior::Maximized,
+                                2 => OpenBehavior::Fullscreen,
+                                3 => OpenBehavior::Floating,
+                                _ => OpenBehavior::Normal,
+                            };
+                            on_update.call(local_rule());
+                        },
+                    }
+                }
+
+                div { class: "editor-toggles",
+                    div { class: "editor-toggle",
+                        button {
+                            class: if local_rule().block_out_from_screencast { "toggle-btn on" } else { "toggle-btn off" },
+                            onclick: move |_| {
+                                local_rule.write().block_out_from_screencast = !local_rule().block_out_from_screencast;
+                                on_update.call(local_rule());
+                            },
+                        }
+                        label { "Block from screencast" }
+                    }
+                }
+
+                div { class: "editor-actions",
+                    button { class: "btn-delete", onclick: move |_| on_delete.call(id), "Delete" }
+                    button { class: "btn-done", onclick: move |_| on_done.call(()), "Done" }
+                }
+            }
+        }
     }
 }
 
 // ============================================================================
-// Keybindings Page (Read-only list view)
+// Keybindings Page (Full editor)
 // ============================================================================
+
+/// Get the next available ID for a new keybinding
+fn next_keybinding_id(bindings: &[Keybinding]) -> u32 {
+    bindings.iter().map(|b| b.id).max().unwrap_or(0) + 1
+}
+
+/// Create a new default keybinding
+fn new_keybinding(id: u32) -> Keybinding {
+    Keybinding {
+        id,
+        key_combo: "Mod+".to_string(),
+        action: KeybindAction::NiriAction("close-window".to_string()),
+        allow_when_locked: false,
+        cooldown_ms: None,
+        repeat: false,
+        hotkey_overlay_title: None,
+    }
+}
 
 #[component]
 fn KeybindingsPage(settings: Signal<KeybindingsSettings>) -> Element {
     let s = settings();
+    let mut settings = settings;
+    let mut editing_id: Signal<Option<u32>> = use_signal(|| None);
 
     rsx! {
         h1 { "Keybindings" }
@@ -1274,107 +1613,984 @@ fn KeybindingsPage(settings: Signal<KeybindingsSettings>) -> Element {
             }
         }
 
+        // Add new keybinding button
+        button {
+            class: "btn-add-keybinding",
+            onclick: move |_| {
+                let next_id = next_keybinding_id(&settings().bindings);
+                let new_bind = new_keybinding(next_id);
+                settings.write().bindings.push(new_bind);
+                editing_id.set(Some(next_id));
+                sync_keybindings(&settings());
+            },
+            "+ Add Keybinding"
+        }
+
         Section { title: "Configured Shortcuts",
             if s.bindings.is_empty() {
                 div { class: "setting-row",
-                    span { class: "setting-description", "No keybindings configured." }
+                    span { class: "setting-description", "No keybindings configured. Click the button above to add one." }
                 }
             } else {
-                for binding in s.bindings.iter().take(20) {
-                    div { class: "setting-row",
-                        div { class: "setting-info",
-                            span { class: "setting-label", "{binding.key_combo}" }
-                            span { class: "setting-description", "{binding.display_name()}" }
-                        }
-                        if binding.allow_when_locked {
-                            span { class: "setting-value", "🔓" }
-                        }
-                    }
-                }
-                if s.bindings.len() > 20 {
-                    div { class: "setting-row",
-                        span { class: "setting-description", "... and {s.bindings.len() - 20} more" }
+                for binding in s.bindings.iter() {
+                    KeybindingRow {
+                        binding: binding.clone(),
+                        is_editing: editing_id() == Some(binding.id),
+                        on_expand: move |id| editing_id.set(Some(id)),
+                        on_collapse: move |_| editing_id.set(None),
+                        on_update: move |updated: Keybinding| {
+                            if let Some(pos) = settings().bindings.iter().position(|b| b.id == updated.id) {
+                                settings.write().bindings[pos] = updated;
+                                sync_keybindings(&settings());
+                            }
+                        },
+                        on_delete: move |id| {
+                            settings.write().bindings.retain(|b| b.id != id);
+                            editing_id.set(None);
+                            sync_keybindings(&settings());
+                        },
                     }
                 }
             }
         }
-
-        p { class: "placeholder", "Edit keybindings in ~/.config/niri/niri-settings/keybindings.kdl" }
     }
 }
 
+/// Row component that shows collapsed or expanded editor
+#[component]
+fn KeybindingRow(
+    binding: Keybinding,
+    is_editing: bool,
+    on_expand: EventHandler<u32>,
+    on_collapse: EventHandler<()>,
+    on_update: EventHandler<Keybinding>,
+    on_delete: EventHandler<u32>,
+) -> Element {
+    let id = binding.id;
+    let binding_for_editor = binding.clone();
+
+    rsx! {
+        div { class: "keybinding-row",
+            // Collapsed view (always shown)
+            div {
+                class: "keybinding-collapsed",
+                onclick: move |_| {
+                    if is_editing {
+                        on_collapse.call(());
+                    } else {
+                        on_expand.call(id);
+                    }
+                },
+
+                span { class: "keybinding-key", "{binding.key_combo}" }
+                span { class: "keybinding-action", "{binding.display_name()}" }
+
+                div { class: "keybinding-badges",
+                    if binding.allow_when_locked {
+                        span { class: "keybinding-badge", "locked" }
+                    }
+                    if binding.repeat {
+                        span { class: "keybinding-badge", "repeat" }
+                    }
+                    if binding.cooldown_ms.is_some() {
+                        span { class: "keybinding-badge", "cooldown" }
+                    }
+                }
+            }
+
+            // Expanded editor (shown when editing)
+            if is_editing {
+                KeybindingEditor {
+                    binding: binding_for_editor,
+                    on_update: on_update,
+                    on_delete: on_delete,
+                    on_done: on_collapse,
+                }
+            }
+        }
+    }
+}
+
+/// Inline editor for a keybinding
+#[component]
+fn KeybindingEditor(
+    binding: Keybinding,
+    on_update: EventHandler<Keybinding>,
+    on_delete: EventHandler<u32>,
+    on_done: EventHandler<()>,
+) -> Element {
+    let id = binding.id;
+    let mut local_binding = use_signal(|| binding.clone());
+
+    // Action type dropdown index
+    let action_type_idx = match local_binding().action {
+        KeybindAction::Spawn(_) => 0,
+        KeybindAction::NiriAction(_) => 1,
+        KeybindAction::NiriActionWithArgs(_, _) => 2,
+    };
+
+    // Extract action fields for display
+    let (action_name, action_args) = match &local_binding().action {
+        KeybindAction::Spawn(args) => (String::new(), args.join(" ")),
+        KeybindAction::NiriAction(name) => (name.clone(), String::new()),
+        KeybindAction::NiriActionWithArgs(name, args) => (name.clone(), args.join(" ")),
+    };
+
+    rsx! {
+        div { class: "keybinding-editor",
+            div { class: "keybinding-editor-grid",
+
+                // Key combo field
+                div { class: "editor-field",
+                    label { "Key Combo" }
+                    input {
+                        r#type: "text",
+                        value: "{local_binding().key_combo}",
+                        placeholder: "e.g., Mod+Space, Mod+Shift+Q",
+                        oninput: move |e| {
+                            local_binding.write().key_combo = e.value();
+                            on_update.call(local_binding());
+                        }
+                    }
+                }
+
+                // Action type dropdown
+                div { class: "editor-field",
+                    label { "Action Type" }
+                    Dropdown {
+                        options: vec![
+                            DropdownOption { value: "0".into(), label: "Spawn Command".into() },
+                            DropdownOption { value: "1".into(), label: "Niri Action".into() },
+                            DropdownOption { value: "2".into(), label: "Niri Action with Args".into() },
+                        ],
+                        selected_value: action_type_idx.to_string(),
+                        on_change: move |val: String| {
+                            let idx: i32 = val.parse().unwrap_or(1);
+                            let new_action = match idx {
+                                0 => KeybindAction::Spawn(vec![]),
+                                1 => KeybindAction::NiriAction("close-window".to_string()),
+                                2 => KeybindAction::NiriActionWithArgs("focus-workspace".to_string(), vec![]),
+                                _ => KeybindAction::NiriAction("close-window".to_string()),
+                            };
+                            local_binding.write().action = new_action;
+                            on_update.call(local_binding());
+                        },
+                    }
+                }
+
+                // Action-specific fields
+                match action_type_idx {
+                    0 => rsx! {
+                        // Spawn: command input
+                        div { class: "editor-field",
+                            label { "Command" }
+                            input {
+                                r#type: "text",
+                                value: "{action_args}",
+                                placeholder: "e.g., alacritty, firefox --new-window",
+                                oninput: move |e| {
+                                    // Parse using shell_words-like simple split
+                                    let args = parse_command(&e.value());
+                                    local_binding.write().action = KeybindAction::Spawn(args);
+                                    on_update.call(local_binding());
+                                }
+                            }
+                        }
+                    },
+                    1 => rsx! {
+                        // NiriAction: action name
+                        div { class: "editor-field",
+                            label { "Action" }
+                            input {
+                                r#type: "text",
+                                value: "{action_name}",
+                                placeholder: "e.g., close-window, toggle-overview",
+                                oninput: move |e| {
+                                    local_binding.write().action = KeybindAction::NiriAction(e.value());
+                                    on_update.call(local_binding());
+                                }
+                            }
+                        }
+                    },
+                    _ => rsx! {
+                        // NiriActionWithArgs: action name + args
+                        div { class: "editor-field",
+                            label { "Action" }
+                            input {
+                                r#type: "text",
+                                value: "{action_name}",
+                                placeholder: "e.g., focus-workspace, set-column-width",
+                                oninput: move |e| {
+                                    let args = match &local_binding().action {
+                                        KeybindAction::NiriActionWithArgs(_, a) => a.clone(),
+                                        _ => vec![],
+                                    };
+                                    local_binding.write().action = KeybindAction::NiriActionWithArgs(e.value(), args);
+                                    on_update.call(local_binding());
+                                }
+                            }
+                        }
+                        div { class: "editor-field",
+                            label { "Arguments" }
+                            input {
+                                r#type: "text",
+                                value: "{action_args}",
+                                placeholder: "e.g., 1, +10%",
+                                oninput: move |e| {
+                                    let name = match &local_binding().action {
+                                        KeybindAction::NiriActionWithArgs(n, _) => n.clone(),
+                                        _ => String::new(),
+                                    };
+                                    let args = parse_command(&e.value());
+                                    local_binding.write().action = KeybindAction::NiriActionWithArgs(name, args);
+                                    on_update.call(local_binding());
+                                }
+                            }
+                        }
+                    },
+                }
+
+                // Overlay title (optional)
+                div { class: "editor-field",
+                    label { "Overlay Title" }
+                    input {
+                        r#type: "text",
+                        value: "{local_binding().hotkey_overlay_title.clone().unwrap_or_default()}",
+                        placeholder: "Optional title for hotkey overlay",
+                        oninput: move |e| {
+                            let val = e.value();
+                            local_binding.write().hotkey_overlay_title = if val.is_empty() { None } else { Some(val) };
+                            on_update.call(local_binding());
+                        }
+                    }
+                }
+
+                // Toggle options row
+                div { class: "editor-toggles",
+                    div { class: "editor-toggle",
+                        button {
+                            class: if local_binding().allow_when_locked { "toggle-btn on" } else { "toggle-btn off" },
+                            onclick: move |_| {
+                                local_binding.write().allow_when_locked = !local_binding().allow_when_locked;
+                                on_update.call(local_binding());
+                            },
+                        }
+                        label { "Allow when locked" }
+                    }
+
+                    div { class: "editor-toggle",
+                        button {
+                            class: if local_binding().repeat { "toggle-btn on" } else { "toggle-btn off" },
+                            onclick: move |_| {
+                                local_binding.write().repeat = !local_binding().repeat;
+                                on_update.call(local_binding());
+                            },
+                        }
+                        label { "Repeat" }
+                    }
+                }
+
+                // Cooldown slider (optional)
+                div { class: "editor-field",
+                    label { "Cooldown (ms)" }
+                    div { class: "slider-control",
+                        button {
+                            class: if local_binding().cooldown_ms.is_some() { "toggle-btn on" } else { "toggle-btn off" },
+                            onclick: move |_| {
+                                let current = local_binding().cooldown_ms;
+                                local_binding.write().cooldown_ms = if current.is_some() { None } else { Some(500) };
+                                on_update.call(local_binding());
+                            },
+                        }
+                        if let Some(cooldown) = local_binding().cooldown_ms {
+                            button {
+                                class: "slider-btn",
+                                onclick: move |_| {
+                                    let new_val = (cooldown - 100).max(KEYBIND_COOLDOWN_MIN);
+                                    local_binding.write().cooldown_ms = Some(new_val);
+                                    on_update.call(local_binding());
+                                },
+                                "-"
+                            }
+                            span { class: "slider-value", "{cooldown}ms" }
+                            button {
+                                class: "slider-btn",
+                                onclick: move |_| {
+                                    let new_val = (cooldown + 100).min(KEYBIND_COOLDOWN_MAX);
+                                    local_binding.write().cooldown_ms = Some(new_val);
+                                    on_update.call(local_binding());
+                                },
+                                "+"
+                            }
+                        }
+                    }
+                }
+
+                // Action buttons
+                div { class: "editor-actions",
+                    button {
+                        class: "btn-delete",
+                        onclick: move |_| on_delete.call(id),
+                        "Delete"
+                    }
+                    button {
+                        class: "btn-done",
+                        onclick: move |_| on_done.call(()),
+                        "Done"
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Simple command parser (splits on whitespace, handles basic quoting)
+fn parse_command(input: &str) -> Vec<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return vec![];
+    }
+
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_quote = false;
+    let mut quote_char = ' ';
+
+    for c in trimmed.chars() {
+        match c {
+            '"' | '\'' if !in_quote => {
+                in_quote = true;
+                quote_char = c;
+            }
+            c if in_quote && c == quote_char => {
+                in_quote = false;
+            }
+            ' ' if !in_quote => {
+                if !current.is_empty() {
+                    args.push(current.clone());
+                    current.clear();
+                }
+            }
+            _ => current.push(c),
+        }
+    }
+    if !current.is_empty() {
+        args.push(current);
+    }
+
+    args
+}
+
 // ============================================================================
-// Outputs Page (Read-only list view)
+// Outputs Page (Full editor)
 // ============================================================================
+
+/// Create a new default output config
+fn new_output_config(name: String) -> OutputConfig {
+    OutputConfig {
+        name,
+        enabled: true,
+        scale: 1.0,
+        mode: String::new(),
+        mode_custom: false,
+        modeline: None,
+        position_x: 0,
+        position_y: 0,
+        transform: Transform::Normal,
+        vrr: VrrMode::Off,
+        focus_at_startup: false,
+        backdrop_color: None,
+        hot_corners: None,
+        layout_override: None,
+    }
+}
+
+/// Get Transform display name
+fn transform_label(t: Transform) -> &'static str {
+    match t {
+        Transform::Normal => "Normal",
+        Transform::Rotate90 => "90°",
+        Transform::Rotate180 => "180°",
+        Transform::Rotate270 => "270°",
+        Transform::Flipped => "Flipped",
+        Transform::Flipped90 => "Flipped 90°",
+        Transform::Flipped180 => "Flipped 180°",
+        Transform::Flipped270 => "Flipped 270°",
+    }
+}
+
 
 #[component]
 fn OutputsPage(settings: Signal<OutputSettings>) -> Element {
     let s = settings();
+    let mut settings = settings;
+    let mut editing_name: Signal<Option<String>> = use_signal(|| None);
 
     rsx! {
-        h1 { "Outputs" }
+        h1 { "Displays" }
+
+        // Add new output button
+        button {
+            class: "btn-add-output",
+            onclick: move |_| {
+                // Generate unique name
+                let count = settings().outputs.len();
+                let name = format!("HDMI-A-{}", count + 1);
+                let new_output = new_output_config(name.clone());
+                settings.write().outputs.push(new_output);
+                editing_name.set(Some(name));
+                sync_outputs(&settings());
+            },
+            "+ Add Display"
+        }
 
         Section { title: "Configured Displays",
             if s.outputs.is_empty() {
                 div { class: "setting-row",
-                    span { class: "setting-description", "No outputs configured." }
+                    span { class: "setting-description", "No displays configured. Click the button above to add one." }
                 }
             } else {
                 for output in s.outputs.iter() {
-                    div { class: "setting-row",
-                        div { class: "setting-info",
-                            span { class: "setting-label", "{output.name}" }
-                            span { class: "setting-description",
-                                if output.mode.is_empty() {
-                                    "Default mode"
-                                } else {
-                                    "{output.mode}"
-                                }
+                    OutputRow {
+                        output: output.clone(),
+                        is_editing: editing_name() == Some(output.name.clone()),
+                        on_expand: move |name: String| editing_name.set(Some(name)),
+                        on_collapse: move |_| editing_name.set(None),
+                        on_update: move |updated: OutputConfig| {
+                            if let Some(pos) = settings().outputs.iter().position(|o| o.name == updated.name) {
+                                settings.write().outputs[pos] = updated;
+                                sync_outputs(&settings());
                             }
-                        }
-                        div { class: "slider-control",
-                            span { class: "setting-value", "{output.scale}x" }
-                            if !output.enabled {
-                                span { class: "setting-value", " (disabled)" }
-                            }
-                        }
+                        },
+                        on_delete: move |name: String| {
+                            settings.write().outputs.retain(|o| o.name != name);
+                            editing_name.set(None);
+                            sync_outputs(&settings());
+                        },
                     }
                 }
             }
         }
+    }
+}
 
-        p { class: "placeholder", "Edit outputs in ~/.config/niri/niri-settings/outputs.kdl" }
+/// Row component that shows collapsed or expanded editor
+#[component]
+fn OutputRow(
+    output: OutputConfig,
+    is_editing: bool,
+    on_expand: EventHandler<String>,
+    on_collapse: EventHandler<()>,
+    on_update: EventHandler<OutputConfig>,
+    on_delete: EventHandler<String>,
+) -> Element {
+    let name = output.name.clone();
+    let name_for_expand = name.clone();
+    let output_for_editor = output.clone();
+
+    rsx! {
+        div { class: "output-row",
+            // Collapsed view
+            div {
+                class: "output-collapsed",
+                onclick: move |_| {
+                    if is_editing {
+                        on_collapse.call(());
+                    } else {
+                        on_expand.call(name_for_expand.clone());
+                    }
+                },
+
+                span { class: "output-name", "{output.name}" }
+
+                div { class: "output-info",
+                    span { class: "output-mode",
+                        if output.mode.is_empty() {
+                            "Default mode"
+                        } else {
+                            "{output.mode}"
+                        }
+                    }
+                    span { class: "output-scale", "{output.scale}x scale" }
+                }
+
+                div { class: "output-badges",
+                    if !output.enabled {
+                        span { class: "output-badge disabled", "disabled" }
+                    }
+                    if output.transform != Transform::Normal {
+                        span { class: "output-badge", "{transform_label(output.transform)}" }
+                    }
+                    if output.vrr != VrrMode::Off {
+                        span { class: "output-badge", "VRR" }
+                    }
+                    if output.focus_at_startup {
+                        span { class: "output-badge", "focus" }
+                    }
+                }
+            }
+
+            // Expanded editor
+            if is_editing {
+                OutputEditor {
+                    output: output_for_editor,
+                    on_update: on_update,
+                    on_delete: on_delete,
+                    on_done: on_collapse,
+                }
+            }
+        }
+    }
+}
+
+/// Get available modes for an output from niri IPC
+fn get_available_modes(output_name: &str) -> Vec<String> {
+    let mut modes = vec!["".to_string()]; // Empty = default mode
+
+    if let Ok(outputs) = get_full_outputs() {
+        if let Some(output_info) = outputs.iter().find(|o| o.name == output_name) {
+            for mode in &output_info.modes {
+                // Convert millihertz to Hz
+                let refresh_hz = mode.refresh_rate as f64 / 1000.0;
+                let mode_str = format!("{}x{}@{:.3}", mode.width, mode.height, refresh_hz);
+                modes.push(mode_str);
+            }
+        }
+    }
+
+    modes
+}
+
+/// Format mode string for display in dropdown
+fn format_mode_display(mode: &str) -> String {
+    if mode.is_empty() {
+        "Default (auto)".to_string()
+    } else {
+        mode.to_string()
+    }
+}
+
+/// Inline editor for an output
+#[component]
+fn OutputEditor(
+    output: OutputConfig,
+    on_update: EventHandler<OutputConfig>,
+    on_delete: EventHandler<String>,
+    on_done: EventHandler<()>,
+) -> Element {
+    let name = output.name.clone();
+    let name_for_modes = name.clone();
+    let mut local_output = use_signal(|| output.clone());
+
+    // Get available modes from niri IPC
+    let available_modes = use_signal(|| get_available_modes(&name_for_modes));
+
+    // Transform dropdown index
+    let transform_idx = match local_output().transform {
+        Transform::Normal => 0,
+        Transform::Rotate90 => 1,
+        Transform::Rotate180 => 2,
+        Transform::Rotate270 => 3,
+        Transform::Flipped => 4,
+        Transform::Flipped90 => 5,
+        Transform::Flipped180 => 6,
+        Transform::Flipped270 => 7,
+    };
+
+    // VRR dropdown index
+    let vrr_idx = match local_output().vrr {
+        VrrMode::Off => 0,
+        VrrMode::On => 1,
+        VrrMode::OnDemand => 2,
+    };
+
+    rsx! {
+        div { class: "output-editor",
+            div { class: "output-editor-grid",
+
+                // Name field (updates on blur to avoid breaking references)
+                div { class: "editor-field",
+                    label { "Name" }
+                    input {
+                        r#type: "text",
+                        value: "{local_output().name}",
+                        placeholder: "e.g., HDMI-A-1, DP-1, eDP-1",
+                        oninput: move |e| {
+                            local_output.write().name = e.value();
+                        },
+                        onblur: move |_| {
+                            on_update.call(local_output());
+                        }
+                    }
+                }
+
+                // Mode dropdown (populated from niri IPC)
+                div { class: "editor-field",
+                    label { "Mode" }
+                    Dropdown {
+                        options: available_modes().iter().map(|m| DropdownOption {
+                            value: m.clone(),
+                            label: format_mode_display(m),
+                        }).collect(),
+                        selected_value: local_output().mode.clone(),
+                        on_change: move |val: String| {
+                            local_output.write().mode = val;
+                            on_update.call(local_output());
+                        },
+                    }
+                }
+
+                // Scale field
+                div { class: "editor-row",
+                    div { class: "editor-field",
+                        label { "Scale" }
+                        div { class: "slider-control",
+                            button {
+                                class: "slider-btn",
+                                onclick: move |_| {
+                                    let new_val = (local_output().scale - 0.25).max(0.25);
+                                    local_output.write().scale = new_val;
+                                    on_update.call(local_output());
+                                },
+                                "-"
+                            }
+                            span { class: "slider-value", "{local_output().scale:.2}x" }
+                            button {
+                                class: "slider-btn",
+                                onclick: move |_| {
+                                    let new_val = (local_output().scale + 0.25).min(4.0);
+                                    local_output.write().scale = new_val;
+                                    on_update.call(local_output());
+                                },
+                                "+"
+                            }
+                        }
+                    }
+                }
+
+                // Position fields
+                div { class: "editor-row",
+                    div { class: "editor-field",
+                        label { "Position X" }
+                        div { class: "slider-control",
+                            button {
+                                class: "slider-btn",
+                                onclick: move |_| {
+                                    local_output.write().position_x -= 100;
+                                    on_update.call(local_output());
+                                },
+                                "-"
+                            }
+                            span { class: "slider-value", "{local_output().position_x}" }
+                            button {
+                                class: "slider-btn",
+                                onclick: move |_| {
+                                    local_output.write().position_x += 100;
+                                    on_update.call(local_output());
+                                },
+                                "+"
+                            }
+                        }
+                    }
+
+                    div { class: "editor-field",
+                        label { "Position Y" }
+                        div { class: "slider-control",
+                            button {
+                                class: "slider-btn",
+                                onclick: move |_| {
+                                    local_output.write().position_y -= 100;
+                                    on_update.call(local_output());
+                                },
+                                "-"
+                            }
+                            span { class: "slider-value", "{local_output().position_y}" }
+                            button {
+                                class: "slider-btn",
+                                onclick: move |_| {
+                                    local_output.write().position_y += 100;
+                                    on_update.call(local_output());
+                                },
+                                "+"
+                            }
+                        }
+                    }
+                }
+
+                // Transform dropdown
+                div { class: "editor-field",
+                    label { "Transform" }
+                    Dropdown {
+                        options: vec![
+                            DropdownOption { value: "0".into(), label: "Normal".into() },
+                            DropdownOption { value: "1".into(), label: "90°".into() },
+                            DropdownOption { value: "2".into(), label: "180°".into() },
+                            DropdownOption { value: "3".into(), label: "270°".into() },
+                            DropdownOption { value: "4".into(), label: "Flipped".into() },
+                            DropdownOption { value: "5".into(), label: "Flipped 90°".into() },
+                            DropdownOption { value: "6".into(), label: "Flipped 180°".into() },
+                            DropdownOption { value: "7".into(), label: "Flipped 270°".into() },
+                        ],
+                        selected_value: transform_idx.to_string(),
+                        on_change: move |val: String| {
+                            let idx: i32 = val.parse().unwrap_or(0);
+                            let transform = match idx {
+                                0 => Transform::Normal,
+                                1 => Transform::Rotate90,
+                                2 => Transform::Rotate180,
+                                3 => Transform::Rotate270,
+                                4 => Transform::Flipped,
+                                5 => Transform::Flipped90,
+                                6 => Transform::Flipped180,
+                                7 => Transform::Flipped270,
+                                _ => Transform::Normal,
+                            };
+                            local_output.write().transform = transform;
+                            on_update.call(local_output());
+                        },
+                    }
+                }
+
+                // VRR dropdown
+                div { class: "editor-field",
+                    label { "Variable Refresh Rate" }
+                    Dropdown {
+                        options: vec![
+                            DropdownOption { value: "0".into(), label: "Off".into() },
+                            DropdownOption { value: "1".into(), label: "On".into() },
+                            DropdownOption { value: "2".into(), label: "On Demand".into() },
+                        ],
+                        selected_value: vrr_idx.to_string(),
+                        on_change: move |val: String| {
+                            let idx: i32 = val.parse().unwrap_or(0);
+                            let vrr = match idx {
+                                0 => VrrMode::Off,
+                                1 => VrrMode::On,
+                                2 => VrrMode::OnDemand,
+                                _ => VrrMode::Off,
+                            };
+                            local_output.write().vrr = vrr;
+                            on_update.call(local_output());
+                        },
+                    }
+                }
+
+                // Toggle options row
+                div { class: "editor-toggles",
+                    div { class: "editor-toggle",
+                        button {
+                            class: if local_output().enabled { "toggle-btn on" } else { "toggle-btn off" },
+                            onclick: move |_| {
+                                local_output.write().enabled = !local_output().enabled;
+                                on_update.call(local_output());
+                            },
+                        }
+                        label { "Enabled" }
+                    }
+
+                    div { class: "editor-toggle",
+                        button {
+                            class: if local_output().focus_at_startup { "toggle-btn on" } else { "toggle-btn off" },
+                            onclick: move |_| {
+                                local_output.write().focus_at_startup = !local_output().focus_at_startup;
+                                on_update.call(local_output());
+                            },
+                        }
+                        label { "Focus at startup" }
+                    }
+                }
+
+                // Action buttons
+                div { class: "editor-actions",
+                    button {
+                        class: "btn-delete",
+                        onclick: move |_| on_delete.call(name.clone()),
+                        "Delete"
+                    }
+                    button {
+                        class: "btn-done",
+                        onclick: move |_| on_done.call(()),
+                        "Done"
+                    }
+                }
+            }
+        }
     }
 }
 
 // ============================================================================
-// Startup Page (Read-only list view)
+// Startup Page (Full editor)
 // ============================================================================
+
+/// Get the next available ID for a new startup command
+fn next_startup_id(settings: &StartupSettings) -> u32 {
+    settings.commands.iter().map(|c| c.id).max().unwrap_or(0) + 1
+}
+
+/// Create a new default startup command
+fn new_startup_command(id: u32) -> StartupCommand {
+    StartupCommand {
+        id,
+        command: vec![String::new()],
+    }
+}
 
 #[component]
 fn StartupPage(settings: Signal<StartupSettings>) -> Element {
     let s = settings();
+    let mut settings = settings;
+    let mut editing_id: Signal<Option<u32>> = use_signal(|| None);
 
     rsx! {
         h1 { "Startup Commands" }
 
+        // Add new command button
+        button {
+            class: "btn-add-startup",
+            onclick: move |_| {
+                let next_id = next_startup_id(&settings());
+                let new_cmd = new_startup_command(next_id);
+                settings.write().commands.push(new_cmd);
+                editing_id.set(Some(next_id));
+                sync_startup(&settings());
+            },
+            "+ Add Startup Command"
+        }
+
         Section { title: "Commands to run at startup",
             if s.commands.is_empty() {
                 div { class: "setting-row",
-                    span { class: "setting-description", "No startup commands configured." }
+                    span { class: "setting-description", "No startup commands configured. Click the button above to add one." }
                 }
             } else {
                 for cmd in s.commands.iter() {
-                    div { class: "setting-row",
-                        div { class: "setting-info",
-                            span { class: "setting-label", "{cmd.display()}" }
-                        }
+                    StartupRow {
+                        command: cmd.clone(),
+                        is_editing: editing_id() == Some(cmd.id),
+                        on_expand: move |id| editing_id.set(Some(id)),
+                        on_collapse: move |_| editing_id.set(None),
+                        on_update: move |updated: StartupCommand| {
+                            if let Some(pos) = settings().commands.iter().position(|c| c.id == updated.id) {
+                                settings.write().commands[pos] = updated;
+                                sync_startup(&settings());
+                            }
+                        },
+                        on_delete: move |id| {
+                            settings.write().commands.retain(|c| c.id != id);
+                            editing_id.set(None);
+                            sync_startup(&settings());
+                        },
                     }
                 }
             }
         }
+    }
+}
 
-        p { class: "placeholder", "Edit startup commands in ~/.config/niri/niri-settings/startup.kdl" }
+/// Row component for startup command
+#[component]
+fn StartupRow(
+    command: StartupCommand,
+    is_editing: bool,
+    on_expand: EventHandler<u32>,
+    on_collapse: EventHandler<()>,
+    on_update: EventHandler<StartupCommand>,
+    on_delete: EventHandler<u32>,
+) -> Element {
+    let id = command.id;
+    let command_for_editor = command.clone();
+
+    rsx! {
+        div { class: "startup-row",
+            // Collapsed view
+            div {
+                class: "startup-collapsed",
+                onclick: move |_| {
+                    if is_editing {
+                        on_collapse.call(());
+                    } else {
+                        on_expand.call(id);
+                    }
+                },
+
+                span { class: "startup-command",
+                    if command.command.is_empty() || command.command[0].is_empty() {
+                        "(empty command)"
+                    } else {
+                        "{command.display()}"
+                    }
+                }
+            }
+
+            // Expanded editor
+            if is_editing {
+                StartupEditor {
+                    command: command_for_editor,
+                    on_update: on_update,
+                    on_delete: on_delete,
+                    on_done: on_collapse,
+                }
+            }
+        }
+    }
+}
+
+/// Inline editor for a startup command
+#[component]
+fn StartupEditor(
+    command: StartupCommand,
+    on_update: EventHandler<StartupCommand>,
+    on_delete: EventHandler<u32>,
+    on_done: EventHandler<()>,
+) -> Element {
+    let id = command.id;
+    let mut local_command = use_signal(|| command.clone());
+
+    // Store command as a single string for editing
+    let mut command_text = use_signal(|| command.display());
+
+    rsx! {
+        div { class: "startup-editor",
+            div { class: "startup-editor-grid",
+
+                // Command field
+                div { class: "editor-field",
+                    label { "Command" }
+                    input {
+                        r#type: "text",
+                        value: "{command_text()}",
+                        placeholder: "e.g., waybar, swww-daemon, mako",
+                        oninput: move |e| {
+                            command_text.set(e.value());
+                        },
+                        onblur: move |_| {
+                            // Parse command string into args
+                            let args = parse_command(&command_text());
+                            local_command.write().command = if args.is_empty() {
+                                vec![String::new()]
+                            } else {
+                                args
+                            };
+                            on_update.call(local_command());
+                        }
+                    }
+                }
+
+                // Action buttons
+                div { class: "editor-actions",
+                    button {
+                        class: "btn-delete",
+                        onclick: move |_| on_delete.call(id),
+                        "Delete"
+                    }
+                    button {
+                        class: "btn-done",
+                        onclick: move |_| on_done.call(()),
+                        "Done"
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1706,121 +2922,389 @@ fn OverviewPage(settings: Signal<OverviewSettings>) -> Element {
 }
 
 // ============================================================================
-// Recent Windows Page
+// Recent Windows Page (Full editor)
 // ============================================================================
 
 #[component]
 fn RecentWindowsPage(settings: Signal<RecentWindowsSettings>) -> Element {
     let s = settings();
+    let mut settings = settings;
 
     rsx! {
         h1 { "Recent Windows" }
 
-        Section { title: "Switcher",
-            div { class: "setting-row",
-                div { class: "setting-info",
-                    span { class: "setting-label", "Status" }
+        Section { title: "Switcher Settings",
+            ToggleRow {
+                label: "Enable switcher",
+                description: Some("Enable the Alt-Tab recent windows switcher"),
+                value: !s.off,
+                on_change: move |v: bool| {
+                    settings.write().off = !v;
+                    sync_recent_windows(&settings());
                 }
-                span { class: "setting-value", if s.off { "Disabled" } else { "Enabled" } }
             }
 
             div { class: "setting-row",
                 div { class: "setting-info",
                     span { class: "setting-label", "Open delay" }
+                    span { class: "setting-description", "Delay before switcher UI appears (ms)" }
                 }
-                span { class: "setting-value", "{s.open_delay_ms}ms" }
+                div { class: "slider-control",
+                    button {
+                        class: "slider-btn",
+                        onclick: move |_| {
+                            settings.write().open_delay_ms = (settings().open_delay_ms - 50).max(0);
+                            sync_recent_windows(&settings());
+                        },
+                        "-"
+                    }
+                    span { class: "slider-value", "{s.open_delay_ms}ms" }
+                    button {
+                        class: "slider-btn",
+                        onclick: move |_| {
+                            settings.write().open_delay_ms = (settings().open_delay_ms + 50).min(1000);
+                            sync_recent_windows(&settings());
+                        },
+                        "+"
+                    }
+                }
             }
 
             div { class: "setting-row",
                 div { class: "setting-info",
                     span { class: "setting-label", "Debounce" }
+                    span { class: "setting-description", "Delay before window is added to recent list (ms)" }
                 }
-                span { class: "setting-value", "{s.debounce_ms}ms" }
+                div { class: "slider-control",
+                    button {
+                        class: "slider-btn",
+                        onclick: move |_| {
+                            settings.write().debounce_ms = (settings().debounce_ms - 50).max(0);
+                            sync_recent_windows(&settings());
+                        },
+                        "-"
+                    }
+                    span { class: "slider-value", "{s.debounce_ms}ms" }
+                    button {
+                        class: "slider-btn",
+                        onclick: move |_| {
+                            settings.write().debounce_ms = (settings().debounce_ms + 50).min(500);
+                            sync_recent_windows(&settings());
+                        },
+                        "+"
+                    }
+                }
             }
         }
 
-        Section { title: "Keybindings",
-            if s.binds.is_empty() {
-                div { class: "setting-row",
-                    span { class: "setting-description", "Using default Alt+Tab binding" }
+        Section { title: "Preview Settings",
+            div { class: "setting-row",
+                div { class: "setting-info",
+                    span { class: "setting-label", "Max preview height" }
                 }
-            } else {
-                for bind in s.binds.iter() {
-                    div { class: "setting-row",
-                        div { class: "setting-info",
-                            span { class: "setting-label", "{bind.key_combo}" }
-                            span { class: "setting-description",
-                                if bind.is_next { "Next window" } else { "Previous window" }
-                            }
+                div { class: "slider-control",
+                    button {
+                        class: "slider-btn",
+                        onclick: move |_| {
+                            settings.write().previews.max_height = (settings().previews.max_height - 25).max(50);
+                            sync_recent_windows(&settings());
+                        },
+                        "-"
+                    }
+                    span { class: "slider-value", "{s.previews.max_height}px" }
+                    button {
+                        class: "slider-btn",
+                        onclick: move |_| {
+                            settings.write().previews.max_height = (settings().previews.max_height + 25).min(500);
+                            sync_recent_windows(&settings());
+                        },
+                        "+"
+                    }
+                }
+            }
+        }
+
+        Section { title: "Highlight Settings",
+            div { class: "setting-row",
+                div { class: "setting-info",
+                    span { class: "setting-label", "Highlight padding" }
+                }
+                div { class: "slider-control",
+                    button {
+                        class: "slider-btn",
+                        onclick: move |_| {
+                            settings.write().highlight.padding = (settings().highlight.padding - 2).max(0);
+                            sync_recent_windows(&settings());
+                        },
+                        "-"
+                    }
+                    span { class: "slider-value", "{s.highlight.padding}px" }
+                    button {
+                        class: "slider-btn",
+                        onclick: move |_| {
+                            settings.write().highlight.padding = (settings().highlight.padding + 2).min(32);
+                            sync_recent_windows(&settings());
+                        },
+                        "+"
+                    }
+                }
+            }
+
+            div { class: "setting-row",
+                div { class: "setting-info",
+                    span { class: "setting-label", "Corner radius" }
+                }
+                div { class: "slider-control",
+                    button {
+                        class: "slider-btn",
+                        onclick: move |_| {
+                            settings.write().highlight.corner_radius = (settings().highlight.corner_radius - 2).max(0);
+                            sync_recent_windows(&settings());
+                        },
+                        "-"
+                    }
+                    span { class: "slider-value", "{s.highlight.corner_radius}px" }
+                    button {
+                        class: "slider-btn",
+                        onclick: move |_| {
+                            settings.write().highlight.corner_radius = (settings().highlight.corner_radius + 2).min(32);
+                            sync_recent_windows(&settings());
+                        },
+                        "+"
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Layout Extras Page (Full editor)
+// ============================================================================
+
+#[component]
+fn LayoutExtrasPage(settings: Signal<LayoutExtrasSettings>) -> Element {
+    let s = settings();
+    let mut settings = settings;
+
+    rsx! {
+        h1 { "Layout Extras" }
+
+        Section { title: "Window Shadows",
+            ToggleRow {
+                label: "Enable shadows",
+                description: Some("Draw shadows behind windows"),
+                value: s.shadow.enabled,
+                on_change: move |v| {
+                    settings.write().shadow.enabled = v;
+                    sync_layout_extras(&settings());
+                }
+            }
+
+            if s.shadow.enabled {
+                div { class: "setting-row",
+                    div { class: "setting-info",
+                        span { class: "setting-label", "Softness (blur)" }
+                    }
+                    div { class: "slider-control",
+                        button {
+                            class: "slider-btn",
+                            onclick: move |_| {
+                                settings.write().shadow.softness = (settings().shadow.softness - 5).max(0);
+                                sync_layout_extras(&settings());
+                            },
+                            "-"
+                        }
+                        span { class: "slider-value", "{s.shadow.softness}" }
+                        button {
+                            class: "slider-btn",
+                            onclick: move |_| {
+                                settings.write().shadow.softness = (settings().shadow.softness + 5).min(100);
+                                sync_layout_extras(&settings());
+                            },
+                            "+"
+                        }
+                    }
+                }
+
+                div { class: "setting-row",
+                    div { class: "setting-info",
+                        span { class: "setting-label", "Spread" }
+                    }
+                    div { class: "slider-control",
+                        button {
+                            class: "slider-btn",
+                            onclick: move |_| {
+                                settings.write().shadow.spread = (settings().shadow.spread - 1).max(0);
+                                sync_layout_extras(&settings());
+                            },
+                            "-"
+                        }
+                        span { class: "slider-value", "{s.shadow.spread}" }
+                        button {
+                            class: "slider-btn",
+                            onclick: move |_| {
+                                settings.write().shadow.spread = (settings().shadow.spread + 1).min(50);
+                                sync_layout_extras(&settings());
+                            },
+                            "+"
+                        }
+                    }
+                }
+
+                div { class: "setting-row",
+                    div { class: "setting-info",
+                        span { class: "setting-label", "Offset Y" }
+                    }
+                    div { class: "slider-control",
+                        button {
+                            class: "slider-btn",
+                            onclick: move |_| {
+                                settings.write().shadow.offset_y = settings().shadow.offset_y - 1;
+                                sync_layout_extras(&settings());
+                            },
+                            "-"
+                        }
+                        span { class: "slider-value", "{s.shadow.offset_y}" }
+                        button {
+                            class: "slider-btn",
+                            onclick: move |_| {
+                                settings.write().shadow.offset_y = settings().shadow.offset_y + 1;
+                                sync_layout_extras(&settings());
+                            },
+                            "+"
+                        }
+                    }
+                }
+
+                ToggleRow {
+                    label: "Draw behind window",
+                    description: Some("Draw shadow behind the window content"),
+                    value: s.shadow.draw_behind_window,
+                    on_change: move |v| {
+                        settings.write().shadow.draw_behind_window = v;
+                        sync_layout_extras(&settings());
+                    }
+                }
+            }
+        }
+
+        Section { title: "Tab Indicator",
+            ToggleRow {
+                label: "Enable tab indicator",
+                description: Some("Show indicator for tabbed windows"),
+                value: s.tab_indicator.enabled,
+                on_change: move |v| {
+                    settings.write().tab_indicator.enabled = v;
+                    sync_layout_extras(&settings());
+                }
+            }
+
+            if s.tab_indicator.enabled {
+                ToggleRow {
+                    label: "Hide when single tab",
+                    description: Some("Hide indicator when only one tab in column"),
+                    value: s.tab_indicator.hide_when_single_tab,
+                    on_change: move |v| {
+                        settings.write().tab_indicator.hide_when_single_tab = v;
+                        sync_layout_extras(&settings());
+                    }
+                }
+
+                div { class: "setting-row",
+                    div { class: "setting-info",
+                        span { class: "setting-label", "Width" }
+                    }
+                    div { class: "slider-control",
+                        button {
+                            class: "slider-btn",
+                            onclick: move |_| {
+                                settings.write().tab_indicator.width = (settings().tab_indicator.width - 1).max(1);
+                                sync_layout_extras(&settings());
+                            },
+                            "-"
+                        }
+                        span { class: "slider-value", "{s.tab_indicator.width}px" }
+                        button {
+                            class: "slider-btn",
+                            onclick: move |_| {
+                                settings.write().tab_indicator.width = (settings().tab_indicator.width + 1).min(20);
+                                sync_layout_extras(&settings());
+                            },
+                            "+"
+                        }
+                    }
+                }
+
+                div { class: "setting-row",
+                    div { class: "setting-info",
+                        span { class: "setting-label", "Gap" }
+                    }
+                    div { class: "slider-control",
+                        button {
+                            class: "slider-btn",
+                            onclick: move |_| {
+                                settings.write().tab_indicator.gap = (settings().tab_indicator.gap - 1).max(0);
+                                sync_layout_extras(&settings());
+                            },
+                            "-"
+                        }
+                        span { class: "slider-value", "{s.tab_indicator.gap}px" }
+                        button {
+                            class: "slider-btn",
+                            onclick: move |_| {
+                                settings.write().tab_indicator.gap = (settings().tab_indicator.gap + 1).min(20);
+                                sync_layout_extras(&settings());
+                            },
+                            "+"
                         }
                     }
                 }
             }
         }
 
-        p { class: "placeholder", "Edit in ~/.config/niri/niri-settings/recent-windows.kdl" }
-    }
-}
-
-// ============================================================================
-// Layout Extras Page
-// ============================================================================
-
-#[component]
-fn LayoutExtrasPage(settings: Signal<LayoutExtrasSettings>) -> Element {
-    let s = settings();
-
-    rsx! {
-        h1 { "Layout Extras" }
-
-        Section { title: "Window Shadows",
-            div { class: "setting-row",
-                div { class: "setting-info",
-                    span { class: "setting-label", "Shadows enabled" }
-                }
-                span { class: "setting-value", if s.shadow.enabled { "Yes" } else { "No" } }
-            }
-
-            div { class: "setting-row",
-                div { class: "setting-info",
-                    span { class: "setting-label", "Shadow softness" }
-                }
-                span { class: "setting-value", "{s.shadow.softness}px" }
-            }
-        }
-
-        Section { title: "Tab Indicator",
-            div { class: "setting-row",
-                div { class: "setting-info",
-                    span { class: "setting-label", "Tab indicator enabled" }
-                }
-                span { class: "setting-value", if s.tab_indicator.enabled { "Yes" } else { "No" } }
-            }
-        }
-
         Section { title: "Insert Hint",
-            div { class: "setting-row",
-                div { class: "setting-info",
-                    span { class: "setting-label", "Insert hint enabled" }
+            ToggleRow {
+                label: "Enable insert hint",
+                description: Some("Show visual hint when inserting windows"),
+                value: s.insert_hint.enabled,
+                on_change: move |v| {
+                    settings.write().insert_hint.enabled = v;
+                    sync_layout_extras(&settings());
                 }
-                span { class: "setting-value", if s.insert_hint.enabled { "Yes" } else { "No" } }
             }
         }
-
-        p { class: "placeholder", "Edit in ~/.config/niri/niri-settings/layout-extras.kdl" }
     }
 }
 
 // ============================================================================
-// Workspaces Page
+// Workspaces Page (Full editor)
 // ============================================================================
+
+fn next_workspace_id(settings: &WorkspacesSettings) -> u32 {
+    settings.workspaces.iter().map(|w| w.id).max().unwrap_or(0) + 1
+}
 
 #[component]
 fn WorkspacesPage(settings: Signal<WorkspacesSettings>) -> Element {
     let s = settings();
+    let mut settings = settings;
+    let mut editing_id: Signal<Option<u32>> = use_signal(|| None);
 
     rsx! {
         h1 { "Workspaces" }
+
+        button {
+            class: "btn-add-startup",
+            onclick: move |_| {
+                let next_id = next_workspace_id(&settings());
+                let new_ws = NamedWorkspace { id: next_id, name: format!("Workspace {}", next_id), open_on_output: None, layout_override: None };
+                settings.write().workspaces.push(new_ws);
+                editing_id.set(Some(next_id));
+                sync_workspaces(&settings());
+            },
+            "+ Add Workspace"
+        }
 
         Section { title: "Named Workspaces",
             if s.workspaces.is_empty() {
@@ -1829,32 +3313,145 @@ fn WorkspacesPage(settings: Signal<WorkspacesSettings>) -> Element {
                 }
             } else {
                 for ws in s.workspaces.iter() {
-                    div { class: "setting-row",
-                        div { class: "setting-info",
-                            span { class: "setting-label", "{ws.name}" }
-                            if let Some(ref output) = ws.open_on_output {
-                                span { class: "setting-description", "on {output}" }
+                    WorkspaceRow {
+                        workspace: ws.clone(),
+                        is_editing: editing_id() == Some(ws.id),
+                        on_expand: move |id| editing_id.set(Some(id)),
+                        on_collapse: move |_| editing_id.set(None),
+                        on_update: move |updated: NamedWorkspace| {
+                            if let Some(pos) = settings().workspaces.iter().position(|w| w.id == updated.id) {
+                                settings.write().workspaces[pos] = updated;
+                                sync_workspaces(&settings());
                             }
-                        }
+                        },
+                        on_delete: move |id| {
+                            settings.write().workspaces.retain(|w| w.id != id);
+                            editing_id.set(None);
+                            sync_workspaces(&settings());
+                        },
                     }
                 }
             }
         }
+    }
+}
 
-        p { class: "placeholder", "Edit in ~/.config/niri/niri-settings/workspaces.kdl" }
+#[component]
+fn WorkspaceRow(
+    workspace: NamedWorkspace,
+    is_editing: bool,
+    on_expand: EventHandler<u32>,
+    on_collapse: EventHandler<()>,
+    on_update: EventHandler<NamedWorkspace>,
+    on_delete: EventHandler<u32>,
+) -> Element {
+    let id = workspace.id;
+    let ws_for_editor = workspace.clone();
+
+    rsx! {
+        div { class: "startup-row",
+            div {
+                class: "startup-collapsed",
+                onclick: move |_| {
+                    if is_editing { on_collapse.call(()); } else { on_expand.call(id); }
+                },
+                span { class: "startup-command",
+                    "{workspace.name}"
+                    if let Some(ref output) = workspace.open_on_output {
+                        " (on {output})"
+                    }
+                }
+            }
+
+            if is_editing {
+                WorkspaceEditor {
+                    workspace: ws_for_editor,
+                    on_update: on_update,
+                    on_delete: on_delete,
+                    on_done: on_collapse,
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn WorkspaceEditor(
+    workspace: NamedWorkspace,
+    on_update: EventHandler<NamedWorkspace>,
+    on_delete: EventHandler<u32>,
+    on_done: EventHandler<()>,
+) -> Element {
+    let id = workspace.id;
+    let mut local_ws = use_signal(|| workspace.clone());
+    let mut output_text = use_signal(|| workspace.open_on_output.clone().unwrap_or_default());
+
+    rsx! {
+        div { class: "startup-editor",
+            div { class: "startup-editor-grid",
+                div { class: "editor-row",
+                    div { class: "editor-field",
+                        label { "Name" }
+                        input {
+                            r#type: "text",
+                            value: "{local_ws().name}",
+                            placeholder: "Workspace name",
+                            oninput: move |e| { local_ws.write().name = e.value(); },
+                            onblur: move |_| { on_update.call(local_ws()); }
+                        }
+                    }
+                    div { class: "editor-field",
+                        label { "Output" }
+                        input {
+                            r#type: "text",
+                            value: "{output_text()}",
+                            placeholder: "e.g., DP-1, HDMI-A-1 (optional)",
+                            oninput: move |e| { output_text.set(e.value()); },
+                            onblur: move |_| {
+                                let val = output_text();
+                                local_ws.write().open_on_output = if val.is_empty() { None } else { Some(val) };
+                                on_update.call(local_ws());
+                            }
+                        }
+                    }
+                }
+                div { class: "editor-actions",
+                    button { class: "btn-delete", onclick: move |_| on_delete.call(id), "Delete" }
+                    button { class: "btn-done", onclick: move |_| on_done.call(()), "Done" }
+                }
+            }
+        }
     }
 }
 
 // ============================================================================
-// Layer Rules Page
+// Layer Rules Page (Full editor)
 // ============================================================================
+
+fn next_layer_rule_id(settings: &LayerRulesSettings) -> u32 {
+    settings.rules.iter().map(|r| r.id).max().unwrap_or(0) + 1
+}
 
 #[component]
 fn LayerRulesPage(settings: Signal<LayerRulesSettings>) -> Element {
     let s = settings();
+    let mut settings = settings;
+    let mut editing_id: Signal<Option<u32>> = use_signal(|| None);
 
     rsx! {
         h1 { "Layer Rules" }
+
+        button {
+            class: "btn-add-startup",
+            onclick: move |_| {
+                let next_id = next_layer_rule_id(&settings());
+                let new_rule = LayerRule { id: next_id, name: format!("Rule {}", next_id), ..Default::default() };
+                settings.write().rules.push(new_rule);
+                editing_id.set(Some(next_id));
+                sync_layer_rules(&settings());
+            },
+            "+ Add Layer Rule"
+        }
 
         Section { title: "Configured Rules",
             if s.rules.is_empty() {
@@ -1863,21 +3460,141 @@ fn LayerRulesPage(settings: Signal<LayerRulesSettings>) -> Element {
                 }
             } else {
                 for rule in s.rules.iter() {
-                    div { class: "setting-row",
-                        div { class: "setting-info",
-                            span { class: "setting-label", "{rule.name}" }
-                            if let Some(ref m) = rule.matches.first() {
-                                if let Some(ref ns) = m.namespace {
-                                    span { class: "setting-description", "namespace: {ns}" }
-                                }
+                    LayerRuleRow {
+                        rule: rule.clone(),
+                        is_editing: editing_id() == Some(rule.id),
+                        on_expand: move |id| editing_id.set(Some(id)),
+                        on_collapse: move |_| editing_id.set(None),
+                        on_update: move |updated: LayerRule| {
+                            if let Some(pos) = settings().rules.iter().position(|r| r.id == updated.id) {
+                                settings.write().rules[pos] = updated;
+                                sync_layer_rules(&settings());
                             }
-                        }
+                        },
+                        on_delete: move |id| {
+                            settings.write().rules.retain(|r| r.id != id);
+                            editing_id.set(None);
+                            sync_layer_rules(&settings());
+                        },
                     }
                 }
             }
         }
+    }
+}
 
-        p { class: "placeholder", "Edit in ~/.config/niri/niri-settings/layer-rules.kdl" }
+#[component]
+fn LayerRuleRow(
+    rule: LayerRule,
+    is_editing: bool,
+    on_expand: EventHandler<u32>,
+    on_collapse: EventHandler<()>,
+    on_update: EventHandler<LayerRule>,
+    on_delete: EventHandler<u32>,
+) -> Element {
+    let id = rule.id;
+    let rule_for_editor = rule.clone();
+    let namespace = rule.matches.first().and_then(|m| m.namespace.clone()).unwrap_or_default();
+
+    rsx! {
+        div { class: "startup-row",
+            div {
+                class: "startup-collapsed",
+                onclick: move |_| {
+                    if is_editing { on_collapse.call(()); } else { on_expand.call(id); }
+                },
+                span { class: "startup-command",
+                    "{rule.name}"
+                    if !namespace.is_empty() {
+                        " (namespace: {namespace})"
+                    }
+                }
+            }
+
+            if is_editing {
+                LayerRuleEditor {
+                    rule: rule_for_editor,
+                    on_update: on_update,
+                    on_delete: on_delete,
+                    on_done: on_collapse,
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn LayerRuleEditor(
+    rule: LayerRule,
+    on_update: EventHandler<LayerRule>,
+    on_delete: EventHandler<u32>,
+    on_done: EventHandler<()>,
+) -> Element {
+    let id = rule.id;
+    let mut local_rule = use_signal(|| rule.clone());
+    let mut namespace_text = use_signal(|| rule.matches.first().and_then(|m| m.namespace.clone()).unwrap_or_default());
+
+    rsx! {
+        div { class: "startup-editor",
+            div { class: "startup-editor-grid",
+                div { class: "editor-field",
+                    label { "Rule Name" }
+                    input {
+                        r#type: "text",
+                        value: "{local_rule().name}",
+                        placeholder: "Rule name",
+                        oninput: move |e| { local_rule.write().name = e.value(); },
+                        onblur: move |_| { on_update.call(local_rule()); }
+                    }
+                }
+
+                div { class: "editor-field",
+                    label { "Namespace (regex)" }
+                    input {
+                        r#type: "text",
+                        value: "{namespace_text()}",
+                        placeholder: "e.g., waybar, mako",
+                        oninput: move |e| { namespace_text.set(e.value()); },
+                        onblur: move |_| {
+                            let ns = namespace_text();
+                            if local_rule().matches.is_empty() {
+                                local_rule.write().matches.push(LayerRuleMatch::default());
+                            }
+                            local_rule.write().matches[0].namespace = if ns.is_empty() { None } else { Some(ns) };
+                            on_update.call(local_rule());
+                        }
+                    }
+                }
+
+                div { class: "editor-toggles",
+                    div { class: "editor-toggle",
+                        button {
+                            class: if local_rule().place_within_backdrop { "toggle-btn on" } else { "toggle-btn off" },
+                            onclick: move |_| {
+                                local_rule.write().place_within_backdrop = !local_rule().place_within_backdrop;
+                                on_update.call(local_rule());
+                            },
+                        }
+                        label { "Place within backdrop" }
+                    }
+                    div { class: "editor-toggle",
+                        button {
+                            class: if local_rule().baba_is_float { "toggle-btn on" } else { "toggle-btn off" },
+                            onclick: move |_| {
+                                local_rule.write().baba_is_float = !local_rule().baba_is_float;
+                                on_update.call(local_rule());
+                            },
+                        }
+                        label { "Floating animations" }
+                    }
+                }
+
+                div { class: "editor-actions",
+                    button { class: "btn-delete", onclick: move |_| on_delete.call(id), "Delete" }
+                    button { class: "btn-done", onclick: move |_| on_done.call(()), "Done" }
+                }
+            }
+        }
     }
 }
 
@@ -1979,15 +3696,33 @@ fn GesturesPage(settings: Signal<GestureSettings>) -> Element {
 }
 
 // ============================================================================
-// Environment Page
+// Environment Page (Full editor)
 // ============================================================================
+
+fn next_env_id(settings: &EnvironmentSettings) -> u32 {
+    settings.variables.iter().map(|v| v.id).max().unwrap_or(0) + 1
+}
 
 #[component]
 fn EnvironmentPage(settings: Signal<EnvironmentSettings>) -> Element {
     let s = settings();
+    let mut settings = settings;
+    let mut editing_id: Signal<Option<u32>> = use_signal(|| None);
 
     rsx! {
         h1 { "Environment" }
+
+        button {
+            class: "btn-add-startup",
+            onclick: move |_| {
+                let next_id = next_env_id(&settings());
+                let new_var = EnvironmentVariable { id: next_id, name: String::new(), value: String::new() };
+                settings.write().variables.push(new_var);
+                editing_id.set(Some(next_id));
+                sync_environment(&settings());
+            },
+            "+ Add Environment Variable"
+        }
 
         Section { title: "Environment Variables",
             if s.variables.is_empty() {
@@ -1996,31 +3731,126 @@ fn EnvironmentPage(settings: Signal<EnvironmentSettings>) -> Element {
                 }
             } else {
                 for var in s.variables.iter() {
-                    div { class: "setting-row",
-                        div { class: "setting-info",
-                            span { class: "setting-label", "{var.name}" }
-                        }
-                        span { class: "setting-value", "{var.value}" }
+                    EnvVarRow {
+                        variable: var.clone(),
+                        is_editing: editing_id() == Some(var.id),
+                        on_expand: move |id| editing_id.set(Some(id)),
+                        on_collapse: move |_| editing_id.set(None),
+                        on_update: move |updated: EnvironmentVariable| {
+                            if let Some(pos) = settings().variables.iter().position(|v| v.id == updated.id) {
+                                settings.write().variables[pos] = updated;
+                                sync_environment(&settings());
+                            }
+                        },
+                        on_delete: move |id| {
+                            settings.write().variables.retain(|v| v.id != id);
+                            editing_id.set(None);
+                            sync_environment(&settings());
+                        },
                     }
                 }
             }
         }
+    }
+}
 
-        p { class: "placeholder", "Edit in ~/.config/niri/niri-settings/environment.kdl" }
+#[component]
+fn EnvVarRow(
+    variable: EnvironmentVariable,
+    is_editing: bool,
+    on_expand: EventHandler<u32>,
+    on_collapse: EventHandler<()>,
+    on_update: EventHandler<EnvironmentVariable>,
+    on_delete: EventHandler<u32>,
+) -> Element {
+    let id = variable.id;
+    let var_for_editor = variable.clone();
+
+    rsx! {
+        div { class: "startup-row",
+            div {
+                class: "startup-collapsed",
+                onclick: move |_| {
+                    if is_editing { on_collapse.call(()); } else { on_expand.call(id); }
+                },
+                span { class: "startup-command",
+                    if variable.name.is_empty() {
+                        "(empty)"
+                    } else {
+                        "{variable.name}={variable.value}"
+                    }
+                }
+            }
+
+            if is_editing {
+                EnvVarEditor {
+                    variable: var_for_editor,
+                    on_update: on_update,
+                    on_delete: on_delete,
+                    on_done: on_collapse,
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn EnvVarEditor(
+    variable: EnvironmentVariable,
+    on_update: EventHandler<EnvironmentVariable>,
+    on_delete: EventHandler<u32>,
+    on_done: EventHandler<()>,
+) -> Element {
+    let id = variable.id;
+    let mut local_var = use_signal(|| variable.clone());
+
+    rsx! {
+        div { class: "startup-editor",
+            div { class: "startup-editor-grid",
+                div { class: "editor-row",
+                    div { class: "editor-field",
+                        label { "Name" }
+                        input {
+                            r#type: "text",
+                            value: "{local_var().name}",
+                            placeholder: "e.g., EDITOR, PATH",
+                            oninput: move |e| { local_var.write().name = e.value(); },
+                            onblur: move |_| { on_update.call(local_var()); }
+                        }
+                    }
+                    div { class: "editor-field",
+                        label { "Value" }
+                        input {
+                            r#type: "text",
+                            value: "{local_var().value}",
+                            placeholder: "e.g., vim, /usr/bin",
+                            oninput: move |e| { local_var.write().value = e.value(); },
+                            onblur: move |_| { on_update.call(local_var()); }
+                        }
+                    }
+                }
+                div { class: "editor-actions",
+                    button { class: "btn-delete", onclick: move |_| on_delete.call(id), "Delete" }
+                    button { class: "btn-done", onclick: move |_| on_done.call(()), "Done" }
+                }
+            }
+        }
     }
 }
 
 // ============================================================================
-// Switch Events Page
+// Switch Events Page (Full editor)
 // ============================================================================
 
 #[component]
 fn SwitchEventsPage(settings: Signal<SwitchEventsSettings>) -> Element {
-    let s = settings();
-    let lid_close_action = if s.lid_close.has_action() { s.lid_close.display() } else { "None".to_string() };
-    let lid_open_action = if s.lid_open.has_action() { s.lid_open.display() } else { "None".to_string() };
-    let tablet_on_action = if s.tablet_mode_on.has_action() { s.tablet_mode_on.display() } else { "None".to_string() };
-    let tablet_off_action = if s.tablet_mode_off.has_action() { s.tablet_mode_off.display() } else { "None".to_string() };
+    let mut settings = settings;
+
+    // Local signals for each command input
+    let mut lid_close_text = use_signal(|| settings().lid_close.display());
+    let mut lid_open_text = use_signal(|| settings().lid_open.display());
+    let mut tablet_on_text = use_signal(|| settings().tablet_mode_on.display());
+    let mut tablet_off_text = use_signal(|| settings().tablet_mode_off.display());
 
     rsx! {
         h1 { "Switch Events" }
@@ -2028,36 +3858,74 @@ fn SwitchEventsPage(settings: Signal<SwitchEventsSettings>) -> Element {
         Section { title: "Lid Events",
             div { class: "setting-row",
                 div { class: "setting-info",
-                    span { class: "setting-label", "Lid close action" }
+                    span { class: "setting-label", "Lid close" }
+                    span { class: "setting-description", "Command to run when laptop lid closes" }
                 }
-                span { class: "setting-value", "{lid_close_action}" }
+                input {
+                    r#type: "text",
+                    value: "{lid_close_text()}",
+                    placeholder: "e.g., systemctl suspend",
+                    oninput: move |e| { lid_close_text.set(e.value()); },
+                    onblur: move |_| {
+                        settings.write().lid_close.spawn = parse_command(&lid_close_text());
+                        sync_switch_events(&settings());
+                    }
+                }
             }
 
             div { class: "setting-row",
                 div { class: "setting-info",
-                    span { class: "setting-label", "Lid open action" }
+                    span { class: "setting-label", "Lid open" }
+                    span { class: "setting-description", "Command to run when laptop lid opens" }
                 }
-                span { class: "setting-value", "{lid_open_action}" }
+                input {
+                    r#type: "text",
+                    value: "{lid_open_text()}",
+                    placeholder: "e.g., brightnessctl set 100%",
+                    oninput: move |e| { lid_open_text.set(e.value()); },
+                    onblur: move |_| {
+                        settings.write().lid_open.spawn = parse_command(&lid_open_text());
+                        sync_switch_events(&settings());
+                    }
+                }
             }
         }
 
         Section { title: "Tablet Mode",
             div { class: "setting-row",
                 div { class: "setting-info",
-                    span { class: "setting-label", "Tablet mode on action" }
+                    span { class: "setting-label", "Tablet mode on" }
+                    span { class: "setting-description", "Command to run when entering tablet mode" }
                 }
-                span { class: "setting-value", "{tablet_on_action}" }
+                input {
+                    r#type: "text",
+                    value: "{tablet_on_text()}",
+                    placeholder: "e.g., wvkbd-mobintl",
+                    oninput: move |e| { tablet_on_text.set(e.value()); },
+                    onblur: move |_| {
+                        settings.write().tablet_mode_on.spawn = parse_command(&tablet_on_text());
+                        sync_switch_events(&settings());
+                    }
+                }
             }
 
             div { class: "setting-row",
                 div { class: "setting-info",
-                    span { class: "setting-label", "Tablet mode off action" }
+                    span { class: "setting-label", "Tablet mode off" }
+                    span { class: "setting-description", "Command to run when exiting tablet mode" }
                 }
-                span { class: "setting-value", "{tablet_off_action}" }
+                input {
+                    r#type: "text",
+                    value: "{tablet_off_text()}",
+                    placeholder: "e.g., pkill wvkbd",
+                    oninput: move |e| { tablet_off_text.set(e.value()); },
+                    onblur: move |_| {
+                        settings.write().tablet_mode_off.spawn = parse_command(&tablet_off_text());
+                        sync_switch_events(&settings());
+                    }
+                }
             }
         }
-
-        p { class: "placeholder", "Edit in ~/.config/niri/niri-settings/switch-events.kdl" }
     }
 }
 

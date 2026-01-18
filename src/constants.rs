@@ -204,3 +204,11 @@ pub const MAX_ENVIRONMENT_VARS: usize = 100;
 
 /// Maximum number of startup commands
 pub const MAX_STARTUP_COMMANDS: usize = 50;
+
+// ============================================================================
+// KEYBINDINGS PARAMETERS
+// ============================================================================
+
+/// Keybinding cooldown range (milliseconds)
+pub const KEYBIND_COOLDOWN_MIN: i32 = 0;
+pub const KEYBIND_COOLDOWN_MAX: i32 = 5000;
