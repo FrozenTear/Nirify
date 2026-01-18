@@ -49,7 +49,7 @@ pub fn sidebar(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> i
                     })
             },
         )
-        .style(|s| s.width_full()),
+        .style(|s| s.flex_col().width_full()),
     ))
     .style(sidebar_style)
 }
