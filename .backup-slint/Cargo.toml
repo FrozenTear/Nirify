@@ -14,7 +14,7 @@ members = ["macros"]
 
 [dependencies]
 niri-settings-macros = { path = "macros" }
-floem = { git = "https://github.com/lapce/floem", branch = "main" }
+slint = "1.14"
 kdl = { version = "6.5", features = ["v1-fallback"] }
 dirs = "6.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -27,6 +27,9 @@ log = "0.4"
 env_logger = "0.11"
 rfd = "0.15"
 paste = "1.0"
+
+[build-dependencies]
+slint-build = "1.14"
 
 [dev-dependencies]
 tempfile = "3.23"

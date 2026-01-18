@@ -1,0 +1,235 @@
+//! Application state management for niri-settings
+//!
+//! Uses Floem's reactive signals to manage UI state.
+
+use floem::reactive::{RwSignal, SignalUpdate};
+use std::sync::{Arc, Mutex};
+
+use crate::config::{ConfigPaths, Settings};
+
+/// Navigation category for the sidebar
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Category {
+    #[default]
+    Appearance,
+    Keyboard,
+    Mouse,
+    Touchpad,
+    Trackpoint,
+    Trackball,
+    Tablet,
+    Touch,
+    Outputs,
+    Animations,
+    Cursor,
+    Overview,
+    RecentWindows,
+    Behavior,
+    LayoutExtras,
+    Workspaces,
+    WindowRules,
+    LayerRules,
+    Gestures,
+    Keybindings,
+    Startup,
+    Environment,
+    SwitchEvents,
+    Miscellaneous,
+    Debug,
+}
+
+impl Category {
+    /// Get the display label for this category
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Appearance => "Appearance",
+            Self::Keyboard => "Keyboard",
+            Self::Mouse => "Mouse",
+            Self::Touchpad => "Touchpad",
+            Self::Trackpoint => "Trackpoint",
+            Self::Trackball => "Trackball",
+            Self::Tablet => "Tablet",
+            Self::Touch => "Touch",
+            Self::Outputs => "Displays",
+            Self::Animations => "Animations",
+            Self::Cursor => "Cursor",
+            Self::Overview => "Overview",
+            Self::RecentWindows => "Recent Windows",
+            Self::Behavior => "Behavior",
+            Self::LayoutExtras => "Layout Extras",
+            Self::Workspaces => "Workspaces",
+            Self::WindowRules => "Window Rules",
+            Self::LayerRules => "Layer Rules",
+            Self::Gestures => "Gestures",
+            Self::Keybindings => "Keybindings",
+            Self::Startup => "Startup",
+            Self::Environment => "Environment",
+            Self::SwitchEvents => "Switch Events",
+            Self::Miscellaneous => "Miscellaneous",
+            Self::Debug => "Debug",
+        }
+    }
+
+    /// Get the navigation group for this category
+    pub fn nav_group(&self) -> NavGroup {
+        match self {
+            Self::Appearance => NavGroup::Appearance,
+            Self::Keyboard
+            | Self::Mouse
+            | Self::Touchpad
+            | Self::Trackpoint
+            | Self::Trackball
+            | Self::Tablet
+            | Self::Touch
+            | Self::Outputs => NavGroup::Input,
+            Self::Animations | Self::Cursor | Self::Overview | Self::RecentWindows => {
+                NavGroup::Visuals
+            }
+            Self::Behavior | Self::LayoutExtras | Self::Workspaces => NavGroup::Behavior,
+            Self::WindowRules | Self::LayerRules | Self::Gestures => NavGroup::Rules,
+            Self::Keybindings
+            | Self::Startup
+            | Self::Environment
+            | Self::SwitchEvents
+            | Self::Miscellaneous
+            | Self::Debug => NavGroup::System,
+        }
+    }
+}
+
+/// Navigation group (top-level tabs)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NavGroup {
+    #[default]
+    Appearance,
+    Input,
+    Visuals,
+    Behavior,
+    Rules,
+    System,
+}
+
+impl NavGroup {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Appearance => "Appearance",
+            Self::Input => "Input",
+            Self::Visuals => "Visuals",
+            Self::Behavior => "Behavior",
+            Self::Rules => "Rules",
+            Self::System => "System",
+        }
+    }
+
+    pub fn all() -> &'static [NavGroup] {
+        &[
+            Self::Appearance,
+            Self::Input,
+            Self::Visuals,
+            Self::Behavior,
+            Self::Rules,
+            Self::System,
+        ]
+    }
+
+    /// Get the categories in this group
+    pub fn categories(&self) -> &'static [Category] {
+        match self {
+            Self::Appearance => &[Category::Appearance],
+            Self::Input => &[
+                Category::Keyboard,
+                Category::Mouse,
+                Category::Touchpad,
+                Category::Trackpoint,
+                Category::Trackball,
+                Category::Tablet,
+                Category::Touch,
+                Category::Outputs,
+            ],
+            Self::Visuals => &[
+                Category::Animations,
+                Category::Cursor,
+                Category::Overview,
+                Category::RecentWindows,
+            ],
+            Self::Behavior => &[
+                Category::Behavior,
+                Category::LayoutExtras,
+                Category::Workspaces,
+            ],
+            Self::Rules => &[
+                Category::WindowRules,
+                Category::LayerRules,
+                Category::Gestures,
+            ],
+            Self::System => &[
+                Category::Keybindings,
+                Category::Startup,
+                Category::Environment,
+                Category::SwitchEvents,
+                Category::Miscellaneous,
+                Category::Debug,
+            ],
+        }
+    }
+}
+
+/// Global application state
+#[derive(Clone)]
+pub struct AppState {
+    /// Current navigation category
+    pub category: RwSignal<Category>,
+    /// Current navigation group
+    pub nav_group: RwSignal<NavGroup>,
+    /// Search query
+    pub search_query: RwSignal<String>,
+    /// Status message
+    pub status_message: RwSignal<Option<(String, bool)>>,
+    /// Settings data (shared with config system)
+    pub settings: Arc<Mutex<Settings>>,
+    /// Config paths
+    pub paths: Arc<ConfigPaths>,
+}
+
+impl AppState {
+    pub fn new(settings: Arc<Mutex<Settings>>, paths: Arc<ConfigPaths>) -> Self {
+        Self {
+            category: RwSignal::new(Category::Appearance),
+            nav_group: RwSignal::new(NavGroup::Appearance),
+            search_query: RwSignal::new(String::new()),
+            status_message: RwSignal::new(None),
+            settings,
+            paths,
+        }
+    }
+
+    /// Navigate to a category
+    pub fn navigate_to(&self, category: Category) {
+        self.category.set(category);
+        self.nav_group.set(category.nav_group());
+    }
+
+    /// Show a status message
+    pub fn show_status(&self, message: impl Into<String>, is_error: bool) {
+        self.status_message.set(Some((message.into(), is_error)));
+    }
+
+    /// Clear the status message
+    pub fn clear_status(&self) {
+        self.status_message.set(None);
+    }
+
+    /// Get a clone of the current settings
+    pub fn get_settings(&self) -> Settings {
+        self.settings.lock().unwrap().clone()
+    }
+
+    /// Update settings with a closure
+    pub fn update_settings<F>(&self, f: F)
+    where
+        F: FnOnce(&mut Settings),
+    {
+        let mut settings = self.settings.lock().unwrap();
+        f(&mut settings);
+    }
+}

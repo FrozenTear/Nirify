@@ -1,32 +1,18 @@
 //! Async wrappers for IPC operations that run on background threads
 //!
 //! These functions move IPC calls off the UI thread to prevent UI freezes
-//! when niri is slow or unresponsive. Results are delivered via Slint's
-//! `invoke_from_event_loop` which safely queues callbacks on the UI thread.
-//!
-//! # Usage
-//!
-//! ```rust,ignore
-//! let ui_weak = ui.as_weak();
-//! ipc::async_ops::reload_config_async(move |result| {
-//!     if let Some(ui) = ui_weak.upgrade() {
-//!         match result {
-//!             Ok(()) => info!("Config reloaded"),
-//!             Err(e) => show_error(&ui, &e.to_string()),
-//!         }
-//!     }
-//! });
-//! ```
+//! when niri is slow or unresponsive. Results are delivered via callbacks
+//! which the caller can use to update reactive state.
 //!
 //! # Thread Safety
 //!
 //! Each async function spawns a short-lived thread that:
 //! 1. Executes the synchronous IPC call (with 2s timeout)
-//! 2. Queues the result callback on the UI thread via `invoke_from_event_loop`
+//! 2. Calls the result callback
 //! 3. Exits
 //!
-//! If the app is shutting down, `invoke_from_event_loop` will fail gracefully
-//! and the callback simply won't run - this is safe and expected.
+//! Note: The callback is called on the background thread. If you need to
+//! update UI state, use Floem's reactive signals which are thread-safe.
 
 use super::{FullOutputInfo, IpcResult, WindowInfo, WorkspaceInfo};
 use log::debug;
@@ -35,7 +21,7 @@ use std::thread;
 /// Reload niri configuration asynchronously.
 ///
 /// Spawns a background thread to call `reload_config()`, then invokes
-/// the callback on the UI thread with the result.
+/// the callback with the result.
 pub fn reload_config_async<F>(on_complete: F)
 where
     F: FnOnce(IpcResult<()>) + Send + 'static,
@@ -44,18 +30,11 @@ where
         debug!("Async reload_config started");
         let result = super::reload_config();
         debug!("Async reload_config completed: {:?}", result.is_ok());
-
-        // Queue callback on UI thread - ignore error if event loop stopped
-        let _ = slint::invoke_from_event_loop(move || {
-            on_complete(result);
-        });
+        on_complete(result);
     });
 }
 
 /// Get list of windows asynchronously.
-///
-/// Spawns a background thread to call `get_windows()`, then invokes
-/// the callback on the UI thread with the result.
 pub fn get_windows_async<F>(on_complete: F)
 where
     F: FnOnce(IpcResult<Vec<WindowInfo>>) + Send + 'static,
@@ -67,17 +46,11 @@ where
             "Async get_windows completed: {} windows",
             result.as_ref().map_or(0, |w| w.len())
         );
-
-        let _ = slint::invoke_from_event_loop(move || {
-            on_complete(result);
-        });
+        on_complete(result);
     });
 }
 
 /// Get list of workspaces asynchronously.
-///
-/// Spawns a background thread to call `get_workspaces()`, then invokes
-/// the callback on the UI thread with the result.
 pub fn get_workspaces_async<F>(on_complete: F)
 where
     F: FnOnce(IpcResult<Vec<WorkspaceInfo>>) + Send + 'static,
@@ -89,17 +62,11 @@ where
             "Async get_workspaces completed: {} workspaces",
             result.as_ref().map_or(0, |w| w.len())
         );
-
-        let _ = slint::invoke_from_event_loop(move || {
-            on_complete(result);
-        });
+        on_complete(result);
     });
 }
 
 /// Get focused window asynchronously.
-///
-/// Spawns a background thread to call `get_focused_window()`, then invokes
-/// the callback on the UI thread with the result.
 pub fn get_focused_window_async<F>(on_complete: F)
 where
     F: FnOnce(IpcResult<Option<WindowInfo>>) + Send + 'static,
@@ -108,17 +75,11 @@ where
         debug!("Async get_focused_window started");
         let result = super::get_focused_window();
         debug!("Async get_focused_window completed");
-
-        let _ = slint::invoke_from_event_loop(move || {
-            on_complete(result);
-        });
+        on_complete(result);
     });
 }
 
 /// Get focused output asynchronously.
-///
-/// Spawns a background thread to call `get_focused_output()`, then invokes
-/// the callback on the UI thread with the result.
 pub fn get_focused_output_async<F>(on_complete: F)
 where
     F: FnOnce(IpcResult<Option<String>>) + Send + 'static,
@@ -127,18 +88,11 @@ where
         debug!("Async get_focused_output started");
         let result = super::get_focused_output();
         debug!("Async get_focused_output completed");
-
-        let _ = slint::invoke_from_event_loop(move || {
-            on_complete(result);
-        });
+        on_complete(result);
     });
 }
 
 /// Get full output information asynchronously.
-///
-/// Spawns a background thread to call `get_full_outputs()`, then invokes
-/// the callback on the UI thread with the result. This includes mode lists,
-/// scale, position, transform, and VRR status for each output.
 pub fn get_full_outputs_async<F>(on_complete: F)
 where
     F: FnOnce(IpcResult<Vec<FullOutputInfo>>) + Send + 'static,
@@ -150,10 +104,7 @@ where
             "Async get_full_outputs completed: {} outputs",
             result.as_ref().map_or(0, |o| o.len())
         );
-
-        let _ = slint::invoke_from_event_loop(move || {
-            on_complete(result);
-        });
+        on_complete(result);
     });
 }
 
@@ -162,10 +113,6 @@ mod tests {
     use super::*;
     use std::sync::mpsc;
     use std::time::Duration;
-
-    // Note: These tests don't actually test async behavior since invoke_from_event_loop
-    // requires a running Slint event loop. They verify the functions compile and
-    // the sync IPC functions are called correctly.
 
     #[test]
     fn test_async_functions_compile() {
@@ -193,15 +140,16 @@ mod tests {
     #[test]
     fn test_callback_captures_work() {
         // Verify closures can capture and move values
-        let (tx, _rx) = mpsc::channel::<bool>();
+        let (tx, rx) = mpsc::channel::<bool>();
 
         reload_config_async(move |_result| {
-            // This would send if we had an event loop
             let _ = tx.send(true);
         });
 
-        // Give the thread a moment to spawn (it will fail to invoke_from_event_loop
-        // since there's no Slint event loop, but that's expected)
-        std::thread::sleep(Duration::from_millis(50));
+        // The callback should be called on the background thread
+        match rx.recv_timeout(Duration::from_secs(5)) {
+            Ok(_) => (), // Callback was called
+            Err(_) => (), // IPC may fail if niri isn't running, that's fine
+        }
     }
 }
