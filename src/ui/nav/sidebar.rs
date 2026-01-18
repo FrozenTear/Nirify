@@ -13,8 +13,9 @@ pub fn sidebar(
     let nav_group = *current_nav_group.read();
 
     rect()
-        .horizontal()
+        .direction(Direction::Horizontal)
         .width(Size::fill())
+        .height(Size::px(50.0))
         .padding((SPACING_MD, SPACING_2XL, SPACING_MD, SPACING_2XL))
         .background(MANTLE)
         .spacing(SPACING_SM)
@@ -23,13 +24,10 @@ pub fn sidebar(
 
 /// Generate category buttons based on the current nav group
 fn category_buttons(nav_group: NavGroup, mut current_category: State<Category>) -> impl IntoElement {
-    // Build the buttons manually based on the nav group
     let categories = nav_group.categories();
 
-    // For simplicity, just show the first few categories
-    // A proper implementation would need to handle this dynamically
     rect()
-        .horizontal()
+        .direction(Direction::Horizontal)
         .spacing(SPACING_SM)
         .child(
             match categories.get(0) {
@@ -37,9 +35,9 @@ fn category_buttons(nav_group: NavGroup, mut current_category: State<Category>) 
                     let cat = *cat;
                     Button::new()
                         .on_press(move |_| *current_category.write() = cat)
-                        .child(cat.label())
+                        .child(label().text(cat.label()).max_lines(1))
                 }
-                None => Button::new().child("None"),
+                None => Button::new().child(label().text("None").max_lines(1)),
             }
         )
         .child(
@@ -48,9 +46,9 @@ fn category_buttons(nav_group: NavGroup, mut current_category: State<Category>) 
                     let cat = *cat;
                     Button::new()
                         .on_press(move |_| *current_category.write() = cat)
-                        .child(cat.label())
+                        .child(label().text(cat.label()).max_lines(1))
                 }
-                None => Button::new().child(""),
+                None => Button::new().child(label().text("").max_lines(1)),
             }
         )
         .child(
@@ -59,9 +57,9 @@ fn category_buttons(nav_group: NavGroup, mut current_category: State<Category>) 
                     let cat = *cat;
                     Button::new()
                         .on_press(move |_| *current_category.write() = cat)
-                        .child(cat.label())
+                        .child(label().text(cat.label()).max_lines(1))
                 }
-                None => Button::new().child(""),
+                None => Button::new().child(label().text("").max_lines(1)),
             }
         )
 }

@@ -1,130 +1,110 @@
 //! Trackball settings page
 
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::views::Stack;
-use std::rc::Rc;
+use freya::prelude::*;
 
 use crate::config::SettingsCategory;
-use crate::ui::components::{section, slider_row_with_callback, toggle_row_with_callback};
+use crate::ui::components::{section, slider_row, toggle_row};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the trackball settings page
-pub fn trackball_page(state: AppState) -> impl IntoView {
+pub fn trackball_page(state: AppState) -> impl IntoElement {
     let settings = state.get_settings();
     let trackball = settings.trackball;
 
-    let off = RwSignal::new(trackball.off);
-    let natural_scroll = RwSignal::new(trackball.natural_scroll);
-    let left_handed = RwSignal::new(trackball.left_handed);
-    let accel_speed = RwSignal::new(trackball.accel_speed);
-    let middle_emulation = RwSignal::new(trackball.middle_emulation);
-    let scroll_button_lock = RwSignal::new(trackball.scroll_button_lock);
+    let state_natural = state.clone();
+    let state_left = state.clone();
+    let state_middle = state.clone();
+    let state_scroll_lock = state.clone();
+    let state_accel = state.clone();
+    let state_off = state.clone();
 
-    // Callbacks
-    let on_natural_scroll = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.trackball.natural_scroll = val);
-            state.mark_dirty_and_save(SettingsCategory::Trackball);
-        })
-    };
-
-    let on_left_handed = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.trackball.left_handed = val);
-            state.mark_dirty_and_save(SettingsCategory::Trackball);
-        })
-    };
-
-    let on_middle_emulation = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.trackball.middle_emulation = val);
-            state.mark_dirty_and_save(SettingsCategory::Trackball);
-        })
-    };
-
-    let on_scroll_button_lock = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.trackball.scroll_button_lock = val);
-            state.mark_dirty_and_save(SettingsCategory::Trackball);
-        })
-    };
-
-    let on_accel_speed = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.trackball.accel_speed = val);
-            state.mark_dirty_and_save(SettingsCategory::Trackball);
-        })
-    };
-
-    let on_off = {
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.trackball.off = val);
-            state.mark_dirty_and_save(SettingsCategory::Trackball);
-        })
-    };
-
-    Stack::vertical((
-        section(
+    rect()
+        .width(Size::fill())
+        .spacing(SPACING_LG)
+        // General section
+        .child(section(
             "General",
-            Stack::vertical((
-                toggle_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
                     "Natural scrolling",
-                    Some("Invert scroll direction"),
-                    natural_scroll,
-                    Some(on_natural_scroll),
-                ),
-                toggle_row_with_callback(
+                    "Invert scroll direction",
+                    trackball.natural_scroll,
+                    move |val| {
+                        state_natural.update_settings(|s| s.trackball.natural_scroll = val);
+                        state_natural.mark_dirty_and_save(SettingsCategory::Trackball);
+                    },
+                ))
+                .child(toggle_row(
                     "Left-handed mode",
-                    Some("Swap left and right buttons"),
-                    left_handed,
-                    Some(on_left_handed),
-                ),
-                toggle_row_with_callback(
+                    "Swap left and right buttons",
+                    trackball.left_handed,
+                    move |val| {
+                        state_left.update_settings(|s| s.trackball.left_handed = val);
+                        state_left.mark_dirty_and_save(SettingsCategory::Trackball);
+                    },
+                ))
+                .child(toggle_row(
                     "Middle button emulation",
-                    Some("Emulate middle click"),
-                    middle_emulation,
-                    Some(on_middle_emulation),
-                ),
-            )),
-        ),
-        section(
+                    "Emulate middle click",
+                    trackball.middle_emulation,
+                    move |val| {
+                        state_middle.update_settings(|s| s.trackball.middle_emulation = val);
+                        state_middle.mark_dirty_and_save(SettingsCategory::Trackball);
+                    },
+                )),
+        ))
+        // Scrolling section
+        .child(section(
             "Scrolling",
-            Stack::vertical((toggle_row_with_callback(
-                "Scroll button lock",
-                Some("Don't need to hold scroll button"),
-                scroll_button_lock,
-                Some(on_scroll_button_lock),
-            ),)),
-        ),
-        section(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
+                    "Scroll button lock",
+                    "Don't need to hold scroll button",
+                    trackball.scroll_button_lock,
+                    move |val| {
+                        state_scroll_lock.update_settings(|s| s.trackball.scroll_button_lock = val);
+                        state_scroll_lock.mark_dirty_and_save(SettingsCategory::Trackball);
+                    },
+                )),
+        ))
+        // Speed section
+        .child(section(
             "Speed",
-            Stack::vertical((slider_row_with_callback(
-                "Acceleration",
-                Some("Pointer acceleration speed"),
-                accel_speed,
-                -1.0,
-                1.0,
-                0.1,
-                "",
-                Some(on_accel_speed),
-            ),)),
-        ),
-        section(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(slider_row(
+                    "Acceleration",
+                    "Pointer acceleration speed",
+                    trackball.accel_speed,
+                    -1.0,
+                    1.0,
+                    "",
+                    move |val| {
+                        state_accel.update_settings(|s| s.trackball.accel_speed = val);
+                        state_accel.mark_dirty_and_save(SettingsCategory::Trackball);
+                    },
+                )),
+        ))
+        // Device section
+        .child(section(
             "Device",
-            Stack::vertical((toggle_row_with_callback(
-                "Disable trackball",
-                Some("Turn off trackball input"),
-                off,
-                Some(on_off),
-            ),)),
-        ),
-    ))
-    .style(|s| s.width_full().gap(SPACING_LG))
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
+                    "Disable trackball",
+                    "Turn off trackball input",
+                    trackball.off,
+                    move |val| {
+                        state_off.update_settings(|s| s.trackball.off = val);
+                        state_off.mark_dirty_and_save(SettingsCategory::Trackball);
+                    },
+                )),
+        ))
 }

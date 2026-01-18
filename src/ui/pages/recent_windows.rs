@@ -1,83 +1,69 @@
 //! Recent windows (Alt-Tab) settings page
 
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::views::Stack;
-use std::rc::Rc;
+use freya::prelude::*;
 
 use crate::config::SettingsCategory;
-use crate::ui::components::{section, slider_row_with_callback, toggle_row_with_callback};
+use crate::ui::components::{section, slider_row, toggle_row};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the recent windows settings page
-pub fn recent_windows_page(state: AppState) -> impl IntoView {
+pub fn recent_windows_page(state: AppState) -> impl IntoElement {
     let settings = state.get_settings();
     let recent = settings.recent_windows;
 
-    let off = RwSignal::new(recent.off);
-    let debounce_ms = RwSignal::new(recent.debounce_ms as f64);
-    let open_delay_ms = RwSignal::new(recent.open_delay_ms as f64);
+    let state_off = state.clone();
+    let state_debounce = state.clone();
+    let state_delay = state.clone();
 
-    // Callbacks
-    let on_off = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.recent_windows.off = val);
-            state.mark_dirty_and_save(SettingsCategory::RecentWindows);
-        })
-    };
-
-    let on_debounce_ms = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.recent_windows.debounce_ms = val as i32);
-            state.mark_dirty_and_save(SettingsCategory::RecentWindows);
-        })
-    };
-
-    let on_open_delay_ms = {
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.recent_windows.open_delay_ms = val as i32);
-            state.mark_dirty_and_save(SettingsCategory::RecentWindows);
-        })
-    };
-
-    Stack::vertical((
-        section(
+    rect()
+        .width(Size::fill())
+        .spacing(SPACING_LG)
+        // General section
+        .child(section(
             "General",
-            Stack::vertical((toggle_row_with_callback(
-                "Disable recent windows",
-                Some("Turn off the Alt-Tab switcher"),
-                off,
-                Some(on_off),
-            ),)),
-        ),
-        section(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
+                    "Disable recent windows",
+                    "Turn off the Alt-Tab switcher",
+                    recent.off,
+                    move |val| {
+                        state_off.update_settings(|s| s.recent_windows.off = val);
+                        state_off.mark_dirty_and_save(SettingsCategory::RecentWindows);
+                    },
+                )),
+        ))
+        // Timing section
+        .child(section(
             "Timing",
-            Stack::vertical((
-                slider_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(slider_row(
                     "Debounce delay",
-                    Some("Delay before adding to recent list"),
-                    debounce_ms,
+                    "Delay before adding to recent list",
+                    recent.debounce_ms as f64,
                     0.0,
                     1000.0,
-                    50.0,
                     "ms",
-                    Some(on_debounce_ms),
-                ),
-                slider_row_with_callback(
+                    move |val| {
+                        state_debounce.update_settings(|s| s.recent_windows.debounce_ms = val as i32);
+                        state_debounce.mark_dirty_and_save(SettingsCategory::RecentWindows);
+                    },
+                ))
+                .child(slider_row(
                     "Open delay",
-                    Some("Delay before UI appears"),
-                    open_delay_ms,
+                    "Delay before UI appears",
+                    recent.open_delay_ms as f64,
                     0.0,
                     500.0,
-                    25.0,
                     "ms",
-                    Some(on_open_delay_ms),
-                ),
-            )),
-        ),
-    ))
-    .style(|s| s.width_full().gap(SPACING_LG))
+                    move |val| {
+                        state_delay.update_settings(|s| s.recent_windows.open_delay_ms = val as i32);
+                        state_delay.mark_dirty_and_save(SettingsCategory::RecentWindows);
+                    },
+                )),
+        ))
 }

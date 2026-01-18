@@ -42,7 +42,7 @@ impl Category {
     /// Get the display label for this category
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Appearance => "Appearance",
+            Self::Appearance => "General",
             Self::Keyboard => "Keyboard",
             Self::Mouse => "Mouse",
             Self::Touchpad => "Touchpad",

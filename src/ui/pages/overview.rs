@@ -1,72 +1,68 @@
 //! Overview settings page
 
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::views::Stack;
-use std::rc::Rc;
+use freya::prelude::*;
 
 use crate::config::SettingsCategory;
 use crate::types::Color;
-use crate::ui::components::{color_row_with_callback, section, slider_row_with_callback};
+use crate::ui::components::{section, slider_row, text_row};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the overview settings page
-pub fn overview_page(state: AppState) -> impl IntoView {
+pub fn overview_page(state: AppState) -> impl IntoElement {
     let settings = state.get_settings();
     let overview = settings.overview;
 
-    let zoom = RwSignal::new(overview.zoom);
-    let backdrop_color = RwSignal::new(
-        overview
-            .backdrop_color
-            .map(|c| c.to_hex())
-            .unwrap_or_default(),
-    );
+    let backdrop_hex = overview
+        .backdrop_color
+        .map(|c| c.to_hex())
+        .unwrap_or_default();
 
-    // Callbacks
-    let on_zoom = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.overview.zoom = val);
-            state.mark_dirty_and_save(SettingsCategory::Overview);
-        })
-    };
+    let state_zoom = state.clone();
+    let state_backdrop = state.clone();
 
-    let on_backdrop_color = {
-        Rc::new(move |val: String| {
-            if val.is_empty() {
-                state.update_settings(|s| s.overview.backdrop_color = None);
-            } else if let Some(color) = Color::from_hex(&val) {
-                state.update_settings(|s| s.overview.backdrop_color = Some(color));
-            }
-            state.mark_dirty_and_save(SettingsCategory::Overview);
-        })
-    };
-
-    Stack::vertical((
-        section(
+    rect()
+        .width(Size::fill())
+        .spacing(SPACING_LG)
+        // View section
+        .child(section(
             "View",
-            Stack::vertical((slider_row_with_callback(
-                "Zoom level",
-                Some("Overview zoom (0.1 = zoomed out, 2.0 = zoomed in)"),
-                zoom,
-                0.1,
-                2.0,
-                0.1,
-                "x",
-                Some(on_zoom),
-            ),)),
-        ),
-        section(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(slider_row(
+                    "Zoom level",
+                    "Overview zoom (0.1 = zoomed out, 2.0 = zoomed in)",
+                    overview.zoom,
+                    0.1,
+                    2.0,
+                    "x",
+                    move |val| {
+                        state_zoom.update_settings(|s| s.overview.zoom = val);
+                        state_zoom.mark_dirty_and_save(SettingsCategory::Overview);
+                    },
+                )),
+        ))
+        // Appearance section
+        .child(section(
             "Appearance",
-            Stack::vertical((color_row_with_callback(
-                "Backdrop color",
-                Some("Background color behind workspace previews"),
-                backdrop_color,
-                Some(on_backdrop_color),
-            ),)),
-        ),
-    ))
-    .style(|s| s.width_full().gap(SPACING_LG))
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(text_row(
+                    "Backdrop color",
+                    "Background color (hex, e.g., #000000)",
+                    &backdrop_hex,
+                    "#00000080",
+                    move |val| {
+                        if val.is_empty() {
+                            state_backdrop.update_settings(|s| s.overview.backdrop_color = None);
+                        } else if let Some(color) = Color::from_hex(&val) {
+                            state_backdrop
+                                .update_settings(|s| s.overview.backdrop_color = Some(color));
+                        }
+                        state_backdrop.mark_dirty_and_save(SettingsCategory::Overview);
+                    },
+                )),
+        ))
 }

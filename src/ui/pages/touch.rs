@@ -1,50 +1,54 @@
 //! Touch screen settings page
 
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::views::Stack;
-use std::rc::Rc;
+use freya::prelude::*;
 
 use crate::config::SettingsCategory;
-use crate::ui::components::{section, text_row, toggle_row_with_callback};
+use crate::ui::components::{section, text_row, toggle_row};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the touch screen settings page
-pub fn touch_page(state: AppState) -> impl IntoView {
+pub fn touch_page(state: AppState) -> impl IntoElement {
     let settings = state.get_settings();
     let touch = settings.touch;
 
-    let off = RwSignal::new(touch.off);
-    let map_to_output = RwSignal::new(touch.map_to_output);
+    let state_map = state.clone();
+    let state_off = state.clone();
 
-    // Callbacks
-    let on_off = {
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.touch.off = val);
-            state.mark_dirty_and_save(SettingsCategory::Touch);
-        })
-    };
-
-    Stack::vertical((
-        section(
+    rect()
+        .width(Size::fill())
+        .spacing(SPACING_LG)
+        // Display Mapping section
+        .child(section(
             "Display Mapping",
-            Stack::vertical((text_row(
-                "Map to output",
-                Some("Monitor name to map touch to (e.g., eDP-1)"),
-                map_to_output,
-                "",
-            ),)),
-        ),
-        section(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(text_row(
+                    "Map to output",
+                    "Monitor name to map touch to (e.g., eDP-1)",
+                    &touch.map_to_output,
+                    "",
+                    move |val| {
+                        state_map.update_settings(|s| s.touch.map_to_output = val);
+                        state_map.mark_dirty_and_save(SettingsCategory::Touch);
+                    },
+                )),
+        ))
+        // Device section
+        .child(section(
             "Device",
-            Stack::vertical((toggle_row_with_callback(
-                "Disable touch",
-                Some("Turn off touch input"),
-                off,
-                Some(on_off),
-            ),)),
-        ),
-    ))
-    .style(|s| s.width_full().gap(SPACING_LG))
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
+                    "Disable touch",
+                    "Turn off touch input",
+                    touch.off,
+                    move |val| {
+                        state_off.update_settings(|s| s.touch.off = val);
+                        state_off.mark_dirty_and_save(SettingsCategory::Touch);
+                    },
+                )),
+        ))
 }

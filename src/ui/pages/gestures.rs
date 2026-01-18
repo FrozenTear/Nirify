@@ -1,163 +1,131 @@
 //! Gestures and hot corners settings page
 
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::views::Stack;
-use std::rc::Rc;
+use freya::prelude::*;
 
 use crate::config::SettingsCategory;
-use crate::ui::components::{section, slider_row_with_callback, toggle_row_with_callback};
+use crate::ui::components::{section, slider_row, toggle_row};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the gestures settings page
-pub fn gestures_page(state: AppState) -> impl IntoView {
+pub fn gestures_page(state: AppState) -> impl IntoElement {
     let settings = state.get_settings();
     let gestures = settings.gestures;
 
-    // Hot corners
-    let hot_corners_enabled = RwSignal::new(gestures.hot_corners.enabled);
+    let state_hot_corners = state.clone();
+    let state_scroll_en = state.clone();
+    let state_scroll_size = state.clone();
+    let state_scroll_delay = state.clone();
+    let state_ws_en = state.clone();
+    let state_ws_size = state.clone();
+    let state_ws_delay = state.clone();
 
-    // DnD edge view scroll
-    let edge_scroll_enabled = RwSignal::new(gestures.dnd_edge_view_scroll.enabled);
-    let edge_scroll_size = RwSignal::new(gestures.dnd_edge_view_scroll.trigger_size as f64);
-    let edge_scroll_delay = RwSignal::new(gestures.dnd_edge_view_scroll.delay_ms as f64);
-
-    // DnD edge workspace switch
-    let edge_workspace_enabled = RwSignal::new(gestures.dnd_edge_workspace_switch.enabled);
-    let edge_workspace_size = RwSignal::new(gestures.dnd_edge_workspace_switch.trigger_size as f64);
-    let edge_workspace_delay = RwSignal::new(gestures.dnd_edge_workspace_switch.delay_ms as f64);
-
-    // Callbacks
-    let on_hot_corners = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.gestures.hot_corners.enabled = val);
-            state.mark_dirty_and_save(SettingsCategory::Gestures);
-        })
-    };
-
-    let on_edge_scroll_enabled = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.gestures.dnd_edge_view_scroll.enabled = val);
-            state.mark_dirty_and_save(SettingsCategory::Gestures);
-        })
-    };
-
-    let on_edge_scroll_size = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.gestures.dnd_edge_view_scroll.trigger_size = val as i32);
-            state.mark_dirty_and_save(SettingsCategory::Gestures);
-        })
-    };
-
-    let on_edge_scroll_delay = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.gestures.dnd_edge_view_scroll.delay_ms = val as i32);
-            state.mark_dirty_and_save(SettingsCategory::Gestures);
-        })
-    };
-
-    let on_edge_workspace_enabled = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.gestures.dnd_edge_workspace_switch.enabled = val);
-            state.mark_dirty_and_save(SettingsCategory::Gestures);
-        })
-    };
-
-    let on_edge_workspace_size = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| {
-                s.gestures.dnd_edge_workspace_switch.trigger_size = val as i32
-            });
-            state.mark_dirty_and_save(SettingsCategory::Gestures);
-        })
-    };
-
-    let on_edge_workspace_delay = {
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.gestures.dnd_edge_workspace_switch.delay_ms = val as i32);
-            state.mark_dirty_and_save(SettingsCategory::Gestures);
-        })
-    };
-
-    Stack::vertical((
-        section(
+    rect()
+        .width(Size::fill())
+        .spacing(SPACING_LG)
+        // Hot Corners section
+        .child(section(
             "Hot Corners",
-            Stack::vertical((toggle_row_with_callback(
-                "Enable hot corners",
-                Some("Trigger actions when cursor reaches corners"),
-                hot_corners_enabled,
-                Some(on_hot_corners),
-            ),)),
-        ),
-        section(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
+                    "Enable hot corners",
+                    "Trigger actions when cursor reaches corners",
+                    gestures.hot_corners.enabled,
+                    move |val| {
+                        state_hot_corners.update_settings(|s| s.gestures.hot_corners.enabled = val);
+                        state_hot_corners.mark_dirty_and_save(SettingsCategory::Gestures);
+                    },
+                )),
+        ))
+        // Edge Scrolling section
+        .child(section(
             "Edge Scrolling (Drag & Drop)",
-            Stack::vertical((
-                toggle_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
                     "Enable edge scroll",
-                    Some("Scroll view when dragging to screen edge"),
-                    edge_scroll_enabled,
-                    Some(on_edge_scroll_enabled),
-                ),
-                slider_row_with_callback(
+                    "Scroll view when dragging to screen edge",
+                    gestures.dnd_edge_view_scroll.enabled,
+                    move |val| {
+                        state_scroll_en
+                            .update_settings(|s| s.gestures.dnd_edge_view_scroll.enabled = val);
+                        state_scroll_en.mark_dirty_and_save(SettingsCategory::Gestures);
+                    },
+                ))
+                .child(slider_row(
                     "Trigger zone size",
-                    Some("Edge zone width in pixels"),
-                    edge_scroll_size,
+                    "Edge zone width in pixels",
+                    gestures.dnd_edge_view_scroll.trigger_size as f64,
                     1.0,
                     100.0,
-                    5.0,
                     "px",
-                    Some(on_edge_scroll_size),
-                ),
-                slider_row_with_callback(
+                    move |val| {
+                        state_scroll_size.update_settings(|s| {
+                            s.gestures.dnd_edge_view_scroll.trigger_size = val as i32
+                        });
+                        state_scroll_size.mark_dirty_and_save(SettingsCategory::Gestures);
+                    },
+                ))
+                .child(slider_row(
                     "Trigger delay",
-                    Some("Delay before scrolling starts"),
-                    edge_scroll_delay,
+                    "Delay before scrolling starts",
+                    gestures.dnd_edge_view_scroll.delay_ms as f64,
                     0.0,
                     1000.0,
-                    50.0,
                     "ms",
-                    Some(on_edge_scroll_delay),
-                ),
-            )),
-        ),
-        section(
+                    move |val| {
+                        state_scroll_delay
+                            .update_settings(|s| s.gestures.dnd_edge_view_scroll.delay_ms = val as i32);
+                        state_scroll_delay.mark_dirty_and_save(SettingsCategory::Gestures);
+                    },
+                )),
+        ))
+        // Workspace Switch section
+        .child(section(
             "Workspace Switch (Drag & Drop)",
-            Stack::vertical((
-                toggle_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
                     "Enable edge workspace switch",
-                    Some("Switch workspace when dragging to edge"),
-                    edge_workspace_enabled,
-                    Some(on_edge_workspace_enabled),
-                ),
-                slider_row_with_callback(
+                    "Switch workspace when dragging to edge",
+                    gestures.dnd_edge_workspace_switch.enabled,
+                    move |val| {
+                        state_ws_en
+                            .update_settings(|s| s.gestures.dnd_edge_workspace_switch.enabled = val);
+                        state_ws_en.mark_dirty_and_save(SettingsCategory::Gestures);
+                    },
+                ))
+                .child(slider_row(
                     "Trigger zone size",
-                    Some("Edge zone width in pixels"),
-                    edge_workspace_size,
+                    "Edge zone width in pixels",
+                    gestures.dnd_edge_workspace_switch.trigger_size as f64,
                     1.0,
                     100.0,
-                    5.0,
                     "px",
-                    Some(on_edge_workspace_size),
-                ),
-                slider_row_with_callback(
+                    move |val| {
+                        state_ws_size.update_settings(|s| {
+                            s.gestures.dnd_edge_workspace_switch.trigger_size = val as i32
+                        });
+                        state_ws_size.mark_dirty_and_save(SettingsCategory::Gestures);
+                    },
+                ))
+                .child(slider_row(
                     "Trigger delay",
-                    Some("Delay before switching"),
-                    edge_workspace_delay,
+                    "Delay before switching",
+                    gestures.dnd_edge_workspace_switch.delay_ms as f64,
                     0.0,
                     1000.0,
-                    50.0,
                     "ms",
-                    Some(on_edge_workspace_delay),
-                ),
-            )),
-        ),
-    ))
-    .style(|s| s.width_full().gap(SPACING_LG))
+                    move |val| {
+                        state_ws_delay.update_settings(|s| {
+                            s.gestures.dnd_edge_workspace_switch.delay_ms = val as i32
+                        });
+                        state_ws_delay.mark_dirty_and_save(SettingsCategory::Gestures);
+                    },
+                )),
+        ))
 }

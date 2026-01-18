@@ -1,501 +1,351 @@
-//! Setting row components - refined controls for the Crystalline Dark theme
+//! Setting row components for Freya
 //!
 //! Each row follows a two-column layout:
 //! - Left: Label + optional description
-//! - Right: Interactive control (toggle, slider, color picker, etc.)
+//! - Right: Interactive control (toggle, slider, input, etc.)
 //!
-//! All components support an optional on_change callback for auto-save wiring.
+//! These are plain functions that return Elements directly - no Component trait,
+//! no hooks. The parent manages state and passes value + callback.
 
-use floem::event::{Event, EventListener};
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::ui_events::pointer::{PointerButtonEvent, PointerEvent, PointerUpdate};
-use floem::views::{text_input, Container, Empty, Label, Stack};
-use std::rc::Rc;
+use freya::prelude::*;
 
-use crate::ui::theme::{
-    color_input_container_style, color_swatch_style, icon_button_style, parse_hex_color,
-    setting_row_style, text_input_style, ACCENT, BG_ELEVATED, BORDER, BORDER_SUBTLE,
-    FONT_SIZE_BASE, FONT_SIZE_SM, RADIUS_FULL, RADIUS_SM, SPACING_MD, SPACING_SM, SPACING_XS,
-    SURFACE1, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
-};
-
-/// Callback type for value changes
-pub type OnChange<T> = Option<Rc<dyn Fn(T)>>;
+use crate::ui::theme::*;
 
 // ============================================================================
-// Toggle Row - Custom styled switch
+// Toggle Row - Switch control (plain function, no hooks)
 // ============================================================================
 
-/// A setting row with a custom toggle switch
+/// Create a setting row with a toggle switch.
+/// Parent manages state and passes value + on_change callback.
 pub fn toggle_row(
-    label_text: &'static str,
-    description: Option<&'static str>,
-    value: RwSignal<bool>,
-) -> impl IntoView {
-    toggle_row_with_callback(label_text, description, value, None)
-}
+    title: &str,
+    description: &str,
+    value: bool,
+    on_change: impl Fn(bool) + 'static,
+) -> Element {
+    let title = title.to_string();
+    let description = description.to_string();
 
-/// A setting row with a custom toggle switch and change callback
-pub fn toggle_row_with_callback(
-    label_text: &'static str,
-    description: Option<&'static str>,
-    value: RwSignal<bool>,
-    on_change: OnChange<bool>,
-) -> impl IntoView {
-    Stack::horizontal((
-        // Left side: label + description
-        setting_label(label_text, description),
-        // Right side: custom toggle switch
-        toggle_switch_with_callback(value, on_change),
-    ))
-    .style(setting_row_style)
-}
-
-/// Custom toggle switch component
-fn toggle_switch_with_callback(value: RwSignal<bool>, on_change: OnChange<bool>) -> impl IntoView {
-    let is_on = move || value.get();
-
-    Container::new(
-        // Toggle knob
-        Container::new(Empty::new()).style(move |s| {
-            let base = s
-                .width(18.0)
-                .height(18.0)
-                .border_radius(RADIUS_FULL)
-                .background(TEXT_PRIMARY);
-
-            if is_on() {
-                base.margin_left(20.0)
-            } else {
-                base.margin_left(2.0)
-            }
-        }),
-    )
-    .style(move |s| {
-        let base = s
-            .width(44.0)
-            .height(24.0)
-            .border_radius(RADIUS_FULL)
-            .border(1.0)
-            .items_center();
-
-        if is_on() {
-            base.background(ACCENT).border_color(ACCENT)
-        } else {
-            base.background(SURFACE1).border_color(BORDER)
-        }
-    })
-    .on_click_stop(move |_| {
-        let new_val = !value.get();
-        value.set(new_val);
-        if let Some(ref cb) = on_change {
-            cb(new_val);
-        }
-    })
-}
-
-// ============================================================================
-// Slider Row - Styled slider with value display
-// ============================================================================
-
-/// A setting row with a slider and value badge
-pub fn slider_row(
-    label_text: &'static str,
-    description: Option<&'static str>,
-    value: RwSignal<f64>,
-    min: f64,
-    max: f64,
-    step: f64,
-    unit: &'static str,
-) -> impl IntoView {
-    slider_row_with_callback(label_text, description, value, min, max, step, unit, None)
-}
-
-/// Determine decimal precision from step size
-fn precision_from_step(step: f64) -> usize {
-    if step >= 1.0 {
-        0
-    } else if step >= 0.1 {
-        1
-    } else if step >= 0.01 {
-        2
-    } else {
-        3
-    }
-}
-
-/// Format a value with appropriate precision based on step size
-fn format_value(value: f64, step: f64) -> String {
-    let precision = precision_from_step(step);
-    if precision == 0 {
-        format!("{}", value as i64)
-    } else {
-        format!("{:.prec$}", value, prec = precision)
-    }
-}
-
-/// A setting row with a slider, editable value input, and change callback
-#[allow(clippy::too_many_arguments)]
-pub fn slider_row_with_callback(
-    label_text: &'static str,
-    description: Option<&'static str>,
-    value: RwSignal<f64>,
-    min: f64,
-    max: f64,
-    step: f64,
-    unit: &'static str,
-    on_change: OnChange<f64>,
-) -> impl IntoView {
-    // Create a string signal for the text input, synced with the value
-    let text_value = RwSignal::new(format_value(value.get(), step));
-
-    // Keep text in sync when value changes from slider
-    floem::reactive::Effect::new(move |_| {
-        let v = value.get();
-        text_value.set(format_value(v, step));
-    });
-
-    let on_change_input = on_change.clone();
-
-    // Calculate input width based on expected value range
-    let input_width = if step >= 1.0 && max <= 9999.0 {
-        45.0
-    } else {
-        60.0 // Wider for decimal values
-    };
-
-    Stack::horizontal((
-        // Left side: label + description
-        setting_label(label_text, description),
-        // Right side: slider + editable value input
-        Stack::horizontal((
-            // Slider track with knob (clamped to visual range)
-            slider_control_with_callback(value, min, max, step, on_change),
-            // Editable value input (allows values beyond slider range)
-            Stack::horizontal((
-                text_input(text_value)
-                    .on_event_stop(EventListener::FocusLost, move |_| {
-                        // Parse and apply the value on blur
-                        if let Ok(v) = text_value.get().parse::<f64>() {
-                            // Clamp to the defined range
-                            let clamped = v.clamp(min, max);
-                            value.set(clamped);
-                            text_value.set(format_value(clamped, step));
-                            if let Some(ref cb) = on_change_input {
-                                cb(clamped);
-                            }
-                        } else {
-                            // Reset to current value if parse fails
-                            text_value.set(format_value(value.get(), step));
-                        }
-                    })
-                    .style(move |s| {
-                        s.width(input_width)
-                            .padding_vert(SPACING_XS)
-                            .padding_horiz(SPACING_SM)
-                            .background(BG_ELEVATED)
-                            .border_radius(RADIUS_SM)
-                            .border(1.0)
-                            .border_color(BORDER_SUBTLE)
-                            .color(TEXT_PRIMARY)
-                            .font_size(FONT_SIZE_SM)
-                    }),
-                Label::derived(move || unit.to_string())
-                    .style(|s| s.color(TEXT_TERTIARY).font_size(FONT_SIZE_SM)),
-            ))
-            .style(|s| s.items_center().gap(SPACING_XS)),
-        ))
-        .style(|s| s.items_center().gap(SPACING_MD)),
-    ))
-    .style(setting_row_style)
-}
-
-/// Slider dimensions
-const SLIDER_TRACK_WIDTH: f64 = 140.0;
-const SLIDER_TRACK_HEIGHT: f64 = 6.0;
-const SLIDER_HANDLE_SIZE: f64 = 16.0;
-const SLIDER_PADDING: f64 = SLIDER_HANDLE_SIZE / 2.0; // Padding on each side for handle
-
-/// Custom slider control - draggable track with visual feedback
-fn slider_control_with_callback(
-    value: RwSignal<f64>,
-    min: f64,
-    max: f64,
-    step: f64,
-    on_change: OnChange<f64>,
-) -> impl IntoView {
-    let percentage = move || ((value.get() - min) / (max - min)).clamp(0.0, 1.0);
-    let is_dragging = RwSignal::new(false);
-
-    // Clone callbacks for different event handlers
-    let on_change_down = on_change.clone();
-    let on_change_move = on_change.clone();
-    let on_change_up = on_change;
-
-    // The total interactive width includes padding for the handle on both sides
-    let total_width = SLIDER_TRACK_WIDTH + SLIDER_PADDING * 2.0;
-
-    // Helper to calculate value from x position (accounting for handle padding)
-    let calc_value = move |x: f64| -> f64 {
-        // x is relative to the interactive container
-        // Subtract left padding to get position relative to track start
-        // Then divide by track width to get percentage
-        let track_x = x - SLIDER_PADDING;
-        let pct = (track_x / SLIDER_TRACK_WIDTH).clamp(0.0, 1.0);
-        let raw_val = min + pct * (max - min);
-        // Round to nearest step
-        let stepped = ((raw_val - min) / step).round() * step + min;
-        stepped.clamp(min, max)
-    };
-
-    // Single container that handles all interaction
-    // Track and handle are positioned inside
-    Stack::horizontal((
-        // Left padding spacer
-        Empty::new().style(|s| s.width(SLIDER_PADDING)),
-        // Track with fill
-        Container::new(Container::new(Empty::new()).style(move |s| {
-            let pct = percentage();
-            s.width(pct * SLIDER_TRACK_WIDTH)
-                .height(SLIDER_TRACK_HEIGHT)
-                .border_radius(RADIUS_FULL)
-                .background(ACCENT)
-        }))
-        .style(|s| {
-            s.width(SLIDER_TRACK_WIDTH)
-                .height(SLIDER_TRACK_HEIGHT)
-                .border_radius(RADIUS_FULL)
-                .background(SURFACE1)
-        }),
-        // Handle - positioned relative to track end, moved back by percentage
-        Container::new(Empty::new()).style(move |s| {
-            let pct = percentage();
-            // Handle starts after track, move it left based on inverse percentage
-            let handle_offset = -(1.0 - pct) * SLIDER_TRACK_WIDTH - SLIDER_HANDLE_SIZE / 2.0;
-            s.width(SLIDER_HANDLE_SIZE)
-                .height(SLIDER_HANDLE_SIZE)
-                .border_radius(RADIUS_FULL)
-                .background(TEXT_PRIMARY)
-                .border(2.0)
-                .border_color(ACCENT)
-                .margin_left(handle_offset)
-        }),
-        // Right padding spacer
-        Empty::new().style(|s| s.width(SLIDER_PADDING)),
-    ))
-    .style(move |s| {
-        s.width(total_width)
-            .height(SLIDER_HANDLE_SIZE)
-            .items_center()
-            .cursor(floem::style::CursorStyle::Pointer)
-    })
-    .on_event(EventListener::PointerDown, move |e| {
-        if let Event::Pointer(PointerEvent::Down(PointerButtonEvent { state, .. })) = e {
-            is_dragging.set(true);
-            let new_val = calc_value(state.logical_point().x);
-            value.set(new_val);
-            if let Some(ref cb) = on_change_down {
-                cb(new_val);
-            }
-        }
-        floem::event::EventPropagation::Stop
-    })
-    .on_event(EventListener::PointerMove, move |e| {
-        if is_dragging.get() {
-            if let Event::Pointer(PointerEvent::Move(PointerUpdate { current, .. })) = e {
-                let new_val = calc_value(current.logical_point().x);
-                value.set(new_val);
-                if let Some(ref cb) = on_change_move {
-                    cb(new_val);
-                }
-            }
-        }
-        floem::event::EventPropagation::Continue
-    })
-    .on_event(EventListener::PointerUp, move |e| {
-        if is_dragging.get() {
-            is_dragging.set(false);
-            if let Event::Pointer(PointerEvent::Up(PointerButtonEvent { state, .. })) = e {
-                let new_val = calc_value(state.logical_point().x);
-                value.set(new_val);
-                if let Some(ref cb) = on_change_up {
-                    cb(new_val);
-                }
-            }
-        }
-        floem::event::EventPropagation::Stop
-    })
-}
-
-// ============================================================================
-// Color Row - Color swatch with hex input
-// ============================================================================
-
-/// A setting row with color swatch and hex input
-pub fn color_row(
-    label_text: &'static str,
-    description: Option<&'static str>,
-    value: RwSignal<String>,
-) -> impl IntoView {
-    color_row_with_callback(label_text, description, value, None)
-}
-
-/// A setting row with color swatch, hex input, and change callback
-pub fn color_row_with_callback(
-    label_text: &'static str,
-    description: Option<&'static str>,
-    value: RwSignal<String>,
-    on_change: OnChange<String>,
-) -> impl IntoView {
-    let on_change_clear = on_change.clone();
-
-    Stack::horizontal((
-        // Left side: label + description
-        setting_label(label_text, description),
-        // Right side: color swatch + hex input
-        Stack::horizontal((
-            // Color swatch preview
-            Container::new(Empty::new()).style(move |s| {
-                let hex = value.get();
-                let color = parse_hex_color(&hex);
-                color_swatch_style(s).background(color)
-            }),
-            // Hex input container
-            Stack::horizontal((
-                text_input(value)
-                    .on_event_stop(floem::event::EventListener::FocusLost, move |_| {
-                        if let Some(ref cb) = on_change {
-                            cb(value.get());
-                        }
-                    })
-                    .style(|s| {
-                        s.width(80.0)
-                            .padding(SPACING_XS)
-                            .background(BG_ELEVATED)
-                            .border_radius(RADIUS_SM)
-                            .color(TEXT_PRIMARY)
-                            .font_size(FONT_SIZE_SM)
-                            .border(0.0)
-                    }),
-                // Clear button
-                Label::derived(|| "✕".to_string())
-                    .style(icon_button_style)
-                    .on_click_stop(move |_| {
-                        value.set(String::new());
-                        if let Some(ref cb) = on_change_clear {
-                            cb(String::new());
-                        }
-                    }),
-            ))
-            .style(color_input_container_style),
-        ))
-        .style(|s| s.items_center().gap(SPACING_SM)),
-    ))
-    .style(setting_row_style)
-}
-
-// ============================================================================
-// Text Row - Text input field
-// ============================================================================
-
-/// A setting row with a text input field
-pub fn text_row(
-    label_text: &'static str,
-    description: Option<&'static str>,
-    value: RwSignal<String>,
-    placeholder: &'static str,
-) -> impl IntoView {
-    text_row_with_callback(label_text, description, value, placeholder, None)
-}
-
-/// A setting row with a text input field and change callback
-pub fn text_row_with_callback(
-    label_text: &'static str,
-    description: Option<&'static str>,
-    value: RwSignal<String>,
-    placeholder: &'static str,
-    on_change: OnChange<String>,
-) -> impl IntoView {
-    Stack::horizontal((
-        setting_label(label_text, description),
-        text_input(value)
-            .placeholder(placeholder)
-            .on_event_stop(EventListener::FocusLost, move |_| {
-                if let Some(ref cb) = on_change {
-                    cb(value.get());
-                }
-            })
-            .style(|s| text_input_style(s).width(200.0)),
-    ))
-    .style(setting_row_style)
-}
-
-// ============================================================================
-// Dropdown Row - Select field
-// ============================================================================
-
-/// A setting row with a dropdown selector
-pub fn dropdown_row<T: Clone + PartialEq + 'static>(
-    label_text: &'static str,
-    description: Option<&'static str>,
-    options: Vec<(&'static str, T)>,
-    selected: RwSignal<T>,
-) -> impl IntoView {
-    let options_for_label = options.clone();
-
-    Stack::horizontal((
-        setting_label(label_text, description),
-        // Dropdown display (simplified as styled label)
-        Stack::horizontal((
-            Label::derived(move || {
-                let current = selected.get();
-                options_for_label
-                    .iter()
-                    .find(|(_, v)| *v == current)
-                    .map(|(name, _)| (*name).to_string())
-                    .unwrap_or_else(|| "Select...".to_string())
-            })
-            .style(|s| s.color(TEXT_PRIMARY).font_size(FONT_SIZE_SM)),
-            // Chevron indicator
-            Label::derived(|| "▼".to_string())
-                .style(|s| s.color(TEXT_TERTIARY).font_size(FONT_SIZE_SM)),
-        ))
-        .style(|s| {
-            s.padding_horiz(SPACING_MD)
-                .padding_vert(SPACING_SM)
-                .background(BG_ELEVATED)
-                .border_radius(RADIUS_SM)
-                .border(1.0)
-                .border_color(BORDER_SUBTLE)
-                .min_width(160.0)
-                .gap(SPACING_SM)
-                .items_center()
-                .justify_between()
-        }),
-    ))
-    .style(setting_row_style)
-}
-
-// ============================================================================
-// Helper Components
-// ============================================================================
-
-/// Create the label + description column for setting rows
-fn setting_label(label_text: &'static str, description: Option<&'static str>) -> impl IntoView {
-    Stack::vertical((
-        Label::derived(move || label_text.to_string())
-            .style(|s| s.color(TEXT_PRIMARY).font_size(FONT_SIZE_BASE)),
-        match description {
-            Some(desc) => Label::derived(move || desc.to_string())
-                .style(|s| {
-                    s.font_size(FONT_SIZE_SM)
+    rect()
+        .content(Content::flex())
+        .direction(Direction::Horizontal)
+        .width(Size::fill())
+        .height(Size::px(50.0))
+        .cross_align(Alignment::Center)
+        .spacing(SPACING_MD)
+        .child(
+            // Labels - take remaining space
+            rect()
+                .width(Size::flex(1.0))
+                .child(
+                    label()
+                        .text(title)
+                        .color(TEXT_PRIMARY)
+                        .font_size(FONT_SIZE_BASE)
+                        .max_lines(1),
+                )
+                .child(
+                    label()
+                        .text(description)
                         .color(TEXT_SECONDARY)
-                        .margin_top(SPACING_XS)
-                })
-                .into_any(),
-            None => Empty::new().into_any(),
-        },
-    ))
-    .style(|s| s.flex_grow(1.0))
+                        .font_size(FONT_SIZE_SM)
+                        .max_lines(1),
+                ),
+        )
+        .child(
+            Switch::new()
+                .toggled(value)
+                .on_toggle(move |_| {
+                    on_change(!value);
+                }),
+        )
+        .into()
+}
+
+// ============================================================================
+// Slider Row - Slider with value display (plain function, no hooks)
+// ============================================================================
+
+/// Create a setting row with a slider control.
+/// Parent manages state and passes value + on_change callback.
+pub fn slider_row(
+    title: &str,
+    description: &str,
+    value: f64,
+    min: f64,
+    max: f64,
+    unit: &str,
+    on_change: impl Fn(f64) + 'static,
+) -> Element {
+    let title = title.to_string();
+    let description = description.to_string();
+    let unit = unit.to_string();
+
+    // Normalize value to 0-100 range for slider
+    let to_slider = move |v: f64| ((v - min) / (max - min)) * 100.0;
+    let from_slider = move |v: f64| (v / 100.0) * (max - min) + min;
+
+    rect()
+        .content(Content::flex())
+        .direction(Direction::Horizontal)
+        .width(Size::fill())
+        .height(Size::px(50.0))
+        .cross_align(Alignment::Center)
+        .spacing(SPACING_MD)
+        .child(
+            // Labels - take remaining space
+            rect()
+                .width(Size::flex(1.0))
+                .child(
+                    label()
+                        .text(title)
+                        .color(TEXT_PRIMARY)
+                        .font_size(FONT_SIZE_BASE)
+                        .max_lines(1),
+                )
+                .child(
+                    label()
+                        .text(description)
+                        .color(TEXT_SECONDARY)
+                        .font_size(FONT_SIZE_SM)
+                        .max_lines(1),
+                ),
+        )
+        .child(
+            Slider::new(move |v| {
+                let actual = from_slider(v);
+                on_change(actual);
+            })
+            .value(to_slider(value))
+            .size(Size::px(100.0)),
+        )
+        .child(
+            label()
+                .text(format!("{:.0}{}", value, unit))
+                .color(TEXT_PRIMARY)
+                .font_size(FONT_SIZE_SM)
+                .width(Size::px(40.0))
+                .max_lines(1),
+        )
+        .into()
+}
+
+// ============================================================================
+// Text Row - Text input field (plain function, no hooks)
+// ============================================================================
+
+/// Create a setting row with a text input.
+/// Parent manages state and passes value + on_change callback.
+pub fn text_row(
+    title: &str,
+    description: &str,
+    value: &str,
+    placeholder: &str,
+    on_change: impl Fn(String) + 'static,
+) -> Element {
+    let title = title.to_string();
+    let description = description.to_string();
+    let value = value.to_string();
+    let placeholder = placeholder.to_string();
+
+    rect()
+        .content(Content::flex())
+        .direction(Direction::Horizontal)
+        .width(Size::fill())
+        .height(Size::px(50.0))
+        .cross_align(Alignment::Center)
+        .spacing(SPACING_MD)
+        .child(
+            // Labels - take remaining space
+            rect()
+                .width(Size::flex(1.0))
+                .child(
+                    label()
+                        .text(title)
+                        .color(TEXT_PRIMARY)
+                        .font_size(FONT_SIZE_BASE)
+                        .max_lines(1),
+                )
+                .child(
+                    label()
+                        .text(description)
+                        .color(TEXT_SECONDARY)
+                        .font_size(FONT_SIZE_SM)
+                        .max_lines(1),
+                ),
+        )
+        .child(
+            Input::new()
+                .value(value)
+                .placeholder(placeholder)
+                .width(Size::px(140.0))
+                .on_change(move |v: String| {
+                    on_change(v);
+                }),
+        )
+        .into()
+}
+
+// ============================================================================
+// Display-only rows (no hooks needed)
+// ============================================================================
+
+/// A simple toggle row that just displays a value (no interactivity)
+pub fn toggle_row_display(title: &str, description: &str, value: bool) -> impl IntoElement {
+    let title = title.to_string();
+    let description = description.to_string();
+    let value_text = if value { "On" } else { "Off" };
+
+    rect()
+        .content(Content::flex())
+        .direction(Direction::Horizontal)
+        .width(Size::fill())
+        .height(Size::px(50.0))
+        .cross_align(Alignment::Center)
+        .spacing(SPACING_MD)
+        .child(
+            rect()
+                .width(Size::flex(1.0))
+                .child(
+                    label()
+                        .text(title)
+                        .color(TEXT_PRIMARY)
+                        .font_size(FONT_SIZE_BASE)
+                        .max_lines(1),
+                )
+                .child(
+                    label()
+                        .text(description)
+                        .color(TEXT_SECONDARY)
+                        .font_size(FONT_SIZE_SM)
+                        .max_lines(1),
+                ),
+        )
+        .child(
+            label()
+                .text(value_text)
+                .color(TEXT_PRIMARY)
+                .font_size(FONT_SIZE_BASE)
+                .max_lines(1),
+        )
+}
+
+/// A slider row that just displays a value (no interactivity)
+pub fn slider_row_display(title: &str, description: &str, value: f64, unit: &str) -> impl IntoElement {
+    let title = title.to_string();
+    let description = description.to_string();
+    let value_text = format!("{:.0} {}", value, unit);
+
+    rect()
+        .content(Content::flex())
+        .direction(Direction::Horizontal)
+        .width(Size::fill())
+        .height(Size::px(50.0))
+        .cross_align(Alignment::Center)
+        .spacing(SPACING_MD)
+        .child(
+            rect()
+                .width(Size::flex(1.0))
+                .child(
+                    label()
+                        .text(title)
+                        .color(TEXT_PRIMARY)
+                        .font_size(FONT_SIZE_BASE)
+                        .max_lines(1),
+                )
+                .child(
+                    label()
+                        .text(description)
+                        .color(TEXT_SECONDARY)
+                        .font_size(FONT_SIZE_SM)
+                        .max_lines(1),
+                ),
+        )
+        .child(
+            label()
+                .text(value_text)
+                .color(TEXT_PRIMARY)
+                .font_size(FONT_SIZE_BASE)
+                .max_lines(1),
+        )
+}
+
+/// A text row that just displays a value (no interactivity)
+pub fn text_row_display(title: &str, description: &str, value: &str) -> impl IntoElement {
+    let title = title.to_string();
+    let description = description.to_string();
+    let value = value.to_string();
+
+    rect()
+        .content(Content::flex())
+        .direction(Direction::Horizontal)
+        .width(Size::fill())
+        .height(Size::px(50.0))
+        .cross_align(Alignment::Center)
+        .spacing(SPACING_MD)
+        .child(
+            rect()
+                .width(Size::flex(1.0))
+                .child(
+                    label()
+                        .text(title)
+                        .color(TEXT_PRIMARY)
+                        .font_size(FONT_SIZE_BASE)
+                        .max_lines(1),
+                )
+                .child(
+                    label()
+                        .text(description)
+                        .color(TEXT_SECONDARY)
+                        .font_size(FONT_SIZE_SM)
+                        .max_lines(1),
+                ),
+        )
+        .child(
+            label()
+                .text(value)
+                .color(TEXT_PRIMARY)
+                .font_size(FONT_SIZE_BASE)
+                .max_lines(1),
+        )
+}
+
+/// A simple row displaying a label and value (read-only)
+pub fn value_row(title: &str, description: &str, value: impl ToString) -> impl IntoElement {
+    let title = title.to_string();
+    let description = description.to_string();
+    let value = value.to_string();
+
+    rect()
+        .content(Content::flex())
+        .direction(Direction::Horizontal)
+        .width(Size::fill())
+        .height(Size::px(50.0))
+        .cross_align(Alignment::Center)
+        .spacing(SPACING_MD)
+        .child(
+            rect()
+                .width(Size::flex(1.0))
+                .child(
+                    label()
+                        .text(title)
+                        .color(TEXT_PRIMARY)
+                        .font_size(FONT_SIZE_BASE)
+                        .max_lines(1),
+                )
+                .child(
+                    label()
+                        .text(description)
+                        .color(TEXT_SECONDARY)
+                        .font_size(FONT_SIZE_SM)
+                        .max_lines(1),
+                ),
+        )
+        .child(
+            label()
+                .text(value)
+                .color(TEXT_PRIMARY)
+                .font_size(FONT_SIZE_BASE)
+                .max_lines(1),
+        )
 }

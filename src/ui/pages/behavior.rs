@@ -1,212 +1,167 @@
 //! Behavior settings page
 
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::views::Stack;
-use std::rc::Rc;
+use freya::prelude::*;
 
 use crate::config::SettingsCategory;
-use crate::ui::components::{section, slider_row_with_callback, toggle_row_with_callback};
+use crate::ui::components::{section, slider_row, toggle_row};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the behavior settings page
-pub fn behavior_page(state: AppState) -> impl IntoView {
+pub fn behavior_page(state: AppState) -> impl IntoElement {
     let settings = state.get_settings();
     let behavior = settings.behavior;
 
-    let focus_follows_mouse = RwSignal::new(behavior.focus_follows_mouse);
-    let always_center_single = RwSignal::new(behavior.always_center_single_column);
-    let empty_workspace_above = RwSignal::new(behavior.empty_workspace_above_first);
-    let workspace_back_and_forth = RwSignal::new(behavior.workspace_auto_back_and_forth);
-    let disable_power_key = RwSignal::new(behavior.disable_power_key_handling);
+    let state_focus = state.clone();
+    let state_back_forth = state.clone();
+    let state_center = state.clone();
+    let state_empty_ws = state.clone();
+    let state_col_width = state.clone();
+    let state_strut_l = state.clone();
+    let state_strut_r = state.clone();
+    let state_strut_t = state.clone();
+    let state_strut_b = state.clone();
+    let state_power = state.clone();
 
-    let strut_left = RwSignal::new(behavior.strut_left as f64);
-    let strut_right = RwSignal::new(behavior.strut_right as f64);
-    let strut_top = RwSignal::new(behavior.strut_top as f64);
-    let strut_bottom = RwSignal::new(behavior.strut_bottom as f64);
-
-    let default_column_width = RwSignal::new(behavior.default_column_width_proportion as f64);
-
-    // Callbacks
-    let on_focus_follows_mouse = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.behavior.focus_follows_mouse = val);
-            state.mark_dirty_and_save(SettingsCategory::Behavior);
-        })
-    };
-
-    let on_workspace_back_and_forth = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.behavior.workspace_auto_back_and_forth = val);
-            state.mark_dirty_and_save(SettingsCategory::Behavior);
-        })
-    };
-
-    let on_always_center_single = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.behavior.always_center_single_column = val);
-            state.mark_dirty_and_save(SettingsCategory::Behavior);
-        })
-    };
-
-    let on_empty_workspace_above = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.behavior.empty_workspace_above_first = val);
-            state.mark_dirty_and_save(SettingsCategory::Behavior);
-        })
-    };
-
-    let on_default_column_width = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.behavior.default_column_width_proportion = val as f32);
-            state.mark_dirty_and_save(SettingsCategory::Behavior);
-        })
-    };
-
-    let on_strut_left = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.behavior.strut_left = val as f32);
-            state.mark_dirty_and_save(SettingsCategory::Behavior);
-        })
-    };
-
-    let on_strut_right = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.behavior.strut_right = val as f32);
-            state.mark_dirty_and_save(SettingsCategory::Behavior);
-        })
-    };
-
-    let on_strut_top = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.behavior.strut_top = val as f32);
-            state.mark_dirty_and_save(SettingsCategory::Behavior);
-        })
-    };
-
-    let on_strut_bottom = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.behavior.strut_bottom = val as f32);
-            state.mark_dirty_and_save(SettingsCategory::Behavior);
-        })
-    };
-
-    let on_disable_power_key = {
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.behavior.disable_power_key_handling = val);
-            state.mark_dirty_and_save(SettingsCategory::Behavior);
-        })
-    };
-
-    Stack::vertical((
-        section(
+    rect()
+        .width(Size::fill())
+        .spacing(SPACING_LG)
+        // Focus section
+        .child(section(
             "Focus",
-            Stack::vertical((
-                toggle_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
                     "Focus follows mouse",
-                    Some("Automatically focus window under cursor"),
-                    focus_follows_mouse,
-                    Some(on_focus_follows_mouse),
-                ),
-                toggle_row_with_callback(
+                    "Automatically focus window under cursor",
+                    behavior.focus_follows_mouse,
+                    move |val| {
+                        state_focus.update_settings(|s| s.behavior.focus_follows_mouse = val);
+                        state_focus.mark_dirty_and_save(SettingsCategory::Behavior);
+                    },
+                ))
+                .child(toggle_row(
                     "Workspace back and forth",
-                    Some("Switch to previous workspace with same key"),
-                    workspace_back_and_forth,
-                    Some(on_workspace_back_and_forth),
-                ),
-            )),
-        ),
-        section(
+                    "Switch to previous workspace with same key",
+                    behavior.workspace_auto_back_and_forth,
+                    move |val| {
+                        state_back_forth
+                            .update_settings(|s| s.behavior.workspace_auto_back_and_forth = val);
+                        state_back_forth.mark_dirty_and_save(SettingsCategory::Behavior);
+                    },
+                )),
+        ))
+        // Layout section
+        .child(section(
             "Layout",
-            Stack::vertical((
-                toggle_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
                     "Center single column",
-                    Some("Always center when only one column exists"),
-                    always_center_single,
-                    Some(on_always_center_single),
-                ),
-                toggle_row_with_callback(
+                    "Always center when only one column exists",
+                    behavior.always_center_single_column,
+                    move |val| {
+                        state_center
+                            .update_settings(|s| s.behavior.always_center_single_column = val);
+                        state_center.mark_dirty_and_save(SettingsCategory::Behavior);
+                    },
+                ))
+                .child(toggle_row(
                     "Empty workspace above first",
-                    Some("Add empty workspace above the first one"),
-                    empty_workspace_above,
-                    Some(on_empty_workspace_above),
-                ),
-                slider_row_with_callback(
+                    "Add empty workspace above the first one",
+                    behavior.empty_workspace_above_first,
+                    move |val| {
+                        state_empty_ws
+                            .update_settings(|s| s.behavior.empty_workspace_above_first = val);
+                        state_empty_ws.mark_dirty_and_save(SettingsCategory::Behavior);
+                    },
+                ))
+                .child(slider_row(
                     "Default column width",
-                    Some("Width proportion for new columns (0.5 = half)"),
-                    default_column_width,
+                    "Width proportion for new columns (0.5 = half)",
+                    behavior.default_column_width_proportion as f64,
                     0.1,
                     2.0,
-                    0.1,
                     "",
-                    Some(on_default_column_width),
-                ),
-            )),
-        ),
-        section(
+                    move |val| {
+                        state_col_width
+                            .update_settings(|s| s.behavior.default_column_width_proportion = val as f32);
+                        state_col_width.mark_dirty_and_save(SettingsCategory::Behavior);
+                    },
+                )),
+        ))
+        // Screen Margins section
+        .child(section(
             "Screen Margins (Struts)",
-            Stack::vertical((
-                slider_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(slider_row(
                     "Left margin",
-                    Some("Reserved space on left edge"),
-                    strut_left,
+                    "Reserved space on left edge",
+                    behavior.strut_left as f64,
                     0.0,
                     500.0,
-                    10.0,
                     "px",
-                    Some(on_strut_left),
-                ),
-                slider_row_with_callback(
+                    move |val| {
+                        state_strut_l.update_settings(|s| s.behavior.strut_left = val as f32);
+                        state_strut_l.mark_dirty_and_save(SettingsCategory::Behavior);
+                    },
+                ))
+                .child(slider_row(
                     "Right margin",
-                    Some("Reserved space on right edge"),
-                    strut_right,
+                    "Reserved space on right edge",
+                    behavior.strut_right as f64,
                     0.0,
                     500.0,
-                    10.0,
                     "px",
-                    Some(on_strut_right),
-                ),
-                slider_row_with_callback(
+                    move |val| {
+                        state_strut_r.update_settings(|s| s.behavior.strut_right = val as f32);
+                        state_strut_r.mark_dirty_and_save(SettingsCategory::Behavior);
+                    },
+                ))
+                .child(slider_row(
                     "Top margin",
-                    Some("Reserved space on top edge"),
-                    strut_top,
+                    "Reserved space on top edge",
+                    behavior.strut_top as f64,
                     0.0,
                     500.0,
-                    10.0,
                     "px",
-                    Some(on_strut_top),
-                ),
-                slider_row_with_callback(
+                    move |val| {
+                        state_strut_t.update_settings(|s| s.behavior.strut_top = val as f32);
+                        state_strut_t.mark_dirty_and_save(SettingsCategory::Behavior);
+                    },
+                ))
+                .child(slider_row(
                     "Bottom margin",
-                    Some("Reserved space on bottom edge"),
-                    strut_bottom,
+                    "Reserved space on bottom edge",
+                    behavior.strut_bottom as f64,
                     0.0,
                     500.0,
-                    10.0,
                     "px",
-                    Some(on_strut_bottom),
-                ),
-            )),
-        ),
-        section(
+                    move |val| {
+                        state_strut_b.update_settings(|s| s.behavior.strut_bottom = val as f32);
+                        state_strut_b.mark_dirty_and_save(SettingsCategory::Behavior);
+                    },
+                )),
+        ))
+        // System section
+        .child(section(
             "System",
-            Stack::vertical((toggle_row_with_callback(
-                "Disable power key handling",
-                Some("Let the system handle the power button"),
-                disable_power_key,
-                Some(on_disable_power_key),
-            ),)),
-        ),
-    ))
-    .style(|s| s.width_full().gap(SPACING_LG))
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
+                    "Disable power key handling",
+                    "Let the system handle the power button",
+                    behavior.disable_power_key_handling,
+                    move |val| {
+                        state_power
+                            .update_settings(|s| s.behavior.disable_power_key_handling = val);
+                        state_power.mark_dirty_and_save(SettingsCategory::Behavior);
+                    },
+                )),
+        ))
 }

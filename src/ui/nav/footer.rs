@@ -7,26 +7,22 @@ use crate::ui::theme::*;
 /// Create the footer with status indicator and close button
 pub fn footer() -> impl IntoElement {
     rect()
-        .horizontal()
+        .direction(Direction::Horizontal)
         .width(Size::fill())
+        .height(Size::px(50.0))
         .padding((SPACING_LG, SPACING_2XL, SPACING_LG, SPACING_2XL))
         .background(MANTLE)
         .child(
             // Status indicator
             rect()
-                .horizontal()
+                .direction(Direction::Horizontal)
                 .spacing(SPACING_SM)
-                .child(rect().color(SUCCESS).font_size(FONT_SIZE_SM).child("✓"))
-                .child(
-                    rect()
-                        .color(TEXT_GHOST)
-                        .font_size(FONT_SIZE_SM)
-                        .child("Changes saved automatically"),
-                ),
+                .child(label().text("✓").color(SUCCESS).font_size(FONT_SIZE_SM).max_lines(1))
+                .child(label().text("Changes saved automatically").color(TEXT_GHOST).font_size(FONT_SIZE_SM).max_lines(1)),
         )
         .child(
             // Spacer
-            rect().width(Size::fill()),
+            rect().width(Size::flex(1.0)),
         )
         .child(
             // Close button
@@ -34,6 +30,6 @@ pub fn footer() -> impl IntoElement {
                 .on_press(|_| {
                     std::process::exit(0);
                 })
-                .child("Close"),
+                .child(label().text("Close").max_lines(1)),
         )
 }

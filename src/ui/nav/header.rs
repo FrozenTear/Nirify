@@ -11,26 +11,25 @@ pub fn header(
     current_category: State<Category>,
 ) -> impl IntoElement {
     rect()
-        .horizontal()
+        .direction(Direction::Horizontal)
         .width(Size::fill())
+        .height(Size::px(60.0))
         .padding((SPACING_LG, SPACING_2XL, SPACING_LG, SPACING_2XL))
         .background(MANTLE)
+        .main_align(Alignment::SpaceBetween)
         .child(
             // Title
-            rect()
+            label()
+                .text("Niri Settings")
                 .color(TEXT_PRIMARY)
                 .font_size(FONT_SIZE_XL)
                 .font_weight(FontWeight::BOLD)
-                .child("Niri Settings"),
+                .max_lines(1),
         )
         .child(
-            // Spacer
-            rect().width(Size::fill()),
-        )
-        .child(
-            // Navigation tabs - simplified for now
+            // Navigation tabs
             rect()
-                .horizontal()
+                .direction(Direction::Horizontal)
                 .spacing(SPACING_SM)
                 .child(nav_button("Appearance", NavGroup::Appearance, current_nav_group, current_category))
                 .child(nav_button("Input", NavGroup::Input, current_nav_group, current_category))
@@ -42,7 +41,7 @@ pub fn header(
 }
 
 fn nav_button(
-    label: &'static str,
+    text: &'static str,
     group: NavGroup,
     mut current_nav_group: State<NavGroup>,
     mut current_category: State<Category>,
@@ -54,5 +53,5 @@ fn nav_button(
                 *current_category.write() = *first_cat;
             }
         })
-        .child(label)
+        .child(label().text(text).max_lines(1))
 }

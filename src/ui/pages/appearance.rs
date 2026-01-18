@@ -1,211 +1,130 @@
 //! Appearance settings page
 
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::views::Stack;
-use std::rc::Rc;
+use freya::prelude::*;
 
 use crate::config::SettingsCategory;
-use crate::types::{Color, ColorOrGradient};
-use crate::ui::components::{
-    color_row_with_callback, section, slider_row_with_callback, toggle_row_with_callback,
-};
+use crate::ui::components::{section, slider_row, toggle_row, value_row};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the appearance settings page
-pub fn appearance_page(state: AppState) -> impl IntoView {
-    // Create local signals from settings
+pub fn appearance_page(state: AppState) -> impl IntoElement {
     let settings = state.get_settings();
     let appearance = settings.appearance;
 
-    let focus_ring_enabled = RwSignal::new(appearance.focus_ring_enabled);
-    let focus_ring_width = RwSignal::new(appearance.focus_ring_width as f64);
-    let focus_ring_active = RwSignal::new(appearance.focus_ring_active.to_hex());
-    let focus_ring_inactive = RwSignal::new(appearance.focus_ring_inactive.to_hex());
-    let focus_ring_urgent = RwSignal::new(appearance.focus_ring_urgent.to_hex());
+    // Clone state for callbacks
+    let state_focus_ring = state.clone();
+    let state_focus_width = state.clone();
+    let state_border = state.clone();
+    let state_border_thickness = state.clone();
+    let state_gaps = state.clone();
+    let state_corner_radius = state.clone();
 
-    let border_enabled = RwSignal::new(appearance.border_enabled);
-    let border_thickness = RwSignal::new(appearance.border_thickness as f64);
-
-    let gaps = RwSignal::new(appearance.gaps as f64);
-    let corner_radius = RwSignal::new(appearance.corner_radius as f64);
-
-    // Create callbacks that update settings and save
-    let on_focus_ring_enabled = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.appearance.focus_ring_enabled = val);
-            state.mark_dirty_and_save(SettingsCategory::Appearance);
-        })
-    };
-
-    let on_focus_ring_width = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.appearance.focus_ring_width = val as f32);
-            state.mark_dirty_and_save(SettingsCategory::Appearance);
-        })
-    };
-
-    let on_focus_ring_active = {
-        let state = state.clone();
-        Rc::new(move |val: String| {
-            if let Some(color) = Color::from_hex(&val) {
-                state.update_settings(|s| {
-                    s.appearance.focus_ring_active = ColorOrGradient::Color(color)
-                });
-                state.mark_dirty_and_save(SettingsCategory::Appearance);
-            }
-        })
-    };
-
-    let on_focus_ring_inactive = {
-        let state = state.clone();
-        Rc::new(move |val: String| {
-            if let Some(color) = Color::from_hex(&val) {
-                state.update_settings(|s| {
-                    s.appearance.focus_ring_inactive = ColorOrGradient::Color(color)
-                });
-                state.mark_dirty_and_save(SettingsCategory::Appearance);
-            }
-        })
-    };
-
-    let on_focus_ring_urgent = {
-        let state = state.clone();
-        Rc::new(move |val: String| {
-            if let Some(color) = Color::from_hex(&val) {
-                state.update_settings(|s| {
-                    s.appearance.focus_ring_urgent = ColorOrGradient::Color(color)
-                });
-                state.mark_dirty_and_save(SettingsCategory::Appearance);
-            }
-        })
-    };
-
-    let on_border_enabled = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.appearance.border_enabled = val);
-            state.mark_dirty_and_save(SettingsCategory::Appearance);
-        })
-    };
-
-    let on_border_thickness = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.appearance.border_thickness = val as f32);
-            state.mark_dirty_and_save(SettingsCategory::Appearance);
-        })
-    };
-
-    let on_gaps = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.appearance.gaps = val as f32);
-            state.mark_dirty_and_save(SettingsCategory::Appearance);
-        })
-    };
-
-    let on_corner_radius = {
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.appearance.corner_radius = val as f32);
-            state.mark_dirty_and_save(SettingsCategory::Appearance);
-        })
-    };
-
-    Stack::vertical((
+    rect()
+        .width(Size::fill())
+        .spacing(SPACING_LG)
         // Focus Ring section
-        section(
+        .child(section(
             "Focus Ring",
-            Stack::vertical((
-                toggle_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
                     "Enable focus ring",
-                    Some("Show a colored ring around the focused window"),
-                    focus_ring_enabled,
-                    Some(on_focus_ring_enabled),
-                ),
-                slider_row_with_callback(
+                    "Show a colored ring around the focused window",
+                    appearance.focus_ring_enabled,
+                    move |val| {
+                        state_focus_ring.update_settings(|s| s.appearance.focus_ring_enabled = val);
+                        state_focus_ring.mark_dirty_and_save(SettingsCategory::Appearance);
+                    },
+                ))
+                .child(slider_row(
                     "Ring width",
-                    Some("Thickness of the focus ring in pixels"),
-                    focus_ring_width,
+                    "Thickness of the focus ring in pixels",
+                    appearance.focus_ring_width as f64,
                     1.0,
                     20.0,
-                    1.0,
                     "px",
-                    Some(on_focus_ring_width),
-                ),
-                color_row_with_callback(
+                    move |val| {
+                        state_focus_width.update_settings(|s| s.appearance.focus_ring_width = val as f32);
+                        state_focus_width.mark_dirty_and_save(SettingsCategory::Appearance);
+                    },
+                ))
+                .child(value_row(
                     "Active color",
-                    Some("Color when window is focused"),
-                    focus_ring_active,
-                    Some(on_focus_ring_active),
-                ),
-                color_row_with_callback(
+                    "Color when window is focused",
+                    appearance.focus_ring_active.to_hex(),
+                ))
+                .child(value_row(
                     "Inactive color",
-                    Some("Color when window is not focused"),
-                    focus_ring_inactive,
-                    Some(on_focus_ring_inactive),
-                ),
-                color_row_with_callback(
-                    "Urgent color",
-                    Some("Color when window needs attention"),
-                    focus_ring_urgent,
-                    Some(on_focus_ring_urgent),
-                ),
-            )),
-        ),
+                    "Color when window is not focused",
+                    appearance.focus_ring_inactive.to_hex(),
+                )),
+        ))
         // Window Border section
-        section(
+        .child(section(
             "Window Border",
-            Stack::vertical((
-                toggle_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
                     "Enable window border",
-                    Some("Show a border around windows (inside the focus ring)"),
-                    border_enabled,
-                    Some(on_border_enabled),
-                ),
-                slider_row_with_callback(
+                    "Show a border around windows (inside the focus ring)",
+                    appearance.border_enabled,
+                    move |val| {
+                        state_border.update_settings(|s| s.appearance.border_enabled = val);
+                        state_border.mark_dirty_and_save(SettingsCategory::Appearance);
+                    },
+                ))
+                .child(slider_row(
                     "Border thickness",
-                    Some("Thickness of the window border in pixels"),
-                    border_thickness,
+                    "Thickness of the window border in pixels",
+                    appearance.border_thickness as f64,
                     1.0,
                     15.0,
-                    1.0,
                     "px",
-                    Some(on_border_thickness),
-                ),
-            )),
-        ),
+                    move |val| {
+                        state_border_thickness.update_settings(|s| s.appearance.border_thickness = val as f32);
+                        state_border_thickness.mark_dirty_and_save(SettingsCategory::Appearance);
+                    },
+                )),
+        ))
         // Gaps section
-        section(
+        .child(section(
             "Gaps",
-            Stack::vertical((slider_row_with_callback(
-                "Window gaps",
-                Some("Space between windows"),
-                gaps,
-                0.0,
-                64.0,
-                2.0,
-                "px",
-                Some(on_gaps),
-            ),)),
-        ),
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(slider_row(
+                    "Window gaps",
+                    "Space between windows",
+                    appearance.gaps as f64,
+                    0.0,
+                    64.0,
+                    "px",
+                    move |val| {
+                        state_gaps.update_settings(|s| s.appearance.gaps = val as f32);
+                        state_gaps.mark_dirty_and_save(SettingsCategory::Appearance);
+                    },
+                )),
+        ))
         // Corners section
-        section(
+        .child(section(
             "Corners",
-            Stack::vertical((slider_row_with_callback(
-                "Corner radius",
-                Some("Window corner rounding"),
-                corner_radius,
-                0.0,
-                40.0,
-                2.0,
-                "px",
-                Some(on_corner_radius),
-            ),)),
-        ),
-    ))
-    .style(|s| s.width_full().gap(SPACING_LG))
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(slider_row(
+                    "Corner radius",
+                    "Window corner rounding",
+                    appearance.corner_radius as f64,
+                    0.0,
+                    40.0,
+                    "px",
+                    move |val| {
+                        state_corner_radius.update_settings(|s| s.appearance.corner_radius = val as f32);
+                        state_corner_radius.mark_dirty_and_save(SettingsCategory::Appearance);
+                    },
+                )),
+        ))
 }

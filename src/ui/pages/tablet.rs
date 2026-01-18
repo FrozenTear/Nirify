@@ -1,67 +1,64 @@
 //! Tablet (drawing tablet) settings page
 
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::views::Stack;
-use std::rc::Rc;
+use freya::prelude::*;
 
 use crate::config::SettingsCategory;
-use crate::ui::components::{section, text_row, toggle_row_with_callback};
+use crate::ui::components::{section, text_row, toggle_row};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the tablet settings page
-pub fn tablet_page(state: AppState) -> impl IntoView {
+pub fn tablet_page(state: AppState) -> impl IntoElement {
     let settings = state.get_settings();
     let tablet = settings.tablet;
 
-    let off = RwSignal::new(tablet.off);
-    let left_handed = RwSignal::new(tablet.left_handed);
-    let map_to_output = RwSignal::new(tablet.map_to_output);
+    let state_map = state.clone();
+    let state_left = state.clone();
+    let state_off = state.clone();
 
-    // Callbacks
-    let on_left_handed = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.tablet.left_handed = val);
-            state.mark_dirty_and_save(SettingsCategory::Tablet);
-        })
-    };
-
-    let on_off = {
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.tablet.off = val);
-            state.mark_dirty_and_save(SettingsCategory::Tablet);
-        })
-    };
-
-    Stack::vertical((
-        section(
+    rect()
+        .width(Size::fill())
+        .spacing(SPACING_LG)
+        // Display Mapping section
+        .child(section(
             "Display Mapping",
-            Stack::vertical((text_row(
-                "Map to output",
-                Some("Monitor name to map tablet to (e.g., HDMI-1)"),
-                map_to_output,
-                "",
-            ),)),
-        ),
-        section(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(text_row(
+                    "Map to output",
+                    "Monitor name to map tablet to (e.g., HDMI-1)",
+                    &tablet.map_to_output,
+                    "",
+                    move |val| {
+                        state_map.update_settings(|s| s.tablet.map_to_output = val);
+                        state_map.mark_dirty_and_save(SettingsCategory::Tablet);
+                    },
+                )),
+        ))
+        // Options section
+        .child(section(
             "Options",
-            Stack::vertical((
-                toggle_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
                     "Left-handed mode",
-                    Some("Flip tablet orientation"),
-                    left_handed,
-                    Some(on_left_handed),
-                ),
-                toggle_row_with_callback(
+                    "Flip tablet orientation",
+                    tablet.left_handed,
+                    move |val| {
+                        state_left.update_settings(|s| s.tablet.left_handed = val);
+                        state_left.mark_dirty_and_save(SettingsCategory::Tablet);
+                    },
+                ))
+                .child(toggle_row(
                     "Disable tablet",
-                    Some("Turn off tablet input"),
-                    off,
-                    Some(on_off),
-                ),
-            )),
-        ),
-    ))
-    .style(|s| s.width_full().gap(SPACING_LG))
+                    "Turn off tablet input",
+                    tablet.off,
+                    move |val| {
+                        state_off.update_settings(|s| s.tablet.off = val);
+                        state_off.mark_dirty_and_save(SettingsCategory::Tablet);
+                    },
+                )),
+        ))
 }

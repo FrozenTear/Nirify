@@ -1,181 +1,149 @@
 //! Animation settings page
 
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::views::Stack;
-use std::rc::Rc;
+use freya::prelude::*;
 
 use crate::config::models::AnimationType;
 use crate::config::SettingsCategory;
-use crate::ui::components::{section, slider_row_with_callback, toggle_row_with_callback};
+use crate::ui::components::{section, slider_row, toggle_row};
 use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the animations settings page
-pub fn animations_page(state: AppState) -> impl IntoView {
+pub fn animations_page(state: AppState) -> impl IntoElement {
     let settings = state.get_settings();
     let animations = settings.animations;
 
-    let enabled = RwSignal::new(animations.enabled);
-    let slowdown = RwSignal::new(animations.slowdown);
-
     // Per-animation enabled states
-    let workspace_switch = RwSignal::new(
-        animations.per_animation.workspace_switch.animation_type != AnimationType::Off,
-    );
-    let window_open =
-        RwSignal::new(animations.per_animation.window_open.animation_type != AnimationType::Off);
-    let window_close =
-        RwSignal::new(animations.per_animation.window_close.animation_type != AnimationType::Off);
-    let window_movement = RwSignal::new(
-        animations.per_animation.window_movement.animation_type != AnimationType::Off,
-    );
-    let window_resize =
-        RwSignal::new(animations.per_animation.window_resize.animation_type != AnimationType::Off);
+    let workspace_switch_enabled =
+        animations.per_animation.workspace_switch.animation_type != AnimationType::Off;
+    let window_open_enabled =
+        animations.per_animation.window_open.animation_type != AnimationType::Off;
+    let window_close_enabled =
+        animations.per_animation.window_close.animation_type != AnimationType::Off;
+    let window_movement_enabled =
+        animations.per_animation.window_movement.animation_type != AnimationType::Off;
+    let window_resize_enabled =
+        animations.per_animation.window_resize.animation_type != AnimationType::Off;
 
-    // Callbacks for auto-save
-    let on_enabled = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| s.animations.enabled = val);
-            state.mark_dirty_and_save(SettingsCategory::Animations);
-        })
-    };
+    let state_enabled = state.clone();
+    let state_slowdown = state.clone();
+    let state_ws_switch = state.clone();
+    let state_win_open = state.clone();
+    let state_win_close = state.clone();
+    let state_win_move = state.clone();
+    let state_win_resize = state.clone();
 
-    let on_slowdown = {
-        let state = state.clone();
-        Rc::new(move |val: f64| {
-            state.update_settings(|s| s.animations.slowdown = val);
-            state.mark_dirty_and_save(SettingsCategory::Animations);
-        })
-    };
-
-    let on_workspace_switch = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| {
-                s.animations.per_animation.workspace_switch.animation_type = if val {
-                    AnimationType::Easing
-                } else {
-                    AnimationType::Off
-                };
-            });
-            state.mark_dirty_and_save(SettingsCategory::Animations);
-        })
-    };
-
-    let on_window_open = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| {
-                s.animations.per_animation.window_open.animation_type = if val {
-                    AnimationType::Easing
-                } else {
-                    AnimationType::Off
-                };
-            });
-            state.mark_dirty_and_save(SettingsCategory::Animations);
-        })
-    };
-
-    let on_window_close = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| {
-                s.animations.per_animation.window_close.animation_type = if val {
-                    AnimationType::Easing
-                } else {
-                    AnimationType::Off
-                };
-            });
-            state.mark_dirty_and_save(SettingsCategory::Animations);
-        })
-    };
-
-    let on_window_movement = {
-        let state = state.clone();
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| {
-                s.animations.per_animation.window_movement.animation_type = if val {
-                    AnimationType::Easing
-                } else {
-                    AnimationType::Off
-                };
-            });
-            state.mark_dirty_and_save(SettingsCategory::Animations);
-        })
-    };
-
-    let on_window_resize = {
-        Rc::new(move |val: bool| {
-            state.update_settings(|s| {
-                s.animations.per_animation.window_resize.animation_type = if val {
-                    AnimationType::Easing
-                } else {
-                    AnimationType::Off
-                };
-            });
-            state.mark_dirty_and_save(SettingsCategory::Animations);
-        })
-    };
-
-    Stack::vertical((
-        section(
+    rect()
+        .width(Size::fill())
+        .spacing(SPACING_LG)
+        // Global section
+        .child(section(
             "Global",
-            Stack::vertical((
-                toggle_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
                     "Enable animations",
-                    Some("Turn on all window animations"),
-                    enabled,
-                    Some(on_enabled),
-                ),
-                slider_row_with_callback(
+                    "Turn on all window animations",
+                    animations.enabled,
+                    move |val| {
+                        state_enabled.update_settings(|s| s.animations.enabled = val);
+                        state_enabled.mark_dirty_and_save(SettingsCategory::Animations);
+                    },
+                ))
+                .child(slider_row(
                     "Animation speed",
-                    Some("Global speed multiplier (1.0 = normal)"),
-                    slowdown,
+                    "Global speed multiplier (1.0 = normal)",
+                    animations.slowdown,
                     0.1,
                     10.0,
-                    0.1,
                     "x",
-                    Some(on_slowdown),
-                ),
-            )),
-        ),
-        section(
+                    move |val| {
+                        state_slowdown.update_settings(|s| s.animations.slowdown = val);
+                        state_slowdown.mark_dirty_and_save(SettingsCategory::Animations);
+                    },
+                )),
+        ))
+        // Animation Types section
+        .child(section(
             "Animation Types",
-            Stack::vertical((
-                toggle_row_with_callback(
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child(toggle_row(
                     "Workspace switch",
-                    Some("Animate when switching workspaces"),
-                    workspace_switch,
-                    Some(on_workspace_switch),
-                ),
-                toggle_row_with_callback(
+                    "Animate when switching workspaces",
+                    workspace_switch_enabled,
+                    move |val| {
+                        state_ws_switch.update_settings(|s| {
+                            s.animations.per_animation.workspace_switch.animation_type = if val {
+                                AnimationType::Easing
+                            } else {
+                                AnimationType::Off
+                            };
+                        });
+                        state_ws_switch.mark_dirty_and_save(SettingsCategory::Animations);
+                    },
+                ))
+                .child(toggle_row(
                     "Window open",
-                    Some("Animate window opening"),
-                    window_open,
-                    Some(on_window_open),
-                ),
-                toggle_row_with_callback(
+                    "Animate window opening",
+                    window_open_enabled,
+                    move |val| {
+                        state_win_open.update_settings(|s| {
+                            s.animations.per_animation.window_open.animation_type = if val {
+                                AnimationType::Easing
+                            } else {
+                                AnimationType::Off
+                            };
+                        });
+                        state_win_open.mark_dirty_and_save(SettingsCategory::Animations);
+                    },
+                ))
+                .child(toggle_row(
                     "Window close",
-                    Some("Animate window closing"),
-                    window_close,
-                    Some(on_window_close),
-                ),
-                toggle_row_with_callback(
+                    "Animate window closing",
+                    window_close_enabled,
+                    move |val| {
+                        state_win_close.update_settings(|s| {
+                            s.animations.per_animation.window_close.animation_type = if val {
+                                AnimationType::Easing
+                            } else {
+                                AnimationType::Off
+                            };
+                        });
+                        state_win_close.mark_dirty_and_save(SettingsCategory::Animations);
+                    },
+                ))
+                .child(toggle_row(
                     "Window movement",
-                    Some("Animate window dragging"),
-                    window_movement,
-                    Some(on_window_movement),
-                ),
-                toggle_row_with_callback(
+                    "Animate window dragging",
+                    window_movement_enabled,
+                    move |val| {
+                        state_win_move.update_settings(|s| {
+                            s.animations.per_animation.window_movement.animation_type = if val {
+                                AnimationType::Easing
+                            } else {
+                                AnimationType::Off
+                            };
+                        });
+                        state_win_move.mark_dirty_and_save(SettingsCategory::Animations);
+                    },
+                ))
+                .child(toggle_row(
                     "Window resize",
-                    Some("Animate window resizing"),
-                    window_resize,
-                    Some(on_window_resize),
-                ),
-            )),
-        ),
-    ))
-    .style(|s| s.width_full().gap(SPACING_LG))
+                    "Animate window resizing",
+                    window_resize_enabled,
+                    move |val| {
+                        state_win_resize.update_settings(|s| {
+                            s.animations.per_animation.window_resize.animation_type = if val {
+                                AnimationType::Easing
+                            } else {
+                                AnimationType::Off
+                            };
+                        });
+                        state_win_resize.mark_dirty_and_save(SettingsCategory::Animations);
+                    },
+                )),
+        ))
 }

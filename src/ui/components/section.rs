@@ -6,6 +6,8 @@ use crate::ui::theme::*;
 
 /// Create a section card with an uppercase title header
 pub fn section(title: &str, content: impl IntoElement) -> impl IntoElement {
+    let title = title.to_uppercase();
+
     rect()
         .width(Size::fill())
         .background(BG_SURFACE)
@@ -14,11 +16,12 @@ pub fn section(title: &str, content: impl IntoElement) -> impl IntoElement {
         .spacing(SPACING_LG)
         .child(
             // Section header
-            rect()
+            label()
+                .text(title)
                 .color(ACCENT)
                 .font_size(FONT_SIZE_XS)
                 .font_weight(FontWeight::BOLD)
-                .child(title.to_uppercase()),
+                .max_lines(1),
         )
         .child(content)
 }

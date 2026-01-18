@@ -4,13 +4,16 @@
 
 use freya::prelude::*;
 
-use crate::ui::components::section;
 use crate::ui::nav::{footer, header, sidebar};
+use crate::ui::pages::*;
 use crate::ui::state::{AppState, Category, NavGroup};
 use crate::ui::theme::*;
 
 /// Create the main application view
 pub fn app_view(state: AppState) -> impl IntoElement {
+    // Initialize Freya theme (required for built-in components like Switch, Slider, Input)
+    let _theme = use_init_theme(|| DARK_THEME);
+
     let current_category = use_state(|| Category::Appearance);
     let current_nav_group = use_state(|| NavGroup::Appearance);
 
@@ -27,77 +30,46 @@ pub fn app_view(state: AppState) -> impl IntoElement {
 /// Content area with the current page
 fn content_area(state: AppState, current_category: State<Category>) -> impl IntoElement {
     let cat = *current_category.read();
-    let settings = state.get_settings();
 
     ScrollView::new()
+        .width(Size::fill())
+        .height(Size::flex(1.0))
         .child(
             rect()
                 .width(Size::fill())
                 .padding((SPACING_2XL, SPACING_2XL, SPACING_2XL, SPACING_2XL))
                 .background(BG_BASE)
-                .child(page_content(cat, settings)),
+                .child(render_page(state, cat)),
         )
 }
 
-/// Get the page content for a category
-fn page_content(category: Category, settings: crate::config::Settings) -> impl IntoElement {
-    section(
-        category.label(),
-        rect()
-            .width(Size::fill())
-            .spacing(SPACING_MD)
-            .child(setting_row(
-                "Gap Size",
-                "Space between windows",
-                format!("{} px", settings.appearance.gaps as i32),
-            ))
-            .child(setting_row(
-                "Focus Ring",
-                "Show ring around focused window",
-                if settings.appearance.focus_ring_enabled {
-                    "Enabled"
-                } else {
-                    "Disabled"
-                },
-            ))
-            .child(setting_row(
-                "Border",
-                "Show border around windows",
-                if settings.appearance.border_enabled {
-                    "Enabled"
-                } else {
-                    "Disabled"
-                },
-            )),
-    )
-}
-
-/// A simple setting row with label, description, and value
-fn setting_row(label: &str, description: &str, value: impl ToString) -> impl IntoElement {
-    rect()
-        .horizontal()
-        .width(Size::fill())
-        .padding((SPACING_MD, 0.0, SPACING_MD, 0.0))
-        .child(
-            rect()
-                .width(Size::fill())
-                .child(
-                    rect()
-                        .color(TEXT_PRIMARY)
-                        .font_size(FONT_SIZE_BASE)
-                        .child(label.to_string()),
-                )
-                .child(
-                    rect()
-                        .color(TEXT_SECONDARY)
-                        .font_size(FONT_SIZE_SM)
-                        .child(description.to_string()),
-                ),
-        )
-        .child(
-            rect()
-                .color(TEXT_PRIMARY)
-                .font_size(FONT_SIZE_BASE)
-                .child(value.to_string()),
-        )
+/// Render the appropriate page based on category
+fn render_page(state: AppState, category: Category) -> Element {
+    match category {
+        Category::Appearance => appearance_page(state).into_element(),
+        Category::Keyboard => keyboard_page(state).into_element(),
+        Category::Mouse => mouse_page(state).into_element(),
+        Category::Touchpad => touchpad_page(state).into_element(),
+        Category::Trackpoint => trackpoint_page(state).into_element(),
+        Category::Trackball => trackball_page(state).into_element(),
+        Category::Tablet => tablet_page(state).into_element(),
+        Category::Touch => touch_page(state).into_element(),
+        Category::Outputs => outputs_page(state).into_element(),
+        Category::Animations => animations_page(state).into_element(),
+        Category::Cursor => cursor_page(state).into_element(),
+        Category::Overview => overview_page(state).into_element(),
+        Category::RecentWindows => recent_windows_page(state).into_element(),
+        Category::Behavior => behavior_page(state).into_element(),
+        Category::LayoutExtras => layout_extras_page(state).into_element(),
+        Category::Workspaces => workspaces_page(state).into_element(),
+        Category::WindowRules => window_rules_page(state).into_element(),
+        Category::LayerRules => layer_rules_page(state).into_element(),
+        Category::Gestures => gestures_page(state).into_element(),
+        Category::Keybindings => keybindings_page(state).into_element(),
+        Category::Startup => startup_page(state).into_element(),
+        Category::Environment => environment_page(state).into_element(),
+        Category::SwitchEvents => switch_events_page(state).into_element(),
+        Category::Miscellaneous => miscellaneous_page(state).into_element(),
+        Category::Debug => debug_page(state).into_element(),
+    }
 }

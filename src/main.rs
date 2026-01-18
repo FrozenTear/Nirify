@@ -28,7 +28,13 @@ fn main() -> Result<()> {
     // Launch Freya app
     launch(
         LaunchConfig::new()
-            .with_window(WindowConfig::new(move || ui::app_view(state.clone())).with_size(1000.0, 700.0).with_title("Niri Settings")),
+            .with_window(
+                WindowConfig::new(move || ui::app_view(state.clone()))
+                    .with_size(1000.0, 700.0)
+                    .with_min_size(600.0, 400.0)
+                    .with_title("Niri Settings")
+                    .with_resizable(true),
+            ),
     );
 
     // Save settings on exit
