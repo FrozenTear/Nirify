@@ -1,6 +1,6 @@
-//! Floem-based UI for niri-settings
+//! Freya-based UI for niri-settings
 //!
-//! This module contains all the UI components built with Floem.
+//! This module contains all the UI components built with Freya.
 
 pub mod app;
 pub mod components;

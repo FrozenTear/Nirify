@@ -1,8 +1,9 @@
 //! niri-settings - Native settings application for the niri Wayland compositor
 //!
-//! This is the main entry point that initializes the application with Floem UI.
+//! This is the main entry point that initializes the application with Freya UI.
 
 use anyhow::Result;
+use freya::prelude::*;
 use log::{error, info, warn};
 use std::sync::{Arc, Mutex};
 
@@ -24,8 +25,11 @@ fn main() -> Result<()> {
     // Create app state
     let state = ui::AppState::new(settings.clone(), paths.clone());
 
-    // Launch Floem app
-    floem::launch(move || ui::app_view(state.clone()));
+    // Launch Freya app
+    launch(
+        LaunchConfig::new()
+            .with_window(WindowConfig::new(move || ui::app_view(state.clone())).with_size(1000.0, 700.0).with_title("Niri Settings")),
+    );
 
     // Save settings on exit
     save_on_exit(&settings, &paths);

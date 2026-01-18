@@ -1,8 +1,8 @@
 //! Application state management for niri-settings
 //!
-//! Uses Floem's reactive signals to manage UI state.
+//! Uses Freya's reactive state system (use_state) for UI state management.
+//! Global app state is managed through a shared Arc<Mutex<>> for settings.
 
-use floem::reactive::{RwSignal, SignalUpdate};
 use std::sync::{Arc, Mutex};
 
 use crate::config::{save_dirty, ConfigPaths, DirtyTracker, Settings, SettingsCategory};
@@ -174,17 +174,13 @@ impl NavGroup {
     }
 }
 
-/// Global application state
+/// Global application state - shared across the application
+///
+/// In Freya, local UI state uses `use_state()` hooks within components.
+/// This struct holds the shared application data that persists across
+/// component re-renders.
 #[derive(Clone)]
 pub struct AppState {
-    /// Current navigation category
-    pub category: RwSignal<Category>,
-    /// Current navigation group
-    pub nav_group: RwSignal<NavGroup>,
-    /// Search query
-    pub search_query: RwSignal<String>,
-    /// Status message
-    pub status_message: RwSignal<Option<(String, bool)>>,
     /// Settings data (shared with config system)
     pub settings: Arc<Mutex<Settings>>,
     /// Config paths
@@ -196,10 +192,6 @@ pub struct AppState {
 impl AppState {
     pub fn new(settings: Arc<Mutex<Settings>>, paths: Arc<ConfigPaths>) -> Self {
         Self {
-            category: RwSignal::new(Category::Appearance),
-            nav_group: RwSignal::new(NavGroup::Appearance),
-            search_query: RwSignal::new(String::new()),
-            status_message: RwSignal::new(None),
             settings,
             paths,
             dirty_tracker: Arc::new(DirtyTracker::new()),
@@ -229,25 +221,8 @@ impl AppState {
             }
             Err(e) => {
                 log::error!("Auto-save failed: {}", e);
-                self.show_status(format!("Save failed: {}", e), true);
             }
         }
-    }
-
-    /// Navigate to a category
-    pub fn navigate_to(&self, category: Category) {
-        self.category.set(category);
-        self.nav_group.set(category.nav_group());
-    }
-
-    /// Show a status message
-    pub fn show_status(&self, message: impl Into<String>, is_error: bool) {
-        self.status_message.set(Some((message.into(), is_error)));
-    }
-
-    /// Clear the status message
-    pub fn clear_status(&self) {
-        self.status_message.set(None);
     }
 
     /// Get a clone of the current settings

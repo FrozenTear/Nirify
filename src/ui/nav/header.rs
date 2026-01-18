@@ -1,80 +1,58 @@
-//! Header navigation component
-//!
-//! Crystalline Dark header with app title and primary navigation tabs
-//! Uses underline indicators for selected state
+//! Header component with title and primary navigation
 
-use floem::prelude::*;
-use floem::reactive::RwSignal;
-use floem::views::{Container, Empty, Label, Stack};
+use freya::prelude::*;
 
 use crate::ui::state::{Category, NavGroup};
-use crate::ui::theme::{
-    header_style, nav_tab_selected_style, nav_tab_style, ACCENT, BORDER_SUBTLE, FONT_SIZE_SM,
-    SPACING_LG, SPACING_MD, SPACING_SM, TEXT_GHOST,
-};
+use crate::ui::theme::*;
 
-/// Create the header with app title and primary navigation tabs
-pub fn header(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> impl IntoView {
-    Stack::vertical((
-        // App title (subtle, centered)
-        Label::derived(|| "n i r i   s e t t i n g s".to_string()).style(|s| {
-            s.font_size(FONT_SIZE_SM)
-                .color(TEXT_GHOST)
-                .padding_bottom(SPACING_LG)
-        }),
-        // Primary navigation tabs row
-        Stack::horizontal(
-            NavGroup::all()
-                .iter()
-                .map(|group| {
-                    let group = *group;
-                    nav_tab(group, nav_group, category)
-                })
-                .collect::<Vec<_>>(),
+/// Create the header with title and primary navigation tabs
+pub fn header(
+    current_nav_group: State<NavGroup>,
+    current_category: State<Category>,
+) -> impl IntoElement {
+    rect()
+        .horizontal()
+        .width(Size::fill())
+        .padding((SPACING_LG, SPACING_2XL, SPACING_LG, SPACING_2XL))
+        .background(MANTLE)
+        .child(
+            // Title
+            rect()
+                .color(TEXT_PRIMARY)
+                .font_size(FONT_SIZE_XL)
+                .font_weight(FontWeight::BOLD)
+                .child("Niri Settings"),
         )
-        .style(|s| s.gap(SPACING_SM).items_end()),
-    ))
-    .style(header_style)
+        .child(
+            // Spacer
+            rect().width(Size::fill()),
+        )
+        .child(
+            // Navigation tabs - simplified for now
+            rect()
+                .horizontal()
+                .spacing(SPACING_SM)
+                .child(nav_button("Appearance", NavGroup::Appearance, current_nav_group, current_category))
+                .child(nav_button("Input", NavGroup::Input, current_nav_group, current_category))
+                .child(nav_button("Visuals", NavGroup::Visuals, current_nav_group, current_category))
+                .child(nav_button("Behavior", NavGroup::Behavior, current_nav_group, current_category))
+                .child(nav_button("Rules", NavGroup::Rules, current_nav_group, current_category))
+                .child(nav_button("System", NavGroup::System, current_nav_group, current_category)),
+        )
 }
 
-/// Individual navigation tab with underline indicator
-fn nav_tab(
+fn nav_button(
+    label: &'static str,
     group: NavGroup,
-    nav_group: RwSignal<NavGroup>,
-    category: RwSignal<Category>,
-) -> impl IntoView {
-    let is_selected = move || nav_group.get() == group;
-
-    Stack::vertical((
-        // Tab label
-        Label::derived(move || group.label().to_string()).style(move |s| {
-            if is_selected() {
-                nav_tab_selected_style(s)
-            } else {
-                nav_tab_style(s)
+    mut current_nav_group: State<NavGroup>,
+    mut current_category: State<Category>,
+) -> Button {
+    Button::new()
+        .on_press(move |_| {
+            *current_nav_group.write() = group;
+            if let Some(first_cat) = group.categories().first() {
+                *current_category.write() = *first_cat;
             }
-        }),
-        // Underline indicator
-        Container::new(Empty::new()).style(move |s| {
-            let base = s
-                .width_full()
-                .height(2.0)
-                .margin_top(SPACING_SM)
-                .border_radius(1.0);
-
-            if is_selected() {
-                base.background(ACCENT)
-            } else {
-                base.background(BORDER_SUBTLE)
-            }
-        }),
-    ))
-    .style(|s| s.padding_horiz(SPACING_MD).items_center())
-    .on_click_stop(move |_| {
-        nav_group.set(group);
-        // Set category to first in group
-        if let Some(first_cat) = group.categories().first() {
-            category.set(*first_cat);
-        }
-    })
+        })
+        .child(label)
 }

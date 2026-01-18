@@ -1,94 +1,103 @@
 //! Main application view
 //!
-//! Crystalline Dark - A refined settings interface
-//!
-//! Layout structure (top to bottom):
-//! ┌─────────────────────────────────────┐
-//! │ Header                              │ (title + primary nav)
-//! ├─────────────────────────────────────┤
-//! │ Secondary Nav                       │ (subcategory pills)
-//! ├─────────────────────────────────────┤
-//! │ Search Bar                          │ (search + actions)
-//! ├─────────────────────────────────────┤
-//! │                                     │
-//! │ Content Area (scrollable)           │
-//! │                                     │
-//! ├─────────────────────────────────────┤
-//! │ Footer                              │ (status + close)
-//! └─────────────────────────────────────┘
+//! Crystalline Dark - A refined settings interface built with Freya
 
-use floem::prelude::*;
-use floem::views::{dyn_view, Scroll, Stack};
+use freya::prelude::*;
 
-use crate::ui::nav::{footer, header, search_bar, sidebar};
-use crate::ui::pages::*;
-use crate::ui::state::{AppState, Category};
-use crate::ui::theme::{content_style, BG_DEEP};
+use crate::ui::components::section;
+use crate::ui::nav::{footer, header, sidebar};
+use crate::ui::state::{AppState, Category, NavGroup};
+use crate::ui::theme::*;
 
 /// Create the main application view
-pub fn app_view(state: AppState) -> impl IntoView {
-    let nav_group = state.nav_group;
-    let category = state.category;
-    let search_query = state.search_query;
-    let state_for_content = state.clone();
+pub fn app_view(state: AppState) -> impl IntoElement {
+    let current_category = use_state(|| Category::Appearance);
+    let current_nav_group = use_state(|| NavGroup::Appearance);
 
-    Stack::vertical((
-        // Header with title and primary navigation
-        header(nav_group, category),
-        // Secondary navigation with subcategory pills
-        sidebar(nav_group, category),
-        // Search bar with actions
-        search_bar(search_query),
-        // Scrollable content area
-        Scroll::new(
-            dyn_view(move || {
-                let cat = category.get();
-                let state = state_for_content.clone();
+    rect()
+        .width(Size::fill())
+        .height(Size::fill())
+        .background(BG_DEEP)
+        .child(header(current_nav_group, current_category))
+        .child(sidebar(current_nav_group, current_category))
+        .child(content_area(state.clone(), current_category))
+        .child(footer())
+}
 
-                match cat {
-                    // Appearance
-                    Category::Appearance => appearance_page(state).into_any(),
+/// Content area with the current page
+fn content_area(state: AppState, current_category: State<Category>) -> impl IntoElement {
+    let cat = *current_category.read();
+    let settings = state.get_settings();
 
-                    // Input devices
-                    Category::Keyboard => keyboard_page(state).into_any(),
-                    Category::Mouse => mouse_page(state).into_any(),
-                    Category::Touchpad => touchpad_page(state).into_any(),
-                    Category::Trackpoint => trackpoint_page(state).into_any(),
-                    Category::Trackball => trackball_page(state).into_any(),
-                    Category::Tablet => tablet_page(state).into_any(),
-                    Category::Touch => touch_page(state).into_any(),
-                    Category::Outputs => outputs_page(state).into_any(),
-
-                    // Visuals
-                    Category::Animations => animations_page(state).into_any(),
-                    Category::Cursor => cursor_page(state).into_any(),
-                    Category::Overview => overview_page(state).into_any(),
-                    Category::RecentWindows => recent_windows_page(state).into_any(),
-
-                    // Behavior
-                    Category::Behavior => behavior_page(state).into_any(),
-                    Category::LayoutExtras => layout_extras_page(state).into_any(),
-                    Category::Workspaces => workspaces_page(state).into_any(),
-
-                    // Rules
-                    Category::WindowRules => window_rules_page(state).into_any(),
-                    Category::LayerRules => layer_rules_page(state).into_any(),
-                    Category::Gestures => gestures_page(state).into_any(),
-
-                    // System
-                    Category::Keybindings => keybindings_page(state).into_any(),
-                    Category::Startup => startup_page(state).into_any(),
-                    Category::Environment => environment_page(state).into_any(),
-                    Category::SwitchEvents => switch_events_page(state).into_any(),
-                    Category::Miscellaneous => miscellaneous_page(state).into_any(),
-                    Category::Debug => debug_page(state).into_any(),
-                }
-            })
-            .style(|s| s.width_full()),
+    ScrollView::new()
+        .child(
+            rect()
+                .width(Size::fill())
+                .padding((SPACING_2XL, SPACING_2XL, SPACING_2XL, SPACING_2XL))
+                .background(BG_BASE)
+                .child(page_content(cat, settings)),
         )
-        .style(content_style),
-        // Footer with status and close button
-        footer(),
-    ))
-    .style(|s| s.width_full().height_full().background(BG_DEEP))
+}
+
+/// Get the page content for a category
+fn page_content(category: Category, settings: crate::config::Settings) -> impl IntoElement {
+    section(
+        category.label(),
+        rect()
+            .width(Size::fill())
+            .spacing(SPACING_MD)
+            .child(setting_row(
+                "Gap Size",
+                "Space between windows",
+                format!("{} px", settings.appearance.gaps as i32),
+            ))
+            .child(setting_row(
+                "Focus Ring",
+                "Show ring around focused window",
+                if settings.appearance.focus_ring_enabled {
+                    "Enabled"
+                } else {
+                    "Disabled"
+                },
+            ))
+            .child(setting_row(
+                "Border",
+                "Show border around windows",
+                if settings.appearance.border_enabled {
+                    "Enabled"
+                } else {
+                    "Disabled"
+                },
+            )),
+    )
+}
+
+/// A simple setting row with label, description, and value
+fn setting_row(label: &str, description: &str, value: impl ToString) -> impl IntoElement {
+    rect()
+        .horizontal()
+        .width(Size::fill())
+        .padding((SPACING_MD, 0.0, SPACING_MD, 0.0))
+        .child(
+            rect()
+                .width(Size::fill())
+                .child(
+                    rect()
+                        .color(TEXT_PRIMARY)
+                        .font_size(FONT_SIZE_BASE)
+                        .child(label.to_string()),
+                )
+                .child(
+                    rect()
+                        .color(TEXT_SECONDARY)
+                        .font_size(FONT_SIZE_SM)
+                        .child(description.to_string()),
+                ),
+        )
+        .child(
+            rect()
+                .color(TEXT_PRIMARY)
+                .font_size(FONT_SIZE_BASE)
+                .child(value.to_string()),
+        )
 }

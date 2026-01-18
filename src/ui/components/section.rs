@@ -1,35 +1,24 @@
 //! Section component - elevated glass-like card with header
-//!
-//! Creates visual grouping for related settings with
-//! uppercase accent-colored headers
 
-use floem::prelude::*;
-use floem::views::{Label, Stack};
+use freya::prelude::*;
 
-use crate::ui::theme::{section_header_style, section_style};
+use crate::ui::theme::*;
 
 /// Create a section card with an uppercase title header
-///
-/// # Arguments
-/// * `title` - The section title (will be displayed in uppercase)
-/// * `content` - The section content (typically a stack of setting rows)
-///
-/// # Example
-/// ```ignore
-/// section(
-///     "Focus Ring",
-///     Stack::vertical((
-///         toggle_row(...),
-///         slider_row(...),
-///     ))
-/// )
-/// ```
-pub fn section<V: IntoView + 'static>(title: &'static str, content: V) -> impl IntoView {
-    Stack::vertical((
-        // Section header - uppercase, accent colored, small caps style
-        Label::derived(move || title.to_uppercase()).style(section_header_style),
-        // Section content
-        content,
-    ))
-    .style(section_style)
+pub fn section(title: &str, content: impl IntoElement) -> impl IntoElement {
+    rect()
+        .width(Size::fill())
+        .background(BG_SURFACE)
+        .corner_radius(RADIUS_LG)
+        .padding((SPACING_XL, SPACING_XL, SPACING_XL, SPACING_XL))
+        .spacing(SPACING_LG)
+        .child(
+            // Section header
+            rect()
+                .color(ACCENT)
+                .font_size(FONT_SIZE_XS)
+                .font_weight(FontWeight::BOLD)
+                .child(title.to_uppercase()),
+        )
+        .child(content)
 }
