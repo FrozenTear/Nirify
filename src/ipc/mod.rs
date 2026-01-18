@@ -65,14 +65,33 @@ pub type IpcQueryError = IpcError;
 const MAX_RESPONSE_SIZE: u64 = 10 * 1024 * 1024;
 
 /// Information about a running window from niri IPC
+/// Uses flatten with extra to ignore unknown fields from niri
 #[derive(Debug, Clone, Deserialize)]
 pub struct WindowInfo {
     pub id: u64,
-    pub title: String,
-    pub app_id: String,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub app_id: Option<String>,
+    #[serde(default)]
     pub is_floating: bool,
     #[serde(default)]
     pub workspace_id: Option<u64>,
+    /// Capture any extra fields niri sends that we don't explicitly handle
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+impl WindowInfo {
+    /// Get title, defaulting to empty string if missing
+    pub fn title(&self) -> &str {
+        self.title.as_deref().unwrap_or("")
+    }
+
+    /// Get app_id, defaulting to empty string if missing
+    pub fn app_id(&self) -> &str {
+        self.app_id.as_deref().unwrap_or("")
+    }
 }
 
 // Response wrapper types for proper JSON parsing
@@ -429,7 +448,10 @@ pub fn get_windows() -> IpcResult<Vec<WindowInfo>> {
 /// Get unique app IDs from running windows
 pub fn get_unique_app_ids() -> IpcResult<Vec<String>> {
     let windows = get_windows()?;
-    let mut app_ids: Vec<String> = windows.into_iter().map(|w| w.app_id).collect();
+    let mut app_ids: Vec<String> = windows
+        .into_iter()
+        .filter_map(|w| w.app_id)
+        .collect();
     app_ids.sort();
     app_ids.dedup();
     Ok(app_ids)
@@ -521,10 +543,21 @@ pub fn get_focused_window() -> IpcResult<Option<WindowInfo>> {
     }
 }
 
+/// Output info from FocusedOutput response
+/// Uses serde(flatten) to capture extra fields and just extract the name
+#[derive(Debug, Deserialize)]
+struct FocusedOutputInfo {
+    #[serde(default)]
+    name: String,
+    /// Capture any extra fields niri sends
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
 #[derive(Debug, Deserialize)]
 struct FocusedOutputResponse {
     #[serde(rename = "FocusedOutput")]
-    output: Option<String>,
+    output: Option<FocusedOutputInfo>,
 }
 
 /// Get the name of the currently focused output
@@ -540,7 +573,7 @@ pub fn get_focused_output() -> IpcResult<Option<String>> {
     let response = send_simple_request("FocusedOutput")?;
 
     match serde_json::from_str::<NiriResponse<FocusedOutputResponse>>(&response) {
-        Ok(NiriResponse::Ok { inner }) => Ok(inner.output),
+        Ok(NiriResponse::Ok { inner }) => Ok(inner.output.map(|o| o.name)),
         Ok(NiriResponse::Err { error }) => {
             warn!(
                 "Niri returned error for focused output request: {:?}",
@@ -878,8 +911,8 @@ mod tests {
             NiriResponse::Ok { inner } => {
                 assert_eq!(inner.windows.len(), 2);
                 assert_eq!(inner.windows[0].id, 1);
-                assert_eq!(inner.windows[0].title, "Firefox");
-                assert_eq!(inner.windows[0].app_id, "firefox");
+                assert_eq!(inner.windows[0].title(), "Firefox");
+                assert_eq!(inner.windows[0].app_id(), "firefox");
                 assert!(!inner.windows[0].is_floating);
                 assert_eq!(inner.windows[0].workspace_id, Some(1));
                 assert_eq!(inner.windows[1].id, 2);
@@ -921,7 +954,7 @@ mod tests {
             NiriResponse::Ok { inner } => {
                 let window = inner.window.unwrap();
                 assert_eq!(window.id, 5);
-                assert_eq!(window.app_id, "code");
+                assert_eq!(window.app_id(), "code");
             }
             NiriResponse::Err { .. } => panic!("Expected Ok variant"),
         }
@@ -939,11 +972,26 @@ mod tests {
 
     #[test]
     fn test_parse_focused_output_response() {
-        let json = r#"{"Ok":{"FocusedOutput":"HDMI-A-1"}}"#;
+        // Test with actual niri response format (object with name field)
+        let json = r#"{"Ok":{"FocusedOutput":{"name":"DP-4","make":"PNP(AOC)","model":"27G2WG3-","serial":"1234","physical_size":[600,340],"modes":[]}}}"#;
         let parsed: NiriResponse<FocusedOutputResponse> = serde_json::from_str(json).unwrap();
         match parsed {
             NiriResponse::Ok { inner } => {
-                assert_eq!(inner.output, Some("HDMI-A-1".to_string()));
+                let output = inner.output.unwrap();
+                assert_eq!(output.name, "DP-4");
+            }
+            NiriResponse::Err { .. } => panic!("Expected Ok variant"),
+        }
+    }
+
+    #[test]
+    fn test_parse_focused_output_response_null() {
+        // Test when no output is focused
+        let json = r#"{"Ok":{"FocusedOutput":null}}"#;
+        let parsed: NiriResponse<FocusedOutputResponse> = serde_json::from_str(json).unwrap();
+        match parsed {
+            NiriResponse::Ok { inner } => {
+                assert!(inner.output.is_none());
             }
             NiriResponse::Err { .. } => panic!("Expected Ok variant"),
         }
@@ -1083,6 +1131,23 @@ mod tests {
         let info: WindowInfo = serde_json::from_str(minimal).unwrap();
         assert_eq!(info.id, 1);
         assert_eq!(info.workspace_id, None);
+    }
+
+    #[test]
+    fn test_window_info_with_extra_fields() {
+        // Test with actual niri response format that includes extra fields
+        let json = r#"{"id":30,"title":"~/niri-settings-rust - fish","app_id":"com.mitchellh.ghostty","pid":48663,"workspace_id":1,"is_focused":false,"is_floating":false,"is_urgent":false,"layout":{"pos_in_scrolling_layout":[2,1],"tile_size":[754.0,1906.0],"window_size":[754,1906]},"focus_timestamp":{"secs":6134,"nanos":500029935}}"#;
+        let info: WindowInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.id, 30);
+        assert_eq!(info.title(), "~/niri-settings-rust - fish");
+        assert_eq!(info.app_id(), "com.mitchellh.ghostty");
+        assert!(!info.is_floating);
+        assert_eq!(info.workspace_id, Some(1));
+        // Extra fields should be captured in the extra map
+        assert!(info.extra.contains_key("pid"));
+        assert!(info.extra.contains_key("is_urgent"));
+        assert!(info.extra.contains_key("layout"));
+        assert!(info.extra.contains_key("focus_timestamp"));
     }
 
     #[test]

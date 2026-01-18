@@ -145,6 +145,8 @@ enum Category {
     Startup,
     Environment,
     SwitchEvents,
+    Tools,
+    Backups,
     Miscellaneous,
     Debug,
 }
@@ -175,6 +177,8 @@ impl Category {
             Category::Startup => "Startup",
             Category::Environment => "Environment",
             Category::SwitchEvents => "Switch Events",
+            Category::Tools => "Tools",
+            Category::Backups => "Backups",
             Category::Miscellaneous => "Miscellaneous",
             Category::Debug => "Debug",
         }
@@ -237,6 +241,8 @@ impl NavGroup {
                 Category::Startup,
                 Category::Environment,
                 Category::SwitchEvents,
+                Category::Tools,
+                Category::Backups,
                 Category::Miscellaneous,
                 Category::Debug,
             ],
@@ -490,6 +496,8 @@ fn PageContent(
         Category::Startup => rsx! { StartupPage { settings: startup } },
         Category::Environment => rsx! { EnvironmentPage { settings: environment } },
         Category::SwitchEvents => rsx! { SwitchEventsPage { settings: switch_events } },
+        Category::Tools => rsx! { ToolsPage {} },
+        Category::Backups => rsx! { BackupsPage {} },
         Category::Miscellaneous => rsx! { MiscellaneousPage { settings: miscellaneous } },
         Category::Debug => rsx! { DebugPage { settings: debug } },
     }
@@ -4096,6 +4104,425 @@ fn DebugPage(settings: Signal<DebugSettings>) -> Element {
                 on_change: move |v| {
                     settings.write().disable_transactions = v;
                     sync_debug(&settings());
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Tools Page - Query niri state via IPC
+// ============================================================================
+
+#[component]
+fn ToolsPage() -> Element {
+    let mut output_text = use_signal(|| String::new());
+    let mut last_action = use_signal(|| String::new());
+    let niri_running = ipc::is_niri_running();
+
+    rsx! {
+        div { class: "page",
+            if !niri_running {
+                div { class: "warning-banner",
+                    span { class: "warning-dot" }
+                    "Niri is not running. Tools require a running niri instance."
+                }
+            }
+
+            Section { title: "Query Windows",
+                div { class: "tools-buttons",
+                    button {
+                        class: "btn-tool",
+                        disabled: !niri_running,
+                        onclick: move |_| {
+                            match ipc::get_windows() {
+                                Ok(windows) => {
+                                    let text = if windows.is_empty() {
+                                        "No windows found.".to_string()
+                                    } else {
+                                        windows.iter().map(|w| {
+                                            format!("[{}] {} - {}{}",
+                                                w.id,
+                                                w.app_id(),
+                                                w.title(),
+                                                if w.is_floating { " (floating)" } else { "" }
+                                            )
+                                        }).collect::<Vec<_>>().join("\n")
+                                    };
+                                    output_text.set(text);
+                                    last_action.set("List Windows".to_string());
+                                }
+                                Err(e) => {
+                                    output_text.set(format!("Error: {}", e));
+                                    last_action.set("List Windows (failed)".to_string());
+                                }
+                            }
+                        },
+                        "List Windows"
+                    }
+                    button {
+                        class: "btn-tool",
+                        disabled: !niri_running,
+                        onclick: move |_| {
+                            match ipc::get_focused_window() {
+                                Ok(Some(w)) => {
+                                    let text = format!("[{}] {} - {}{}",
+                                        w.id, w.app_id(), w.title(),
+                                        if w.is_floating { " (floating)" } else { "" }
+                                    );
+                                    output_text.set(text);
+                                    last_action.set("Focused Window".to_string());
+                                }
+                                Ok(None) => {
+                                    output_text.set("No window is focused.".to_string());
+                                    last_action.set("Focused Window".to_string());
+                                }
+                                Err(e) => {
+                                    output_text.set(format!("Error: {}", e));
+                                    last_action.set("Focused Window (failed)".to_string());
+                                }
+                            }
+                        },
+                        "Focused Window"
+                    }
+                }
+            }
+
+            Section { title: "Query Workspaces",
+                div { class: "tools-buttons",
+                    button {
+                        class: "btn-tool",
+                        disabled: !niri_running,
+                        onclick: move |_| {
+                            match ipc::get_workspaces() {
+                                Ok(workspaces) => {
+                                    let text = if workspaces.is_empty() {
+                                        "No workspaces found.".to_string()
+                                    } else {
+                                        workspaces.iter().map(|ws| {
+                                            format!("[{}] #{} {} on {}{}{}",
+                                                ws.id,
+                                                ws.idx,
+                                                ws.name.as_deref().unwrap_or("(unnamed)"),
+                                                ws.output.as_deref().unwrap_or("?"),
+                                                if ws.is_active { " (active)" } else { "" },
+                                                if ws.is_focused { " (focused)" } else { "" }
+                                            )
+                                        }).collect::<Vec<_>>().join("\n")
+                                    };
+                                    output_text.set(text);
+                                    last_action.set("List Workspaces".to_string());
+                                }
+                                Err(e) => {
+                                    output_text.set(format!("Error: {}", e));
+                                    last_action.set("List Workspaces (failed)".to_string());
+                                }
+                            }
+                        },
+                        "List Workspaces"
+                    }
+                }
+            }
+
+            Section { title: "Query Outputs",
+                div { class: "tools-buttons",
+                    button {
+                        class: "btn-tool",
+                        disabled: !niri_running,
+                        onclick: move |_| {
+                            match ipc::get_full_outputs() {
+                                Ok(outputs) => {
+                                    let text = if outputs.is_empty() {
+                                        "No outputs found.".to_string()
+                                    } else {
+                                        outputs.iter().map(|o| {
+                                            format!("{}: {} {} @ {}x scale",
+                                                o.name,
+                                                if o.make.is_empty() { "Unknown" } else { &o.make },
+                                                o.model,
+                                                o.scale()
+                                            )
+                                        }).collect::<Vec<_>>().join("\n")
+                                    };
+                                    output_text.set(text);
+                                    last_action.set("List Outputs".to_string());
+                                }
+                                Err(e) => {
+                                    output_text.set(format!("Error: {}", e));
+                                    last_action.set("List Outputs (failed)".to_string());
+                                }
+                            }
+                        },
+                        "List Outputs"
+                    }
+                    button {
+                        class: "btn-tool",
+                        disabled: !niri_running,
+                        onclick: move |_| {
+                            match ipc::get_focused_output() {
+                                Ok(Some(name)) => {
+                                    output_text.set(format!("Focused output: {}", name));
+                                    last_action.set("Focused Output".to_string());
+                                }
+                                Ok(None) => {
+                                    output_text.set("No output is focused.".to_string());
+                                    last_action.set("Focused Output".to_string());
+                                }
+                                Err(e) => {
+                                    output_text.set(format!("Error: {}", e));
+                                    last_action.set("Focused Output (failed)".to_string());
+                                }
+                            }
+                        },
+                        "Focused Output"
+                    }
+                }
+            }
+
+            Section { title: "Actions",
+                div { class: "tools-buttons",
+                    button {
+                        class: "btn-tool",
+                        disabled: !niri_running,
+                        onclick: move |_| {
+                            match ipc::reload_config() {
+                                Ok(()) => {
+                                    output_text.set("Config reloaded successfully.".to_string());
+                                    last_action.set("Reload Config".to_string());
+                                }
+                                Err(e) => {
+                                    output_text.set(format!("Error: {}", e));
+                                    last_action.set("Reload Config (failed)".to_string());
+                                }
+                            }
+                        },
+                        "Reload Config"
+                    }
+                    button {
+                        class: "btn-tool",
+                        disabled: !niri_running,
+                        onclick: move |_| {
+                            match ipc::validate_config() {
+                                Ok(msg) => {
+                                    output_text.set(msg);
+                                    last_action.set("Validate Config".to_string());
+                                }
+                                Err(e) => {
+                                    output_text.set(format!("Validation error: {}", e));
+                                    last_action.set("Validate Config (failed)".to_string());
+                                }
+                            }
+                        },
+                        "Validate Config"
+                    }
+                    button {
+                        class: "btn-tool",
+                        disabled: !niri_running,
+                        onclick: move |_| {
+                            match ipc::get_version() {
+                                Ok(version) => {
+                                    output_text.set(format!("Niri version: {}", version));
+                                    last_action.set("Get Version".to_string());
+                                }
+                                Err(e) => {
+                                    output_text.set(format!("Error: {}", e));
+                                    last_action.set("Get Version (failed)".to_string());
+                                }
+                            }
+                        },
+                        "Get Version"
+                    }
+                }
+            }
+
+            if !last_action().is_empty() {
+                Section { title: "Output",
+                    div { class: "tools-output-header", "Last action: {last_action()}" }
+                    div { class: "tools-output",
+                        pre { "{output_text()}" }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Backups Page - Browse and restore config backups
+// ============================================================================
+
+/// Backup entry for display
+#[derive(Clone, PartialEq)]
+struct BackupEntry {
+    filename: String,
+    full_path: std::path::PathBuf,
+    date: String,
+    size: String,
+}
+
+fn load_backups() -> Vec<BackupEntry> {
+    let backup_dir = &CONFIG_PATHS.backup_dir;
+
+    let mut entries = Vec::new();
+
+    if let Ok(dir) = std::fs::read_dir(backup_dir) {
+        for entry in dir.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                let filename = path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+
+                // Parse date from filename (format: name.YYYY-MM-DDTHH-MM-SS.sss.bak)
+                let date = if let Some(start) = filename.find('.') {
+                    let rest = &filename[start + 1..];
+                    if let Some(end) = rest.rfind('.') {
+                        rest[..end].replace('T', " ").replace('-', ":")
+                    } else {
+                        "Unknown date".to_string()
+                    }
+                } else {
+                    "Unknown date".to_string()
+                };
+
+                let size = std::fs::metadata(&path)
+                    .map(|m| {
+                        let bytes = m.len();
+                        if bytes < 1024 {
+                            format!("{} B", bytes)
+                        } else if bytes < 1024 * 1024 {
+                            format!("{:.1} KB", bytes as f64 / 1024.0)
+                        } else {
+                            format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+                        }
+                    })
+                    .unwrap_or_else(|_| "? B".to_string());
+
+                entries.push(BackupEntry {
+                    filename,
+                    full_path: path,
+                    date,
+                    size,
+                });
+            }
+        }
+    }
+
+    // Sort by filename (which includes timestamp) descending (newest first)
+    entries.sort_by(|a, b| b.filename.cmp(&a.filename));
+    entries
+}
+
+#[component]
+fn BackupsPage() -> Element {
+    let mut backups = use_signal(|| load_backups());
+    let mut preview_content = use_signal(|| String::new());
+    let mut preview_filename = use_signal(|| String::new());
+    let mut status_message = use_signal(|| String::new());
+
+    let refresh = move |_| {
+        backups.set(load_backups());
+        status_message.set("Backups refreshed.".to_string());
+    };
+
+    rsx! {
+        div { class: "page",
+            div { class: "info-banner",
+                span { class: "info-dot" }
+                "Backups are created automatically when settings are saved. You can preview and restore them here."
+            }
+
+            Section { title: "Backup Files",
+                div { class: "backup-actions",
+                    button {
+                        class: "btn-tool",
+                        onclick: refresh,
+                        "Refresh List"
+                    }
+                    span { class: "backup-count", "{backups().len()} backup(s) found" }
+                }
+
+                if backups().is_empty() {
+                    div { class: "empty-state",
+                        "No backups found. Backups are created when you modify settings."
+                    }
+                } else {
+                    div { class: "backup-list",
+                        for backup in backups().iter() {
+                            div { class: "backup-item",
+                                div { class: "backup-info",
+                                    div { class: "backup-filename", "{backup.filename}" }
+                                    div { class: "backup-meta", "{backup.date} • {backup.size}" }
+                                }
+                                div { class: "backup-item-actions",
+                                    button {
+                                        class: "btn-small",
+                                        onclick: {
+                                            let path = backup.full_path.clone();
+                                            let filename = backup.filename.clone();
+                                            move |_| {
+                                                match std::fs::read_to_string(&path) {
+                                                    Ok(content) => {
+                                                        preview_content.set(content);
+                                                        preview_filename.set(filename.clone());
+                                                    }
+                                                    Err(e) => {
+                                                        status_message.set(format!("Failed to read backup: {}", e));
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "Preview"
+                                    }
+                                    button {
+                                        class: "btn-small btn-warning",
+                                        onclick: {
+                                            let path = backup.full_path.clone();
+                                            let filename = backup.filename.clone();
+                                            move |_| {
+                                                // Determine original file from backup name
+                                                // Format: original.TIMESTAMP.bak -> restore to managed_dir/original
+                                                let original_name = filename.split('.').next().unwrap_or("unknown");
+                                                let restore_path = CONFIG_PATHS.managed_dir.join(format!("{}.kdl", original_name));
+
+                                                match std::fs::read_to_string(&path) {
+                                                    Ok(content) => {
+                                                        match std::fs::write(&restore_path, &content) {
+                                                            Ok(()) => {
+                                                                status_message.set(format!("Restored {} successfully. Reload niri config to apply.", original_name));
+                                                                let _ = ipc::reload_config();
+                                                            }
+                                                            Err(e) => {
+                                                                status_message.set(format!("Failed to restore: {}", e));
+                                                            }
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        status_message.set(format!("Failed to read backup: {}", e));
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "Restore"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !status_message().is_empty() {
+                div { class: "status-message", "{status_message()}" }
+            }
+
+            if !preview_filename().is_empty() {
+                Section { title: "Preview",
+                    div { class: "backup-preview-header", "File: {preview_filename()}" }
+                    div { class: "backup-preview",
+                        pre { "{preview_content()}" }
+                    }
                 }
             }
         }
