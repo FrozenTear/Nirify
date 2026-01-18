@@ -1,13 +1,15 @@
 //! Secondary navigation showing subcategories
 //!
-//! Horizontal row of subcategory tabs below the main header
+//! Horizontal row of pill-style tabs for navigating within a group
 
 use floem::prelude::*;
 use floem::reactive::RwSignal;
-use floem::views::Button;
+use floem::views::Label;
 
 use crate::ui::state::{Category, NavGroup};
-use crate::ui::theme::{secondary_nav_style, LAVENDER, SPACING_MD, SPACING_SM, SUBTEXT0};
+use crate::ui::theme::{
+    secondary_nav_style, secondary_tab_selected_style, secondary_tab_style,
+};
 
 /// Create the secondary nav showing subcategories for the current group
 pub fn sidebar(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> impl IntoView {
@@ -17,20 +19,15 @@ pub fn sidebar(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> i
         move |cat| {
             let is_selected = move || category.get() == cat;
 
-            Button::new(cat.label())
+            Label::derived(move || cat.label().to_string())
                 .style(move |s| {
-                    let base = s
-                        .padding_horiz(SPACING_MD)
-                        .padding_vert(SPACING_SM)
-                        .border_radius(4.0);
-
                     if is_selected() {
-                        base.color(LAVENDER)
+                        secondary_tab_selected_style(s)
                     } else {
-                        base.color(SUBTEXT0)
+                        secondary_tab_style(s)
                     }
                 })
-                .action(move || {
+                .on_click_stop(move |_| {
                     category.set(cat);
                 })
         },

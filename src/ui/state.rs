@@ -5,7 +5,7 @@
 use floem::reactive::{RwSignal, SignalUpdate};
 use std::sync::{Arc, Mutex};
 
-use crate::config::{ConfigPaths, Settings};
+use crate::config::{save_dirty, ConfigPaths, DirtyTracker, Settings, SettingsCategory};
 
 /// Navigation category for the sidebar
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -189,6 +189,8 @@ pub struct AppState {
     pub settings: Arc<Mutex<Settings>>,
     /// Config paths
     pub paths: Arc<ConfigPaths>,
+    /// Dirty tracker for selective saves
+    pub dirty_tracker: Arc<DirtyTracker>,
 }
 
 impl AppState {
@@ -200,6 +202,35 @@ impl AppState {
             status_message: RwSignal::new(None),
             settings,
             paths,
+            dirty_tracker: Arc::new(DirtyTracker::new()),
+        }
+    }
+
+    /// Mark a settings category as dirty and save immediately
+    ///
+    /// Changes are saved right away to provide immediate feedback.
+    /// The DirtyTracker ensures only changed categories are written.
+    pub fn mark_dirty_and_save(&self, category: SettingsCategory) {
+        self.dirty_tracker.mark(category);
+        self.perform_save();
+    }
+
+    /// Perform the save of all dirty categories
+    fn perform_save(&self) {
+        let dirty = self.dirty_tracker.take();
+        if dirty.is_empty() {
+            return;
+        }
+
+        let settings = self.get_settings();
+        match save_dirty(&self.paths, &settings, &dirty) {
+            Ok(count) => {
+                log::debug!("Auto-saved {} category files", count);
+            }
+            Err(e) => {
+                log::error!("Auto-save failed: {}", e);
+                self.show_status(format!("Save failed: {}", e), true);
+            }
         }
     }
 

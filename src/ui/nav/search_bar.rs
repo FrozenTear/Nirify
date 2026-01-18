@@ -1,37 +1,30 @@
-//! Search bar with action button
+//! Search bar component with refined styling
+//!
+//! Features a search icon, text input, and action button
 
 use floem::prelude::*;
 use floem::reactive::RwSignal;
-use floem::views::{text_input, Button, Label, Stack};
+use floem::views::{text_input, Label, Stack};
 
 use crate::ui::theme::{
-    search_bar_style, BORDER_RADIUS_SM, OVERLAY0, SPACING_MD, SPACING_SM, SUBTEXT1, SURFACE0,
-    SURFACE1, TEXT,
+    button_secondary_style, search_bar_style, search_input_style, TEXT_MUTED,
 };
 
 /// Create the search bar with "Review Changes" button
 pub fn search_bar(search_query: RwSignal<String>) -> impl IntoView {
     Stack::horizontal((
-        // Search icon placeholder
-        Label::derived(|| "🔍".to_string()).style(|s| s.color(OVERLAY0)),
-        // Search input
+        // Search icon
+        Label::derived(|| "⌕".to_string()).style(|s| s.color(TEXT_MUTED).font_size(16.0)),
+        // Search input field
         text_input(search_query)
             .placeholder("Search settings...")
-            .style(|s| {
-                s.flex_grow(1.0)
-                    .background(SURFACE0)
-                    .border_radius(BORDER_RADIUS_SM)
-                    .padding(SPACING_SM)
-                    .color(TEXT)
-            }),
+            .style(search_input_style),
         // Review Changes button
-        Button::new("Review Changes").style(|s| {
-            s.padding_horiz(SPACING_MD)
-                .padding_vert(SPACING_SM)
-                .border_radius(BORDER_RADIUS_SM)
-                .background(SURFACE1)
-                .color(SUBTEXT1)
-        }),
+        Label::derived(|| "Review Changes".to_string())
+            .style(button_secondary_style)
+            .on_click_stop(|_| {
+                // TODO: Open review changes dialog
+            }),
     ))
     .style(search_bar_style)
 }

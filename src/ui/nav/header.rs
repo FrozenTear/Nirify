@@ -1,60 +1,80 @@
 //! Header navigation component
 //!
-//! Layout: Centered title at top, primary nav tabs below
+//! Crystalline Dark header with app title and primary navigation tabs
+//! Uses underline indicators for selected state
 
 use floem::prelude::*;
 use floem::reactive::RwSignal;
-use floem::views::{Button, Label, Stack};
+use floem::views::{Container, Empty, Label, Stack};
 
 use crate::ui::state::{Category, NavGroup};
 use crate::ui::theme::{
-    nav_tab_selected_style, nav_tab_style, MANTLE, OVERLAY0, SPACING_LG, SPACING_MD, SPACING_SM,
-    SURFACE0,
+    header_style, nav_tab_selected_style, nav_tab_style, ACCENT, BORDER_SUBTLE, FONT_SIZE_SM,
+    SPACING_LG, SPACING_MD, SPACING_SM, TEXT_GHOST,
 };
 
-/// Create the header with title and primary nav tabs
+/// Create the header with app title and primary navigation tabs
 pub fn header(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> impl IntoView {
     Stack::vertical((
-        // App title (centered)
-        Label::derived(|| "niri settings".to_string()).style(|s| {
-            s.font_size(14.0)
-                .color(OVERLAY0)
-                .padding_top(SPACING_LG)
-                .padding_bottom(SPACING_MD)
+        // App title (subtle, centered)
+        Label::derived(|| "n i r i   s e t t i n g s".to_string()).style(|s| {
+            s.font_size(FONT_SIZE_SM)
+                .color(TEXT_GHOST)
+                .padding_bottom(SPACING_LG)
         }),
-        // Primary nav tabs (centered row)
+        // Primary navigation tabs row
         Stack::horizontal(
             NavGroup::all()
                 .iter()
                 .map(|group| {
                     let group = *group;
-                    let is_selected = move || nav_group.get() == group;
-
-                    Button::new(group.label())
-                        .style(move |s| {
-                            if is_selected() {
-                                nav_tab_selected_style(s)
-                            } else {
-                                nav_tab_style(s)
-                            }
-                        })
-                        .action(move || {
-                            nav_group.set(group);
-                            // Set category to first in group
-                            if let Some(first_cat) = group.categories().first() {
-                                category.set(*first_cat);
-                            }
-                        })
+                    nav_tab(group, nav_group, category)
                 })
                 .collect::<Vec<_>>(),
         )
-        .style(|s| s.gap(SPACING_SM).padding_bottom(SPACING_MD)),
+        .style(|s| s.gap(SPACING_SM).items_end()),
     ))
-    .style(|s| {
-        s.width_full()
-            .items_center()
-            .background(MANTLE)
-            .border_bottom(1.0)
-            .border_color(SURFACE0)
+    .style(header_style)
+}
+
+/// Individual navigation tab with underline indicator
+fn nav_tab(
+    group: NavGroup,
+    nav_group: RwSignal<NavGroup>,
+    category: RwSignal<Category>,
+) -> impl IntoView {
+    let is_selected = move || nav_group.get() == group;
+
+    Stack::vertical((
+        // Tab label
+        Label::derived(move || group.label().to_string()).style(move |s| {
+            if is_selected() {
+                nav_tab_selected_style(s)
+            } else {
+                nav_tab_style(s)
+            }
+        }),
+        // Underline indicator
+        Container::new(Empty::new()).style(move |s| {
+            let base = s
+                .width_full()
+                .height(2.0)
+                .margin_top(SPACING_SM)
+                .border_radius(1.0);
+
+            if is_selected() {
+                base.background(ACCENT)
+            } else {
+                base.background(BORDER_SUBTLE)
+            }
+        }),
+    ))
+    .style(|s| s.padding_horiz(SPACING_MD).items_center())
+    .on_click_stop(move |_| {
+        nav_group.set(group);
+        // Set category to first in group
+        if let Some(first_cat) = group.categories().first() {
+            category.set(*first_cat);
+        }
     })
 }
