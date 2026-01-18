@@ -275,8 +275,8 @@ impl NavGroup {
 }
 
 // ============================================================================
-// Custom Dropdown Component (select elements not supported in Blitz)
-// Renders inline and pushes content down (z-index doesn't work in Blitz)
+// Portal-based Dropdown System
+// Uses click coordinates to position dropdown overlay at root level
 // ============================================================================
 
 /// A single option for the Dropdown component
@@ -286,14 +286,51 @@ struct DropdownOption {
     label: String,
 }
 
-/// Custom dropdown component using buttons (since <select> is not supported in Blitz)
+/// State for the portal dropdown overlay
+#[derive(Clone, PartialEq, Default)]
+struct PortalDropdownState {
+    /// Is any dropdown currently open?
+    is_open: bool,
+    /// Unique ID of the open dropdown
+    dropdown_id: u32,
+    /// Click X coordinate (for positioning)
+    x: f64,
+    /// Click Y coordinate (for positioning)
+    y: f64,
+    /// Options to display
+    options: Vec<DropdownOption>,
+    /// Currently selected value
+    selected_value: String,
+    /// Selected value from portal (set when user clicks an option)
+    selection_result: Option<String>,
+}
+
+/// Global counter for dropdown IDs
+static DROPDOWN_ID_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Generate a unique dropdown ID
+fn next_dropdown_id() -> u32 {
+    DROPDOWN_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Context for portal dropdown system
+#[derive(Clone, Copy)]
+struct PortalContext {
+    state: Signal<PortalDropdownState>,
+}
+
+/// Custom dropdown component using portal overlay for proper z-index behavior
 #[component]
 fn Dropdown(
     options: Vec<DropdownOption>,
     selected_value: String,
     on_change: EventHandler<String>,
 ) -> Element {
-    let mut is_open = use_signal(|| false);
+    // Get portal context from parent
+    let mut portal_ctx = use_context::<PortalContext>();
+
+    // Generate a unique ID for this dropdown instance
+    let dropdown_id = use_hook(next_dropdown_id);
 
     let selected_label = options
         .iter()
@@ -301,29 +338,117 @@ fn Dropdown(
         .map(|o| o.label.clone())
         .unwrap_or_else(|| selected_value.clone());
 
+    // Check if THIS dropdown is currently open
+    let state = portal_ctx.state.read();
+    let is_open = state.is_open && state.dropdown_id == dropdown_id;
+
+    // Check if there's a selection result for THIS dropdown
+    if state.dropdown_id == dropdown_id {
+        if let Some(ref value) = state.selection_result {
+            let value = value.clone();
+            // Clear the result and close
+            drop(state);
+            portal_ctx.state.set(PortalDropdownState::default());
+            // Call the change handler
+            on_change.call(value);
+            return rsx! {
+                div { class: "dropdown",
+                    button {
+                        class: "dropdown-trigger",
+                        "{selected_label}"
+                        span { class: "dropdown-arrow", "▼" }
+                    }
+                }
+            };
+        }
+    }
+    drop(state);
+
     rsx! {
         div { class: "dropdown",
             button {
-                class: if is_open() { "dropdown-trigger open" } else { "dropdown-trigger" },
-                onclick: move |_| { is_open.set(!is_open()); },
-                "{selected_label}"
-                span { class: "dropdown-arrow", if is_open() { "▲" } else { "▼" } }
-            }
-            if is_open() {
-                div { class: "dropdown-menu",
-                    for opt in options.iter() {
-                        button {
-                            class: if opt.value == selected_value { "dropdown-item selected" } else { "dropdown-item" },
-                            onclick: {
-                                let value = opt.value.clone();
-                                move |_| {
-                                    on_change.call(value.clone());
-                                    is_open.set(false);
-                                }
-                            },
-                            "{opt.label}"
+                class: if is_open { "dropdown-trigger open" } else { "dropdown-trigger" },
+                onclick: {
+                    let options = options.clone();
+                    let selected_value = selected_value.clone();
+                    move |e: Event<MouseData>| {
+                        let coords = e.data().client_coordinates();
+                        let current_state = portal_ctx.state.read();
+
+                        if current_state.is_open && current_state.dropdown_id == dropdown_id {
+                            // Close this dropdown
+                            drop(current_state);
+                            portal_ctx.state.set(PortalDropdownState::default());
+                        } else {
+                            // Open this dropdown with click position
+                            drop(current_state);
+                            portal_ctx.state.set(PortalDropdownState {
+                                is_open: true,
+                                dropdown_id,
+                                x: coords.x,
+                                y: coords.y,
+                                options: options.clone(),
+                                selected_value: selected_value.clone(),
+                                selection_result: None,
+                            });
                         }
                     }
+                },
+                "{selected_label}"
+                span { class: "dropdown-arrow", if is_open { "▲" } else { "▼" } }
+            }
+        }
+    }
+}
+
+/// Portal overlay component - renders at root level for proper z-index
+#[component]
+fn PortalOverlay() -> Element {
+    let mut portal_ctx = use_context::<PortalContext>();
+    let state = portal_ctx.state.read();
+
+    if !state.is_open {
+        return rsx! {};
+    }
+
+    // Position the dropdown menu near the click coordinates
+    let menu_style = format!(
+        "position: fixed; left: {}px; top: {}px; z-index: 10000;",
+        state.x.max(0.0),
+        state.y.max(0.0) + 5.0  // Slight offset below click
+    );
+
+    let _dropdown_id = state.dropdown_id;
+    let options = state.options.clone();
+    let selected_value = state.selected_value.clone();
+    drop(state);
+
+    rsx! {
+        // Backdrop to catch clicks outside dropdown
+        div {
+            class: "portal-backdrop",
+            onclick: move |_| {
+                portal_ctx.state.set(PortalDropdownState::default());
+            },
+        }
+        // Dropdown menu positioned at click location
+        div {
+            class: "portal-dropdown-menu",
+            style: "{menu_style}",
+            for opt in options.iter() {
+                button {
+                    class: if opt.value == selected_value { "dropdown-item selected" } else { "dropdown-item" },
+                    onclick: {
+                        let value = opt.value.clone();
+                        move |_| {
+                            // Store the selection result - the Dropdown component will pick it up
+                            let mut current = portal_ctx.state.read().clone();
+                            current.is_open = false;
+                            current.selection_result = Some(value.clone());
+                            portal_ctx.state.set(current);
+                        }
+                    },
+                    "{opt.label}"
                 }
             }
         }
@@ -338,6 +463,12 @@ fn Dropdown(
 fn App() -> Element {
     let selected = use_signal(|| Category::Appearance);
     let search_query = use_signal(|| String::new());
+
+    // Portal context for dropdown overlays
+    let portal_state = use_signal(PortalDropdownState::default);
+    use_context_provider(|| PortalContext {
+        state: portal_state,
+    });
 
     // Initialize all settings signals from the loaded config
     let s = SETTINGS.read().unwrap();
@@ -383,6 +514,8 @@ fn App() -> Element {
             }
             Footer {}
         }
+        // Portal overlay rendered at root level for proper z-index
+        PortalOverlay {}
     }
 }
 

@@ -462,6 +462,49 @@ select:focus {
     color: var(--accent);
 }
 
+/* Portal overlay for dropdowns - renders at root level */
+.portal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    background: transparent;
+}
+
+.portal-dropdown-menu {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    min-width: 140px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.portal-dropdown-menu .dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 8px var(--space-sm);
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.portal-dropdown-menu .dropdown-item:hover {
+    background-color: var(--bg-hover);
+}
+
+.portal-dropdown-menu .dropdown-item.selected {
+    background-color: var(--accent-muted);
+    color: var(--accent);
+}
+
 /* ============================================
    COLOR PICKER (Like Slint design)
    ============================================ */
