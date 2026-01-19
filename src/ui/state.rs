@@ -252,7 +252,13 @@ impl AppState {
 
     /// Get a clone of the current settings
     pub fn get_settings(&self) -> Settings {
-        self.settings.lock().unwrap().clone()
+        match self.settings.lock() {
+            Ok(s) => s.clone(),
+            Err(poisoned) => {
+                log::warn!("Settings mutex was poisoned - recovering data");
+                poisoned.into_inner().clone()
+            }
+        }
     }
 
     /// Update settings with a closure
@@ -260,7 +266,13 @@ impl AppState {
     where
         F: FnOnce(&mut Settings),
     {
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = match self.settings.lock() {
+            Ok(s) => s,
+            Err(poisoned) => {
+                log::warn!("Settings mutex was poisoned during update - recovering");
+                poisoned.into_inner()
+            }
+        };
         f(&mut settings);
     }
 }
