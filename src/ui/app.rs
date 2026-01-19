@@ -17,14 +17,46 @@ pub struct ReactiveState {
     pub settings: Settings,
     /// Public refresh signal - callbacks should clone this as `mut` and call set()
     pub refresh: State<u64>,
+
+    // UI state for list/editor pages (hooks must be called unconditionally)
+    pub outputs_selected: State<i32>,
+    pub outputs_new_name: State<String>,
+    pub keybindings_selected: State<i32>,
+    pub rules_selected: State<i32>,
+    pub rules_opening_expanded: State<bool>,
+    pub rules_visual_expanded: State<bool>,
+    pub rules_size_expanded: State<bool>,
+
+    /// Currently open dropdown ID (None = all closed)
+    pub open_dropdown: State<Option<usize>>,
 }
 
 impl ReactiveState {
-    pub fn new(app_state: AppState, settings: Settings, refresh: State<u64>) -> Self {
+    pub fn new(
+        app_state: AppState,
+        settings: Settings,
+        refresh: State<u64>,
+        outputs_selected: State<i32>,
+        outputs_new_name: State<String>,
+        keybindings_selected: State<i32>,
+        rules_selected: State<i32>,
+        rules_opening_expanded: State<bool>,
+        rules_visual_expanded: State<bool>,
+        rules_size_expanded: State<bool>,
+        open_dropdown: State<Option<usize>>,
+    ) -> Self {
         Self {
             app_state,
             settings,
             refresh,
+            outputs_selected,
+            outputs_new_name,
+            keybindings_selected,
+            rules_selected,
+            rules_opening_expanded,
+            rules_visual_expanded,
+            rules_size_expanded,
+            open_dropdown,
         }
     }
 
@@ -43,6 +75,12 @@ impl ReactiveState {
     }
 }
 
+// Dropdown ID constants for different select rows across the app
+pub const DROPDOWN_OUTPUTS_TRANSFORM: usize = 100;
+pub const DROPDOWN_OUTPUTS_VRR: usize = 101;
+pub const DROPDOWN_KEYBINDINGS_ACTION: usize = 200;
+pub const DROPDOWN_RULES_BEHAVIOR: usize = 300;
+
 /// Create the main application view
 pub fn app_view(state: AppState) -> impl IntoElement {
     // Initialize Freya theme (required for built-in components like Switch, Slider, Input)
@@ -54,12 +92,36 @@ pub fn app_view(state: AppState) -> impl IntoElement {
     // Refresh counter - incrementing this triggers re-renders
     let refresh = use_state(|| 0u64);
 
+    // UI state for list/editor pages - must be created here unconditionally
+    let outputs_selected = use_state(|| -1i32);
+    let outputs_new_name = use_state(String::new);
+    let keybindings_selected = use_state(|| -1i32);
+    let rules_selected = use_state(|| -1i32);
+    let rules_opening_expanded = use_state(|| true);
+    let rules_visual_expanded = use_state(|| true);
+    let rules_size_expanded = use_state(|| false);
+
+    // Dropdown state - tracks which dropdown is open
+    let open_dropdown: State<Option<usize>> = use_state(|| None);
+
     // Read current refresh value to create dependency
     let _refresh_val = *refresh.read();
 
     // Get fresh settings on each render
     let settings = state.get_settings();
-    let reactive_state = ReactiveState::new(state, settings, refresh);
+    let reactive_state = ReactiveState::new(
+        state,
+        settings,
+        refresh,
+        outputs_selected,
+        outputs_new_name,
+        keybindings_selected,
+        rules_selected,
+        rules_opening_expanded,
+        rules_visual_expanded,
+        rules_size_expanded,
+        open_dropdown,
+    );
 
     rect()
         .content(Content::flex())
