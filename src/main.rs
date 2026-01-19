@@ -25,12 +25,13 @@ fn main() -> Result<()> {
     let state = ui::AppState::new(settings.clone(), paths.clone());
 
     // Launch Floem app
+    // Note: floem::launch() never returns - it blocks until the window is closed.
+    // Settings are automatically saved on every change via AppState::mark_dirty_and_save(),
+    // so there's no need for an explicit save-on-exit handler.
     floem::launch(move || ui::app_view(state.clone()));
 
-    // Save settings on exit
-    save_on_exit(&settings, &paths);
-
-    Ok(())
+    // Unreachable: floem::launch never returns
+    unreachable!("floem::launch should never return");
 }
 
 /// Initialize logging with env_logger
@@ -78,21 +79,4 @@ fn init_settings(paths: &config::ConfigPaths, is_first_run: bool) -> Arc<Mutex<c
     );
 
     Arc::new(Mutex::new(loaded_settings))
-}
-
-/// Save settings when the app exits
-fn save_on_exit(settings: &Arc<Mutex<config::Settings>>, paths: &Arc<config::ConfigPaths>) {
-    let settings_copy = match settings.lock() {
-        Ok(s) => s.clone(),
-        Err(poisoned) => {
-            warn!("Settings mutex was poisoned on exit - recovering data");
-            poisoned.into_inner().clone()
-        }
-    };
-
-    if let Err(e) = config::save_settings(paths, &settings_copy) {
-        warn!("Failed to save settings on exit: {}", e);
-    } else {
-        info!("Settings saved successfully on exit");
-    }
 }
