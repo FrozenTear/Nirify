@@ -3,18 +3,21 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, slider_row, toggle_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the recent windows settings page
-pub fn recent_windows_page(state: AppState) -> impl IntoElement {
+pub fn recent_windows_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let recent = settings.recent_windows;
+    let recent = &settings.recent_windows;
 
-    let state_off = state.clone();
-    let state_debounce = state.clone();
-    let state_delay = state.clone();
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
+    let state3 = state.clone();
+    let mut refresh3 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -30,8 +33,10 @@ pub fn recent_windows_page(state: AppState) -> impl IntoElement {
                     "Turn off the Alt-Tab switcher",
                     recent.off,
                     move |val| {
-                        state_off.update_settings(|s| s.recent_windows.off = val);
-                        state_off.mark_dirty_and_save(SettingsCategory::RecentWindows);
+                        state1.update_and_save(SettingsCategory::RecentWindows, |s| {
+                            s.recent_windows.off = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -49,8 +54,10 @@ pub fn recent_windows_page(state: AppState) -> impl IntoElement {
                     1000.0,
                     "ms",
                     move |val| {
-                        state_debounce.update_settings(|s| s.recent_windows.debounce_ms = val as i32);
-                        state_debounce.mark_dirty_and_save(SettingsCategory::RecentWindows);
+                        state2.update_and_save(SettingsCategory::RecentWindows, |s| {
+                            s.recent_windows.debounce_ms = val as i32
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -61,8 +68,10 @@ pub fn recent_windows_page(state: AppState) -> impl IntoElement {
                     500.0,
                     "ms",
                     move |val| {
-                        state_delay.update_settings(|s| s.recent_windows.open_delay_ms = val as i32);
-                        state_delay.mark_dirty_and_save(SettingsCategory::RecentWindows);
+                        state3.update_and_save(SettingsCategory::RecentWindows, |s| {
+                            s.recent_windows.open_delay_ms = val as i32
+                        });
+                        refresh3.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))

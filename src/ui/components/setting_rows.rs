@@ -1,27 +1,24 @@
 //! Setting row components for Freya
 //!
+//! Refined, minimal setting rows with clean visual hierarchy.
 //! Each row follows a two-column layout:
 //! - Left: Label + optional description
 //! - Right: Interactive control (toggle, slider, input, etc.)
-//!
-//! These are plain functions that return Elements directly - no Component trait,
-//! no hooks. The parent manages state and passes value + callback.
 
 use freya::prelude::*;
 
 use crate::ui::theme::*;
 
 // ============================================================================
-// Toggle Row - Switch control (plain function, no hooks)
+// Toggle Row - Switch control
 // ============================================================================
 
-/// Create a setting row with a toggle switch.
-/// Parent manages state and passes value + on_change callback.
+/// Create a setting row with a toggle switch
 pub fn toggle_row(
     title: &str,
     description: &str,
     value: bool,
-    on_change: impl Fn(bool) + 'static,
+    mut on_change: impl FnMut(bool) + 'static,
 ) -> Element {
     let title = title.to_string();
     let description = description.to_string();
@@ -30,24 +27,25 @@ pub fn toggle_row(
         .content(Content::flex())
         .direction(Direction::Horizontal)
         .width(Size::fill())
-        .height(Size::px(50.0))
+        .height(Size::px(ROW_HEIGHT))
         .cross_align(Alignment::Center)
-        .spacing(SPACING_MD)
+        .spacing(SPACING_LG)
         .child(
             // Labels - take remaining space
             rect()
                 .width(Size::flex(1.0))
+                .spacing(SPACING_2XS)
                 .child(
                     label()
                         .text(title)
-                        .color(TEXT_PRIMARY)
+                        .color(TEXT_BRIGHT)
                         .font_size(FONT_SIZE_BASE)
                         .max_lines(1),
                 )
                 .child(
                     label()
                         .text(description)
-                        .color(TEXT_SECONDARY)
+                        .color(TEXT_DIM)
                         .font_size(FONT_SIZE_SM)
                         .max_lines(1),
                 ),
@@ -63,11 +61,10 @@ pub fn toggle_row(
 }
 
 // ============================================================================
-// Slider Row - Slider with value display (plain function, no hooks)
+// Slider Row - Slider with value display
 // ============================================================================
 
-/// Create a setting row with a slider control.
-/// Parent manages state and passes value + on_change callback.
+/// Create a setting row with a slider control
 pub fn slider_row(
     title: &str,
     description: &str,
@@ -75,7 +72,7 @@ pub fn slider_row(
     min: f64,
     max: f64,
     unit: &str,
-    on_change: impl Fn(f64) + 'static,
+    mut on_change: impl FnMut(f64) + 'static,
 ) -> Element {
     let title = title.to_string();
     let description = description.to_string();
@@ -89,59 +86,65 @@ pub fn slider_row(
         .content(Content::flex())
         .direction(Direction::Horizontal)
         .width(Size::fill())
-        .height(Size::px(50.0))
+        .height(Size::px(ROW_HEIGHT))
         .cross_align(Alignment::Center)
-        .spacing(SPACING_MD)
+        .spacing(SPACING_LG)
         .child(
             // Labels - take remaining space
             rect()
                 .width(Size::flex(1.0))
+                .spacing(SPACING_2XS)
                 .child(
                     label()
                         .text(title)
-                        .color(TEXT_PRIMARY)
+                        .color(TEXT_BRIGHT)
                         .font_size(FONT_SIZE_BASE)
                         .max_lines(1),
                 )
                 .child(
                     label()
                         .text(description)
-                        .color(TEXT_SECONDARY)
+                        .color(TEXT_DIM)
                         .font_size(FONT_SIZE_SM)
                         .max_lines(1),
                 ),
         )
         .child(
+            // Slider control
             Slider::new(move |v| {
                 let actual = from_slider(v);
                 on_change(actual);
             })
             .value(to_slider(value))
-            .size(Size::px(100.0)),
+            .size(Size::px(120.0)),
         )
         .child(
-            label()
-                .text(format!("{:.0}{}", value, unit))
-                .color(TEXT_PRIMARY)
-                .font_size(FONT_SIZE_SM)
-                .width(Size::px(40.0))
-                .max_lines(1),
+            // Value display - monospace style
+            rect()
+                .width(Size::px(48.0))
+                .main_align(Alignment::End)
+                .child(
+                    label()
+                        .text(format!("{:.0}{}", value, unit))
+                        .color(ACCENT_VIVID)
+                        .font_size(FONT_SIZE_SM)
+                        .max_lines(1),
+                ),
         )
         .into()
 }
 
 // ============================================================================
-// Text Row - Text input field (plain function, no hooks)
+// Text Row - Text input field
 // ============================================================================
 
-/// Create a setting row with a text input.
-/// Parent manages state and passes value + on_change callback.
+/// Create a setting row with a text input
 pub fn text_row(
     title: &str,
     description: &str,
     value: &str,
     placeholder: &str,
-    on_change: impl Fn(String) + 'static,
+    mut on_change: impl FnMut(String) + 'static,
 ) -> Element {
     let title = title.to_string();
     let description = description.to_string();
@@ -152,24 +155,25 @@ pub fn text_row(
         .content(Content::flex())
         .direction(Direction::Horizontal)
         .width(Size::fill())
-        .height(Size::px(50.0))
+        .height(Size::px(ROW_HEIGHT))
         .cross_align(Alignment::Center)
-        .spacing(SPACING_MD)
+        .spacing(SPACING_LG)
         .child(
             // Labels - take remaining space
             rect()
                 .width(Size::flex(1.0))
+                .spacing(SPACING_2XS)
                 .child(
                     label()
                         .text(title)
-                        .color(TEXT_PRIMARY)
+                        .color(TEXT_BRIGHT)
                         .font_size(FONT_SIZE_BASE)
                         .max_lines(1),
                 )
                 .child(
                     label()
                         .text(description)
-                        .color(TEXT_SECONDARY)
+                        .color(TEXT_DIM)
                         .font_size(FONT_SIZE_SM)
                         .max_lines(1),
                 ),
@@ -178,7 +182,7 @@ pub fn text_row(
             Input::new()
                 .value(value)
                 .placeholder(placeholder)
-                .width(Size::px(140.0))
+                .width(Size::px(160.0))
                 .on_change(move |v: String| {
                     on_change(v);
                 }),
@@ -187,36 +191,38 @@ pub fn text_row(
 }
 
 // ============================================================================
-// Display-only rows (no hooks needed)
+// Display-only rows (read-only values)
 // ============================================================================
 
-/// A simple toggle row that just displays a value (no interactivity)
+/// A simple toggle row that displays a value (no interactivity)
 pub fn toggle_row_display(title: &str, description: &str, value: bool) -> impl IntoElement {
     let title = title.to_string();
     let description = description.to_string();
     let value_text = if value { "On" } else { "Off" };
+    let value_color = if value { ACCENT_VIVID } else { TEXT_DIM };
 
     rect()
         .content(Content::flex())
         .direction(Direction::Horizontal)
         .width(Size::fill())
-        .height(Size::px(50.0))
+        .height(Size::px(ROW_HEIGHT))
         .cross_align(Alignment::Center)
-        .spacing(SPACING_MD)
+        .spacing(SPACING_LG)
         .child(
             rect()
                 .width(Size::flex(1.0))
+                .spacing(SPACING_2XS)
                 .child(
                     label()
                         .text(title)
-                        .color(TEXT_PRIMARY)
+                        .color(TEXT_BRIGHT)
                         .font_size(FONT_SIZE_BASE)
                         .max_lines(1),
                 )
                 .child(
                     label()
                         .text(description)
-                        .color(TEXT_SECONDARY)
+                        .color(TEXT_DIM)
                         .font_size(FONT_SIZE_SM)
                         .max_lines(1),
                 ),
@@ -224,39 +230,40 @@ pub fn toggle_row_display(title: &str, description: &str, value: bool) -> impl I
         .child(
             label()
                 .text(value_text)
-                .color(TEXT_PRIMARY)
-                .font_size(FONT_SIZE_BASE)
+                .color(value_color)
+                .font_size(FONT_SIZE_SM)
                 .max_lines(1),
         )
 }
 
-/// A slider row that just displays a value (no interactivity)
+/// A slider row that displays a value (no interactivity)
 pub fn slider_row_display(title: &str, description: &str, value: f64, unit: &str) -> impl IntoElement {
     let title = title.to_string();
     let description = description.to_string();
-    let value_text = format!("{:.0} {}", value, unit);
+    let value_text = format!("{:.0}{}", value, unit);
 
     rect()
         .content(Content::flex())
         .direction(Direction::Horizontal)
         .width(Size::fill())
-        .height(Size::px(50.0))
+        .height(Size::px(ROW_HEIGHT))
         .cross_align(Alignment::Center)
-        .spacing(SPACING_MD)
+        .spacing(SPACING_LG)
         .child(
             rect()
                 .width(Size::flex(1.0))
+                .spacing(SPACING_2XS)
                 .child(
                     label()
                         .text(title)
-                        .color(TEXT_PRIMARY)
+                        .color(TEXT_BRIGHT)
                         .font_size(FONT_SIZE_BASE)
                         .max_lines(1),
                 )
                 .child(
                     label()
                         .text(description)
-                        .color(TEXT_SECONDARY)
+                        .color(TEXT_DIM)
                         .font_size(FONT_SIZE_SM)
                         .max_lines(1),
                 ),
@@ -264,13 +271,13 @@ pub fn slider_row_display(title: &str, description: &str, value: f64, unit: &str
         .child(
             label()
                 .text(value_text)
-                .color(TEXT_PRIMARY)
-                .font_size(FONT_SIZE_BASE)
+                .color(ACCENT_VIVID)
+                .font_size(FONT_SIZE_SM)
                 .max_lines(1),
         )
 }
 
-/// A text row that just displays a value (no interactivity)
+/// A text row that displays a value (no interactivity)
 pub fn text_row_display(title: &str, description: &str, value: &str) -> impl IntoElement {
     let title = title.to_string();
     let description = description.to_string();
@@ -280,23 +287,24 @@ pub fn text_row_display(title: &str, description: &str, value: &str) -> impl Int
         .content(Content::flex())
         .direction(Direction::Horizontal)
         .width(Size::fill())
-        .height(Size::px(50.0))
+        .height(Size::px(ROW_HEIGHT))
         .cross_align(Alignment::Center)
-        .spacing(SPACING_MD)
+        .spacing(SPACING_LG)
         .child(
             rect()
                 .width(Size::flex(1.0))
+                .spacing(SPACING_2XS)
                 .child(
                     label()
                         .text(title)
-                        .color(TEXT_PRIMARY)
+                        .color(TEXT_BRIGHT)
                         .font_size(FONT_SIZE_BASE)
                         .max_lines(1),
                 )
                 .child(
                     label()
                         .text(description)
-                        .color(TEXT_SECONDARY)
+                        .color(TEXT_DIM)
                         .font_size(FONT_SIZE_SM)
                         .max_lines(1),
                 ),
@@ -304,8 +312,8 @@ pub fn text_row_display(title: &str, description: &str, value: &str) -> impl Int
         .child(
             label()
                 .text(value)
-                .color(TEXT_PRIMARY)
-                .font_size(FONT_SIZE_BASE)
+                .color(ACCENT_VIVID)
+                .font_size(FONT_SIZE_SM)
                 .max_lines(1),
         )
 }
@@ -320,23 +328,24 @@ pub fn value_row(title: &str, description: &str, value: impl ToString) -> impl I
         .content(Content::flex())
         .direction(Direction::Horizontal)
         .width(Size::fill())
-        .height(Size::px(50.0))
+        .height(Size::px(ROW_HEIGHT))
         .cross_align(Alignment::Center)
-        .spacing(SPACING_MD)
+        .spacing(SPACING_LG)
         .child(
             rect()
                 .width(Size::flex(1.0))
+                .spacing(SPACING_2XS)
                 .child(
                     label()
                         .text(title)
-                        .color(TEXT_PRIMARY)
+                        .color(TEXT_BRIGHT)
                         .font_size(FONT_SIZE_BASE)
                         .max_lines(1),
                 )
                 .child(
                     label()
                         .text(description)
-                        .color(TEXT_SECONDARY)
+                        .color(TEXT_DIM)
                         .font_size(FONT_SIZE_SM)
                         .max_lines(1),
                 ),
@@ -344,8 +353,8 @@ pub fn value_row(title: &str, description: &str, value: impl ToString) -> impl I
         .child(
             label()
                 .text(value)
-                .color(TEXT_PRIMARY)
-                .font_size(FONT_SIZE_BASE)
+                .color(ACCENT_VIVID)
+                .font_size(FONT_SIZE_SM)
                 .max_lines(1),
         )
 }

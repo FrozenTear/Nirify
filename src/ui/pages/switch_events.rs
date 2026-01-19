@@ -2,12 +2,12 @@
 
 use freya::prelude::*;
 
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, value_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::{SPACING_LG, TEXT_SECONDARY};
 
 /// Create the switch events settings page
-pub fn switch_events_page(state: AppState) -> impl IntoElement {
+pub fn switch_events_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
     let events = &settings.switch_events;
 

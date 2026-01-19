@@ -3,21 +3,27 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, slider_row, toggle_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the trackpoint settings page
-pub fn trackpoint_page(state: AppState) -> impl IntoElement {
+pub fn trackpoint_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let trackpoint = settings.trackpoint;
+    let trackpoint = &settings.trackpoint;
 
-    let state_natural = state.clone();
-    let state_left = state.clone();
-    let state_middle = state.clone();
-    let state_scroll_lock = state.clone();
-    let state_accel = state.clone();
-    let state_off = state.clone();
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
+    let state3 = state.clone();
+    let mut refresh3 = state.refresh.clone();
+    let state4 = state.clone();
+    let mut refresh4 = state.refresh.clone();
+    let state5 = state.clone();
+    let mut refresh5 = state.refresh.clone();
+    let state6 = state.clone();
+    let mut refresh6 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -33,8 +39,10 @@ pub fn trackpoint_page(state: AppState) -> impl IntoElement {
                     "Invert scroll direction",
                     trackpoint.natural_scroll,
                     move |val| {
-                        state_natural.update_settings(|s| s.trackpoint.natural_scroll = val);
-                        state_natural.mark_dirty_and_save(SettingsCategory::Trackpoint);
+                        state1.update_and_save(SettingsCategory::Trackpoint, |s| {
+                            s.trackpoint.natural_scroll = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -42,8 +50,10 @@ pub fn trackpoint_page(state: AppState) -> impl IntoElement {
                     "Swap left and right buttons",
                     trackpoint.left_handed,
                     move |val| {
-                        state_left.update_settings(|s| s.trackpoint.left_handed = val);
-                        state_left.mark_dirty_and_save(SettingsCategory::Trackpoint);
+                        state2.update_and_save(SettingsCategory::Trackpoint, |s| {
+                            s.trackpoint.left_handed = val
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -51,8 +61,10 @@ pub fn trackpoint_page(state: AppState) -> impl IntoElement {
                     "Emulate middle click",
                     trackpoint.middle_emulation,
                     move |val| {
-                        state_middle.update_settings(|s| s.trackpoint.middle_emulation = val);
-                        state_middle.mark_dirty_and_save(SettingsCategory::Trackpoint);
+                        state3.update_and_save(SettingsCategory::Trackpoint, |s| {
+                            s.trackpoint.middle_emulation = val
+                        });
+                        refresh3.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -67,8 +79,10 @@ pub fn trackpoint_page(state: AppState) -> impl IntoElement {
                     "Don't need to hold scroll button",
                     trackpoint.scroll_button_lock,
                     move |val| {
-                        state_scroll_lock.update_settings(|s| s.trackpoint.scroll_button_lock = val);
-                        state_scroll_lock.mark_dirty_and_save(SettingsCategory::Trackpoint);
+                        state4.update_and_save(SettingsCategory::Trackpoint, |s| {
+                            s.trackpoint.scroll_button_lock = val
+                        });
+                        refresh4.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -86,8 +100,10 @@ pub fn trackpoint_page(state: AppState) -> impl IntoElement {
                     1.0,
                     "",
                     move |val| {
-                        state_accel.update_settings(|s| s.trackpoint.accel_speed = val);
-                        state_accel.mark_dirty_and_save(SettingsCategory::Trackpoint);
+                        state5.update_and_save(SettingsCategory::Trackpoint, |s| {
+                            s.trackpoint.accel_speed = val
+                        });
+                        refresh5.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -102,8 +118,10 @@ pub fn trackpoint_page(state: AppState) -> impl IntoElement {
                     "Turn off trackpoint input",
                     trackpoint.off,
                     move |val| {
-                        state_off.update_settings(|s| s.trackpoint.off = val);
-                        state_off.mark_dirty_and_save(SettingsCategory::Trackpoint);
+                        state6.update_and_save(SettingsCategory::Trackpoint, |s| {
+                            s.trackpoint.off = val
+                        });
+                        refresh6.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))

@@ -3,17 +3,19 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, text_row, toggle_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the touch screen settings page
-pub fn touch_page(state: AppState) -> impl IntoElement {
+pub fn touch_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let touch = settings.touch;
+    let touch = &settings.touch;
 
-    let state_map = state.clone();
-    let state_off = state.clone();
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -30,8 +32,10 @@ pub fn touch_page(state: AppState) -> impl IntoElement {
                     &touch.map_to_output,
                     "",
                     move |val| {
-                        state_map.update_settings(|s| s.touch.map_to_output = val);
-                        state_map.mark_dirty_and_save(SettingsCategory::Touch);
+                        state1.update_and_save(SettingsCategory::Touch, |s| {
+                            s.touch.map_to_output = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -46,8 +50,10 @@ pub fn touch_page(state: AppState) -> impl IntoElement {
                     "Turn off touch input",
                     touch.off,
                     move |val| {
-                        state_off.update_settings(|s| s.touch.off = val);
-                        state_off.mark_dirty_and_save(SettingsCategory::Touch);
+                        state2.update_and_save(SettingsCategory::Touch, |s| {
+                            s.touch.off = val
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))

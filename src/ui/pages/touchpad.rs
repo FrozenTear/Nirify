@@ -3,26 +3,37 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, slider_row, toggle_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the touchpad settings page
-pub fn touchpad_page(state: AppState) -> impl IntoElement {
+pub fn touchpad_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let touchpad = settings.touchpad;
+    let touchpad = &settings.touchpad;
 
-    let state_tap = state.clone();
-    let state_drag = state.clone();
-    let state_drag_lock = state.clone();
-    let state_middle = state.clone();
-    let state_natural = state.clone();
-    let state_scroll = state.clone();
-    let state_accel = state.clone();
-    let state_left = state.clone();
-    let state_dwt = state.clone();
-    let state_external = state.clone();
-    let state_off = state.clone();
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
+    let state3 = state.clone();
+    let mut refresh3 = state.refresh.clone();
+    let state4 = state.clone();
+    let mut refresh4 = state.refresh.clone();
+    let state5 = state.clone();
+    let mut refresh5 = state.refresh.clone();
+    let state6 = state.clone();
+    let mut refresh6 = state.refresh.clone();
+    let state7 = state.clone();
+    let mut refresh7 = state.refresh.clone();
+    let state8 = state.clone();
+    let mut refresh8 = state.refresh.clone();
+    let state9 = state.clone();
+    let mut refresh9 = state.refresh.clone();
+    let state10 = state.clone();
+    let mut refresh10 = state.refresh.clone();
+    let state11 = state.clone();
+    let mut refresh11 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -38,8 +49,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     "Tap the touchpad to click",
                     touchpad.tap,
                     move |val| {
-                        state_tap.update_settings(|s| s.touchpad.tap = val);
-                        state_tap.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state1.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.tap = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -47,8 +60,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     "Tap and drag to select",
                     touchpad.drag,
                     move |val| {
-                        state_drag.update_settings(|s| s.touchpad.drag = val);
-                        state_drag.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state2.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.drag = val
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -56,8 +71,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     "Continue dragging without holding",
                     touchpad.drag_lock,
                     move |val| {
-                        state_drag_lock.update_settings(|s| s.touchpad.drag_lock = val);
-                        state_drag_lock.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state3.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.drag_lock = val
+                        });
+                        refresh3.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -65,8 +82,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     "Two-finger tap for middle click",
                     touchpad.middle_emulation,
                     move |val| {
-                        state_middle.update_settings(|s| s.touchpad.middle_emulation = val);
-                        state_middle.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state4.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.middle_emulation = val
+                        });
+                        refresh4.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -81,8 +100,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     "Content follows finger direction",
                     touchpad.natural_scroll,
                     move |val| {
-                        state_natural.update_settings(|s| s.touchpad.natural_scroll = val);
-                        state_natural.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state5.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.natural_scroll = val
+                        });
+                        refresh5.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -93,8 +114,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     3.0,
                     "x",
                     move |val| {
-                        state_scroll.update_settings(|s| s.touchpad.scroll_factor = val);
-                        state_scroll.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state6.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.scroll_factor = val
+                        });
+                        refresh6.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -112,8 +135,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     1.0,
                     "",
                     move |val| {
-                        state_accel.update_settings(|s| s.touchpad.accel_speed = val);
-                        state_accel.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state7.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.accel_speed = val
+                        });
+                        refresh7.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -128,8 +153,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     "Swap left and right buttons",
                     touchpad.left_handed,
                     move |val| {
-                        state_left.update_settings(|s| s.touchpad.left_handed = val);
-                        state_left.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state8.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.left_handed = val
+                        });
+                        refresh8.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -137,8 +164,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     "Prevent accidental touches",
                     touchpad.dwt,
                     move |val| {
-                        state_dwt.update_settings(|s| s.touchpad.dwt = val);
-                        state_dwt.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state9.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.dwt = val
+                        });
+                        refresh9.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -146,8 +175,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     "Turn off when mouse connected",
                     touchpad.disabled_on_external_mouse,
                     move |val| {
-                        state_external.update_settings(|s| s.touchpad.disabled_on_external_mouse = val);
-                        state_external.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state10.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.disabled_on_external_mouse = val
+                        });
+                        refresh10.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -155,8 +186,10 @@ pub fn touchpad_page(state: AppState) -> impl IntoElement {
                     "Turn off touchpad input",
                     touchpad.off,
                     move |val| {
-                        state_off.update_settings(|s| s.touchpad.off = val);
-                        state_off.mark_dirty_and_save(SettingsCategory::Touchpad);
+                        state11.update_and_save(SettingsCategory::Touchpad, |s| {
+                            s.touchpad.off = val
+                        });
+                        refresh11.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))

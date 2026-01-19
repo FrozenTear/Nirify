@@ -2,12 +2,12 @@
 
 use freya::prelude::*;
 
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, value_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::{SPACING_LG, TEXT_SECONDARY};
 
 /// Create the layer rules settings page
-pub fn layer_rules_page(state: AppState) -> impl IntoElement {
+pub fn layer_rules_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
     let rules = &settings.layer_rules.rules;
 

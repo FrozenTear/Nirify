@@ -3,20 +3,25 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, toggle_row, value_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the debug settings page
-pub fn debug_page(state: AppState) -> impl IntoElement {
+pub fn debug_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let debug = settings.debug;
+    let debug = &settings.debug;
 
-    let state_preview = state.clone();
-    let state_cursor = state.clone();
-    let state_scanout = state.clone();
-    let state_throttle = state.clone();
-    let state_trans = state.clone();
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
+    let state3 = state.clone();
+    let mut refresh3 = state.refresh.clone();
+    let state4 = state.clone();
+    let mut refresh4 = state.refresh.clone();
+    let state5 = state.clone();
+    let mut refresh5 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -44,8 +49,10 @@ pub fn debug_page(state: AppState) -> impl IntoElement {
                     "Render monitors like screencast",
                     debug.preview_render,
                     move |val| {
-                        state_preview.update_settings(|s| s.debug.preview_render = val);
-                        state_preview.mark_dirty_and_save(SettingsCategory::Debug);
+                        state1.update_and_save(SettingsCategory::Debug, |s| {
+                            s.debug.preview_render = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -53,8 +60,10 @@ pub fn debug_page(state: AppState) -> impl IntoElement {
                     "Force cursor through compositor",
                     debug.disable_cursor_plane,
                     move |val| {
-                        state_cursor.update_settings(|s| s.debug.disable_cursor_plane = val);
-                        state_cursor.mark_dirty_and_save(SettingsCategory::Debug);
+                        state2.update_and_save(SettingsCategory::Debug, |s| {
+                            s.debug.disable_cursor_plane = val
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -62,8 +71,10 @@ pub fn debug_page(state: AppState) -> impl IntoElement {
                     "Always composite fullscreen windows",
                     debug.disable_direct_scanout,
                     move |val| {
-                        state_scanout.update_settings(|s| s.debug.disable_direct_scanout = val);
-                        state_scanout.mark_dirty_and_save(SettingsCategory::Debug);
+                        state3.update_and_save(SettingsCategory::Debug, |s| {
+                            s.debug.disable_direct_scanout = val
+                        });
+                        refresh3.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -78,9 +89,10 @@ pub fn debug_page(state: AppState) -> impl IntoElement {
                     "Send resize events immediately",
                     debug.disable_resize_throttling,
                     move |val| {
-                        state_throttle
-                            .update_settings(|s| s.debug.disable_resize_throttling = val);
-                        state_throttle.mark_dirty_and_save(SettingsCategory::Debug);
+                        state4.update_and_save(SettingsCategory::Debug, |s| {
+                            s.debug.disable_resize_throttling = val
+                        });
+                        refresh4.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -88,8 +100,10 @@ pub fn debug_page(state: AppState) -> impl IntoElement {
                     "Don't wait for synchronized resizing",
                     debug.disable_transactions,
                     move |val| {
-                        state_trans.update_settings(|s| s.debug.disable_transactions = val);
-                        state_trans.mark_dirty_and_save(SettingsCategory::Debug);
+                        state5.update_and_save(SettingsCategory::Debug, |s| {
+                            s.debug.disable_transactions = val
+                        });
+                        refresh5.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))

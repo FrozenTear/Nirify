@@ -3,22 +3,28 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, slider_row, toggle_row, value_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the appearance settings page
-pub fn appearance_page(state: AppState) -> impl IntoElement {
+pub fn appearance_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let appearance = settings.appearance;
+    let appearance = &settings.appearance;
 
     // Clone state for callbacks
-    let state_focus_ring = state.clone();
-    let state_focus_width = state.clone();
-    let state_border = state.clone();
-    let state_border_thickness = state.clone();
-    let state_gaps = state.clone();
-    let state_corner_radius = state.clone();
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
+    let state3 = state.clone();
+    let mut refresh3 = state.refresh.clone();
+    let state4 = state.clone();
+    let mut refresh4 = state.refresh.clone();
+    let state5 = state.clone();
+    let mut refresh5 = state.refresh.clone();
+    let state6 = state.clone();
+    let mut refresh6 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -34,8 +40,10 @@ pub fn appearance_page(state: AppState) -> impl IntoElement {
                     "Show a colored ring around the focused window",
                     appearance.focus_ring_enabled,
                     move |val| {
-                        state_focus_ring.update_settings(|s| s.appearance.focus_ring_enabled = val);
-                        state_focus_ring.mark_dirty_and_save(SettingsCategory::Appearance);
+                        state1.update_and_save(SettingsCategory::Appearance, |s| {
+                            s.appearance.focus_ring_enabled = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -46,8 +54,10 @@ pub fn appearance_page(state: AppState) -> impl IntoElement {
                     20.0,
                     "px",
                     move |val| {
-                        state_focus_width.update_settings(|s| s.appearance.focus_ring_width = val as f32);
-                        state_focus_width.mark_dirty_and_save(SettingsCategory::Appearance);
+                        state2.update_and_save(SettingsCategory::Appearance, |s| {
+                            s.appearance.focus_ring_width = val as f32
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(value_row(
@@ -72,8 +82,10 @@ pub fn appearance_page(state: AppState) -> impl IntoElement {
                     "Show a border around windows (inside the focus ring)",
                     appearance.border_enabled,
                     move |val| {
-                        state_border.update_settings(|s| s.appearance.border_enabled = val);
-                        state_border.mark_dirty_and_save(SettingsCategory::Appearance);
+                        state3.update_and_save(SettingsCategory::Appearance, |s| {
+                            s.appearance.border_enabled = val
+                        });
+                        refresh3.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -84,8 +96,10 @@ pub fn appearance_page(state: AppState) -> impl IntoElement {
                     15.0,
                     "px",
                     move |val| {
-                        state_border_thickness.update_settings(|s| s.appearance.border_thickness = val as f32);
-                        state_border_thickness.mark_dirty_and_save(SettingsCategory::Appearance);
+                        state4.update_and_save(SettingsCategory::Appearance, |s| {
+                            s.appearance.border_thickness = val as f32
+                        });
+                        refresh4.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -103,8 +117,10 @@ pub fn appearance_page(state: AppState) -> impl IntoElement {
                     64.0,
                     "px",
                     move |val| {
-                        state_gaps.update_settings(|s| s.appearance.gaps = val as f32);
-                        state_gaps.mark_dirty_and_save(SettingsCategory::Appearance);
+                        state5.update_and_save(SettingsCategory::Appearance, |s| {
+                            s.appearance.gaps = val as f32
+                        });
+                        refresh5.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -122,8 +138,10 @@ pub fn appearance_page(state: AppState) -> impl IntoElement {
                     40.0,
                     "px",
                     move |val| {
-                        state_corner_radius.update_settings(|s| s.appearance.corner_radius = val as f32);
-                        state_corner_radius.mark_dirty_and_save(SettingsCategory::Appearance);
+                        state6.update_and_save(SettingsCategory::Appearance, |s| {
+                            s.appearance.corner_radius = val as f32
+                        });
+                        refresh6.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))

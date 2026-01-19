@@ -4,28 +4,45 @@ use freya::prelude::*;
 
 use crate::config::SettingsCategory;
 use crate::types::{Color, ColorOrGradient};
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, slider_row, text_row, toggle_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the layout extras settings page
-pub fn layout_extras_page(state: AppState) -> impl IntoElement {
+pub fn layout_extras_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let layout = settings.layout_extras;
+    let layout = &settings.layout_extras;
 
-    let state_shadow_en = state.clone();
-    let state_shadow_soft = state.clone();
-    let state_shadow_spread = state.clone();
-    let state_shadow_ox = state.clone();
-    let state_shadow_oy = state.clone();
-    let state_shadow_color = state.clone();
-    let state_shadow_inactive = state.clone();
-    let state_tab_en = state.clone();
-    let state_tab_hide = state.clone();
-    let state_tab_width = state.clone();
-    let state_tab_gap = state.clone();
-    let state_hint_en = state.clone();
-    let state_hint_color = state.clone();
+    let shadow_color_hex = layout.shadow.color.to_hex();
+    let shadow_inactive_hex = layout.shadow.inactive_color.to_hex();
+    let hint_color_hex = layout.insert_hint.color.to_hex();
+
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
+    let state3 = state.clone();
+    let mut refresh3 = state.refresh.clone();
+    let state4 = state.clone();
+    let mut refresh4 = state.refresh.clone();
+    let state5 = state.clone();
+    let mut refresh5 = state.refresh.clone();
+    let state6 = state.clone();
+    let mut refresh6 = state.refresh.clone();
+    let state7 = state.clone();
+    let mut refresh7 = state.refresh.clone();
+    let state8 = state.clone();
+    let mut refresh8 = state.refresh.clone();
+    let state9 = state.clone();
+    let mut refresh9 = state.refresh.clone();
+    let state10 = state.clone();
+    let mut refresh10 = state.refresh.clone();
+    let state11 = state.clone();
+    let mut refresh11 = state.refresh.clone();
+    let state12 = state.clone();
+    let mut refresh12 = state.refresh.clone();
+    let state13 = state.clone();
+    let mut refresh13 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -41,8 +58,10 @@ pub fn layout_extras_page(state: AppState) -> impl IntoElement {
                     "Show shadows behind windows",
                     layout.shadow.enabled,
                     move |val| {
-                        state_shadow_en.update_settings(|s| s.layout_extras.shadow.enabled = val);
-                        state_shadow_en.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                        state1.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                            s.layout_extras.shadow.enabled = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -53,9 +72,10 @@ pub fn layout_extras_page(state: AppState) -> impl IntoElement {
                     100.0,
                     "px",
                     move |val| {
-                        state_shadow_soft
-                            .update_settings(|s| s.layout_extras.shadow.softness = val as i32);
-                        state_shadow_soft.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                        state2.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                            s.layout_extras.shadow.softness = val as i32
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -66,9 +86,10 @@ pub fn layout_extras_page(state: AppState) -> impl IntoElement {
                     100.0,
                     "px",
                     move |val| {
-                        state_shadow_spread
-                            .update_settings(|s| s.layout_extras.shadow.spread = val as i32);
-                        state_shadow_spread.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                        state3.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                            s.layout_extras.shadow.spread = val as i32
+                        });
+                        refresh3.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -79,9 +100,10 @@ pub fn layout_extras_page(state: AppState) -> impl IntoElement {
                     100.0,
                     "px",
                     move |val| {
-                        state_shadow_ox
-                            .update_settings(|s| s.layout_extras.shadow.offset_x = val as i32);
-                        state_shadow_ox.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                        state4.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                            s.layout_extras.shadow.offset_x = val as i32
+                        });
+                        refresh4.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -92,35 +114,37 @@ pub fn layout_extras_page(state: AppState) -> impl IntoElement {
                     100.0,
                     "px",
                     move |val| {
-                        state_shadow_oy
-                            .update_settings(|s| s.layout_extras.shadow.offset_y = val as i32);
-                        state_shadow_oy.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                        state5.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                            s.layout_extras.shadow.offset_y = val as i32
+                        });
+                        refresh5.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(text_row(
                     "Active shadow color",
                     "Shadow color for focused windows (hex)",
-                    &layout.shadow.color.to_hex(),
+                    &shadow_color_hex,
                     "#00000080",
                     move |val| {
                         if let Some(color) = Color::from_hex(&val) {
-                            state_shadow_color
-                                .update_settings(|s| s.layout_extras.shadow.color = color);
-                            state_shadow_color.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                            state6.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                                s.layout_extras.shadow.color = color
+                            });
+                            refresh6.with_mut(|mut v| *v += 1);
                         }
                     },
                 ))
                 .child(text_row(
                     "Inactive shadow color",
                     "Shadow color for unfocused windows (hex)",
-                    &layout.shadow.inactive_color.to_hex(),
+                    &shadow_inactive_hex,
                     "#00000040",
                     move |val| {
                         if let Some(color) = Color::from_hex(&val) {
-                            state_shadow_inactive
-                                .update_settings(|s| s.layout_extras.shadow.inactive_color = color);
-                            state_shadow_inactive
-                                .mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                            state7.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                                s.layout_extras.shadow.inactive_color = color
+                            });
+                            refresh7.with_mut(|mut v| *v += 1);
                         }
                     },
                 )),
@@ -136,8 +160,10 @@ pub fn layout_extras_page(state: AppState) -> impl IntoElement {
                     "Display indicator for tabbed windows",
                     layout.tab_indicator.enabled,
                     move |val| {
-                        state_tab_en.update_settings(|s| s.layout_extras.tab_indicator.enabled = val);
-                        state_tab_en.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                        state8.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                            s.layout_extras.tab_indicator.enabled = val
+                        });
+                        refresh8.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -145,9 +171,10 @@ pub fn layout_extras_page(state: AppState) -> impl IntoElement {
                     "Hide indicator when only one tab",
                     layout.tab_indicator.hide_when_single_tab,
                     move |val| {
-                        state_tab_hide
-                            .update_settings(|s| s.layout_extras.tab_indicator.hide_when_single_tab = val);
-                        state_tab_hide.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                        state9.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                            s.layout_extras.tab_indicator.hide_when_single_tab = val
+                        });
+                        refresh9.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -158,9 +185,10 @@ pub fn layout_extras_page(state: AppState) -> impl IntoElement {
                     20.0,
                     "px",
                     move |val| {
-                        state_tab_width
-                            .update_settings(|s| s.layout_extras.tab_indicator.width = val as i32);
-                        state_tab_width.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                        state10.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                            s.layout_extras.tab_indicator.width = val as i32
+                        });
+                        refresh10.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -171,9 +199,10 @@ pub fn layout_extras_page(state: AppState) -> impl IntoElement {
                     40.0,
                     "px",
                     move |val| {
-                        state_tab_gap
-                            .update_settings(|s| s.layout_extras.tab_indicator.gap = val as i32);
-                        state_tab_gap.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                        state11.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                            s.layout_extras.tab_indicator.gap = val as i32
+                        });
+                        refresh11.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -188,21 +217,23 @@ pub fn layout_extras_page(state: AppState) -> impl IntoElement {
                     "Display hint for window insertion location",
                     layout.insert_hint.enabled,
                     move |val| {
-                        state_hint_en.update_settings(|s| s.layout_extras.insert_hint.enabled = val);
-                        state_hint_en.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                        state12.update_and_save(SettingsCategory::LayoutExtras, |s| {
+                            s.layout_extras.insert_hint.enabled = val
+                        });
+                        refresh12.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(text_row(
                     "Hint color",
                     "Color of the insertion hint (hex)",
-                    &layout.insert_hint.color.to_hex(),
+                    &hint_color_hex,
                     "#ffffff40",
                     move |val| {
                         if let Some(color) = Color::from_hex(&val) {
-                            state_hint_color.update_settings(|s| {
+                            state13.update_and_save(SettingsCategory::LayoutExtras, |s| {
                                 s.layout_extras.insert_hint.color = ColorOrGradient::Color(color)
                             });
-                            state_hint_color.mark_dirty_and_save(SettingsCategory::LayoutExtras);
+                            refresh13.with_mut(|mut v| *v += 1);
                         }
                     },
                 )),

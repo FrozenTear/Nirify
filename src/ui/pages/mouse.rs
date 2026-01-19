@@ -3,21 +3,27 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, slider_row, toggle_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the mouse settings page
-pub fn mouse_page(state: AppState) -> impl IntoElement {
+pub fn mouse_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let mouse = settings.mouse;
+    let mouse = &settings.mouse;
 
-    let state_natural = state.clone();
-    let state_left = state.clone();
-    let state_middle = state.clone();
-    let state_accel = state.clone();
-    let state_scroll = state.clone();
-    let state_off = state.clone();
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
+    let state3 = state.clone();
+    let mut refresh3 = state.refresh.clone();
+    let state4 = state.clone();
+    let mut refresh4 = state.refresh.clone();
+    let state5 = state.clone();
+    let mut refresh5 = state.refresh.clone();
+    let state6 = state.clone();
+    let mut refresh6 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -33,9 +39,10 @@ pub fn mouse_page(state: AppState) -> impl IntoElement {
                     "Invert scroll direction",
                     mouse.natural_scroll,
                     move |val| {
-                        log::info!("Natural scroll toggled to: {}", val);
-                        state_natural.update_settings(|s| s.mouse.natural_scroll = val);
-                        state_natural.mark_dirty_and_save(SettingsCategory::Mouse);
+                        state1.update_and_save(SettingsCategory::Mouse, |s| {
+                            s.mouse.natural_scroll = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -43,8 +50,10 @@ pub fn mouse_page(state: AppState) -> impl IntoElement {
                     "Swap left and right buttons",
                     mouse.left_handed,
                     move |val| {
-                        state_left.update_settings(|s| s.mouse.left_handed = val);
-                        state_left.mark_dirty_and_save(SettingsCategory::Mouse);
+                        state2.update_and_save(SettingsCategory::Mouse, |s| {
+                            s.mouse.left_handed = val
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -52,8 +61,10 @@ pub fn mouse_page(state: AppState) -> impl IntoElement {
                     "Emulate middle click with left+right",
                     mouse.middle_emulation,
                     move |val| {
-                        state_middle.update_settings(|s| s.mouse.middle_emulation = val);
-                        state_middle.mark_dirty_and_save(SettingsCategory::Mouse);
+                        state3.update_and_save(SettingsCategory::Mouse, |s| {
+                            s.mouse.middle_emulation = val
+                        });
+                        refresh3.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -71,8 +82,10 @@ pub fn mouse_page(state: AppState) -> impl IntoElement {
                     1.0,
                     "",
                     move |val| {
-                        state_accel.update_settings(|s| s.mouse.accel_speed = val);
-                        state_accel.mark_dirty_and_save(SettingsCategory::Mouse);
+                        state4.update_and_save(SettingsCategory::Mouse, |s| {
+                            s.mouse.accel_speed = val
+                        });
+                        refresh4.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -83,8 +96,10 @@ pub fn mouse_page(state: AppState) -> impl IntoElement {
                     3.0,
                     "x",
                     move |val| {
-                        state_scroll.update_settings(|s| s.mouse.scroll_factor = val);
-                        state_scroll.mark_dirty_and_save(SettingsCategory::Mouse);
+                        state5.update_and_save(SettingsCategory::Mouse, |s| {
+                            s.mouse.scroll_factor = val
+                        });
+                        refresh5.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -99,8 +114,10 @@ pub fn mouse_page(state: AppState) -> impl IntoElement {
                     "Turn off mouse input",
                     mouse.off,
                     move |val| {
-                        state_off.update_settings(|s| s.mouse.off = val);
-                        state_off.mark_dirty_and_save(SettingsCategory::Mouse);
+                        state6.update_and_save(SettingsCategory::Mouse, |s| {
+                            s.mouse.off = val
+                        });
+                        refresh6.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))

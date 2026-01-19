@@ -3,23 +3,28 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, slider_row, text_row, toggle_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the cursor settings page
-pub fn cursor_page(state: AppState) -> impl IntoElement {
+pub fn cursor_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let cursor = settings.cursor;
+    let cursor = &settings.cursor;
 
-    let auto_hide_enabled = cursor.hide_after_inactive_ms.is_some();
+    let auto_hide = cursor.hide_after_inactive_ms.is_some();
     let hide_delay = cursor.hide_after_inactive_ms.unwrap_or(3000) as f64;
 
-    let state_theme = state.clone();
-    let state_size = state.clone();
-    let state_hide_typing = state.clone();
-    let state_auto_hide = state.clone();
-    let state_delay = state.clone();
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
+    let state3 = state.clone();
+    let mut refresh3 = state.refresh.clone();
+    let state4 = state.clone();
+    let mut refresh4 = state.refresh.clone();
+    let state5 = state.clone();
+    let mut refresh5 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -36,8 +41,10 @@ pub fn cursor_page(state: AppState) -> impl IntoElement {
                     &cursor.theme,
                     "Adwaita",
                     move |val| {
-                        state_theme.update_settings(|s| s.cursor.theme = val);
-                        state_theme.mark_dirty_and_save(SettingsCategory::Cursor);
+                        state1.update_and_save(SettingsCategory::Cursor, |s| {
+                            s.cursor.theme = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -48,8 +55,10 @@ pub fn cursor_page(state: AppState) -> impl IntoElement {
                     96.0,
                     "px",
                     move |val| {
-                        state_size.update_settings(|s| s.cursor.size = val as i32);
-                        state_size.mark_dirty_and_save(SettingsCategory::Cursor);
+                        state2.update_and_save(SettingsCategory::Cursor, |s| {
+                            s.cursor.size = val as i32
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -64,19 +73,21 @@ pub fn cursor_page(state: AppState) -> impl IntoElement {
                     "Hide cursor when using keyboard",
                     cursor.hide_when_typing,
                     move |val| {
-                        state_hide_typing.update_settings(|s| s.cursor.hide_when_typing = val);
-                        state_hide_typing.mark_dirty_and_save(SettingsCategory::Cursor);
+                        state3.update_and_save(SettingsCategory::Cursor, |s| {
+                            s.cursor.hide_when_typing = val
+                        });
+                        refresh3.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
                     "Auto-hide when idle",
                     "Hide cursor after inactivity",
-                    auto_hide_enabled,
+                    auto_hide,
                     move |val| {
-                        state_auto_hide.update_settings(|s| {
+                        state4.update_and_save(SettingsCategory::Cursor, |s| {
                             s.cursor.hide_after_inactive_ms = if val { Some(3000) } else { None };
                         });
-                        state_auto_hide.mark_dirty_and_save(SettingsCategory::Cursor);
+                        refresh4.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -87,12 +98,12 @@ pub fn cursor_page(state: AppState) -> impl IntoElement {
                     10000.0,
                     "ms",
                     move |val| {
-                        state_delay.update_settings(|s| {
+                        state5.update_and_save(SettingsCategory::Cursor, |s| {
                             if s.cursor.hide_after_inactive_ms.is_some() {
                                 s.cursor.hide_after_inactive_ms = Some(val as i32);
                             }
                         });
-                        state_delay.mark_dirty_and_save(SettingsCategory::Cursor);
+                        refresh5.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))

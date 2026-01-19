@@ -2,12 +2,12 @@
 
 use freya::prelude::*;
 
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, value_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::{SPACING_LG, TEXT_SECONDARY};
 
 /// Create the environment settings page
-pub fn environment_page(state: AppState) -> impl IntoElement {
+pub fn environment_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
     let variables = &settings.environment.variables;
 

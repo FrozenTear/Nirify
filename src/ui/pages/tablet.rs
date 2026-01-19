@@ -3,18 +3,21 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, text_row, toggle_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the tablet settings page
-pub fn tablet_page(state: AppState) -> impl IntoElement {
+pub fn tablet_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let tablet = settings.tablet;
+    let tablet = &settings.tablet;
 
-    let state_map = state.clone();
-    let state_left = state.clone();
-    let state_off = state.clone();
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
+    let state3 = state.clone();
+    let mut refresh3 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -31,8 +34,10 @@ pub fn tablet_page(state: AppState) -> impl IntoElement {
                     &tablet.map_to_output,
                     "",
                     move |val| {
-                        state_map.update_settings(|s| s.tablet.map_to_output = val);
-                        state_map.mark_dirty_and_save(SettingsCategory::Tablet);
+                        state1.update_and_save(SettingsCategory::Tablet, |s| {
+                            s.tablet.map_to_output = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -47,8 +52,10 @@ pub fn tablet_page(state: AppState) -> impl IntoElement {
                     "Flip tablet orientation",
                     tablet.left_handed,
                     move |val| {
-                        state_left.update_settings(|s| s.tablet.left_handed = val);
-                        state_left.mark_dirty_and_save(SettingsCategory::Tablet);
+                        state2.update_and_save(SettingsCategory::Tablet, |s| {
+                            s.tablet.left_handed = val
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(toggle_row(
@@ -56,8 +63,10 @@ pub fn tablet_page(state: AppState) -> impl IntoElement {
                     "Turn off tablet input",
                     tablet.off,
                     move |val| {
-                        state_off.update_settings(|s| s.tablet.off = val);
-                        state_off.mark_dirty_and_save(SettingsCategory::Tablet);
+                        state3.update_and_save(SettingsCategory::Tablet, |s| {
+                            s.tablet.off = val
+                        });
+                        refresh3.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))

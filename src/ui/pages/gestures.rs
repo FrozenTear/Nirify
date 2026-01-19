@@ -3,22 +3,29 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
+use crate::ui::app::ReactiveState;
 use crate::ui::components::{section, slider_row, toggle_row};
-use crate::ui::state::AppState;
 use crate::ui::theme::SPACING_LG;
 
 /// Create the gestures settings page
-pub fn gestures_page(state: AppState) -> impl IntoElement {
+pub fn gestures_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
-    let gestures = settings.gestures;
+    let gestures = &settings.gestures;
 
-    let state_hot_corners = state.clone();
-    let state_scroll_en = state.clone();
-    let state_scroll_size = state.clone();
-    let state_scroll_delay = state.clone();
-    let state_ws_en = state.clone();
-    let state_ws_size = state.clone();
-    let state_ws_delay = state.clone();
+    let state1 = state.clone();
+    let mut refresh1 = state.refresh.clone();
+    let state2 = state.clone();
+    let mut refresh2 = state.refresh.clone();
+    let state3 = state.clone();
+    let mut refresh3 = state.refresh.clone();
+    let state4 = state.clone();
+    let mut refresh4 = state.refresh.clone();
+    let state5 = state.clone();
+    let mut refresh5 = state.refresh.clone();
+    let state6 = state.clone();
+    let mut refresh6 = state.refresh.clone();
+    let state7 = state.clone();
+    let mut refresh7 = state.refresh.clone();
 
     rect()
         .width(Size::fill())
@@ -34,8 +41,10 @@ pub fn gestures_page(state: AppState) -> impl IntoElement {
                     "Trigger actions when cursor reaches corners",
                     gestures.hot_corners.enabled,
                     move |val| {
-                        state_hot_corners.update_settings(|s| s.gestures.hot_corners.enabled = val);
-                        state_hot_corners.mark_dirty_and_save(SettingsCategory::Gestures);
+                        state1.update_and_save(SettingsCategory::Gestures, |s| {
+                            s.gestures.hot_corners.enabled = val
+                        });
+                        refresh1.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -50,9 +59,10 @@ pub fn gestures_page(state: AppState) -> impl IntoElement {
                     "Scroll view when dragging to screen edge",
                     gestures.dnd_edge_view_scroll.enabled,
                     move |val| {
-                        state_scroll_en
-                            .update_settings(|s| s.gestures.dnd_edge_view_scroll.enabled = val);
-                        state_scroll_en.mark_dirty_and_save(SettingsCategory::Gestures);
+                        state2.update_and_save(SettingsCategory::Gestures, |s| {
+                            s.gestures.dnd_edge_view_scroll.enabled = val
+                        });
+                        refresh2.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -63,10 +73,10 @@ pub fn gestures_page(state: AppState) -> impl IntoElement {
                     100.0,
                     "px",
                     move |val| {
-                        state_scroll_size.update_settings(|s| {
+                        state3.update_and_save(SettingsCategory::Gestures, |s| {
                             s.gestures.dnd_edge_view_scroll.trigger_size = val as i32
                         });
-                        state_scroll_size.mark_dirty_and_save(SettingsCategory::Gestures);
+                        refresh3.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -77,9 +87,10 @@ pub fn gestures_page(state: AppState) -> impl IntoElement {
                     1000.0,
                     "ms",
                     move |val| {
-                        state_scroll_delay
-                            .update_settings(|s| s.gestures.dnd_edge_view_scroll.delay_ms = val as i32);
-                        state_scroll_delay.mark_dirty_and_save(SettingsCategory::Gestures);
+                        state4.update_and_save(SettingsCategory::Gestures, |s| {
+                            s.gestures.dnd_edge_view_scroll.delay_ms = val as i32
+                        });
+                        refresh4.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))
@@ -94,9 +105,10 @@ pub fn gestures_page(state: AppState) -> impl IntoElement {
                     "Switch workspace when dragging to edge",
                     gestures.dnd_edge_workspace_switch.enabled,
                     move |val| {
-                        state_ws_en
-                            .update_settings(|s| s.gestures.dnd_edge_workspace_switch.enabled = val);
-                        state_ws_en.mark_dirty_and_save(SettingsCategory::Gestures);
+                        state5.update_and_save(SettingsCategory::Gestures, |s| {
+                            s.gestures.dnd_edge_workspace_switch.enabled = val
+                        });
+                        refresh5.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -107,10 +119,10 @@ pub fn gestures_page(state: AppState) -> impl IntoElement {
                     100.0,
                     "px",
                     move |val| {
-                        state_ws_size.update_settings(|s| {
+                        state6.update_and_save(SettingsCategory::Gestures, |s| {
                             s.gestures.dnd_edge_workspace_switch.trigger_size = val as i32
                         });
-                        state_ws_size.mark_dirty_and_save(SettingsCategory::Gestures);
+                        refresh6.with_mut(|mut v| *v += 1);
                     },
                 ))
                 .child(slider_row(
@@ -121,10 +133,10 @@ pub fn gestures_page(state: AppState) -> impl IntoElement {
                     1000.0,
                     "ms",
                     move |val| {
-                        state_ws_delay.update_settings(|s| {
+                        state7.update_and_save(SettingsCategory::Gestures, |s| {
                             s.gestures.dnd_edge_workspace_switch.delay_ms = val as i32
                         });
-                        state_ws_delay.mark_dirty_and_save(SettingsCategory::Gestures);
+                        refresh7.with_mut(|mut v| *v += 1);
                     },
                 )),
         ))

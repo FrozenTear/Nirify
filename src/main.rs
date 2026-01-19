@@ -30,8 +30,8 @@ fn main() -> Result<()> {
         LaunchConfig::new()
             .with_window(
                 WindowConfig::new(move || ui::app_view(state.clone()))
-                    .with_size(1000.0, 700.0)
-                    .with_min_size(600.0, 400.0)
+                    .with_size(1100.0, 750.0)
+                    .with_min_size(800.0, 500.0)
                     .with_title("Niri Settings")
                     .with_resizable(true),
             ),
