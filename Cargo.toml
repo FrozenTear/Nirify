@@ -12,9 +12,23 @@ categories = ["gui", "config"]
 [workspace]
 members = ["macros"]
 
+# Use Tessera-based main by default
+[[bin]]
+name = "niri-settings"
+path = "src/main_tessera.rs"
+
+# Keep Slint version available for comparison
+[[bin]]
+name = "niri-settings-slint"
+path = "src/main.rs"
+
 [dependencies]
 niri-settings-macros = { path = "macros" }
-slint = "1.14"
+# Tessera UI framework
+tessera-ui = "2"
+tessera-components = "2"
+winit = "0.30"
+# Config and system
 kdl = { version = "6.5", features = ["v1-fallback"] }
 dirs = "6.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -27,9 +41,6 @@ log = "0.4"
 env_logger = "0.11"
 rfd = "0.15"
 paste = "1.0"
-
-[build-dependencies]
-slint-build = "1.14"
 
 [dev-dependencies]
 tempfile = "3.23"
