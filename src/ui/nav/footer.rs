@@ -7,10 +7,11 @@ use crate::ui::theme::*;
 /// Create the footer with status indicator and close button
 pub fn footer() -> impl IntoElement {
     rect()
+        .content(Content::flex())
         .direction(Direction::Horizontal)
         .width(Size::fill())
         .height(Size::px(50.0))
-        .padding((SPACING_LG, SPACING_2XL, SPACING_LG, SPACING_2XL))
+        .padding((SPACING_LG, SPACING_3XL, SPACING_LG, SPACING_2XL))
         .background(MANTLE)
         .child(
             // Status indicator
