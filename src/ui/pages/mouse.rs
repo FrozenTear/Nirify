@@ -3,14 +3,60 @@
 use freya::prelude::*;
 
 use crate::config::SettingsCategory;
-use crate::ui::app::ReactiveState;
-use crate::ui::components::{section, slider_row, toggle_row};
+use crate::types::{AccelProfile, ScrollMethod};
+use crate::ui::app::{
+    ReactiveState, DROPDOWN_MOUSE_ACCEL_PROFILE, DROPDOWN_MOUSE_SCROLL_METHOD,
+};
+use crate::ui::components::{section, select_row_with_state, slider_row, toggle_row};
 use crate::ui::theme::SPACING_LG;
+
+/// Acceleration profile options
+const ACCEL_PROFILE_OPTIONS: &[&str] = &["Adaptive", "Flat"];
+
+/// Scroll method options
+const SCROLL_METHOD_OPTIONS: &[&str] = &["Two Finger", "Edge", "On Button Down", "No Scroll"];
+
+fn accel_profile_to_index(p: AccelProfile) -> usize {
+    match p {
+        AccelProfile::Adaptive => 0,
+        AccelProfile::Flat => 1,
+    }
+}
+
+fn index_to_accel_profile(i: usize) -> AccelProfile {
+    match i {
+        0 => AccelProfile::Adaptive,
+        1 => AccelProfile::Flat,
+        _ => AccelProfile::Adaptive,
+    }
+}
+
+fn scroll_method_to_index(m: ScrollMethod) -> usize {
+    match m {
+        ScrollMethod::TwoFinger => 0,
+        ScrollMethod::Edge => 1,
+        ScrollMethod::OnButtonDown => 2,
+        ScrollMethod::NoScroll => 3,
+    }
+}
+
+fn index_to_scroll_method(i: usize) -> ScrollMethod {
+    match i {
+        0 => ScrollMethod::TwoFinger,
+        1 => ScrollMethod::Edge,
+        2 => ScrollMethod::OnButtonDown,
+        3 => ScrollMethod::NoScroll,
+        _ => ScrollMethod::TwoFinger,
+    }
+}
 
 /// Create the mouse settings page
 pub fn mouse_page(state: ReactiveState) -> impl IntoElement {
     let settings = state.get_settings();
     let mouse = &settings.mouse;
+
+    let accel_profile = mouse.accel_profile;
+    let scroll_method = mouse.scroll_method;
 
     let state1 = state.clone();
     let mut refresh1 = state.refresh.clone();
@@ -70,13 +116,31 @@ pub fn mouse_page(state: ReactiveState) -> impl IntoElement {
         ))
         // Speed section
         .child(section(
-            "Speed",
+            "Speed & Acceleration",
             rect()
                 .width(Size::fill())
                 .spacing(8.0)
+                .child({
+                    let state_clone = state.clone();
+                    let mut refresh = state.refresh.clone();
+                    select_row_with_state(
+                        "Acceleration profile",
+                        "Pointer acceleration curve",
+                        ACCEL_PROFILE_OPTIONS,
+                        accel_profile_to_index(accel_profile),
+                        DROPDOWN_MOUSE_ACCEL_PROFILE,
+                        &state,
+                        move |i| {
+                            state_clone.update_and_save(SettingsCategory::Mouse, |s| {
+                                s.mouse.accel_profile = index_to_accel_profile(i);
+                            });
+                            *refresh.write() += 1;
+                        },
+                    )
+                })
                 .child(slider_row(
-                    "Acceleration",
-                    "Pointer acceleration speed",
+                    "Acceleration speed",
+                    "Pointer acceleration intensity",
                     mouse.accel_speed,
                     -1.0,
                     1.0,
@@ -87,7 +151,32 @@ pub fn mouse_page(state: ReactiveState) -> impl IntoElement {
                         });
                         refresh4.with_mut(|mut v| *v += 1);
                     },
-                ))
+                )),
+        ))
+        // Scrolling section
+        .child(section(
+            "Scrolling",
+            rect()
+                .width(Size::fill())
+                .spacing(8.0)
+                .child({
+                    let state_clone = state.clone();
+                    let mut refresh = state.refresh.clone();
+                    select_row_with_state(
+                        "Scroll method",
+                        "How scrolling is triggered",
+                        SCROLL_METHOD_OPTIONS,
+                        scroll_method_to_index(scroll_method),
+                        DROPDOWN_MOUSE_SCROLL_METHOD,
+                        &state,
+                        move |i| {
+                            state_clone.update_and_save(SettingsCategory::Mouse, |s| {
+                                s.mouse.scroll_method = index_to_scroll_method(i);
+                            });
+                            *refresh.write() += 1;
+                        },
+                    )
+                })
                 .child(slider_row(
                     "Scroll speed",
                     "Scroll sensitivity multiplier",

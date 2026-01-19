@@ -81,6 +81,30 @@ pub const DROPDOWN_OUTPUTS_VRR: usize = 101;
 pub const DROPDOWN_KEYBINDINGS_ACTION: usize = 200;
 pub const DROPDOWN_RULES_BEHAVIOR: usize = 300;
 
+// Mouse dropdowns
+pub const DROPDOWN_MOUSE_ACCEL_PROFILE: usize = 400;
+pub const DROPDOWN_MOUSE_SCROLL_METHOD: usize = 401;
+
+// Touchpad dropdowns
+pub const DROPDOWN_TOUCHPAD_ACCEL_PROFILE: usize = 410;
+pub const DROPDOWN_TOUCHPAD_SCROLL_METHOD: usize = 411;
+pub const DROPDOWN_TOUCHPAD_CLICK_METHOD: usize = 412;
+pub const DROPDOWN_TOUCHPAD_TAP_BUTTON_MAP: usize = 413;
+
+// Trackpoint dropdowns
+pub const DROPDOWN_TRACKPOINT_ACCEL_PROFILE: usize = 420;
+pub const DROPDOWN_TRACKPOINT_SCROLL_METHOD: usize = 421;
+
+// Trackball dropdowns
+pub const DROPDOWN_TRACKBALL_ACCEL_PROFILE: usize = 430;
+pub const DROPDOWN_TRACKBALL_SCROLL_METHOD: usize = 431;
+
+// Behavior dropdowns
+pub const DROPDOWN_BEHAVIOR_WARP_MOUSE: usize = 500;
+pub const DROPDOWN_BEHAVIOR_CENTER_COLUMN: usize = 501;
+pub const DROPDOWN_BEHAVIOR_COLUMN_WIDTH_TYPE: usize = 502;
+pub const DROPDOWN_BEHAVIOR_MOD_KEY: usize = 503;
+
 /// Create the main application view
 pub fn app_view(state: AppState) -> impl IntoElement {
     // Initialize Freya theme (required for built-in components like Switch, Slider, Input)
