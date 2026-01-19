@@ -129,7 +129,9 @@ fn precision_from_step(step: f64) -> usize {
 fn format_value(value: f64, step: f64) -> String {
     let precision = precision_from_step(step);
     if precision == 0 {
-        format!("{}", value as i64)
+        // Clamp to i64 range before casting to prevent overflow
+        let clamped = value.clamp(i64::MIN as f64, i64::MAX as f64);
+        format!("{}", clamped as i64)
     } else {
         format!("{:.prec$}", value, prec = precision)
     }
@@ -224,7 +226,23 @@ fn slider_control_with_callback(
     max: f64,
     step: f64,
     on_change: OnChange<f64>,
-) -> impl IntoView {
+) -> AnyView {
+    // Validate range to prevent division by zero
+    if max <= min {
+        log::error!(
+            "Invalid slider range: min={}, max={}. Slider requires max > min.",
+            min,
+            max
+        );
+        // Return a disabled placeholder to prevent crashes
+        return Container::new(
+            Label::derived(move || format!("Invalid range: [{}, {}]", min, max))
+                .style(|s| s.color(crate::ui::theme::ERROR).font_size(12.0)),
+        )
+        .style(|s| s.padding(4.0))
+        .into_any();
+    }
+
     let percentage = move || ((value.get() - min) / (max - min)).clamp(0.0, 1.0);
     let is_dragging = RwSignal::new(false);
 
@@ -326,6 +344,7 @@ fn slider_control_with_callback(
         }
         floem::event::EventPropagation::Stop
     })
+    .into_any()
 }
 
 // ============================================================================
