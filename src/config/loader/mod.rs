@@ -679,6 +679,7 @@ animations {
             debug_kdl: advanced_dir.join("debug.kdl"),
             switch_events_kdl: advanced_dir.join("switch-events.kdl"),
             recent_windows_kdl: advanced_dir.join("recent-windows.kdl"),
+            preferences_json: managed_dir.join("app-prefs.json"),
         };
 
         // Create custom settings with non-default values

@@ -34,8 +34,9 @@ fn main() -> Result<()> {
         ui::app_view(state.clone(), initial_theme, is_first_run, import_result.clone())
     });
 
-    // Save settings on exit
-    save_on_exit(&settings, &paths);
+    // Note: We don't save all settings on exit anymore.
+    // Auto-save handles changes as they happen via mark_dirty_and_save().
+    // This prevents overwriting manual edits to config files.
 
     Ok(())
 }
@@ -92,19 +93,3 @@ fn init_settings(
     (Arc::new(Mutex::new(loaded_settings)), import_result)
 }
 
-/// Save settings when the app exits
-fn save_on_exit(settings: &Arc<Mutex<config::Settings>>, paths: &Arc<config::ConfigPaths>) {
-    let settings_copy = match settings.lock() {
-        Ok(s) => s.clone(),
-        Err(poisoned) => {
-            warn!("Settings mutex was poisoned on exit - recovering data");
-            poisoned.into_inner().clone()
-        }
-    };
-
-    if let Err(e) = config::save_settings(paths, &settings_copy) {
-        warn!("Failed to save settings on exit: {}", e);
-    } else {
-        info!("Settings saved successfully on exit");
-    }
-}

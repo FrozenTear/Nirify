@@ -1,7 +1,7 @@
 //! Header navigation component
 //!
-//! Crystalline Dark header with app title and primary navigation tabs
-//! Uses underline indicators for selected state
+//! Clean, minimal header with app title and primary navigation tabs
+//! Uses understated underline indicators for selected state
 
 use floem::prelude::*;
 use floem::reactive::RwSignal;
@@ -9,18 +9,18 @@ use floem::views::{Container, Empty, Label, Stack};
 
 use crate::ui::state::{Category, NavGroup};
 use crate::ui::theme::{
-    header_style, nav_tab_selected_style, nav_tab_style, ACCENT, BORDER_SUBTLE, FONT_SIZE_SM,
-    SPACING_LG, SPACING_MD, SPACING_SM, TEXT_GHOST,
+    header_style, nav_tab_selected_style, nav_tab_style, theme, FONT_SIZE_BASE, SPACING_LG,
+    SPACING_MD, SPACING_XL,
 };
 
 /// Create the header with app title and primary navigation tabs
 pub fn header(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> impl IntoView {
-    Stack::vertical((
-        // App title (subtle, centered)
-        Label::derived(|| "n i r i   s e t t i n g s".to_string()).style(|s| {
-            s.font_size(FONT_SIZE_SM)
-                .color(TEXT_GHOST)
-                .padding_bottom(SPACING_LG)
+    Stack::horizontal((
+        // App title - refined, left-aligned
+        Label::derived(|| "niri settings".to_string()).style(move |s| {
+            s.font_size(FONT_SIZE_BASE)
+                .color(theme().text_muted)
+                .margin_right(SPACING_XL)
         }),
         // Primary navigation tabs row
         Stack::horizontal(
@@ -32,12 +32,12 @@ pub fn header(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> im
                 })
                 .collect::<Vec<_>>(),
         )
-        .style(|s| s.gap(SPACING_SM).items_end()),
+        .style(|s| s.gap(SPACING_MD).items_center()),
     ))
     .style(header_style)
 }
 
-/// Individual navigation tab with underline indicator
+/// Individual navigation tab with subtle underline indicator
 fn nav_tab(
     group: NavGroup,
     nav_group: RwSignal<NavGroup>,
@@ -54,22 +54,23 @@ fn nav_tab(
                 nav_tab_style(s)
             }
         }),
-        // Underline indicator
+        // Underline indicator - only visible when selected
         Container::new(Empty::new()).style(move |s| {
+            let t = theme();
             let base = s
                 .width_full()
                 .height(2.0)
-                .margin_top(SPACING_SM)
+                .margin_top(SPACING_MD)
                 .border_radius(1.0);
 
             if is_selected() {
-                base.background(ACCENT)
+                base.background(t.accent)
             } else {
-                base.background(BORDER_SUBTLE)
+                base.background(floem::peniko::Color::TRANSPARENT)
             }
         }),
     ))
-    .style(|s| s.padding_horiz(SPACING_MD).items_center())
+    .style(|s| s.padding_horiz(SPACING_LG).items_center().cursor(floem::style::CursorStyle::Pointer))
     .on_click_stop(move |_| {
         nav_group.set(group);
         // Set category to first in group

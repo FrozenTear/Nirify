@@ -4,9 +4,11 @@
 
 mod section;
 mod setting_rows;
+pub mod window_picker;
 
 pub use section::section;
 pub use setting_rows::{
     color_row, color_row_with_callback, dropdown_row, slider_row, slider_row_with_callback,
     text_row, text_row_with_callback, toggle_row, toggle_row_with_callback,
 };
+pub use window_picker::{window_picker_modal, WindowPickerState};

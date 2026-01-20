@@ -1,4 +1,4 @@
-//! Setting row components - refined controls for the Crystalline Dark theme
+//! Setting row components - refined controls with dynamic theme support
 //!
 //! Each row follows a two-column layout:
 //! - Left: Label + optional description
@@ -15,9 +15,8 @@ use std::rc::Rc;
 
 use crate::ui::theme::{
     color_input_container_style, color_swatch_style, icon_button_style, parse_hex_color,
-    setting_row_style, text_input_style, ACCENT, BG_ELEVATED, BORDER, BORDER_SUBTLE,
-    FONT_SIZE_BASE, FONT_SIZE_SM, RADIUS_FULL, RADIUS_SM, SPACING_MD, SPACING_SM, SPACING_XS,
-    SURFACE1, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
+    setting_row_style, text_input_style, theme, FONT_SIZE_BASE, FONT_SIZE_SM, RADIUS_FULL,
+    RADIUS_SM, SPACING_MD, SPACING_SM, SPACING_XS,
 };
 
 /// Callback type for value changes
@@ -59,11 +58,12 @@ fn toggle_switch_with_callback(value: RwSignal<bool>, on_change: OnChange<bool>)
     Container::new(
         // Toggle knob
         Container::new(Empty::new()).style(move |s| {
+            let t = theme();
             let base = s
                 .width(18.0)
                 .height(18.0)
                 .border_radius(RADIUS_FULL)
-                .background(TEXT_PRIMARY);
+                .background(t.text_primary);
 
             if is_on() {
                 base.margin_left(20.0)
@@ -73,6 +73,7 @@ fn toggle_switch_with_callback(value: RwSignal<bool>, on_change: OnChange<bool>)
         }),
     )
     .style(move |s| {
+        let t = theme();
         let base = s
             .width(44.0)
             .height(24.0)
@@ -81,9 +82,9 @@ fn toggle_switch_with_callback(value: RwSignal<bool>, on_change: OnChange<bool>)
             .items_center();
 
         if is_on() {
-            base.background(ACCENT).border_color(ACCENT)
+            base.background(t.accent).border_color(t.accent)
         } else {
-            base.background(SURFACE1).border_color(BORDER)
+            base.background(t.bg_elevated).border_color(t.border)
         }
     })
     .on_click_stop(move |_| {
@@ -191,18 +192,19 @@ pub fn slider_row_with_callback(
                         }
                     })
                     .style(move |s| {
+                        let t = theme();
                         s.width(input_width)
                             .padding_vert(SPACING_XS)
                             .padding_horiz(SPACING_SM)
-                            .background(BG_ELEVATED)
+                            .background(t.bg_elevated)
                             .border_radius(RADIUS_SM)
                             .border(1.0)
-                            .border_color(BORDER_SUBTLE)
-                            .color(TEXT_PRIMARY)
+                            .border_color(t.border)
+                            .color(t.text_primary)
                             .font_size(FONT_SIZE_SM)
                     }),
                 Label::derived(move || unit.to_string())
-                    .style(|s| s.color(TEXT_TERTIARY).font_size(FONT_SIZE_SM)),
+                    .style(move |s| s.color(theme().text_tertiary).font_size(FONT_SIZE_SM)),
             ))
             .style(|s| s.items_center().gap(SPACING_XS)),
         ))
@@ -256,29 +258,32 @@ fn slider_control_with_callback(
         Empty::new().style(|s| s.width(SLIDER_PADDING)),
         // Track with fill
         Container::new(Container::new(Empty::new()).style(move |s| {
+            let t = theme();
             let pct = percentage();
             s.width(pct * SLIDER_TRACK_WIDTH)
                 .height(SLIDER_TRACK_HEIGHT)
                 .border_radius(RADIUS_FULL)
-                .background(ACCENT)
+                .background(t.accent)
         }))
-        .style(|s| {
+        .style(move |s| {
+            let t = theme();
             s.width(SLIDER_TRACK_WIDTH)
                 .height(SLIDER_TRACK_HEIGHT)
                 .border_radius(RADIUS_FULL)
-                .background(SURFACE1)
+                .background(t.bg_elevated)
         }),
         // Handle - positioned relative to track end, moved back by percentage
         Container::new(Empty::new()).style(move |s| {
+            let t = theme();
             let pct = percentage();
             // Handle starts after track, move it left based on inverse percentage
             let handle_offset = -(1.0 - pct) * SLIDER_TRACK_WIDTH - SLIDER_HANDLE_SIZE / 2.0;
             s.width(SLIDER_HANDLE_SIZE)
                 .height(SLIDER_HANDLE_SIZE)
                 .border_radius(RADIUS_FULL)
-                .background(TEXT_PRIMARY)
+                .background(t.text_primary)
                 .border(2.0)
-                .border_color(ACCENT)
+                .border_color(t.accent)
                 .margin_left(handle_offset)
         }),
         // Right padding spacer
@@ -369,12 +374,13 @@ pub fn color_row_with_callback(
                             cb(value.get());
                         }
                     })
-                    .style(|s| {
+                    .style(move |s| {
+                        let t = theme();
                         s.width(80.0)
                             .padding(SPACING_XS)
-                            .background(BG_ELEVATED)
+                            .background(t.bg_elevated)
                             .border_radius(RADIUS_SM)
-                            .color(TEXT_PRIMARY)
+                            .color(t.text_primary)
                             .font_size(FONT_SIZE_SM)
                             .border(0.0)
                     }),
@@ -456,18 +462,19 @@ pub fn dropdown_row<T: Clone + PartialEq + 'static>(
                     .map(|(name, _)| (*name).to_string())
                     .unwrap_or_else(|| "Select...".to_string())
             })
-            .style(|s| s.color(TEXT_PRIMARY).font_size(FONT_SIZE_SM)),
+            .style(move |s| s.color(theme().text_primary).font_size(FONT_SIZE_SM)),
             // Chevron indicator
             Label::derived(|| "▼".to_string())
-                .style(|s| s.color(TEXT_TERTIARY).font_size(FONT_SIZE_SM)),
+                .style(move |s| s.color(theme().text_tertiary).font_size(FONT_SIZE_SM)),
         ))
-        .style(|s| {
+        .style(move |s| {
+            let t = theme();
             s.padding_horiz(SPACING_MD)
                 .padding_vert(SPACING_SM)
-                .background(BG_ELEVATED)
+                .background(t.bg_elevated)
                 .border_radius(RADIUS_SM)
                 .border(1.0)
-                .border_color(BORDER_SUBTLE)
+                .border_color(t.border)
                 .min_width(160.0)
                 .gap(SPACING_SM)
                 .items_center()
@@ -482,15 +489,16 @@ pub fn dropdown_row<T: Clone + PartialEq + 'static>(
 // ============================================================================
 
 /// Create the label + description column for setting rows
+/// Description is more subtle and only shown when provided
 fn setting_label(label_text: &'static str, description: Option<&'static str>) -> impl IntoView {
     Stack::vertical((
         Label::derived(move || label_text.to_string())
-            .style(|s| s.color(TEXT_PRIMARY).font_size(FONT_SIZE_BASE)),
+            .style(move |s| s.color(theme().text_primary).font_size(FONT_SIZE_BASE)),
         match description {
             Some(desc) => Label::derived(move || desc.to_string())
-                .style(|s| {
+                .style(move |s| {
                     s.font_size(FONT_SIZE_SM)
-                        .color(TEXT_SECONDARY)
+                        .color(theme().text_tertiary) // More subtle - use tertiary instead of secondary
                         .margin_top(SPACING_XS)
                 })
                 .into_any(),

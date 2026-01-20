@@ -1,6 +1,6 @@
 //! Secondary navigation showing subcategories
 //!
-//! Horizontal row of pill-style tabs for navigating within a group
+//! Horizontal row of subtle pill-style tabs for navigating within a group
 
 use floem::prelude::*;
 use floem::reactive::RwSignal;
@@ -19,11 +19,12 @@ pub fn sidebar(nav_group: RwSignal<NavGroup>, category: RwSignal<Category>) -> i
 
             Label::derived(move || cat.label().to_string())
                 .style(move |s| {
-                    if is_selected() {
+                    let base = if is_selected() {
                         secondary_tab_selected_style(s)
                     } else {
                         secondary_tab_style(s)
-                    }
+                    };
+                    base.cursor(floem::style::CursorStyle::Pointer)
                 })
                 .on_click_stop(move |_| {
                     category.set(cat);

@@ -488,7 +488,7 @@ pub const WARNING: Color = YELLOW;
 pub const ERROR: Color = RED;
 
 // ============================================================================
-// Spacing System - 4px base unit
+// Spacing System - 4px base unit with generous whitespace
 // ============================================================================
 
 pub const SPACING_2XS: f32 = 2.0;
@@ -499,6 +499,7 @@ pub const SPACING_LG: f32 = 16.0;
 pub const SPACING_XL: f32 = 24.0;
 pub const SPACING_2XL: f32 = 32.0;
 pub const SPACING_3XL: f32 = 48.0;
+pub const SPACING_4XL: f32 = 64.0;
 
 // ============================================================================
 // Border Radius - Consistent roundness
@@ -532,13 +533,13 @@ pub const FONT_SIZE_2XL: f32 = 24.0;
 // Component Style Helpers (Dynamic Theme-Aware)
 // ============================================================================
 
-/// Header container - the app title bar area
+/// Header container - clean, minimal title area
 pub fn header_style(s: Style) -> Style {
     let t = theme();
     s.width_full()
         .items_center()
-        .background(t.bg_deep)
-        .padding_vert(SPACING_LG)
+        .background(t.bg_base)
+        .padding_vert(SPACING_XL)
         .padding_horiz(SPACING_2XL)
 }
 
@@ -563,41 +564,38 @@ pub fn nav_tab_selected_style(s: Style) -> Style {
         .border_color(t.accent)
 }
 
-/// Secondary navigation tab - pill style unselected
+/// Secondary navigation tab - pill style unselected (subtle)
 pub fn secondary_tab_style(s: Style) -> Style {
     let t = theme();
     s.padding_horiz(SPACING_MD)
-        .padding_vert(SPACING_XS)
-        .border_radius(RADIUS_FULL)
+        .padding_vert(SPACING_SM)
+        .border_radius(RADIUS_MD)
         .color(t.text_tertiary)
         .font_size(FONT_SIZE_SM)
 }
 
-/// Secondary navigation tab - pill style selected
+/// Secondary navigation tab - pill style selected (understated accent)
 pub fn secondary_tab_selected_style(s: Style) -> Style {
     let t = theme();
     s.padding_horiz(SPACING_MD)
-        .padding_vert(SPACING_XS)
-        .border_radius(RADIUS_FULL)
-        .background(t.accent)
-        .color(t.on_accent)
+        .padding_vert(SPACING_SM)
+        .border_radius(RADIUS_MD)
+        .background(t.accent_muted)
+        .color(t.text_primary)
         .font_size(FONT_SIZE_SM)
-        .font_bold()
 }
 
-/// Secondary nav container
+/// Secondary nav container - cleaner with less chrome
 pub fn secondary_nav_style(s: Style) -> Style {
     let t = theme();
     s.width_full()
         .padding_horiz(SPACING_2XL)
-        .padding_vert(SPACING_MD)
+        .padding_vert(SPACING_LG)
         .gap(SPACING_SM)
-        .background(t.bg_deep)
-        .border_bottom(1.0)
-        .border_color(t.border_subtle)
+        .background(t.bg_base)
 }
 
-/// Section card - elevated glass-like panel
+/// Section card - subtle grouping with minimal borders
 pub fn section_style(s: Style) -> Style {
     let t = theme();
     s.width_full()
@@ -605,25 +603,28 @@ pub fn section_style(s: Style) -> Style {
         .border_radius(RADIUS_LG)
         .border(1.0)
         .border_color(t.border_subtle)
-        .padding(SPACING_XL)
-        .margin_bottom(SPACING_LG)
+        .padding_vert(SPACING_LG)
+        .padding_horiz(SPACING_XL)
+        .margin_bottom(SPACING_XL)
 }
 
-/// Section header text styling
+/// Section header text styling - subtle, lowercase, refined
 pub fn section_header_style(s: Style) -> Style {
     let t = theme();
-    s.font_size(FONT_SIZE_XS)
-        .font_bold()
-        .color(t.accent)
+    s.font_size(FONT_SIZE_SM)
+        .color(t.text_muted)
         .margin_bottom(SPACING_LG)
+        .padding_bottom(SPACING_SM)
+        .border_bottom(1.0)
+        .border_color(t.border_subtle)
 }
 
-/// Setting row - horizontal layout with label and control
+/// Setting row - horizontal layout with more breathing room
 pub fn setting_row_style(s: Style) -> Style {
     s.width_full()
-        .padding_vert(SPACING_MD)
+        .padding_vert(SPACING_LG)
         .items_center()
-        .gap(SPACING_LG)
+        .gap(SPACING_XL)
 }
 
 /// Setting row with subtle divider between rows
@@ -632,19 +633,22 @@ pub fn setting_row_divided_style(s: Style) -> Style {
     setting_row_style(s)
         .border_bottom(1.0)
         .border_color(t.border_subtle)
-        .padding_bottom(SPACING_LG)
+        .padding_bottom(SPACING_XL)
         .margin_bottom(SPACING_MD)
 }
 
-/// Search bar container
+/// Search bar container - integrated into content area
 pub fn search_bar_style(s: Style) -> Style {
     let t = theme();
     s.width_full()
         .padding_horiz(SPACING_2XL)
-        .padding_vert(SPACING_LG)
+        .padding_top(SPACING_LG)
+        .padding_bottom(SPACING_XL)
         .items_center()
         .gap(SPACING_MD)
         .background(t.bg_base)
+        .border_bottom(1.0)
+        .border_color(t.border_subtle)
 }
 
 /// Search input field
@@ -661,26 +665,25 @@ pub fn search_input_style(s: Style) -> Style {
         .font_size(FONT_SIZE_BASE)
 }
 
-/// Main content area
+/// Main content area - generous padding for breathing room
 pub fn content_style(s: Style) -> Style {
     let t = theme();
-    s.background(t.bg_base)
+    s.background(t.bg_deep)
         .flex_grow(1.0)
         .width_full()
-        .padding(SPACING_2XL)
+        .padding_horiz(SPACING_3XL)
+        .padding_vert(SPACING_2XL)
 }
 
-/// Footer container
+/// Footer container - subtle, unobtrusive
 pub fn footer_style(s: Style) -> Style {
     let t = theme();
     s.width_full()
         .padding_horiz(SPACING_2XL)
-        .padding_vert(SPACING_LG)
+        .padding_vert(SPACING_MD)
         .items_center()
         .justify_between()
-        .background(t.bg_deep)
-        .border_top(1.0)
-        .border_color(t.border_subtle)
+        .background(t.bg_base)
 }
 
 /// Primary button - accent colored
@@ -795,15 +798,15 @@ pub fn color_input_container_style(s: Style) -> Style {
         .items_center()
 }
 
-/// Text input field
+/// Text input field - uses elevated background for contrast in sections
 pub fn text_input_style(s: Style) -> Style {
     let t = theme();
     s.padding_horiz(SPACING_MD)
         .padding_vert(SPACING_SM)
-        .background(t.bg_surface)
+        .background(t.bg_elevated)
         .border_radius(RADIUS_SM)
         .border(1.0)
-        .border_color(t.border_subtle)
+        .border_color(t.border)
         .color(t.text_primary)
         .font_size(FONT_SIZE_SM)
 }

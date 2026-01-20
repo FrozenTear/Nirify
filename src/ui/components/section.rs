@@ -1,17 +1,17 @@
-//! Section component - elevated glass-like card with header
+//! Section component - subtle card with refined header
 //!
 //! Creates visual grouping for related settings with
-//! uppercase accent-colored headers
+//! understated headers that don't compete for attention
 
 use floem::prelude::*;
 use floem::views::{Label, Stack};
 
 use crate::ui::theme::{section_header_style, section_style};
 
-/// Create a section card with an uppercase title header
+/// Create a section card with a subtle title header
 ///
 /// # Arguments
-/// * `title` - The section title (will be displayed in uppercase)
+/// * `title` - The section title (displayed as-is, not transformed)
 /// * `content` - The section content (typically a stack of setting rows)
 ///
 /// # Example
@@ -26,8 +26,8 @@ use crate::ui::theme::{section_header_style, section_style};
 /// ```
 pub fn section<V: IntoView + 'static>(title: &'static str, content: V) -> impl IntoView {
     Stack::vertical((
-        // Section header - uppercase, accent colored, small caps style
-        Label::derived(move || title.to_uppercase()).style(section_header_style),
+        // Section header - subtle, understated
+        Label::derived(move || title.to_string()).style(section_header_style),
         // Section content
         content,
     ))

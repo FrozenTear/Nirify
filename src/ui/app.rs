@@ -24,7 +24,7 @@ use crate::config::ImportResult;
 use crate::ui::nav::{footer, header, search_bar, sidebar};
 use crate::ui::pages::*;
 use crate::ui::state::{AppState, Category};
-use crate::ui::theme::{bg_deep, content_style, init_theme_system, set_theme, ThemePreset};
+use crate::ui::theme::{bg_base, content_style, init_theme_system, set_theme, ThemePreset};
 use crate::ui::wizard::{wizard_view, WizardState};
 
 /// Create the main application view
@@ -114,7 +114,7 @@ pub fn app_view(
         // Footer with status and close button
         footer(),
     ))
-    .style(move |s| s.width_full().height_full().background(bg_deep()));
+    .style(move |s| s.width_full().height_full().background(bg_base()));
 
     // If first run, show wizard overlay on top
     if let Some(ws) = wizard_state {
