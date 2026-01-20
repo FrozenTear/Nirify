@@ -244,19 +244,28 @@ fn parse_action(doc: &KdlDocument) -> KeybindAction {
         .collect();
 
     // Also check for children that might be action arguments
-    // (e.g., focus-workspace { reference "name"; })
+    // Niri uses several formats:
+    // - focus-workspace { "1"; }          -> child node name IS the argument
+    // - focus-workspace { reference "name"; } -> child has name and value
     if let Some(children) = node.children() {
+        let mut child_args: Vec<String> = Vec::new();
         for child_node in children.nodes() {
             let child_name = child_node.name().value();
-            // Get the value from child entries
+            // Check if child has entries (e.g., reference "name")
             if let Some(entry) = child_node.entries().first() {
                 if let Some(s) = entry.value().as_string() {
-                    return KeybindAction::NiriActionWithArgs(
-                        action_name.to_string(),
-                        vec![format!("{}: {}", child_name, s)],
-                    );
+                    // Format: child-name "value"
+                    child_args.push(format!("{}: {}", child_name, s));
+                } else if let Some(i) = entry.value().as_integer() {
+                    child_args.push(format!("{}: {}", child_name, i));
                 }
+            } else {
+                // The child node name itself is the argument (e.g., "1" in focus-workspace { "1"; })
+                child_args.push(child_name.to_string());
             }
+        }
+        if !child_args.is_empty() {
+            return KeybindAction::NiriActionWithArgs(action_name.to_string(), child_args);
         }
     }
 

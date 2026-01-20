@@ -64,18 +64,69 @@ pub type IpcQueryError = IpcError;
 /// Prevents OOM attacks from malicious/compromised sockets.
 const MAX_RESPONSE_SIZE: u64 = 10 * 1024 * 1024;
 
+/// Helper function to deserialize null or missing strings as empty strings
+fn deserialize_nullable_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    Option::<String>::deserialize(deserializer).map(|opt| opt.unwrap_or_default())
+}
+
 /// Information about a running window from niri IPC
-#[derive(Debug, Clone, Deserialize)]
+/// We use permissive defaults to handle different niri versions
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct WindowInfo {
+    #[serde(default)]
     pub id: u64,
+    /// Window title - can be null in some cases, defaults to empty string
+    #[serde(default, deserialize_with = "deserialize_nullable_string")]
     pub title: String,
+    /// App ID - can be null for some windows (like niri-settings itself), defaults to empty string
+    #[serde(default, deserialize_with = "deserialize_nullable_string")]
     pub app_id: String,
+    #[serde(default)]
     pub is_floating: bool,
     #[serde(default)]
     pub workspace_id: Option<u64>,
+    /// Whether this window is focused (added in newer niri versions)
+    #[serde(default)]
+    pub is_focused: bool,
 }
 
 // Response wrapper types for proper JSON parsing
+// Using a struct-based approach for more robust parsing
+#[derive(Deserialize)]
+struct NiriOkResponse<T> {
+    #[serde(rename = "Ok")]
+    ok: T,
+}
+
+#[derive(Debug, Deserialize)]
+struct NiriErrResponse {
+    #[serde(rename = "Err")]
+    err: serde_json::Value,
+}
+
+// Helper function to parse responses - tries Ok first, then Err
+fn parse_niri_response<T: serde::de::DeserializeOwned>(
+    response: &str,
+) -> Result<T, (Option<serde_json::Value>, Option<serde_json::Error>)> {
+    // First try to parse as an Ok response
+    match serde_json::from_str::<NiriOkResponse<T>>(response) {
+        Ok(ok_resp) => return Ok(ok_resp.ok),
+        Err(ok_err) => {
+            // Then try to parse as an Err response
+            if let Ok(err_resp) = serde_json::from_str::<NiriErrResponse>(response) {
+                return Err((Some(err_resp.err), None));
+            }
+            // If neither works, return the Ok parse error (more informative)
+            Err((None, Some(ok_err)))
+        }
+    }
+}
+
+// Keep the old enum for backwards compatibility in some code paths
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum NiriResponse<T> {
@@ -1083,6 +1134,80 @@ mod tests {
         let info: WindowInfo = serde_json::from_str(minimal).unwrap();
         assert_eq!(info.id, 1);
         assert_eq!(info.workspace_id, None);
+    }
+
+    #[test]
+    fn test_window_info_ignores_extra_fields() {
+        // Test that extra fields from newer niri versions are ignored
+        let json = r#"{
+            "id": 42,
+            "title": "Firefox",
+            "app_id": "firefox",
+            "pid": 12345,
+            "workspace_id": 1,
+            "is_focused": true,
+            "is_floating": false,
+            "is_urgent": false,
+            "layout": {"type": "tiled", "size": [800, 600]},
+            "focus_timestamp": {"secs": 123, "nanos": 456}
+        }"#;
+        let info: WindowInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.id, 42);
+        assert_eq!(info.app_id, "firefox");
+        assert_eq!(info.title, "Firefox");
+        assert!(info.is_focused);
+        assert!(!info.is_floating);
+        // Extra fields like pid, is_urgent, layout, focus_timestamp should be ignored
+    }
+
+    #[test]
+    fn test_window_info_handles_null_app_id() {
+        // Test that null app_id values are handled (e.g., for niri-settings itself)
+        let json = r#"{
+            "id": 27,
+            "title": "niri-settings",
+            "app_id": null,
+            "pid": 68767,
+            "workspace_id": 3,
+            "is_focused": true,
+            "is_floating": false
+        }"#;
+        let info: WindowInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.id, 27);
+        assert_eq!(info.title, "niri-settings");
+        assert_eq!(info.app_id, ""); // null should become empty string
+        assert!(info.is_focused);
+    }
+
+    #[test]
+    fn test_window_info_handles_null_title() {
+        // Test that null title values are handled
+        let json = r#"{
+            "id": 1,
+            "title": null,
+            "app_id": "some-app",
+            "is_floating": false
+        }"#;
+        let info: WindowInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.app_id, "some-app");
+        assert_eq!(info.title, ""); // null should become empty string
+    }
+
+    #[test]
+    fn test_windows_response_with_extra_fields() {
+        // Test full Windows response parsing with extra fields
+        let json = r#"{"Ok":{"Windows":[
+            {"id":1,"title":"Firefox","app_id":"firefox","pid":1234,"is_floating":false,"workspace_id":1,"layout":{}},
+            {"id":2,"title":"Terminal","app_id":"kitty","pid":5678,"is_floating":true,"is_urgent":false}
+        ]}}"#;
+
+        // Test using the parse_niri_response helper
+        let result = parse_niri_response::<WindowsResponse>(&json);
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+        let windows = result.unwrap().windows;
+        assert_eq!(windows.len(), 2);
+        assert_eq!(windows[0].app_id, "firefox");
+        assert_eq!(windows[1].app_id, "kitty");
     }
 
     #[test]
