@@ -1,0 +1,31 @@
+[package]
+name = "niri-settings-vizia-poc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+vizia = "0.2"
+dirs = "6.0"
+log = "0.4"
+env_logger = "0.11"
+anyhow = "1.0"
+thiserror = "2.0"
+
+# KDL parsing (reuse from main project)
+kdl = "6.5"
+
+# For IPC (if testing)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.dev.package."*"]
+opt-level = 3  # Optimize dependencies in dev mode for faster runtime
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

@@ -1,0 +1,11 @@
+# Optimize build times
+
+[target.x86_64-unknown-linux-gnu]
+# Use mold linker if available (much faster than ld)
+# Install with: sudo apt install mold  OR  cargo install mold
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+[build]
+# Use all available CPU cores
+jobs = 0  # 0 = use all cores
