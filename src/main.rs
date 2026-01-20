@@ -14,18 +14,25 @@ fn main() -> Result<()> {
     let paths = Arc::new(config::ConfigPaths::new()?);
     let is_first_run = paths.is_first_run();
 
-    let settings = init_settings(&paths, is_first_run);
+    let (settings, import_result) = init_settings(&paths, is_first_run);
 
     // Ensure directories exist
     if let Err(e) = paths.ensure_directories() {
         warn!("Failed to create config directories: {}", e);
     }
 
+    // Load app preferences (UI theme, etc.)
+    let prefs = config::load_preferences(&paths.preferences_json);
+    let initial_theme = prefs.theme;
+    info!("Loaded app preferences, theme: {:?}", initial_theme);
+
     // Create app state
     let state = ui::AppState::new(settings.clone(), paths.clone());
 
-    // Launch Floem app
-    floem::launch(move || ui::app_view(state.clone()));
+    // Launch Floem app with wizard on first run
+    floem::launch(move || {
+        ui::app_view(state.clone(), initial_theme, is_first_run, import_result.clone())
+    });
 
     // Save settings on exit
     save_on_exit(&settings, &paths);
@@ -39,8 +46,12 @@ fn init_logging() {
 }
 
 /// Load settings from config files
-fn init_settings(paths: &config::ConfigPaths, is_first_run: bool) -> Arc<Mutex<config::Settings>> {
-    let loaded_settings = if is_first_run {
+/// Returns (settings, import_result) where import_result is Some on first run
+fn init_settings(
+    paths: &config::ConfigPaths,
+    is_first_run: bool,
+) -> (Arc<Mutex<config::Settings>>, Option<config::ImportResult>) {
+    let (loaded_settings, import_result) = if is_first_run {
         // First run: import from user's existing niri config
         info!("First run - importing settings from existing niri config");
         let result = config::import_from_niri_config_with_result(&paths.niri_config);
@@ -53,7 +64,8 @@ fn init_settings(paths: &config::ConfigPaths, is_first_run: bool) -> Arc<Mutex<c
             info!("Imported settings saved to niri-settings directory");
         }
 
-        result.settings
+        let settings = result.settings.clone();
+        (settings, Some(result))
     } else {
         // Normal: load from managed config files
         let load_result = config::load_settings_with_result(paths);
@@ -66,7 +78,7 @@ fn init_settings(paths: &config::ConfigPaths, is_first_run: bool) -> Arc<Mutex<c
             }
         }
 
-        load_result.settings
+        (load_result.settings, None)
     };
 
     info!(
@@ -77,7 +89,7 @@ fn init_settings(paths: &config::ConfigPaths, is_first_run: bool) -> Arc<Mutex<c
         loaded_settings.keybindings.bindings.len()
     );
 
-    Arc::new(Mutex::new(loaded_settings))
+    (Arc::new(Mutex::new(loaded_settings)), import_result)
 }
 
 /// Save settings when the app exits

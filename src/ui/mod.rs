@@ -8,6 +8,8 @@ pub mod nav;
 pub mod pages;
 pub mod state;
 pub mod theme;
+pub mod wizard;
 
 pub use app::app_view;
 pub use state::AppState;
+pub use wizard::{wizard_view, WizardState};

@@ -2,19 +2,25 @@
 
 use floem::prelude::*;
 use floem::reactive::RwSignal;
-use floem::views::Stack;
+use floem::views::{Container, Empty, Label, Stack};
 use std::rc::Rc;
 
-use crate::config::SettingsCategory;
+use crate::config::{save_preferences, AppPreferences, SettingsCategory};
 use crate::types::{Color, ColorOrGradient};
 use crate::ui::components::{
     color_row_with_callback, section, slider_row_with_callback, toggle_row_with_callback,
 };
 use crate::ui::state::AppState;
-use crate::ui::theme::SPACING_LG;
+use crate::ui::theme::{
+    preset_signal, set_theme, theme, ThemePreset, FONT_SIZE_SM, FONT_SIZE_XS, RADIUS_LG, RADIUS_MD,
+    SPACING_LG, SPACING_MD, SPACING_SM, SPACING_XS,
+};
 
 /// Create the appearance settings page
 pub fn appearance_page(state: AppState) -> impl IntoView {
+    // Clone paths early before state is moved into closures
+    let paths = state.paths.clone();
+
     // Create local signals from settings
     let settings = state.get_settings();
     let appearance = settings.appearance;
@@ -116,6 +122,8 @@ pub fn appearance_page(state: AppState) -> impl IntoView {
     };
 
     Stack::vertical((
+        // Theme selector section
+        section("App Theme", theme_selector(paths)),
         // Focus Ring section
         section(
             "Focus Ring",
@@ -208,4 +216,105 @@ pub fn appearance_page(state: AppState) -> impl IntoView {
         ),
     ))
     .style(|s| s.width_full().gap(SPACING_LG))
+}
+
+/// Theme selector component showing all available themes
+fn theme_selector(paths: std::sync::Arc<crate::config::ConfigPaths>) -> impl IntoView {
+    let current = preset_signal();
+
+    Stack::vertical((
+        // Description
+        Label::new("Choose a color theme for the settings app")
+            .style(move |s| s.font_size(FONT_SIZE_SM).color(theme().text_secondary).margin_bottom(SPACING_MD)),
+        // Theme options grid
+        Stack::horizontal(
+            ThemePreset::all()
+                .iter()
+                .map(|preset| theme_option_card(*preset, current, paths.clone()))
+                .collect::<Vec<_>>(),
+        )
+        .style(|s| s.gap(SPACING_MD).flex_wrap(floem::style::FlexWrap::Wrap)),
+    ))
+    .style(|s| s.width_full())
+}
+
+/// Individual theme option card
+fn theme_option_card(
+    preset: ThemePreset,
+    current: RwSignal<ThemePreset>,
+    paths: std::sync::Arc<crate::config::ConfigPaths>,
+) -> impl IntoView {
+    let is_selected = move || current.get() == preset;
+    let preview_theme = preset.to_theme();
+
+    Container::new(
+        Stack::vertical((
+            // Color preview bar showing theme colors
+            Stack::horizontal((
+                // Background color preview
+                Empty::new().style(move |s| {
+                    s.width(24.0)
+                        .height(24.0)
+                        .border_radius(RADIUS_MD)
+                        .background(preview_theme.bg_base)
+                }),
+                // Accent color preview
+                Empty::new().style(move |s| {
+                    s.width(24.0)
+                        .height(24.0)
+                        .border_radius(RADIUS_MD)
+                        .background(preview_theme.accent)
+                }),
+                // Text color preview
+                Empty::new().style(move |s| {
+                    s.width(24.0)
+                        .height(24.0)
+                        .border_radius(RADIUS_MD)
+                        .background(preview_theme.text_primary)
+                }),
+            ))
+            .style(|s| s.gap(SPACING_XS).margin_bottom(SPACING_SM)),
+            // Theme name
+            Label::new(preset.name()).style(move |s| {
+                s.font_size(FONT_SIZE_SM)
+                    .font_bold()
+                    .color(theme().text_primary)
+            }),
+            // Theme description
+            Label::new(preset.description()).style(move |s| {
+                s.font_size(FONT_SIZE_XS)
+                    .color(theme().text_tertiary)
+            }),
+        ))
+        .style(|s| s.items_start()),
+    )
+    .style(move |s| {
+        let t = theme();
+        let base = s
+            .padding(SPACING_MD)
+            .border_radius(RADIUS_LG)
+            .min_width(160.0)
+            .border(2.0)
+            .cursor(floem::style::CursorStyle::Pointer);
+
+        if is_selected() {
+            base.background(t.bg_elevated)
+                .border_color(t.accent)
+        } else {
+            base.background(t.bg_surface)
+                .border_color(t.border_subtle)
+        }
+    })
+    .on_click_stop(move |_| {
+        // Apply the theme
+        set_theme(preset);
+
+        // Save preference to disk
+        let prefs = AppPreferences { theme: preset };
+        if let Err(e) = save_preferences(&paths.preferences_json, &prefs) {
+            log::warn!("Failed to save theme preference: {}", e);
+        } else {
+            log::info!("Saved theme preference: {:?}", preset);
+        }
+    })
 }

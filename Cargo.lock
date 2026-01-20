@@ -2922,6 +2922,7 @@ dependencies = [
  "kdl 6.5.0",
  "log",
  "niri-settings-macros",
+ "once_cell",
  "paste",
  "proptest",
  "rfd 0.15.4",

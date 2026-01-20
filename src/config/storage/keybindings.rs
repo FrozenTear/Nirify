@@ -35,11 +35,31 @@ pub fn generate_keybindings_kdl(settings: &KeybindingsSettings) -> String {
     content.push_str("binds {\n");
 
     for binding in &settings.bindings {
+        // Skip invalid keybindings (empty key combo or empty action)
+        if !is_valid_keybinding(binding) {
+            continue;
+        }
         content.push_str(&generate_keybinding(binding));
     }
 
     content.push_str("}\n");
     content
+}
+
+/// Check if a keybinding is valid for saving to config
+/// Returns false for keybindings with empty key combo or empty action
+fn is_valid_keybinding(binding: &Keybinding) -> bool {
+    // Must have a non-empty key combo
+    if binding.key_combo.trim().is_empty() {
+        return false;
+    }
+
+    // Must have a valid action
+    match &binding.action {
+        KeybindAction::Spawn(args) => !args.is_empty() && !args[0].trim().is_empty(),
+        KeybindAction::NiriAction(name) => !name.trim().is_empty(),
+        KeybindAction::NiriActionWithArgs(name, _) => !name.trim().is_empty(),
+    }
 }
 
 /// Generate KDL for a single keybinding
@@ -94,13 +114,18 @@ fn generate_action(action: &KeybindAction) -> String {
             format!("        {};\n", name)
         }
         KeybindAction::NiriActionWithArgs(name, args) => {
-            // Actions with args use direct argument syntax
-            // e.g., focus-workspace 1
-            // e.g., set-column-width "-10%"
+            // Niri uses inline argument syntax:
+            // focus-workspace 1;
+            // set-column-width "-10%";
             let mut line = format!("        {}", name);
             for arg in args {
                 line.push(' ');
-                line.push_str(&quote_kdl_string(arg));
+                // Numbers don't need quotes, strings with special chars do
+                if arg.chars().all(|c| c.is_ascii_digit()) {
+                    line.push_str(arg);
+                } else {
+                    line.push_str(&quote_kdl_string(arg));
+                }
             }
             line.push_str(";\n");
             line
