@@ -73,15 +73,22 @@ impl WindowPickerState {
 }
 
 /// Create the window picker modal overlay
+/// NOTE: This must be placed inside a Stack::new() with Position::Relative parent.
+/// The absolute positioning is applied only when visible to avoid blocking clicks.
 pub fn window_picker_modal(state: WindowPickerState) -> impl IntoView {
     let visible = state.visible;
 
-    // The content itself has Position::Absolute, so we just need to
-    // conditionally render it. When hidden, Empty takes no space and
-    // doesn't block clicks.
+    // Only apply Position::Absolute when visible, otherwise Empty doesn't block
     dyn_view(move || {
         if visible.get() {
-            window_picker_content(state.clone()).into_any()
+            window_picker_content(state.clone())
+                .style(|s| {
+                    s.position(floem::style::Position::Absolute)
+                        .inset(0.0)
+                        .width_full()
+                        .height_full()
+                })
+                .into_any()
         } else {
             Empty::new().into_any()
         }
@@ -193,11 +200,10 @@ fn window_picker_content(state: WindowPickerState) -> impl IntoView {
     }),))
     .style(move |s| {
         let t = theme();
+        // NOTE: Position::Absolute is applied externally in window_rules.rs
+        // (matching the wizard pattern from app.rs)
         s.width_full()
             .height_full()
-            .position(floem::style::Position::Absolute)
-            .inset_top(0.0)
-            .inset_left(0.0)
             .background(t.bg_base.with_alpha(0.85))
             .justify_center()
             .items_center()

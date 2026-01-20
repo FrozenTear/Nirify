@@ -71,6 +71,7 @@ pub fn window_rules_page(state: AppState) -> impl IntoView {
     .style(|s| s.width_full().gap(SPACING_LG));
 
     // Stack with relative positioning so modal can overlay
+    // Position::Absolute is applied inside window_picker_modal only when visible
     Stack::new((
         page_content,
         window_picker_modal(picker_state.clone()),
