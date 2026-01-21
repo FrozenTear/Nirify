@@ -15,79 +15,11 @@ use std::sync::{Arc, Mutex};
 use super::super::converters::color_to_slint_color;
 use super::super::macros::SaveManager;
 
-// ============================================================================
-// HELPER FUNCTIONS FOR CREATING SETTING MODELS
-// ============================================================================
+// Generate helper functions for OverviewSettingModel
+crate::impl_setting_builders!(OverviewSettingModel);
 
-fn make_toggle(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: bool,
-    visible: bool,
-) -> OverviewSettingModel {
-    OverviewSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 0,
-        bool_value: value,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_slider_int(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: i32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> OverviewSettingModel {
-    OverviewSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        int_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: false,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_slider_float(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: f32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> OverviewSettingModel {
-    OverviewSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        float_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: true,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_color(
+// Custom color function that uses color_to_slint_color for Slint color preview
+fn make_color_with_preview(
     id: &str,
     label: &str,
     desc: &str,
@@ -152,7 +84,7 @@ fn populate_backdrop_settings(settings: &Settings) -> ModelRc<OverviewSettingMod
             backdrop_enabled,
             true,
         ),
-        make_color(
+        make_color_with_preview(
             "backdrop_color",
             "Backdrop color",
             "Color shown behind windows in overview",
@@ -224,7 +156,7 @@ fn populate_shadow_settings(settings: &Settings) -> ModelRc<OverviewSettingModel
             "",
             show_details,
         ),
-        make_color(
+        make_color_with_preview(
             "shadow_color",
             "Shadow color",
             "Color of the workspace shadow (with alpha)",

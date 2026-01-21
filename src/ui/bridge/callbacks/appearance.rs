@@ -18,6 +18,9 @@ use std::sync::{Arc, Mutex};
 use super::super::converters::{color_to_slint_color, slint_color_to_color};
 use super::super::macros::SaveManager;
 
+// Generate helper functions for AppearanceSettingModel
+crate::impl_setting_builders!(AppearanceSettingModel);
+
 // ============================================================================
 // SECTION ENUM FOR SELECTIVE SYNC
 // ============================================================================
@@ -34,53 +37,10 @@ pub enum AppearanceSection {
 }
 
 // ============================================================================
-// HELPER FUNCTIONS FOR CREATING SETTING MODELS
+// CUSTOM HELPER FOR COLOR (appearance uses color_to_slint_color)
 // ============================================================================
 
-fn make_toggle(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: bool,
-    visible: bool,
-) -> AppearanceSettingModel {
-    AppearanceSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 0,
-        bool_value: value,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_slider_float(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: f32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> AppearanceSettingModel {
-    AppearanceSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        float_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: true,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_color(
+fn make_color_with_slint(
     id: &str,
     label: &str,
     desc: &str,
@@ -108,7 +68,7 @@ fn make_color_from_gradient(
     visible: bool,
 ) -> AppearanceSettingModel {
     let color = color_or_gradient.primary_color();
-    make_color(id, label, desc, color, visible)
+    make_color_with_slint(id, label, desc, color, visible)
 }
 
 // ============================================================================
@@ -222,7 +182,7 @@ fn populate_background_settings(
         a: 0xff,
     });
 
-    let settings = vec![make_color(
+    let settings = vec![make_color_with_slint(
         "background_color",
         "Window background",
         "Default background color for windows",

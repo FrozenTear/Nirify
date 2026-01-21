@@ -3,6 +3,37 @@
 //! This module handles callbacks and data synchronization between the UI layer
 //! and the backend settings management.
 //!
+//! # Threading Model
+//!
+//! This application uses a carefully designed threading model for safety and performance:
+//!
+//! ## `Arc<Mutex<Settings>>` for settings storage
+//!
+//! Settings use `Arc<Mutex<>>` (not `Rc<RefCell<>>`) because they're accessed from
+//! multiple contexts:
+//!
+//! 1. **Async reload operations**: `SaveManager` uses async file I/O via `async_ops`
+//!    which runs on background threads. The settings mutex must be thread-safe.
+//!
+//! 2. **Exit handling**: Settings are accessed during application shutdown after
+//!    the Slint event loop has stopped, potentially from a different thread context.
+//!
+//! 3. **IPC operations**: Niri config reload (`ipc::async_ops::reload_config_async`)
+//!    runs asynchronously and may trigger callbacks that access settings.
+//!
+//! ## `Rc<SaveManager>` for save coordination
+//!
+//! The SaveManager uses `Rc` (not `Arc`) because:
+//!
+//! - Slint's UI thread is single-threaded; all callbacks run on the main thread
+//! - SaveManager is only accessed from UI callbacks, never from background threads
+//! - Using `Rc` avoids unnecessary atomic overhead for single-threaded access
+//!
+//! ## `Arc<DirtyTracker>` for change tracking
+//!
+//! DirtyTracker uses `Arc` because it's shared across callbacks and may be
+//! accessed during async save operations to determine which categories need saving.
+//!
 //! # Module Structure
 //!
 //! - `callbacks/` - UI event handlers organized by category

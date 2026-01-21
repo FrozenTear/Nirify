@@ -7,117 +7,14 @@ use crate::config::{Settings, SettingsCategory};
 use crate::types::{Color, ColorOrGradient};
 use crate::{LayoutSettingModel, MainWindow};
 use log::{debug, error};
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, ModelRc, VecModel};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use super::super::macros::SaveManager;
 
-// ============================================================================
-// HELPER FUNCTIONS FOR CREATING SETTING MODELS
-// ============================================================================
-
-fn make_toggle(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: bool,
-    visible: bool,
-) -> LayoutSettingModel {
-    LayoutSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 0,
-        bool_value: value,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_slider_int(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: i32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> LayoutSettingModel {
-    LayoutSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        int_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: false,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_slider_float(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: f32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> LayoutSettingModel {
-    LayoutSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        float_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: true,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_combo(
-    id: &str,
-    label: &str,
-    desc: &str,
-    index: i32,
-    options: &[&str],
-    visible: bool,
-) -> LayoutSettingModel {
-    let opts: Vec<SharedString> = options.iter().map(|s| (*s).into()).collect();
-    LayoutSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 2,
-        combo_index: index,
-        combo_options: ModelRc::new(VecModel::from(opts)),
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_color(id: &str, label: &str, desc: &str, hex: &str, visible: bool) -> LayoutSettingModel {
-    LayoutSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 4,
-        text_value: hex.into(),
-        placeholder: "#RRGGBBAA".into(),
-        visible,
-        ..Default::default()
-    }
-}
+// Generate helper functions for LayoutSettingModel
+crate::impl_setting_builders!(LayoutSettingModel);
 
 // ============================================================================
 // MODEL POPULATION FUNCTIONS

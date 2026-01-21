@@ -2,6 +2,10 @@
 //!
 //! Each module handles callbacks for a specific settings category.
 
+// Shared utilities
+#[macro_use]
+pub mod setting_builders;
+
 // Settings page callback modules
 pub mod animations;
 pub mod appearance;

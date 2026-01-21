@@ -16,79 +16,11 @@ use std::sync::{Arc, Mutex};
 use super::super::converters::{color_to_slint_color, slint_color_to_color};
 use super::super::macros::SaveManager;
 
-// ============================================================================
-// HELPER FUNCTIONS FOR CREATING SETTING MODELS
-// ============================================================================
+// Generate helper functions for RecentWindowsSettingModel
+crate::impl_setting_builders!(RecentWindowsSettingModel);
 
-fn make_toggle(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: bool,
-    visible: bool,
-) -> RecentWindowsSettingModel {
-    RecentWindowsSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 0,
-        bool_value: value,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_slider_int(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: i32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> RecentWindowsSettingModel {
-    RecentWindowsSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        int_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: false,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_slider_float(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: f32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> RecentWindowsSettingModel {
-    RecentWindowsSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        float_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: true,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_color(
+// Custom color function that uses color_to_slint_color for Slint color preview
+fn make_color_with_preview(
     id: &str,
     label: &str,
     desc: &str,
@@ -151,14 +83,14 @@ fn populate_general_settings(rw: &RecentWindowsSettings) -> ModelRc<RecentWindow
 /// Build highlight settings model
 fn populate_highlight_settings(rw: &RecentWindowsSettings) -> ModelRc<RecentWindowsSettingModel> {
     let settings = vec![
-        make_color(
+        make_color_with_preview(
             "highlight_active_color",
             "Active window color",
             "Highlight color for the currently selected window",
             &rw.highlight.active_color,
             true,
         ),
-        make_color(
+        make_color_with_preview(
             "highlight_urgent_color",
             "Urgent window color",
             "Highlight color for urgent/attention-requesting windows",

@@ -13,72 +13,8 @@ use std::sync::{Arc, Mutex};
 
 use super::super::macros::SaveManager;
 
-// ============================================================================
-// HELPER FUNCTIONS FOR CREATING SETTING MODELS
-// ============================================================================
-
-fn make_toggle(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: bool,
-    visible: bool,
-) -> CursorSettingModel {
-    CursorSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 0,
-        bool_value: value,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_text(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: &str,
-    placeholder: &str,
-    visible: bool,
-) -> CursorSettingModel {
-    CursorSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 3,
-        text_value: value.into(),
-        placeholder: placeholder.into(),
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_slider_int(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: i32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> CursorSettingModel {
-    CursorSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        int_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: false,
-        visible,
-        ..Default::default()
-    }
-}
+// Generate helper functions for CursorSettingModel
+crate::impl_setting_builders!(CursorSettingModel);
 
 // ============================================================================
 // MODEL POPULATION FUNCTIONS

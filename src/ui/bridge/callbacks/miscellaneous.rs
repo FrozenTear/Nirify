@@ -6,11 +6,14 @@ use crate::config::models::XWaylandSatelliteConfig;
 use crate::config::{Settings, SettingsCategory};
 use crate::{MainWindow, MiscSettingModel};
 use log::{debug, error};
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, ModelRc, VecModel};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use super::super::macros::SaveManager;
+
+// Generate helper functions for MiscSettingModel
+crate::impl_setting_builders!(MiscSettingModel);
 
 // ============================================================================
 // SECTION ENUM FOR SELECTIVE SYNC
@@ -30,115 +33,6 @@ pub enum MiscSection {
     XWaylandPath,
     Developer,
     All,
-}
-
-// ============================================================================
-// Helper functions for creating setting models
-// ============================================================================
-
-fn make_toggle(id: &str, label: &str, desc: &str, value: bool, visible: bool) -> MiscSettingModel {
-    MiscSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 0,
-        bool_value: value,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_text(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: &str,
-    placeholder: &str,
-    visible: bool,
-) -> MiscSettingModel {
-    MiscSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 3,
-        text_value: value.into(),
-        placeholder: placeholder.into(),
-        visible,
-        ..Default::default()
-    }
-}
-
-#[allow(dead_code)]
-fn make_slider_int(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: i32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> MiscSettingModel {
-    MiscSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        int_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: false,
-        visible,
-        ..Default::default()
-    }
-}
-
-#[allow(dead_code)]
-fn make_slider_float(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: f32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> MiscSettingModel {
-    MiscSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        float_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: true,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_combo(
-    id: &str,
-    label: &str,
-    desc: &str,
-    index: i32,
-    options: &[&str],
-    visible: bool,
-) -> MiscSettingModel {
-    let opts: Vec<SharedString> = options.iter().map(|s| (*s).into()).collect();
-    MiscSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 2,
-        combo_index: index,
-        combo_options: ModelRc::new(VecModel::from(opts)),
-        visible,
-        ..Default::default()
-    }
 }
 
 // ============================================================================
