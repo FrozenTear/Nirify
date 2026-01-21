@@ -708,7 +708,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&sm);
         ui.on_layer_rule_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let rule_idx = get_selected_index(&selected_rule_idx);
@@ -721,7 +721,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     if let Some(rule) = s.layer_rules.rules.get_mut(rule_idx as usize) {
                         let mut needs_model_refresh = false;
 
-                        match id_str.as_str() {
+                        match id_str {
                             // Match settings
                             "match_has_at_startup" => {
                                 if is_valid_match_index(match_idx, rule.matches.len()) {
@@ -812,7 +812,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let selected_rule_idx = Rc::clone(&selected_rule_idx);
         let save_manager = Rc::clone(&sm);
         ui.on_layer_rule_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let rule_idx = get_selected_index(&selected_rule_idx);
@@ -822,7 +822,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     }
 
                     if let Some(rule) = s.layer_rules.rules.get_mut(rule_idx as usize) {
-                        match id_str.as_str() {
+                        match id_str {
                             "corner_radius" => {
                                 rule.geometry_corner_radius = Some(value.clamp(0, 32));
                             }
@@ -868,7 +868,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let selected_rule_idx = Rc::clone(&selected_rule_idx);
         let save_manager = Rc::clone(&sm);
         ui.on_layer_rule_setting_slider_float_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let rule_idx = get_selected_index(&selected_rule_idx);
@@ -878,7 +878,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     }
 
                     if let Some(rule) = s.layer_rules.rules.get_mut(rule_idx as usize) {
-                        match id_str.as_str() {
+                        match id_str {
                             "opacity" => {
                                 rule.opacity = Some(value.clamp(0.0, 1.0));
                             }
@@ -904,7 +904,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let selected_rule_idx = Rc::clone(&selected_rule_idx);
         let save_manager = Rc::clone(&sm);
         ui.on_layer_rule_setting_combo_changed(move |id, index| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let rule_idx = get_selected_index(&selected_rule_idx);
@@ -914,7 +914,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     }
 
                     if let Some(rule) = s.layer_rules.rules.get_mut(rule_idx as usize) {
-                        match id_str.as_str() {
+                        match id_str {
                             "block_out_from" => {
                                 rule.block_out_from = Some(BlockOutFrom::from_index(index));
                             }
@@ -942,7 +942,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&sm);
         ui.on_layer_rule_setting_text_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let value_str = value.to_string();
 
             match settings.lock() {
@@ -955,7 +955,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     }
 
                     if let Some(rule) = s.layer_rules.rules.get_mut(rule_idx as usize) {
-                        match id_str.as_str() {
+                        match id_str {
                             "rule_name" => {
                                 rule.name = value_str.clone();
                                 // Update rule list display
@@ -1016,7 +1016,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&sm);
         ui.on_layer_rule_setting_color_changed(move |id, color| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
 
             match settings.lock() {
                 Ok(mut s) => {
@@ -1035,7 +1035,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                             a: color.alpha(),
                         };
 
-                        match id_str.as_str() {
+                        match id_str {
                             "shadow_color" => {
                                 if let Some(ref mut shadow) = rule.shadow {
                                     shadow.color = rust_color;

@@ -255,13 +255,13 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_overview_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+            let result = match settings.lock() {
                 Ok(mut s) => {
-                    #[allow(unused_assignments)]
                     let mut needs_model_refresh = false;
+                    let mut is_valid = true;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "backdrop_enabled" => {
                             if value {
                                 // Set a default color if enabling and none set
@@ -290,22 +290,34 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         }
                         _ => {
                             debug!("Unknown overview toggle setting: {}", id_str);
-                            return;
+                            is_valid = false;
                         }
                     }
 
-                    // Refresh models if visibility changed
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_all_models(&ui, &s);
-                        }
+                    if is_valid {
+                        debug!("Overview toggle {} = {}", id_str, value);
+                        save_manager.mark_dirty(SettingsCategory::Overview);
+                        save_manager.request_save();
                     }
 
-                    debug!("Overview toggle {} = {}", id_str, value);
-                    save_manager.mark_dirty(SettingsCategory::Overview);
-                    save_manager.request_save();
+                    // Clone settings for UI update if needed
+                    if needs_model_refresh && is_valid {
+                        Some(s.clone())
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    None
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(settings_clone) = result {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_all_models(&ui, &settings_clone);
+                }
             }
         });
     }
@@ -315,10 +327,10 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_overview_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         "shadow_softness" => {
                             if let Some(ref mut ws) = s.overview.workspace_shadow {
                                 ws.softness = value.clamp(0, 100);
@@ -359,10 +371,10 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_overview_setting_slider_float_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         "zoom" => {
                             let clamped =
                                 (value as f64).clamp(OVERVIEW_ZOOM_MIN, OVERVIEW_ZOOM_MAX);
@@ -389,47 +401,72 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_overview_setting_text_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let value_str = value.to_string();
 
-            match settings.lock() {
+            // Track which model to update after lock is released
+            enum ModelUpdate {
+                None,
+                Backdrop(Settings),
+                Shadow(Settings),
+            }
+
+            let update = match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    let update = match id_str {
                         "backdrop_color" => {
                             if let Some(color) = Color::from_hex(&value_str) {
                                 s.overview.backdrop_color = Some(color);
-                                // Update model to show new color preview
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    ui.set_overview_backdrop_settings(populate_backdrop_settings(
-                                        &s,
-                                    ));
-                                }
+                                ModelUpdate::Backdrop(s.clone())
+                            } else {
+                                ModelUpdate::None
                             }
                         }
                         "shadow_color" => {
                             if let Some(ref mut ws) = s.overview.workspace_shadow {
                                 if let Some(color) = Color::from_hex(&value_str) {
                                     ws.color = color;
-                                    // Update model to show new color preview
-                                    if let Some(ui) = ui_weak.upgrade() {
-                                        ui.set_overview_shadow_settings(populate_shadow_settings(
-                                            &s,
-                                        ));
-                                    }
+                                    ModelUpdate::Shadow(s.clone())
+                                } else {
+                                    ModelUpdate::None
                                 }
+                            } else {
+                                ModelUpdate::None
                             }
                         }
                         _ => {
                             debug!("Unknown overview text setting: {}", id_str);
-                            return;
+                            ModelUpdate::None
                         }
+                    };
+
+                    if !matches!(update, ModelUpdate::None) {
+                        debug!("Overview text {} = {}", id_str, value_str);
+                        save_manager.mark_dirty(SettingsCategory::Overview);
+                        save_manager.request_save();
                     }
 
-                    debug!("Overview text {} = {}", id_str, value_str);
-                    save_manager.mark_dirty(SettingsCategory::Overview);
-                    save_manager.request_save();
+                    update
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    ModelUpdate::None
+                }
+            };
+
+            // UI updates happen after lock is released
+            match update {
+                ModelUpdate::Backdrop(s) => {
+                    if let Some(ui) = ui_weak.upgrade() {
+                        ui.set_overview_backdrop_settings(populate_backdrop_settings(&s));
+                    }
+                }
+                ModelUpdate::Shadow(s) => {
+                    if let Some(ui) = ui_weak.upgrade() {
+                        ui.set_overview_shadow_settings(populate_shadow_settings(&s));
+                    }
+                }
+                ModelUpdate::None => {}
             }
         });
     }
@@ -440,9 +477,16 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_overview_setting_color_changed(move |id, color| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
 
-            match settings.lock() {
+            // Track which model to update after lock is released
+            enum ModelUpdate {
+                None,
+                Backdrop(Settings),
+                Shadow(Settings),
+            }
+
+            let update = match settings.lock() {
                 Ok(mut s) => {
                     let rust_color = Color {
                         r: color.red(),
@@ -451,32 +495,52 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         a: color.alpha(),
                     };
 
-                    match id_str.as_str() {
+                    let update = match id_str {
                         "backdrop_color" => {
                             s.overview.backdrop_color = Some(rust_color);
-                            if let Some(ui) = ui_weak.upgrade() {
-                                ui.set_overview_backdrop_settings(populate_backdrop_settings(&s));
-                            }
+                            ModelUpdate::Backdrop(s.clone())
                         }
                         "shadow_color" => {
                             if let Some(ref mut ws) = s.overview.workspace_shadow {
                                 ws.color = rust_color;
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    ui.set_overview_shadow_settings(populate_shadow_settings(&s));
-                                }
+                                ModelUpdate::Shadow(s.clone())
+                            } else {
+                                ModelUpdate::None
                             }
                         }
                         _ => {
                             debug!("Unknown overview color setting: {}", id_str);
-                            return;
+                            ModelUpdate::None
                         }
+                    };
+
+                    if !matches!(update, ModelUpdate::None) {
+                        debug!("Overview color {} changed", id_str);
+                        save_manager.mark_dirty(SettingsCategory::Overview);
+                        save_manager.request_save();
                     }
 
-                    debug!("Overview color {} changed", id_str);
-                    save_manager.mark_dirty(SettingsCategory::Overview);
-                    save_manager.request_save();
+                    update
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    ModelUpdate::None
+                }
+            };
+
+            // UI updates happen after lock is released
+            match update {
+                ModelUpdate::Backdrop(s) => {
+                    if let Some(ui) = ui_weak.upgrade() {
+                        ui.set_overview_backdrop_settings(populate_backdrop_settings(&s));
+                    }
+                }
+                ModelUpdate::Shadow(s) => {
+                    if let Some(ui) = ui_weak.upgrade() {
+                        ui.set_overview_shadow_settings(populate_shadow_settings(&s));
+                    }
+                }
+                ModelUpdate::None => {}
             }
         });
     }

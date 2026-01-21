@@ -19,6 +19,22 @@ use std::sync::{Arc, Mutex};
 use super::super::macros::SaveManager;
 
 // ============================================================================
+// SECTION ENUM FOR SELECTIVE SYNC
+// ============================================================================
+
+/// Identifies which section of behavior settings to refresh
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BehaviorSection {
+    Focus,
+    Workspace,
+    WindowSize,
+    Struts,
+    Modifiers,
+    Power,
+    All,
+}
+
+// ============================================================================
 // HELPER FUNCTIONS FOR CREATING SETTING MODELS
 // ============================================================================
 
@@ -327,6 +343,36 @@ fn populate_power_settings(settings: &Settings) -> ModelRc<BehaviorSettingModel>
 // SYNC ALL MODELS
 // ============================================================================
 
+/// Sync a specific section of behavior UI models from settings
+///
+/// This function allows selective refresh of UI models, avoiding the overhead
+/// of refreshing all sections when only one has changed.
+pub fn sync_models(ui: &MainWindow, settings: &Settings, section: BehaviorSection) {
+    match section {
+        BehaviorSection::Focus => {
+            ui.set_behavior_focus_settings(populate_focus_settings(settings));
+        }
+        BehaviorSection::Workspace => {
+            ui.set_behavior_workspace_settings(populate_workspace_settings(settings));
+        }
+        BehaviorSection::WindowSize => {
+            ui.set_behavior_window_size_settings(populate_window_size_settings(settings));
+        }
+        BehaviorSection::Struts => {
+            ui.set_behavior_strut_settings(populate_strut_settings(settings));
+        }
+        BehaviorSection::Modifiers => {
+            ui.set_behavior_modifier_settings(populate_modifier_settings(settings));
+        }
+        BehaviorSection::Power => {
+            ui.set_behavior_power_settings(populate_power_settings(settings));
+        }
+        BehaviorSection::All => {
+            sync_all_models(ui, settings);
+        }
+    }
+}
+
 /// Sync all UI models from settings
 pub fn sync_all_models(ui: &MainWindow, settings: &Settings) {
     ui.set_behavior_focus_settings(populate_focus_settings(settings));
@@ -349,14 +395,15 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_behavior_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
-                Ok(mut s) => {
-                    let mut needs_model_refresh = false;
+            let id_str = id.as_str();
 
-                    match id_str.as_str() {
+            // Clone data needed for UI update, then release lock before UI operations
+            let refresh_info = match settings.lock() {
+                Ok(mut s) => {
+                    let section = match id_str {
                         "focus_follows_mouse" => {
                             s.behavior.focus_follows_mouse = value;
+                            None // No UI refresh needed
                         }
                         "warp_mouse_to_focus" => {
                             s.behavior.warp_mouse_to_focus = if value {
@@ -364,6 +411,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                             } else {
                                 WarpMouseMode::Off
                             };
+                            None // No UI refresh needed
                         }
                         "center_focused_column" => {
                             s.behavior.center_focused_column = if value {
@@ -371,37 +419,45 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                             } else {
                                 CenterFocusedColumn::Never
                             };
-                            needs_model_refresh = true;
+                            Some(BehaviorSection::Workspace)
                         }
                         "always_center_single_column" => {
                             s.behavior.always_center_single_column = value;
+                            None // No UI refresh needed
                         }
                         "mod_key_nested_enabled" => {
                             s.behavior.mod_key_nested =
                                 if value { Some(ModKey::Alt) } else { None };
-                            needs_model_refresh = true;
+                            Some(BehaviorSection::Modifiers)
                         }
                         "disable_power_key_handling" => {
                             s.behavior.disable_power_key_handling = value;
+                            None // No UI refresh needed
                         }
                         _ => {
                             debug!("Unknown behavior toggle setting: {}", id_str);
                             return;
                         }
-                    }
-
-                    // Refresh models if visibility changed
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_all_models(&ui, &s);
-                        }
-                    }
+                    };
 
                     debug!("Behavior toggle {} = {}", id_str, value);
                     save_manager.mark_dirty(SettingsCategory::Behavior);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    section.map(|sec| (s.clone(), sec))
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some((s, section)) = refresh_info {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_models(&ui, &s, section);
+                }
             }
         });
     }
@@ -411,10 +467,10 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_behavior_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         "strut_left" => {
                             s.behavior.strut_left =
                                 (value as f32).clamp(STRUT_SIZE_MIN, STRUT_SIZE_MAX);
@@ -455,10 +511,10 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_behavior_setting_slider_float_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         "default_column_width_proportion" => {
                             s.behavior.default_column_width_proportion =
                                 value.clamp(COLUMN_PROPORTION_MIN, COLUMN_PROPORTION_MAX);
@@ -484,41 +540,49 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_behavior_setting_combo_changed(move |id, index| {
-            let id_str = id.to_string();
-            match settings.lock() {
-                Ok(mut s) => {
-                    let mut needs_model_refresh = false;
+            let id_str = id.as_str();
 
-                    match id_str.as_str() {
+            // Clone data needed for UI update, then release lock before UI operations
+            let refresh_info = match settings.lock() {
+                Ok(mut s) => {
+                    let section = match id_str {
                         "default_column_width_type" => {
                             s.behavior.default_column_width_type =
                                 ColumnWidthType::from_index(index);
-                            needs_model_refresh = true;
+                            Some(BehaviorSection::WindowSize)
                         }
                         "mod_key" => {
                             s.behavior.mod_key = ModKey::from_index(index);
+                            None // No UI refresh needed
                         }
                         "mod_key_nested" => {
                             s.behavior.mod_key_nested = Some(ModKey::from_index(index));
+                            None // No UI refresh needed
                         }
                         _ => {
                             debug!("Unknown behavior combo setting: {}", id_str);
                             return;
                         }
-                    }
-
-                    // Refresh models if visibility changed
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_all_models(&ui, &s);
-                        }
-                    }
+                    };
 
                     debug!("Behavior combo {} = {}", id_str, index);
                     save_manager.mark_dirty(SettingsCategory::Behavior);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    section.map(|sec| (s.clone(), sec))
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some((s, section)) = refresh_info {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_models(&ui, &s, section);
+                }
             }
         });
     }

@@ -273,13 +273,15 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_gestures_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+
+            // Clone data needed for UI update, then release lock before UI operations
+            let settings_clone = match settings.lock() {
                 Ok(mut s) => {
                     #[allow(unused_assignments)]
                     let mut needs_model_refresh = false;
 
-                    match id_str.as_str() {
+                    match id_str {
                         // Hot corners
                         "hot_corners_enabled" => {
                             s.gestures.hot_corners.enabled = value;
@@ -304,18 +306,28 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         }
                     }
 
-                    // Refresh models if visibility changed
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_gesture_models(&ui, &s);
-                        }
-                    }
-
                     debug!("Gesture toggle {} = {}", id_str, value);
                     save_manager.mark_dirty(SettingsCategory::Gestures);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    if needs_model_refresh {
+                        Some(s.clone())
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(s) = settings_clone {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_gesture_models(&ui, &s);
+                }
             }
         });
     }
@@ -325,10 +337,10 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_gestures_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         // DND edge scroll
                         "dnd_edge_scroll_trigger_width" => {
                             s.gestures.dnd_edge_view_scroll.trigger_size = value.clamp(10, 100);
@@ -374,7 +386,9 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&save_manager);
         ui.on_gestures_hot_corner_toggled(move |corner, value| {
             let corner_str = corner.to_string();
-            match settings.lock() {
+
+            // Update settings with lock, release before UI update
+            let update_corner = match settings.lock() {
                 Ok(mut s) => {
                     match corner_str.as_str() {
                         "top_left" => {
@@ -395,22 +409,30 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         }
                     }
 
-                    // Update UI state
-                    if let Some(ui) = ui_weak.upgrade() {
-                        match corner_str.as_str() {
-                            "top_left" => ui.set_gestures_hot_corner_top_left(value),
-                            "top_right" => ui.set_gestures_hot_corner_top_right(value),
-                            "bottom_left" => ui.set_gestures_hot_corner_bottom_left(value),
-                            "bottom_right" => ui.set_gestures_hot_corner_bottom_right(value),
-                            _ => {}
-                        }
-                    }
-
                     debug!("Hot corner {} = {}", corner_str, value);
                     save_manager.mark_dirty(SettingsCategory::Gestures);
                     save_manager.request_save();
+
+                    // Return the corner name for UI update
+                    Some(corner_str.clone())
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(corner) = update_corner {
+                if let Some(ui) = ui_weak.upgrade() {
+                    match corner.as_str() {
+                        "top_left" => ui.set_gestures_hot_corner_top_left(value),
+                        "top_right" => ui.set_gestures_hot_corner_top_right(value),
+                        "bottom_left" => ui.set_gestures_hot_corner_bottom_left(value),
+                        "bottom_right" => ui.set_gestures_hot_corner_bottom_right(value),
+                        _ => {}
+                    }
+                }
             }
         });
     }

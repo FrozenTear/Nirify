@@ -256,12 +256,14 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&save_manager);
         let ui_weak = ui.as_weak();
         ui.on_keyboard_dynamic_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+
+            // Perform settings update and collect data for UI update
+            let ui_update = match settings.lock() {
                 Ok(mut s) => {
                     let needs_model_refresh = false;
 
-                    match id_str.as_str() {
+                    match id_str {
                         // Note: Keyboard cannot be disabled in niri, so no "off" case
                         "numlock" => {
                             s.keyboard.numlock = value;
@@ -273,17 +275,27 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         }
                     }
 
-                    // Refresh models if visibility might have changed (e.g., off toggle)
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_all_models(&ui, &s);
-                        }
-                    }
-
                     save_manager.mark_dirty(SettingsCategory::Keyboard);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    if needs_model_refresh {
+                        Some(s.clone())
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(settings_clone) = ui_update {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_all_models(&ui, &settings_clone);
+                }
             }
         });
     }
@@ -293,10 +305,10 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_keyboard_dynamic_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         "repeat_delay" => {
                             s.keyboard.repeat_delay =
                                 value.clamp(REPEAT_DELAY_MIN, REPEAT_DELAY_MAX);
@@ -325,7 +337,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let _save_manager = Rc::clone(&save_manager);
         ui.on_keyboard_dynamic_setting_slider_float_changed(move |id, _value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(_s) => {
                     // No float sliders in keyboard settings currently
@@ -341,10 +353,10 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_keyboard_dynamic_setting_combo_changed(move |id, index| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         "track_layout" => {
                             s.keyboard.track_layout = if index == TRACK_LAYOUT_GLOBAL {
                                 String::from("global")
@@ -372,12 +384,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_keyboard_dynamic_setting_text_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let value_str = value.to_string();
 
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         "xkb_layout" => {
                             s.keyboard.xkb_layout = value_str.clone();
                             debug!("XKB layout = {}", value_str);

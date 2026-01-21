@@ -249,7 +249,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_switch_events_command_add(move |event_id, command_text| {
-            let event_id_str = event_id.to_string();
+            let event_id_str = event_id.as_str();
             let cmd = command_text.to_string();
 
             if cmd.trim().is_empty() {
@@ -280,7 +280,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_switch_events_command_remove(move |event_id, index| {
-            let event_id_str = event_id.to_string();
+            let event_id_str = event_id.as_str();
             let idx = index as usize;
 
             match settings.lock() {
@@ -308,7 +308,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let ui_weak = ui.as_weak();
         ui.on_switch_events_command_select(move |event_id, index| {
-            let event_id_str = event_id.to_string();
+            let event_id_str = event_id.as_str();
 
             match settings.lock() {
                 Ok(s) => {
@@ -331,7 +331,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_switch_events_command_text_changed(move |event_id, new_text| {
-            let event_id_str = event_id.to_string();
+            let event_id_str = event_id.as_str();
             let text = new_text.to_string();
 
             if let Some(ui) = ui_weak.upgrade() {

@@ -459,7 +459,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&save_manager);
         let ui_weak = ui.as_weak();
         ui.on_debug_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     if handle_toggle_change(&mut s, &id_str, value) {
@@ -484,7 +484,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&save_manager);
         let ui_weak = ui.as_weak();
         ui.on_debug_setting_text_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let value_str = value.to_string();
             match settings.lock() {
                 Ok(mut s) => {

@@ -244,20 +244,18 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_recent_windows_dynamic_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+
+            // Clone data needed for UI update, then release lock before UI operations
+            let rw_clone = match settings.lock() {
                 Ok(mut s) => {
                     let rw = &mut s.recent_windows;
                     #[allow(unused_assignments)]
                     let mut needs_model_refresh = false;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "enabled" => {
                             rw.off = !value;
-                            // Update feature_enabled property for section visibility
-                            if let Some(ui) = ui_weak.upgrade() {
-                                ui.set_recent_windows_dynamic_feature_enabled(value);
-                            }
                             needs_model_refresh = true;
                         }
                         _ => {
@@ -266,18 +264,29 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         }
                     }
 
-                    // Refresh models if visibility changed
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_recent_windows_models(&ui, rw);
-                        }
-                    }
-
                     debug!("Recent windows toggle {} = {}", id_str, value);
                     save_manager.mark_dirty(SettingsCategory::RecentWindows);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    if needs_model_refresh {
+                        Some(rw.clone())
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(rw) = rw_clone {
+                if let Some(ui) = ui_weak.upgrade() {
+                    ui.set_recent_windows_dynamic_feature_enabled(value);
+                    sync_recent_windows_models(&ui, &rw);
+                }
             }
         });
     }
@@ -287,12 +296,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_recent_windows_dynamic_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let rw = &mut s.recent_windows;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "debounce_ms" => {
                             rw.debounce_ms = value.max(0);
                         }
@@ -328,12 +337,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_recent_windows_dynamic_setting_slider_float_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let rw = &mut s.recent_windows;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "previews_max_scale" => {
                             // Convert from percentage (10-100) to actual value (0.1-1.0)
                             let actual_value = (value as f64 / 100.0).clamp(0.1, 1.0);
@@ -360,31 +369,29 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_recent_windows_dynamic_setting_text_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let value_str = value.to_string();
 
-            match settings.lock() {
+            // Try to parse as color for color fields
+            let color_result = Color::from_hex(&value_str);
+
+            // Clone data needed for UI update, then release lock before UI operations
+            let rw_clone = match settings.lock() {
                 Ok(mut s) => {
                     let rw = &mut s.recent_windows;
+                    let mut needs_refresh = false;
 
-                    // Try to parse as color for color fields
-                    let color_result = Color::from_hex(&value_str);
-
-                    match id_str.as_str() {
+                    match id_str {
                         "highlight_active_color" => {
                             if let Some(color) = color_result {
                                 rw.highlight.active_color = color;
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    sync_recent_windows_models(&ui, rw);
-                                }
+                                needs_refresh = true;
                             }
                         }
                         "highlight_urgent_color" => {
                             if let Some(color) = color_result {
                                 rw.highlight.urgent_color = color;
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    sync_recent_windows_models(&ui, rw);
-                                }
+                                needs_refresh = true;
                             }
                         }
                         _ => {
@@ -399,8 +406,25 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         save_manager.mark_dirty(SettingsCategory::RecentWindows);
                         save_manager.request_save();
                     }
+
+                    // Clone data for UI update if needed
+                    if needs_refresh {
+                        Some(rw.clone())
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(rw) = rw_clone {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_recent_windows_models(&ui, &rw);
+                }
             }
         });
     }
@@ -411,14 +435,15 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_recent_windows_dynamic_setting_color_changed(move |id, color| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let rust_color = slint_color_to_color(color);
 
-            match settings.lock() {
+            // Clone data needed for UI update, then release lock before UI operations
+            let rw_clone = match settings.lock() {
                 Ok(mut s) => {
                     let rw = &mut s.recent_windows;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "highlight_active_color" => {
                             rw.highlight.active_color = rust_color;
                         }
@@ -431,16 +456,22 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         }
                     }
 
-                    // Refresh models to update hex display
-                    if let Some(ui) = ui_weak.upgrade() {
-                        sync_recent_windows_models(&ui, rw);
-                    }
-
                     debug!("Recent windows color {} changed", id_str);
                     save_manager.mark_dirty(SettingsCategory::RecentWindows);
                     save_manager.request_save();
+
+                    // Clone data for UI update
+                    rw.clone()
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(ui) = ui_weak.upgrade() {
+                sync_recent_windows_models(&ui, &rw_clone);
             }
         });
     }

@@ -76,7 +76,7 @@ component DynamicRow inherits Rectangle {
 
         // Control column
         Rectangle {
-            width: 200px;
+            width: Theme.input-width-xl;
             vertical-stretch: 1;
 
             // Toggle (type 0)
@@ -112,7 +112,7 @@ component DynamicRow inherits Rectangle {
                 }
 
                 Text {
-                    width: 55px;
+                    width: Theme.value-label-width;
                     text: setting.use-float
                         ? round(setting.float-value * 100) / 100 + setting.suffix
                         : setting.int-value + setting.suffix;
@@ -128,7 +128,7 @@ component DynamicRow inherits Rectangle {
                 alignment: end;
 
                 ComboBox {
-                    width: 150px;
+                    width: Theme.combobox-width;
                     model: setting.combo-options;
                     current-index: setting.combo-index;
                     selected(_) => {
@@ -229,7 +229,7 @@ component AnimationRow inherits Rectangle {
             }
 
             ComboBox {
-                width: 120px;
+                width: Theme.color-column-width;
                 model: setting.combo-options;
                 current-index: setting.combo-index;
                 selected(_) => {

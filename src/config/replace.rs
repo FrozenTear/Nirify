@@ -223,7 +223,17 @@ fn extract_unmanaged_nodes(analysis: &ConfigAnalysis) -> String {
     for (idx, classification) in &analysis.node_classifications {
         match classification {
             NodeClassification::Unmanaged | NodeClassification::OtherInclude => {
-                let node = &analysis.document.nodes()[*idx];
+                // Bounds check to prevent panic on out-of-range index
+                let nodes = analysis.document.nodes();
+                if *idx >= nodes.len() {
+                    warn!(
+                        "Node index {} out of bounds (len={}), skipping",
+                        idx,
+                        nodes.len()
+                    );
+                    continue;
+                }
+                let node = &nodes[*idx];
                 // Use KDL's Display formatting - preserves structure, may normalize whitespace
                 result.push_str(&format!("{}\n", node));
             }
@@ -325,7 +335,17 @@ pub fn smart_replace_config(config_path: &Path, backup_dir: &Path) -> Result<Sma
     atomic_write(&backup_path, &analysis.original_content)
         .with_context(|| format!("Failed to backup to {:?}", backup_path))?;
 
-    info!("Created backup at {:?}", backup_path);
+    // Verify backup was written correctly before proceeding
+    let backup_content = fs::read_to_string(&backup_path)
+        .with_context(|| format!("Failed to verify backup at {:?}", backup_path))?;
+    if backup_content != analysis.original_content {
+        return Err(anyhow::anyhow!(
+            "Backup verification failed: content mismatch at {:?}. Aborting to prevent data loss.",
+            backup_path
+        ));
+    }
+
+    info!("Created and verified backup at {:?}", backup_path);
 
     // Generate new config content
     let new_content = generate_replaced_config(&analysis);

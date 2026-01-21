@@ -363,13 +363,13 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_layout_extras_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let extras = &mut s.layout_extras;
                     let mut needs_model_refresh = false;
 
-                    match id_str.as_str() {
+                    match id_str {
                         // Shadow settings
                         "shadow_enabled" => {
                             extras.shadow.enabled = value;
@@ -424,12 +424,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_layout_extras_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let extras = &mut s.layout_extras;
 
-                    match id_str.as_str() {
+                    match id_str {
                         // Shadow settings
                         "shadow_softness" => {
                             extras.shadow.softness = value.clamp(0, 100);
@@ -478,12 +478,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_layout_extras_setting_slider_float_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let extras = &mut s.layout_extras;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "tab_length_proportion" => {
                             extras.tab_indicator.length_proportion = value.clamp(0.1, 1.0);
                         }
@@ -508,12 +508,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_layout_extras_setting_combo_changed(move |id, index| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let extras = &mut s.layout_extras;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "tab_position" => {
                             extras.tab_indicator.position = match index {
                                 0 => TabIndicatorPosition::Left,
@@ -545,7 +545,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_layout_extras_setting_color_changed(move |id, hex_value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let hex_str = hex_value.to_string();
 
             // Parse the hex color
@@ -558,7 +558,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                 Ok(mut s) => {
                     let extras = &mut s.layout_extras;
 
-                    match id_str.as_str() {
+                    match id_str {
                         // Shadow colors
                         "shadow_color" => {
                             extras.shadow.color = color;

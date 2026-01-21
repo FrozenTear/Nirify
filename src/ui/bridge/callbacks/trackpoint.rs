@@ -265,18 +265,18 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_trackpoint_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+
+            // Perform settings update and collect data for UI update
+            let update_device_off = match settings.lock() {
                 Ok(mut s) => {
                     let trackpoint = &mut s.trackpoint;
+                    let mut update_device_off = false;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "off" => {
                             trackpoint.off = value;
-                            // Update device_off property for section visibility
-                            if let Some(ui) = ui_weak.upgrade() {
-                                ui.set_trackpoint_dynamic_device_off(value);
-                            }
+                            update_device_off = true;
                         }
                         "natural_scroll" => {
                             trackpoint.natural_scroll = value;
@@ -299,8 +299,20 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     debug!("Trackpoint toggle {} = {}", id_str, value);
                     save_manager.mark_dirty(SettingsCategory::Trackpoint);
                     save_manager.request_save();
+
+                    update_device_off
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if update_device_off {
+                if let Some(ui) = ui_weak.upgrade() {
+                    ui.set_trackpoint_dynamic_device_off(value);
+                }
             }
         });
     }
@@ -310,12 +322,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_trackpoint_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let trackpoint = &mut s.trackpoint;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "scroll_button" => {
                             trackpoint.scroll_button = if value == 0 { None } else { Some(value) };
                         }
@@ -339,12 +351,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_trackpoint_setting_slider_float_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let trackpoint = &mut s.trackpoint;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "accel_speed" => {
                             // Convert from percentage (-100 to 100) to actual value (-1.0 to 1.0)
                             let actual_value =
@@ -372,13 +384,15 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_trackpoint_setting_combo_changed(move |id, index| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+
+            // Perform settings update and collect data for UI update
+            let ui_update = match settings.lock() {
                 Ok(mut s) => {
                     let trackpoint = &mut s.trackpoint;
                     let mut needs_model_refresh = false;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "accel_profile" => {
                             trackpoint.accel_profile = AccelProfile::from_index(index);
                         }
@@ -392,18 +406,28 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         }
                     }
 
-                    // Refresh models if visibility changed
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_all_models(&ui, trackpoint);
-                        }
-                    }
-
                     debug!("Trackpoint combo {} = {}", id_str, index);
                     save_manager.mark_dirty(SettingsCategory::Trackpoint);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    if needs_model_refresh {
+                        Some(trackpoint.clone())
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(trackpoint_clone) = ui_update {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_all_models(&ui, &trackpoint_clone);
+                }
             }
         });
     }
@@ -413,7 +437,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_trackpoint_setting_text_changed(move |id, _value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut _s) => {
                     // No text settings for trackpoint currently

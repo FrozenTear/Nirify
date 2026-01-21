@@ -54,7 +54,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_environment_dynamic_add_variable(move || {
-            match settings.lock() {
+            let (variables_clone, new_idx, new_id) = match settings.lock() {
                 Ok(mut s) => {
                     // Check limit before adding
                     if s.environment.variables.len() >= MAX_ENVIRONMENT_VARS {
@@ -78,24 +78,30 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     let new_idx = (s.environment.variables.len() - 1) as i32;
                     selected_idx.set(new_idx);
 
-                    // Update UI
-                    if let Some(ui) = ui_weak.upgrade() {
-                        ui.set_environment_dynamic_variable_list(build_variable_list_model(
-                            &s.environment.variables,
-                        ));
-                        ui.set_environment_dynamic_selected_index(new_idx);
-
-                        if let Some(var) = s.environment.variables.get(new_idx as usize) {
-                            sync_current_variable(&ui, var);
-                        }
-                    }
-
-                    debug!("Added new environment variable with id {}", new_id);
-                    save_manager.mark_dirty(SettingsCategory::Environment);
-                    save_manager.request_save();
+                    // Clone data for UI update
+                    (s.environment.variables.clone(), new_idx, new_id)
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(ui) = ui_weak.upgrade() {
+                ui.set_environment_dynamic_variable_list(build_variable_list_model(
+                    &variables_clone,
+                ));
+                ui.set_environment_dynamic_selected_index(new_idx);
+
+                if let Some(var) = variables_clone.get(new_idx as usize) {
+                    sync_current_variable(&ui, var);
+                }
             }
+
+            debug!("Added new environment variable with id {}", new_id);
+            save_manager.mark_dirty(SettingsCategory::Environment);
+            save_manager.request_save();
         });
     }
 
@@ -107,44 +113,52 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&save_manager);
         ui.on_environment_dynamic_remove_variable(move |index| {
             let idx = index as usize;
-            match settings.lock() {
+            let (variables_clone, new_sel, name) = match settings.lock() {
                 Ok(mut s) => {
-                    if idx < s.environment.variables.len() {
-                        let name = s.environment.variables[idx].name.clone();
-                        s.environment.variables.remove(idx);
+                    if idx >= s.environment.variables.len() {
+                        return;
+                    }
 
-                        // Update selected index
-                        let new_sel = if s.environment.variables.is_empty() {
-                            -1
-                        } else if idx >= s.environment.variables.len() {
-                            (s.environment.variables.len() - 1) as i32
-                        } else {
-                            idx as i32
-                        };
+                    let name = s.environment.variables[idx].name.clone();
+                    s.environment.variables.remove(idx);
 
-                        selected_idx.set(new_sel);
+                    // Update selected index
+                    let new_sel = if s.environment.variables.is_empty() {
+                        -1
+                    } else if idx >= s.environment.variables.len() {
+                        (s.environment.variables.len() - 1) as i32
+                    } else {
+                        idx as i32
+                    };
 
-                        // Update UI
-                        if let Some(ui) = ui_weak.upgrade() {
-                            ui.set_environment_dynamic_variable_list(build_variable_list_model(
-                                &s.environment.variables,
-                            ));
-                            ui.set_environment_dynamic_selected_index(new_sel);
+                    selected_idx.set(new_sel);
 
-                            if new_sel >= 0 {
-                                if let Some(var) = s.environment.variables.get(new_sel as usize) {
-                                    sync_current_variable(&ui, var);
-                                }
-                            }
-                        }
+                    // Clone data for UI update
+                    (s.environment.variables.clone(), new_sel, name)
+                }
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
 
-                        debug!("Removed environment variable at index {}: {}", idx, name);
-                        save_manager.mark_dirty(SettingsCategory::Environment);
-                        save_manager.request_save();
+            // UI updates happen after lock is released
+            if let Some(ui) = ui_weak.upgrade() {
+                ui.set_environment_dynamic_variable_list(build_variable_list_model(
+                    &variables_clone,
+                ));
+                ui.set_environment_dynamic_selected_index(new_sel);
+
+                if new_sel >= 0 {
+                    if let Some(var) = variables_clone.get(new_sel as usize) {
+                        sync_current_variable(&ui, var);
                     }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
             }
+
+            debug!("Removed environment variable at index {}: {}", idx, name);
+            save_manager.mark_dirty(SettingsCategory::Environment);
+            save_manager.request_save();
         });
     }
 
@@ -156,15 +170,19 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         ui.on_environment_dynamic_select_variable(move |index| {
             selected_idx.set(index);
 
-            match settings.lock() {
-                Ok(s) => {
-                    if let Some(var) = s.environment.variables.get(index as usize) {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_current_variable(&ui, var);
-                        }
-                    }
+            let var_clone = match settings.lock() {
+                Ok(s) => s.environment.variables.get(index as usize).cloned(),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+            };
+
+            // UI updates happen after lock is released
+            if let Some(var) = var_clone {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_current_variable(&ui, &var);
+                }
             }
         });
     }
@@ -182,24 +200,33 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                 return;
             }
 
-            match settings.lock() {
+            let variables_clone = match settings.lock() {
                 Ok(mut s) => {
                     if let Some(var) = s.environment.variables.get_mut(idx as usize) {
                         var.name = value.to_string();
-
-                        // Update list display
-                        if let Some(ui) = ui_weak.upgrade() {
-                            ui.set_environment_dynamic_variable_list(build_variable_list_model(
-                                &s.environment.variables,
-                            ));
-                        }
-
-                        debug!("Changed environment variable name at index {}", idx);
-                        save_manager.mark_dirty(SettingsCategory::Environment);
-                        save_manager.request_save();
+                        // Clone data for UI update
+                        Some(s.environment.variables.clone())
+                    } else {
+                        None
                     }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(variables) = variables_clone {
+                if let Some(ui) = ui_weak.upgrade() {
+                    ui.set_environment_dynamic_variable_list(build_variable_list_model(
+                        &variables,
+                    ));
+                }
+
+                debug!("Changed environment variable name at index {}", idx);
+                save_manager.mark_dirty(SettingsCategory::Environment);
+                save_manager.request_save();
             }
         });
     }
@@ -217,24 +244,33 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                 return;
             }
 
-            match settings.lock() {
+            let variables_clone = match settings.lock() {
                 Ok(mut s) => {
                     if let Some(var) = s.environment.variables.get_mut(idx as usize) {
                         var.value = value.to_string();
-
-                        // Update list display
-                        if let Some(ui) = ui_weak.upgrade() {
-                            ui.set_environment_dynamic_variable_list(build_variable_list_model(
-                                &s.environment.variables,
-                            ));
-                        }
-
-                        debug!("Changed environment variable value at index {}", idx);
-                        save_manager.mark_dirty(SettingsCategory::Environment);
-                        save_manager.request_save();
+                        // Clone data for UI update
+                        Some(s.environment.variables.clone())
+                    } else {
+                        None
                     }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(variables) = variables_clone {
+                if let Some(ui) = ui_weak.upgrade() {
+                    ui.set_environment_dynamic_variable_list(build_variable_list_model(
+                        &variables,
+                    ));
+                }
+
+                debug!("Changed environment variable value at index {}", idx);
+                save_manager.mark_dirty(SettingsCategory::Environment);
+                save_manager.request_save();
             }
         });
     }
@@ -249,7 +285,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
             let from_idx = from as usize;
             let to_idx = to as usize;
 
-            match settings.lock() {
+            let (variables_clone, insert_idx) = match settings.lock() {
                 Ok(mut s) => {
                     let len = s.environment.variables.len();
                     if from_idx >= len || to_idx > len || from_idx == to_idx {
@@ -268,27 +304,33 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     // Update selected index to follow moved item
                     selected_idx.set(insert_idx as i32);
 
-                    // Update UI
-                    if let Some(ui) = ui_weak.upgrade() {
-                        ui.set_environment_dynamic_variable_list(build_variable_list_model(
-                            &s.environment.variables,
-                        ));
-                        ui.set_environment_dynamic_selected_index(insert_idx as i32);
-
-                        if let Some(var) = s.environment.variables.get(insert_idx) {
-                            sync_current_variable(&ui, var);
-                        }
-                    }
-
-                    debug!(
-                        "Reordered environment variable from {} to {} (inserted at {})",
-                        from_idx, to_idx, insert_idx
-                    );
-                    save_manager.mark_dirty(SettingsCategory::Environment);
-                    save_manager.request_save();
+                    // Clone data for UI update
+                    (s.environment.variables.clone(), insert_idx)
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(ui) = ui_weak.upgrade() {
+                ui.set_environment_dynamic_variable_list(build_variable_list_model(
+                    &variables_clone,
+                ));
+                ui.set_environment_dynamic_selected_index(insert_idx as i32);
+
+                if let Some(var) = variables_clone.get(insert_idx) {
+                    sync_current_variable(&ui, var);
+                }
             }
+
+            debug!(
+                "Reordered environment variable from {} to {} (inserted at {})",
+                from_idx, to_idx, insert_idx
+            );
+            save_manager.mark_dirty(SettingsCategory::Environment);
+            save_manager.request_save();
         });
     }
 }

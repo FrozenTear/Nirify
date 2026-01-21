@@ -580,25 +580,17 @@ fn parse_anim_index(id: &str) -> Option<i32> {
 }
 
 /// Handle toggle setting changes
-fn handle_toggle(
-    id: &str,
-    value: bool,
-    settings: &mut Settings,
-    ui_weak: &slint::Weak<MainWindow>,
-) -> bool {
+/// Returns (changed, needs_ui_refresh)
+fn handle_toggle(id: &str, value: bool, settings: &mut Settings) -> (bool, bool) {
     match id {
         "animations_enabled" => {
             settings.animations.enabled = value;
-            // Refresh models to show/hide slowdown slider
-            if let Some(ui) = ui_weak.upgrade() {
-                sync_animation_models(&ui, &settings.animations);
-            }
             debug!("Animations enabled: {}", value);
-            true
+            (true, true) // needs UI refresh to show/hide slowdown slider
         }
         _ => {
             debug!("Unknown toggle setting: {}", id);
-            false
+            (false, false)
         }
     }
 }
@@ -714,12 +706,8 @@ fn handle_slider_int(
 }
 
 /// Handle combo box setting changes
-fn handle_combo(
-    id: &str,
-    index: i32,
-    settings: &mut Settings,
-    ui_weak: &slint::Weak<MainWindow>,
-) -> bool {
+/// Returns (changed, needs_ui_refresh)
+fn handle_combo(id: &str, index: i32, settings: &mut Settings) -> (bool, bool) {
     let id_str = id;
 
     // Animation type selector
@@ -729,12 +717,7 @@ fn handle_combo(
             let anim = anim_id.get_mut(&mut settings.animations.per_animation);
             anim.animation_type = AnimationType::from_index(index);
             debug!("{} type: {:?}", anim_id.name(), anim.animation_type);
-
-            // Refresh models to show/hide spring/easing panels
-            if let Some(ui) = ui_weak.upgrade() {
-                sync_animation_models(&ui, &settings.animations);
-            }
-            return true;
+            return (true, true); // needs UI refresh to show/hide spring/easing panels
         }
     }
 
@@ -745,17 +728,12 @@ fn handle_combo(
             let anim = anim_id.get_mut(&mut settings.animations.per_animation);
             anim.easing.curve = EasingCurve::from_index(index);
             debug!("{} curve: {:?}", anim_id.name(), anim.easing.curve);
-
-            // Refresh models to show/hide bezier controls
-            if let Some(ui) = ui_weak.upgrade() {
-                sync_animation_models(&ui, &settings.animations);
-            }
-            return true;
+            return (true, true); // needs UI refresh to show/hide bezier controls
         }
     }
 
     debug!("Unknown combo setting: {}", id_str);
-    false
+    (false, false)
 }
 
 // ============================================================================
@@ -773,15 +751,31 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&sm);
         let ui_weak = ui.as_weak();
         ui.on_anim_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+            let result = match settings.lock() {
                 Ok(mut s) => {
-                    if handle_toggle(&id_str, value, &mut s, &ui_weak) {
+                    let (changed, needs_refresh) = handle_toggle(&id_str, value, &mut s);
+                    if changed {
                         save_manager.mark_dirty(SettingsCategory::Animations);
                         save_manager.request_save();
                     }
+                    if needs_refresh {
+                        Some(s.animations.clone())
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    None
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(anim_settings) = result {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_animation_models(&ui, &anim_settings);
+                }
             }
         });
     }
@@ -792,7 +786,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&sm);
         let ui_weak = ui.as_weak();
         ui.on_anim_setting_slider_float_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     if handle_slider_float(&id_str, value, &mut s, &ui_weak) {
@@ -811,7 +805,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&sm);
         let ui_weak = ui.as_weak();
         ui.on_anim_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     if handle_slider_int(&id_str, value, &mut s, &ui_weak) {
@@ -830,15 +824,31 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&sm);
         let ui_weak = ui.as_weak();
         ui.on_anim_setting_combo_changed(move |id, index| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+            let result = match settings.lock() {
                 Ok(mut s) => {
-                    if handle_combo(&id_str, index, &mut s, &ui_weak) {
+                    let (changed, needs_refresh) = handle_combo(&id_str, index, &mut s);
+                    if changed {
                         save_manager.mark_dirty(SettingsCategory::Animations);
                         save_manager.request_save();
                     }
+                    if needs_refresh {
+                        Some(s.animations.clone())
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    None
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(anim_settings) = result {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_animation_models(&ui, &anim_settings);
+                }
             }
         });
     }

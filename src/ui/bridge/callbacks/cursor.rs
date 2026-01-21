@@ -175,12 +175,14 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_cursor_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+
+            // Perform settings update and collect data for UI update
+            let ui_update = match settings.lock() {
                 Ok(mut s) => {
                     let mut needs_model_refresh = false;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "hide_when_typing" => {
                             s.cursor.hide_when_typing = value;
                         }
@@ -200,18 +202,28 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         }
                     }
 
-                    // Refresh models if visibility changed
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_cursor_models(&ui, &s);
-                        }
-                    }
-
                     debug!("Cursor toggle {} = {}", id_str, value);
                     save_manager.mark_dirty(SettingsCategory::Cursor);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    if needs_model_refresh {
+                        Some(s.clone())
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(settings_clone) = ui_update {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_cursor_models(&ui, &settings_clone);
+                }
             }
         });
     }
@@ -221,10 +233,10 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_cursor_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         "cursor_size" => {
                             s.cursor.size = value.clamp(CURSOR_SIZE_MIN, CURSOR_SIZE_MAX);
                         }
@@ -252,12 +264,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_cursor_setting_text_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let value_str = value.to_string();
 
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         "cursor_theme" => {
                             s.cursor.theme = value_str.clone();
                         }

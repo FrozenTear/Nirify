@@ -20,8 +20,36 @@ use serde::Deserialize;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
+use std::process::Command;
 use std::time::Duration;
 use thiserror::Error;
+
+/// Standard paths where niri binary may be installed
+const NIRI_BINARY_PATHS: &[&str] = &[
+    "/usr/bin/niri",
+    "/usr/local/bin/niri",
+    "/bin/niri",
+];
+
+/// Find the niri binary in standard system paths
+///
+/// Returns the first path that exists and is executable.
+/// This avoids relying on PATH which could be manipulated.
+fn find_niri_binary() -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+
+    for path_str in NIRI_BINARY_PATHS {
+        let path = PathBuf::from(path_str);
+        if let Ok(metadata) = std::fs::metadata(&path) {
+            // Check it's a file and has execute permission
+            if metadata.is_file() && (metadata.permissions().mode() & 0o111) != 0 {
+                debug!("Found niri binary at {:?}", path);
+                return Some(path);
+            }
+        }
+    }
+    None
+}
 
 /// Unified error type for all IPC operations
 ///
@@ -388,10 +416,15 @@ pub fn quit_niri() -> IpcResult<()> {
 /// Validate niri configuration by running `niri validate`
 ///
 /// Returns Ok(message) if valid, Err(error_details) if invalid.
+/// Uses absolute paths to the niri binary for security (avoids PATH manipulation).
 pub fn validate_config() -> IpcResult<String> {
-    use std::process::Command;
+    let niri_path = find_niri_binary().ok_or_else(|| {
+        IpcError::CommandFailed(
+            "niri binary not found in /usr/bin/niri, /usr/local/bin/niri, or /bin/niri".to_string(),
+        )
+    })?;
 
-    let output = Command::new("niri")
+    let output = Command::new(&niri_path)
         .arg("validate")
         .output()
         .map_err(|e| IpcError::CommandFailed(format!("Failed to run 'niri validate': {}", e)))?;

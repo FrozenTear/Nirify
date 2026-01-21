@@ -13,6 +13,26 @@ use std::sync::{Arc, Mutex};
 use super::super::macros::SaveManager;
 
 // ============================================================================
+// SECTION ENUM FOR SELECTIVE SYNC
+// ============================================================================
+
+/// Identifies which section of miscellaneous settings to refresh
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MiscSection {
+    Decorations,
+    Screenshots,
+    ScreenshotPath,
+    Clipboard,
+    HotkeyOverlay,
+    ConfigNotification,
+    Startup,
+    XWayland,
+    XWaylandPath,
+    Developer,
+    All,
+}
+
+// ============================================================================
 // Helper functions for creating setting models
 // ============================================================================
 
@@ -272,6 +292,50 @@ fn populate_developer_settings(show_debug: bool) -> ModelRc<MiscSettingModel> {
 // Sync all UI models from Settings
 // ============================================================================
 
+/// Sync a specific section of miscellaneous UI models from settings
+///
+/// This function allows selective refresh of UI models, avoiding the overhead
+/// of refreshing all sections when only one has changed.
+pub fn sync_models(ui: &MainWindow, settings: &Settings, show_debug: bool, section: MiscSection) {
+    match section {
+        MiscSection::Decorations => {
+            ui.set_misc_decorations_settings(populate_decorations_settings(settings));
+        }
+        MiscSection::Screenshots => {
+            ui.set_misc_screenshots_settings(populate_screenshots_settings());
+        }
+        MiscSection::ScreenshotPath => {
+            ui.set_misc_screenshot_path_setting(populate_screenshot_path_setting(settings));
+        }
+        MiscSection::Clipboard => {
+            ui.set_misc_clipboard_settings(populate_clipboard_settings(settings));
+        }
+        MiscSection::HotkeyOverlay => {
+            ui.set_misc_hotkey_overlay_settings(populate_hotkey_overlay_settings(settings));
+        }
+        MiscSection::ConfigNotification => {
+            ui.set_misc_config_notification_settings(populate_config_notification_settings(
+                settings,
+            ));
+        }
+        MiscSection::Startup => {
+            ui.set_misc_startup_settings(populate_startup_settings(settings));
+        }
+        MiscSection::XWayland => {
+            ui.set_misc_xwayland_settings(populate_xwayland_settings(settings));
+        }
+        MiscSection::XWaylandPath => {
+            ui.set_misc_xwayland_path_setting(populate_xwayland_path_setting(settings));
+        }
+        MiscSection::Developer => {
+            ui.set_misc_developer_settings(populate_developer_settings(show_debug));
+        }
+        MiscSection::All => {
+            sync_all_models(ui, settings, show_debug);
+        }
+    }
+}
+
 /// Sync all miscellaneous settings UI models from Settings struct
 fn sync_all_models(ui: &MainWindow, settings: &Settings, show_debug: bool) {
     ui.set_misc_decorations_settings(populate_decorations_settings(settings));
@@ -302,49 +366,60 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_misc_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
 
             // Handle show_debug_options separately (UI-only, controls Debug page visibility)
             if id_str == "show_debug_options" {
                 show_debug.set(value);
                 debug!("Show debug options: {}", value);
-                // Update the MainWindow property so the sidebar can show/hide the Debug page
+
+                // Clone settings for UI update, then release lock
+                let settings_clone = settings.lock().ok().map(|s| s.clone());
+
+                // UI updates happen after lock is released
                 if let Some(ui) = ui_weak.upgrade() {
                     ui.set_show_debug_options(value);
-                    if let Ok(s) = settings.lock() {
-                        sync_all_models(&ui, &s, value);
+                    if let Some(s) = settings_clone {
+                        // Only refresh the developer section, not all sections
+                        sync_models(&ui, &s, value, MiscSection::Developer);
                     }
                 }
                 return;
             }
 
+            // For other toggles, no UI refresh needed (they don't affect visibility of other settings)
             match settings.lock() {
                 Ok(mut s) => {
-                    let mut changed = true;
-                    match id_str.as_str() {
+                    let changed = match id_str {
                         "prefer_no_csd" => {
                             s.miscellaneous.prefer_no_csd = value;
+                            true
                         }
                         "disable_primary_clipboard" => {
                             s.miscellaneous.disable_primary_clipboard = value;
+                            true
                         }
                         "hotkey_overlay_skip" => {
                             s.miscellaneous.hotkey_overlay_skip_at_startup = value;
+                            true
                         }
                         "hotkey_overlay_hide_not_bound" => {
                             s.miscellaneous.hotkey_overlay_hide_not_bound = value;
+                            true
                         }
                         "config_notification_disable_failed" => {
                             s.miscellaneous.config_notification_disable_failed = value;
+                            true
                         }
                         "spawn_sh_at_startup" => {
                             s.miscellaneous.spawn_sh_at_startup = value;
+                            true
                         }
                         _ => {
                             debug!("Unknown misc toggle setting: {}", id_str);
-                            changed = false;
+                            false
                         }
-                    }
+                    };
 
                     if changed {
                         debug!("Misc toggle {} = {}", id_str, value);
@@ -364,41 +439,47 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_misc_setting_combo_changed(move |id, index| {
-            let id_str = id.to_string();
-            match settings.lock() {
-                Ok(mut s) => {
-                    let mut changed = true;
-                    let mut needs_refresh = false;
+            let id_str = id.as_str();
 
-                    match id_str.as_str() {
+            // Clone data needed for UI update, then release lock before UI operations
+            let refresh_info = match settings.lock() {
+                Ok(mut s) => {
+                    let section = match id_str {
                         "xwayland_satellite_mode" => {
                             s.miscellaneous.xwayland_satellite = match index {
                                 1 => XWaylandSatelliteConfig::Off,
                                 2 => XWaylandSatelliteConfig::CustomPath(String::new()),
                                 _ => XWaylandSatelliteConfig::Default,
                             };
-                            needs_refresh = true;
+                            // Need to refresh XWaylandPath since its visibility depends on mode
+                            Some(MiscSection::XWaylandPath)
                         }
                         _ => {
                             debug!("Unknown misc combo setting: {}", id_str);
-                            changed = false;
+                            None
                         }
-                    }
+                    };
 
-                    if changed {
+                    if section.is_some() {
                         debug!("Misc combo {} = {}", id_str, index);
                         save_manager.mark_dirty(SettingsCategory::Miscellaneous);
                         save_manager.request_save();
-
-                        // Refresh models if visibility may have changed
-                        if needs_refresh {
-                            if let Some(ui) = ui_weak.upgrade() {
-                                sync_all_models(&ui, &s, show_debug.get());
-                            }
-                        }
                     }
+
+                    // Clone data for UI update if needed
+                    section.map(|sec| (s.clone(), sec))
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some((s, section)) = refresh_info {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_models(&ui, &s, show_debug.get(), section);
+                }
             }
         });
     }
@@ -408,14 +489,14 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_misc_setting_text_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let value_str = value.to_string();
 
             match settings.lock() {
                 Ok(mut s) => {
                     let mut changed = true;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "screenshot_path" => {
                             s.miscellaneous.screenshot_path = value_str.clone();
                         }

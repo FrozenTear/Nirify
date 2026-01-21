@@ -19,6 +19,21 @@ use super::super::converters::{color_to_slint_color, slint_color_to_color};
 use super::super::macros::SaveManager;
 
 // ============================================================================
+// SECTION ENUM FOR SELECTIVE SYNC
+// ============================================================================
+
+/// Identifies which section of appearance settings to refresh
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AppearanceSection {
+    FocusRing,
+    Border,
+    Background,
+    Gaps,
+    Corners,
+    All,
+}
+
+// ============================================================================
 // HELPER FUNCTIONS FOR CREATING SETTING MODELS
 // ============================================================================
 
@@ -247,6 +262,33 @@ fn populate_corners_settings(appearance: &AppearanceSettings) -> ModelRc<Appeara
     ModelRc::new(VecModel::from(settings))
 }
 
+/// Sync a specific section of appearance UI models from settings
+///
+/// This function allows selective refresh of UI models, avoiding the overhead
+/// of refreshing all sections when only one has changed.
+pub fn sync_models(ui: &MainWindow, appearance: &AppearanceSettings, section: AppearanceSection) {
+    match section {
+        AppearanceSection::FocusRing => {
+            ui.set_appearance_focus_ring_settings(populate_focus_ring_settings(appearance));
+        }
+        AppearanceSection::Border => {
+            ui.set_appearance_border_settings(populate_border_settings(appearance));
+        }
+        AppearanceSection::Background => {
+            ui.set_appearance_background_settings(populate_background_settings(appearance));
+        }
+        AppearanceSection::Gaps => {
+            ui.set_appearance_gaps_settings(populate_gaps_settings(appearance));
+        }
+        AppearanceSection::Corners => {
+            ui.set_appearance_corners_settings(populate_corners_settings(appearance));
+        }
+        AppearanceSection::All => {
+            sync_all_models(ui, appearance);
+        }
+    }
+}
+
 /// Sync all UI models from settings
 pub fn sync_all_models(ui: &MainWindow, appearance: &AppearanceSettings) {
     ui.set_appearance_focus_ring_settings(populate_focus_ring_settings(appearance));
@@ -268,39 +310,44 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_appearance_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
-                Ok(mut s) => {
-                    #[allow(unused_assignments)]
-                    let mut needs_model_refresh = false;
+            let id_str = id.as_str();
 
-                    match id_str.as_str() {
+            // Clone data needed for UI update, then release lock before UI operations
+            let refresh_info = match settings.lock() {
+                Ok(mut s) => {
+                    let section = match id_str {
                         "focus_ring_enabled" => {
                             s.appearance.focus_ring_enabled = value;
-                            needs_model_refresh = true;
+                            Some(AppearanceSection::FocusRing)
                         }
                         "border_enabled" => {
                             s.appearance.border_enabled = value;
-                            needs_model_refresh = true;
+                            Some(AppearanceSection::Border)
                         }
                         _ => {
                             debug!("Unknown appearance toggle setting: {}", id_str);
                             return;
                         }
-                    }
-
-                    // Refresh models if visibility changed
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_all_models(&ui, &s.appearance);
-                        }
-                    }
+                    };
 
                     debug!("Appearance toggle {} = {}", id_str, value);
                     save_manager.mark_dirty(SettingsCategory::Appearance);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    section.map(|sec| (s.appearance.clone(), sec))
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some((appearance, section)) = refresh_info {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_models(&ui, &appearance, section);
+                }
             }
         });
     }
@@ -310,10 +357,10 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_appearance_setting_slider_float_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    match id_str {
                         "focus_ring_width" => {
                             s.appearance.focus_ring_width =
                                 value.clamp(FOCUS_RING_WIDTH_MIN, FOCUS_RING_WIDTH_MAX);
@@ -350,76 +397,77 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_appearance_setting_text_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let value_str = value.to_string();
 
-            match settings.lock() {
-                Ok(mut s) => {
-                    // Try to parse as color for color fields
-                    let color_result = Color::from_hex(&value_str);
+            // Try to parse as color for color fields
+            let color_result = Color::from_hex(&value_str);
 
-                    match id_str.as_str() {
+            // Clone data needed for UI update, then release lock before UI operations
+            let refresh_info = match settings.lock() {
+                Ok(mut s) => {
+                    let section = match id_str {
                         "focus_ring_active" => {
                             if let Some(color) = color_result {
                                 s.appearance.focus_ring_active.set_color(color);
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    sync_all_models(&ui, &s.appearance);
-                                }
+                                Some(AppearanceSection::FocusRing)
+                            } else {
+                                None
                             }
                         }
                         "focus_ring_inactive" => {
                             if let Some(color) = color_result {
                                 s.appearance.focus_ring_inactive.set_color(color);
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    sync_all_models(&ui, &s.appearance);
-                                }
+                                Some(AppearanceSection::FocusRing)
+                            } else {
+                                None
                             }
                         }
                         "focus_ring_urgent" => {
                             if let Some(color) = color_result {
                                 s.appearance.focus_ring_urgent.set_color(color);
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    sync_all_models(&ui, &s.appearance);
-                                }
+                                Some(AppearanceSection::FocusRing)
+                            } else {
+                                None
                             }
                         }
                         "border_active" => {
                             if let Some(color) = color_result {
                                 s.appearance.border_active.set_color(color);
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    sync_all_models(&ui, &s.appearance);
-                                }
+                                Some(AppearanceSection::Border)
+                            } else {
+                                None
                             }
                         }
                         "border_inactive" => {
                             if let Some(color) = color_result {
                                 s.appearance.border_inactive.set_color(color);
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    sync_all_models(&ui, &s.appearance);
-                                }
+                                Some(AppearanceSection::Border)
+                            } else {
+                                None
                             }
                         }
                         "border_urgent" => {
                             if let Some(color) = color_result {
                                 s.appearance.border_urgent.set_color(color);
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    sync_all_models(&ui, &s.appearance);
-                                }
+                                Some(AppearanceSection::Border)
+                            } else {
+                                None
                             }
                         }
                         "background_color" => {
                             if let Some(color) = color_result {
                                 s.appearance.background_color = Some(color);
-                                if let Some(ui) = ui_weak.upgrade() {
-                                    sync_all_models(&ui, &s.appearance);
-                                }
+                                Some(AppearanceSection::Background)
+                            } else {
+                                None
                             }
                         }
                         _ => {
                             debug!("Unknown appearance text setting: {}", id_str);
                             return;
                         }
-                    }
+                    };
 
                     // Only save if we had a valid color
                     if color_result.is_some() {
@@ -427,8 +475,21 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         save_manager.mark_dirty(SettingsCategory::Appearance);
                         save_manager.request_save();
                     }
+
+                    // Clone data for UI update if needed
+                    section.map(|sec| (s.appearance.clone(), sec))
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some((appearance, section)) = refresh_info {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_models(&ui, &appearance, section);
+                }
             }
         });
     }
@@ -439,49 +500,63 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_appearance_setting_color_changed(move |id, color| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             let rust_color = slint_color_to_color(color);
 
-            match settings.lock() {
+            // Clone data needed for UI update, then release lock before UI operations
+            let refresh_info = match settings.lock() {
                 Ok(mut s) => {
-                    match id_str.as_str() {
+                    let section = match id_str {
                         "focus_ring_active" => {
                             s.appearance.focus_ring_active.set_color(rust_color);
+                            AppearanceSection::FocusRing
                         }
                         "focus_ring_inactive" => {
                             s.appearance.focus_ring_inactive.set_color(rust_color);
+                            AppearanceSection::FocusRing
                         }
                         "focus_ring_urgent" => {
                             s.appearance.focus_ring_urgent.set_color(rust_color);
+                            AppearanceSection::FocusRing
                         }
                         "border_active" => {
                             s.appearance.border_active.set_color(rust_color);
+                            AppearanceSection::Border
                         }
                         "border_inactive" => {
                             s.appearance.border_inactive.set_color(rust_color);
+                            AppearanceSection::Border
                         }
                         "border_urgent" => {
                             s.appearance.border_urgent.set_color(rust_color);
+                            AppearanceSection::Border
                         }
                         "background_color" => {
                             s.appearance.background_color = Some(rust_color);
+                            AppearanceSection::Background
                         }
                         _ => {
                             debug!("Unknown appearance color setting: {}", id_str);
                             return;
                         }
-                    }
-
-                    // Refresh models to update hex display
-                    if let Some(ui) = ui_weak.upgrade() {
-                        sync_all_models(&ui, &s.appearance);
-                    }
+                    };
 
                     debug!("Appearance color {} changed", id_str);
                     save_manager.mark_dirty(SettingsCategory::Appearance);
                     save_manager.request_save();
+
+                    // Clone data for UI update
+                    (s.appearance.clone(), section)
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(ui) = ui_weak.upgrade() {
+                sync_models(&ui, &refresh_info.0, refresh_info.1);
             }
         });
     }

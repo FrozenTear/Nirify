@@ -269,19 +269,19 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_mouse_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+
+            // Track if this is the "off" toggle for UI update after lock release
+            let (is_off_toggle, mouse_clone) = match settings.lock() {
                 Ok(mut s) => {
                     let mouse = &mut s.mouse;
+                    let mut is_off = false;
                     let needs_model_refresh = false;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "off" => {
                             mouse.off = value;
-                            // Update device_off property for section visibility
-                            if let Some(ui) = ui_weak.upgrade() {
-                                ui.set_mouse_dynamic_device_off(value);
-                            }
+                            is_off = true;
                         }
                         "natural_scroll" => {
                             mouse.natural_scroll = value;
@@ -301,18 +301,32 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         }
                     }
 
-                    // Refresh models if visibility changed
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_all_models(&ui, mouse);
-                        }
-                    }
-
                     debug!("Mouse toggle {} = {}", id_str, value);
                     save_manager.mark_dirty(SettingsCategory::Mouse);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    let clone = if needs_model_refresh {
+                        Some(mouse.clone())
+                    } else {
+                        None
+                    };
+                    (is_off, clone)
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(ui) = ui_weak.upgrade() {
+                if is_off_toggle {
+                    ui.set_mouse_dynamic_device_off(value);
+                }
+                if let Some(mouse) = mouse_clone {
+                    sync_all_models(&ui, &mouse);
+                }
             }
         });
     }
@@ -322,12 +336,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_mouse_setting_slider_int_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let mouse = &mut s.mouse;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "scroll_button" => {
                             mouse.scroll_button = if value == 0 { None } else { Some(value) };
                         }
@@ -351,12 +365,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_mouse_setting_slider_float_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let mouse = &mut s.mouse;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "accel_speed" => {
                             // Convert from percentage (-100 to 100) to actual value (-1.0 to 1.0)
                             let actual_value =
@@ -390,13 +404,15 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_mouse_setting_combo_changed(move |id, index| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+
+            // Clone data needed for UI update, then release lock before UI operations
+            let mouse_clone = match settings.lock() {
                 Ok(mut s) => {
                     let mouse = &mut s.mouse;
                     let mut needs_model_refresh = false;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "accel_profile" => {
                             mouse.accel_profile = AccelProfile::from_index(index);
                         }
@@ -410,18 +426,28 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         }
                     }
 
-                    // Refresh models if visibility changed
-                    if needs_model_refresh {
-                        if let Some(ui) = ui_weak.upgrade() {
-                            sync_all_models(&ui, mouse);
-                        }
-                    }
-
                     debug!("Mouse combo {} = {}", id_str, index);
                     save_manager.mark_dirty(SettingsCategory::Mouse);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    if needs_model_refresh {
+                        Some(mouse.clone())
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some(mouse) = mouse_clone {
+                if let Some(ui) = ui_weak.upgrade() {
+                    sync_all_models(&ui, &mouse);
+                }
             }
         });
     }
@@ -431,7 +457,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_mouse_setting_text_changed(move |id, _value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut _s) => {
                     // No text settings for mouse currently

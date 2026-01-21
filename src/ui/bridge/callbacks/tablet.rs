@@ -242,18 +242,19 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let ui_weak = ui.as_weak();
         let save_manager = Rc::clone(&save_manager);
         ui.on_tablet_setting_toggle_changed(move |id, value| {
-            let id_str = id.to_string();
-            match settings.lock() {
+            let id_str = id.as_str();
+
+            // Perform settings update and collect data for UI update
+            let ui_update = match settings.lock() {
                 Ok(mut s) => {
                     let tablet = &mut s.tablet;
+                    let mut needs_model_refresh = false;
+                    let mut update_device_off = false;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "off" => {
                             tablet.off = value;
-                            // Update device_off property for section visibility
-                            if let Some(ui) = ui_weak.upgrade() {
-                                ui.set_tablet_dynamic_device_off(value);
-                            }
+                            update_device_off = true;
                         }
                         "left_handed" => {
                             tablet.left_handed = value;
@@ -268,10 +269,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                             } else {
                                 tablet.calibration_matrix = None;
                             }
-                            // Refresh models to show/hide matrix sliders
-                            if let Some(ui) = ui_weak.upgrade() {
-                                sync_all_models(&ui, tablet);
-                            }
+                            needs_model_refresh = true;
                         }
                         _ => {
                             debug!("Unknown tablet toggle setting: {}", id_str);
@@ -282,8 +280,30 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                     debug!("Tablet toggle {} = {}", id_str, value);
                     save_manager.mark_dirty(SettingsCategory::Tablet);
                     save_manager.request_save();
+
+                    // Clone data for UI update if needed
+                    if needs_model_refresh || update_device_off {
+                        Some((tablet.clone(), needs_model_refresh, update_device_off))
+                    } else {
+                        None
+                    }
                 }
-                Err(e) => error!("Settings lock error: {}", e),
+                Err(e) => {
+                    error!("Settings lock error: {}", e);
+                    return;
+                }
+            };
+
+            // UI updates happen after lock is released
+            if let Some((tablet_clone, needs_model_refresh, update_device_off)) = ui_update {
+                if let Some(ui) = ui_weak.upgrade() {
+                    if update_device_off {
+                        ui.set_tablet_dynamic_device_off(value);
+                    }
+                    if needs_model_refresh {
+                        sync_all_models(&ui, &tablet_clone);
+                    }
+                }
             }
         });
     }
@@ -293,7 +313,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_tablet_setting_slider_int_changed(move |id, _value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut _s) => {
                     // No int sliders for tablet
@@ -310,7 +330,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_tablet_setting_slider_float_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let tablet = &mut s.tablet;
@@ -320,7 +340,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                         .calibration_matrix
                         .get_or_insert([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
 
-                    match id_str.as_str() {
+                    match id_str {
                         "cal_m0" => matrix[0] = value as f64,
                         "cal_m1" => matrix[1] = value as f64,
                         "cal_m2" => matrix[2] = value as f64,
@@ -347,7 +367,7 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_tablet_setting_combo_changed(move |id, _index| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut _s) => {
                     // No combo settings for tablet
@@ -364,12 +384,12 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let settings = Arc::clone(&settings);
         let save_manager = Rc::clone(&save_manager);
         ui.on_tablet_setting_text_changed(move |id, value| {
-            let id_str = id.to_string();
+            let id_str = id.as_str();
             match settings.lock() {
                 Ok(mut s) => {
                     let tablet = &mut s.tablet;
 
-                    match id_str.as_str() {
+                    match id_str {
                         "map_to_output" => {
                             tablet.map_to_output = value.to_string();
                         }
