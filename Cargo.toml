@@ -51,7 +51,7 @@ opt-level = 0
 opt-level = 2
 
 [profile.release]
-opt-level = "z"
-lto = true
+opt-level = 3
+lto = "thin"  # Much faster than full LTO, 80% of the benefit
 strip = true
-codegen-units = 1
+codegen-units = 16  # Parallel codegen
