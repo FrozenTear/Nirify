@@ -14,7 +14,7 @@ members = ["macros"]
 
 [dependencies]
 niri-settings-macros = { path = "macros" }
-slint = "1.14"
+slint = { version = "1.14", features = ["live-preview"] }
 kdl = { version = "6.5", features = ["v1-fallback"] }
 dirs = "6.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -41,6 +41,14 @@ serial_test = "3.2"
 [[bench]]
 name = "benchmarks"
 harness = false
+
+# Dev profile: optimize dependencies but keep local code debuggable
+[profile.dev]
+opt-level = 0
+
+# Compile dependencies with optimizations (makes Slint much faster to build/run)
+[profile.dev.package."*"]
+opt-level = 2
 
 [profile.release]
 opt-level = "z"
