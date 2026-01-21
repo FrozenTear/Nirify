@@ -46,7 +46,7 @@ fn safe_opacity_to_f32(value: f64, context: &str) -> f32 {
 ///
 /// Looks for a comment like "// Rule Name\n" before the node.
 /// Returns None if no valid name comment found.
-fn extract_name_from_leading_comment(node: &KdlNode) -> Option<String> {
+pub fn extract_name_from_leading_comment(node: &KdlNode) -> Option<String> {
     let format = node.format()?;
     let leading = &format.leading;
     // Look for "// " pattern in the leading content

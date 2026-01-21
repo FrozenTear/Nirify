@@ -70,7 +70,8 @@ pub use keybindings::load_keybindings;
 pub use layout_extras::{load_layout_extras, parse_layout_extras_from_children};
 pub use misc::{load_misc, parse_misc_from_doc};
 pub use rules::{
-    has_flag_in_node, load_layer_rules, load_window_rules, parse_layer_rule_node_children,
+    extract_name_from_leading_comment, has_flag_in_node, load_layer_rules, load_window_rules,
+    parse_layer_rule_node_children,
     parse_window_rule_node_children,
 };
 pub use system::{
@@ -487,9 +488,11 @@ pub fn load_settings_with_result(paths: &ConfigPaths) -> LoadResult {
             let mut next_id = 0u32;
             for node in doc.nodes() {
                 if node.name().value() == "layer-rule" {
+                    let name = extract_name_from_leading_comment(node)
+                        .unwrap_or_else(|| format!("Layer Rule {}", next_id + 1));
                     let mut rule = crate::config::models::LayerRule {
                         id: next_id,
-                        name: format!("Layer Rule {}", next_id + 1),
+                        name,
                         ..Default::default()
                     };
                     next_id += 1;
@@ -510,9 +513,11 @@ pub fn load_settings_with_result(paths: &ConfigPaths) -> LoadResult {
             let mut next_id = 0u32;
             for node in doc.nodes() {
                 if node.name().value() == "window-rule" {
+                    let name = extract_name_from_leading_comment(node)
+                        .unwrap_or_else(|| format!("Rule {}", next_id + 1));
                     let mut rule = crate::config::models::WindowRule {
                         id: next_id,
-                        name: format!("Rule {}", next_id + 1),
+                        name,
                         ..Default::default()
                     };
                     next_id += 1;
