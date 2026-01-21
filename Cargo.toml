@@ -14,7 +14,16 @@ members = ["macros"]
 
 [dependencies]
 niri-settings-macros = { path = "macros" }
-slint = { version = "1.14", features = ["live-preview"] }
+# Use minimal Slint features for faster builds
+# backend-winit-wayland: Native Wayland support (no X11/Qt overhead)
+# renderer-femtovg: OpenGL rendering (faster than software)
+# compat-1-2: API compatibility
+slint = { version = "1.14", default-features = false, features = [
+    "std",
+    "backend-winit-wayland",
+    "renderer-femtovg",
+    "compat-1-2"
+] }
 kdl = { version = "6.5", features = ["v1-fallback"] }
 dirs = "6.0"
 serde = { version = "1.0", features = ["derive"] }
