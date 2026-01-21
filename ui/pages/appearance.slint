@@ -140,14 +140,17 @@ component DynamicRow inherits Rectangle {
 
                 // Slider (type 1)
                 if setting.setting-type == 1: HorizontalLayout {
+                    width: 200px;
                     spacing: Theme.spacing-sm;
-                    alignment: center;
 
-                    Slider {
-                        horizontal-stretch: 1;
+                    // Local property to track slider value for real-time display
+                    property <float> current-value: setting.use-float ? setting.float-value : setting.int-value;
+
+                    slider := Slider {
+                        width: 120px;
                         minimum: setting.min-value;
                         maximum: setting.max-value;
-                        value: setting.use-float ? setting.float-value : setting.int-value;
+                        value <=> parent.current-value;
                         changed(val) => {
                             if (setting.use-float) {
                                 root.slider-float-changed(setting.id, val);
@@ -157,13 +160,22 @@ component DynamicRow inherits Rectangle {
                         }
                     }
 
-                    Text {
+                    LineEdit {
                         width: 55px;
-                        text: round(setting.use-float ? setting.float-value : setting.int-value) + setting.suffix;
-                        color: Theme.text-secondary;
-                        font-size: Theme.font-size-sm;
+                        text: round(parent.current-value) + setting.suffix;
                         horizontal-alignment: right;
-                        vertical-alignment: center;
+                        input-type: number;
+                        edited(new-text) => {
+                            // Parse numeric value from text (strip suffix)
+                            if (new-text.to-float() >= setting.min-value && new-text.to-float() <= setting.max-value) {
+                                parent.current-value = new-text.to-float();
+                                if (setting.use-float) {
+                                    root.slider-float-changed(setting.id, new-text.to-float());
+                                } else {
+                                    root.slider-int-changed(setting.id, round(new-text.to-float()));
+                                }
+                            }
+                        }
                     }
                 }
 
