@@ -237,10 +237,16 @@ pub fn generate_switch_events_kdl(settings: &SwitchEventsSettings) -> String {
         // Note: This is a local fn so it can't capture `warn!` directly,
         // we return a bool to indicate if any command was skipped
         fn add_spawn_block(b: &mut KdlBuilder, name: &str, commands: &[String]) -> Vec<String> {
+            use crate::constants::MAX_STRING_LENGTH;
             let mut skipped = Vec::new();
             if !commands.is_empty() {
                 b.block(name, |inner| {
                     for cmd in commands {
+                        // Validate command length to prevent memory issues
+                        if cmd.len() > MAX_STRING_LENGTH {
+                            skipped.push(cmd.clone());
+                            continue;
+                        }
                         // Validate command can be properly shell-parsed
                         // Don't use fallback - reject malformed commands to prevent injection
                         match shell_words::split(cmd) {

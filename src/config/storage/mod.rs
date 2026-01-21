@@ -122,6 +122,17 @@ pub fn atomic_write(path: &Path, content: &str) -> anyhow::Result<()> {
     fs::rename(&temp_path, path)
         .with_context(|| format!("Failed to rename {:?} to {:?}", temp_path, path))?;
 
+    // Set restrictive permissions (owner read/write only)
+    // Config files may contain sensitive information
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = std::fs::Permissions::from_mode(0o600);
+        if let Err(e) = std::fs::set_permissions(path, perms) {
+            log::warn!("Could not set file permissions on {:?}: {}", path, e);
+        }
+    }
+
     Ok(())
 }
 

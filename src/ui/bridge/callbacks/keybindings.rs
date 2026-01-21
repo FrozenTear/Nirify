@@ -186,10 +186,18 @@ pub fn setup(
                 return;
             }
 
+            let mut combo_str = new_combo.to_string();
+
+            // Validate string length to prevent memory issues
+            if combo_str.len() > crate::constants::MAX_STRING_LENGTH {
+                warn!("Key combo exceeds maximum length, truncating");
+                combo_str.truncate(crate::constants::MAX_STRING_LENGTH);
+            }
+
             match settings.lock() {
                 Ok(mut s) => {
                     if let Some(binding) = s.keybindings.bindings.get_mut(idx as usize) {
-                        binding.key_combo = new_combo.to_string();
+                        binding.key_combo = combo_str;
                         debug!("Updated key combo to: {}", binding.key_combo);
 
                         if let Some(ui) = ui_weak.upgrade() {
@@ -319,12 +327,20 @@ pub fn setup(
                 return;
             }
 
+            let mut command_str = command.to_string();
+
+            // Validate string length to prevent memory issues
+            if command_str.len() > crate::constants::MAX_STRING_LENGTH {
+                warn!("Action command exceeds maximum length, truncating");
+                command_str.truncate(crate::constants::MAX_STRING_LENGTH);
+            }
+
             match settings.lock() {
                 Ok(mut s) => {
                     if let Some(binding) = s.keybindings.bindings.get_mut(idx as usize) {
                         // Parse command string into args
-                        let args: Vec<String> = shell_words::split(&command)
-                            .unwrap_or_else(|_| vec![command.to_string()]);
+                        let args: Vec<String> = shell_words::split(&command_str)
+                            .unwrap_or_else(|_| vec![command_str.clone()]);
 
                         binding.action = KeybindAction::Spawn(args);
                         debug!("Updated spawn command: {:?}", binding.action);
@@ -357,16 +373,24 @@ pub fn setup(
                 return;
             }
 
+            let mut action_str = action_name.to_string();
+
+            // Validate string length to prevent memory issues
+            if action_str.len() > crate::constants::MAX_STRING_LENGTH {
+                warn!("Action name exceeds maximum length, truncating");
+                action_str.truncate(crate::constants::MAX_STRING_LENGTH);
+            }
+
             match settings.lock() {
                 Ok(mut s) => {
                     if let Some(binding) = s.keybindings.bindings.get_mut(idx as usize) {
                         match &binding.action {
                             KeybindAction::NiriAction(_) => {
-                                binding.action = KeybindAction::NiriAction(action_name.to_string());
+                                binding.action = KeybindAction::NiriAction(action_str);
                             }
                             KeybindAction::NiriActionWithArgs(_, args) => {
                                 binding.action = KeybindAction::NiriActionWithArgs(
-                                    action_name.to_string(),
+                                    action_str,
                                     args.clone(),
                                 );
                             }
@@ -498,13 +522,21 @@ pub fn setup(
                 return;
             }
 
+            let mut value_str = value.to_string();
+
+            // Validate string length to prevent memory issues
+            if value_str.len() > crate::constants::MAX_STRING_LENGTH {
+                warn!("Overlay title exceeds maximum length, truncating");
+                value_str.truncate(crate::constants::MAX_STRING_LENGTH);
+            }
+
             match settings.lock() {
                 Ok(mut s) => {
                     if let Some(binding) = s.keybindings.bindings.get_mut(idx as usize) {
-                        binding.hotkey_overlay_title = if value.is_empty() {
+                        binding.hotkey_overlay_title = if value_str.is_empty() {
                             None
                         } else {
-                            Some(value.to_string())
+                            Some(value_str)
                         };
 
                         // Refresh list to show updated display name

@@ -6,108 +6,15 @@
 use crate::config::models::SwitchEventsSettings;
 use crate::config::{Settings, SettingsCategory};
 use crate::{MainWindow, SwitchEventSettingModel};
-use log::{debug, error};
+use log::{debug, error, warn};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use super::super::macros::SaveManager;
 
-// ============================================================================
-// Helper functions for creating setting models
-// ============================================================================
-
-/// Create a toggle setting model
-#[allow(dead_code)]
-fn make_toggle(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: bool,
-    visible: bool,
-) -> SwitchEventSettingModel {
-    SwitchEventSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 0,
-        bool_value: value,
-        visible,
-        ..Default::default()
-    }
-}
-
-/// Create a text input setting model
-#[allow(dead_code)]
-fn make_text(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: &str,
-    placeholder: &str,
-    visible: bool,
-) -> SwitchEventSettingModel {
-    SwitchEventSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 3,
-        text_value: value.into(),
-        placeholder: placeholder.into(),
-        visible,
-        ..Default::default()
-    }
-}
-
-/// Create an integer slider setting model
-#[allow(dead_code)]
-fn make_slider_int(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: i32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> SwitchEventSettingModel {
-    SwitchEventSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        int_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: false,
-        visible,
-        ..Default::default()
-    }
-}
-
-/// Create a combo box setting model
-#[allow(dead_code)]
-fn make_combo(
-    id: &str,
-    label: &str,
-    desc: &str,
-    index: i32,
-    options: &[&str],
-    visible: bool,
-) -> SwitchEventSettingModel {
-    let opts: Vec<SharedString> = options.iter().map(|s| (*s).into()).collect();
-    SwitchEventSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 2,
-        combo_index: index,
-        combo_options: ModelRc::new(VecModel::from(opts)),
-        visible,
-        ..Default::default()
-    }
-}
+// Generate helper functions for SwitchEventSettingModel
+crate::impl_setting_builders!(SwitchEventSettingModel);
 
 // ============================================================================
 // Command list helpers
@@ -250,10 +157,16 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&save_manager);
         ui.on_switch_events_command_add(move |event_id, command_text| {
             let event_id_str = event_id.as_str();
-            let cmd = command_text.to_string();
+            let mut cmd = command_text.to_string();
 
             if cmd.trim().is_empty() {
                 return;
+            }
+
+            // Validate command length to prevent memory issues
+            if cmd.len() > crate::constants::MAX_STRING_LENGTH {
+                warn!("Command text exceeds maximum length, truncating");
+                cmd.truncate(crate::constants::MAX_STRING_LENGTH);
             }
 
             match settings.lock() {
@@ -332,7 +245,13 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
         let save_manager = Rc::clone(&save_manager);
         ui.on_switch_events_command_text_changed(move |event_id, new_text| {
             let event_id_str = event_id.as_str();
-            let text = new_text.to_string();
+            let mut text = new_text.to_string();
+
+            // Validate command length to prevent memory issues
+            if text.len() > crate::constants::MAX_STRING_LENGTH {
+                warn!("Command text exceeds maximum length, truncating");
+                text.truncate(crate::constants::MAX_STRING_LENGTH);
+            }
 
             if let Some(ui) = ui_weak.upgrade() {
                 let idx = get_selected_index(&ui, &event_id_str);

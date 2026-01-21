@@ -180,6 +180,10 @@ pub const STATUS_AUTO_HIDE_SECS: u64 = 3;
 /// Maximum length for user-input strings (prevents memory issues)
 pub const MAX_STRING_LENGTH: usize = 1024;
 
+/// Maximum length for rule patterns (app-id, title, namespace)
+/// Shorter than general strings since patterns rarely need to be very long
+pub const MAX_PATTERN_LENGTH: usize = 512;
+
 /// Maximum number of window rules
 pub const MAX_WINDOW_RULES: usize = 100;
 

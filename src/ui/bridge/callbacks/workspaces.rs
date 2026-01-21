@@ -16,87 +16,8 @@ use std::sync::{Arc, Mutex};
 
 use super::super::macros::SaveManager;
 
-// ============================================================================
-// HELPER FUNCTIONS FOR CREATING SETTING MODELS
-// ============================================================================
-
-fn make_toggle(id: &str, label: &str, desc: &str, value: bool, visible: bool) -> WorkspaceSettingModel {
-    WorkspaceSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 0,
-        bool_value: value,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_slider_float(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: f32,
-    min: f32,
-    max: f32,
-    suffix: &str,
-    visible: bool,
-) -> WorkspaceSettingModel {
-    WorkspaceSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 1,
-        float_value: value,
-        min_value: min,
-        max_value: max,
-        suffix: suffix.into(),
-        use_float: true,
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_combo(
-    id: &str,
-    label: &str,
-    desc: &str,
-    index: i32,
-    options: &[&str],
-    visible: bool,
-) -> WorkspaceSettingModel {
-    let opts: Vec<SharedString> = options.iter().map(|s| (*s).into()).collect();
-    WorkspaceSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 2,
-        combo_index: index,
-        combo_options: ModelRc::new(VecModel::from(opts)),
-        visible,
-        ..Default::default()
-    }
-}
-
-fn make_text(
-    id: &str,
-    label: &str,
-    desc: &str,
-    value: &str,
-    placeholder: &str,
-    visible: bool,
-) -> WorkspaceSettingModel {
-    WorkspaceSettingModel {
-        id: id.into(),
-        label: label.into(),
-        description: desc.into(),
-        setting_type: 3,
-        text_value: value.into(),
-        placeholder: placeholder.into(),
-        visible,
-        ..Default::default()
-    }
-}
+// Generate helper functions for WorkspaceSettingModel
+crate::impl_setting_builders!(WorkspaceSettingModel);
 
 // ============================================================================
 // MODEL POPULATION FUNCTIONS
@@ -663,7 +584,16 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
             if let Ok(mut s) = settings.lock() {
                 if let Some(ws) = s.workspaces.workspaces.get_mut(idx as usize) {
                     let id_str = id.as_str();
-                    let value_str = value.to_string();
+                    let mut value_str = value.to_string();
+
+                    // Validate string length to prevent memory issues
+                    if value_str.len() > crate::constants::MAX_STRING_LENGTH {
+                        warn!(
+                            "Text input '{}' exceeds maximum length, truncating",
+                            id_str
+                        );
+                        value_str.truncate(crate::constants::MAX_STRING_LENGTH);
+                    }
 
                     match id_str {
                         "name" => {

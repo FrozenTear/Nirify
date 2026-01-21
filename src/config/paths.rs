@@ -161,6 +161,17 @@ impl ConfigPaths {
                 std::fs::create_dir_all(dir)
                     .map_err(|e| ConfigError::create_dir_error(dir, e.to_string()))?;
             }
+
+            // Set restrictive permissions on backup directory (owner only)
+            // Backups may contain sensitive configuration data
+            #[cfg(unix)]
+            if dir == &self.backup_dir {
+                use std::os::unix::fs::PermissionsExt;
+                let perms = std::fs::Permissions::from_mode(0o700);
+                if let Err(e) = std::fs::set_permissions(dir, perms) {
+                    log::warn!("Could not set backup directory permissions: {}", e);
+                }
+            }
         }
         Ok(())
     }

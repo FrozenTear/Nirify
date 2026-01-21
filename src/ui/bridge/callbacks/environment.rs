@@ -200,10 +200,18 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                 return;
             }
 
+            let mut value_str = value.to_string();
+
+            // Validate string length to prevent memory issues
+            if value_str.len() > crate::constants::MAX_STRING_LENGTH {
+                warn!("Environment variable name exceeds maximum length, truncating");
+                value_str.truncate(crate::constants::MAX_STRING_LENGTH);
+            }
+
             let variables_clone = match settings.lock() {
                 Ok(mut s) => {
                     if let Some(var) = s.environment.variables.get_mut(idx as usize) {
-                        var.name = value.to_string();
+                        var.name = value_str;
                         // Clone data for UI update
                         Some(s.environment.variables.clone())
                     } else {
@@ -244,10 +252,18 @@ pub fn setup(ui: &MainWindow, settings: Arc<Mutex<Settings>>, save_manager: Rc<S
                 return;
             }
 
+            let mut value_str = value.to_string();
+
+            // Validate string length to prevent memory issues
+            if value_str.len() > crate::constants::MAX_STRING_LENGTH {
+                warn!("Environment variable value exceeds maximum length, truncating");
+                value_str.truncate(crate::constants::MAX_STRING_LENGTH);
+            }
+
             let variables_clone = match settings.lock() {
                 Ok(mut s) => {
                     if let Some(var) = s.environment.variables.get_mut(idx as usize) {
-                        var.value = value.to_string();
+                        var.value = value_str;
                         // Clone data for UI update
                         Some(s.environment.variables.clone())
                     } else {
