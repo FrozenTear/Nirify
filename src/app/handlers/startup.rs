@@ -7,8 +7,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle startup commands messages
     pub(in crate::app) fn update_startup(&mut self, msg: StartupMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let startup = &mut settings.startup;
+        
+        let startup = &mut self.settings.startup;
 
         match msg {
             StartupMessage::AddCommand => {
@@ -33,9 +33,8 @@ impl super::super::App {
             }
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::Startup);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

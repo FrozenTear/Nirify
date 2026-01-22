@@ -8,26 +8,26 @@ use iced::Task;
 impl super::super::App {
     /// Updates keybindings settings
     pub(in crate::app) fn update_keybindings(&mut self, msg: M) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
+        
 
         match msg {
             M::AddKeybinding => {
                 let new_binding = crate::config::models::Keybinding {
-                    id: settings.keybindings.bindings.len() as u32,
+                    id: self.settings.keybindings.bindings.len() as u32,
                     key_combo: String::new(),
                     action: KeybindAction::NiriAction("close-window".to_string()),
                     ..Default::default()
                 };
-                settings.keybindings.bindings.push(new_binding);
-                self.selected_keybinding_index = Some(settings.keybindings.bindings.len() - 1);
+                self.settings.keybindings.bindings.push(new_binding);
+                self.selected_keybinding_index = Some(self.settings.keybindings.bindings.len() - 1);
                 log::info!("Added new keybinding");
             }
 
             M::RemoveKeybinding(idx) => {
-                if idx < settings.keybindings.bindings.len() {
-                    settings.keybindings.bindings.remove(idx);
+                if idx < self.settings.keybindings.bindings.len() {
+                    self.settings.keybindings.bindings.remove(idx);
                     if self.selected_keybinding_index == Some(idx) {
-                        self.selected_keybinding_index = if settings.keybindings.bindings.is_empty() {
+                        self.selected_keybinding_index = if self.settings.keybindings.bindings.is_empty() {
                             None
                         } else {
                             Some(0)
@@ -56,7 +56,7 @@ impl super::super::App {
 
             M::CapturedKey(key_combo) => {
                 if let Some(idx) = self.key_capture_active {
-                    if let Some(binding) = settings.keybindings.bindings.get_mut(idx) {
+                    if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
                         binding.key_combo = key_combo;
                         log::info!("Captured key combo for binding {}", idx);
                     }
@@ -71,7 +71,7 @@ impl super::super::App {
             }
 
             M::UpdateAction(idx, action_str) => {
-                if let Some(binding) = settings.keybindings.bindings.get_mut(idx) {
+                if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
                     if action_str == "spawn" || action_str.starts_with("spawn ") {
                         let args: Vec<String> = if action_str == "spawn" {
                             Vec::new()
@@ -91,7 +91,7 @@ impl super::super::App {
             }
 
             M::SetCommand(idx, command) => {
-                if let Some(binding) = settings.keybindings.bindings.get_mut(idx) {
+                if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
                     let args: Vec<String> = command
                         .split_whitespace()
                         .map(String::from)
@@ -102,28 +102,28 @@ impl super::super::App {
             }
 
             M::SetAllowWhenLocked(idx, value) => {
-                if let Some(binding) = settings.keybindings.bindings.get_mut(idx) {
+                if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
                     binding.allow_when_locked = value;
                     log::info!("Set allow_when_locked={} for binding {}", value, idx);
                 }
             }
 
             M::SetRepeat(idx, value) => {
-                if let Some(binding) = settings.keybindings.bindings.get_mut(idx) {
+                if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
                     binding.repeat = value;
                     log::info!("Set repeat={} for binding {}", value, idx);
                 }
             }
 
             M::SetCooldown(idx, cooldown) => {
-                if let Some(binding) = settings.keybindings.bindings.get_mut(idx) {
+                if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
                     binding.cooldown_ms = cooldown;
                     log::info!("Set cooldown={:?} for binding {}", cooldown, idx);
                 }
             }
 
             M::SetHotkeyOverlayTitle(idx, title) => {
-                if let Some(binding) = settings.keybindings.bindings.get_mut(idx) {
+                if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
                     binding.hotkey_overlay_title = title;
                     log::info!("Set hotkey_overlay_title for binding {}", idx);
                 }
@@ -138,11 +138,9 @@ impl super::super::App {
         }
 
         // Update the cache for view borrowing
-        self.keybindings_cache = settings.keybindings.clone();
-        drop(settings);
 
         self.dirty_tracker.mark(SettingsCategory::Keybindings);
-        self.save_manager.mark_changed();
+        self.mark_changed();
 
         Task::none()
     }

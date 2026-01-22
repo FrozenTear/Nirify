@@ -7,20 +7,20 @@ use iced::Task;
 impl super::super::App {
     /// Updates outputs (displays) settings
     pub(in crate::app) fn update_outputs(&mut self, msg: M) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
+        
 
         match msg {
             M::AddOutput => {
-                settings.outputs.outputs.push(crate::config::models::OutputConfig::default());
-                self.selected_output_index = Some(settings.outputs.outputs.len() - 1);
+                self.settings.outputs.outputs.push(crate::config::models::OutputConfig::default());
+                self.selected_output_index = Some(self.settings.outputs.outputs.len() - 1);
                 log::info!("Added new output");
             }
 
             M::RemoveOutput(idx) => {
-                if idx < settings.outputs.outputs.len() {
-                    settings.outputs.outputs.remove(idx);
+                if idx < self.settings.outputs.outputs.len() {
+                    self.settings.outputs.outputs.remove(idx);
                     if self.selected_output_index == Some(idx) {
-                        self.selected_output_index = if settings.outputs.outputs.is_empty() {
+                        self.selected_output_index = if self.settings.outputs.outputs.is_empty() {
                             None
                         } else {
                             Some(0)
@@ -48,79 +48,79 @@ impl super::super::App {
             }
 
             M::SetOutputName(idx, name) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.name = name;
                 }
             }
 
             M::SetEnabled(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.enabled = value;
                 }
             }
 
             M::SetScale(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.scale = value;
                 }
             }
 
             M::SetMode(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.mode = value;
                 }
             }
 
             M::SetModeCustom(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.mode_custom = value;
                 }
             }
 
             M::SetModeline(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.modeline = value;
                 }
             }
 
             M::SetPositionX(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.position_x = value;
                 }
             }
 
             M::SetPositionY(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.position_y = value;
                 }
             }
 
             M::SetTransform(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.transform = value;
                 }
             }
 
             M::SetVrr(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.vrr = value;
                 }
             }
 
             M::SetFocusAtStartup(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.focus_at_startup = value;
                 }
             }
 
             M::SetBackdropColor(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.backdrop_color = value;
                 }
             }
 
             M::SetHotCornersEnabled(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     if let Some(ref mut hot_corners) = output.hot_corners {
                         hot_corners.enabled = value;
                     } else if value.is_some() {
@@ -133,7 +133,7 @@ impl super::super::App {
             }
 
             M::SetHotCornerTopLeft(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     if let Some(ref mut hot_corners) = output.hot_corners {
                         hot_corners.top_left = value;
                     } else {
@@ -146,7 +146,7 @@ impl super::super::App {
             }
 
             M::SetHotCornerTopRight(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     if let Some(ref mut hot_corners) = output.hot_corners {
                         hot_corners.top_right = value;
                     } else {
@@ -159,7 +159,7 @@ impl super::super::App {
             }
 
             M::SetHotCornerBottomLeft(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     if let Some(ref mut hot_corners) = output.hot_corners {
                         hot_corners.bottom_left = value;
                     } else {
@@ -172,7 +172,7 @@ impl super::super::App {
             }
 
             M::SetHotCornerBottomRight(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     if let Some(ref mut hot_corners) = output.hot_corners {
                         hot_corners.bottom_right = value;
                     } else {
@@ -185,7 +185,7 @@ impl super::super::App {
             }
 
             M::SetLayoutOverride(idx, value) => {
-                if let Some(output) = settings.outputs.outputs.get_mut(idx) {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.layout_override = value;
                 }
             }
@@ -199,11 +199,9 @@ impl super::super::App {
         }
 
         // Update the cache for view borrowing
-        self.outputs_cache = settings.outputs.clone();
-        drop(settings); // Explicitly drop the lock before other operations
 
         self.dirty_tracker.mark(SettingsCategory::Outputs);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

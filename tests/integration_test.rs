@@ -192,6 +192,8 @@ fn test_window_rules_lifecycle() {
 
     // Create settings with window rules
     let mut settings = Settings::default();
+    // Disable float preference to test user-defined rules in isolation
+    settings.preferences.float_settings_app = false;
     settings.window_rules.rules.push(WindowRule {
         id: 1,
         name: "Firefox Floating".to_string(),

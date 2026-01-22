@@ -384,7 +384,7 @@ fn snapshot_workspaces_named() {
 #[test]
 fn snapshot_window_rules_empty() {
     let rules = WindowRulesSettings::default();
-    let kdl = generate_window_rules_kdl(&rules);
+    let kdl = generate_window_rules_kdl(&rules, false);
     assert_snapshot!("window_rules_empty", kdl);
 }
 
@@ -405,7 +405,7 @@ fn snapshot_window_rules_single() {
         }],
         next_id: 2,
     };
-    let kdl = generate_window_rules_kdl(&rules);
+    let kdl = generate_window_rules_kdl(&rules, false);
     assert_snapshot!("window_rules_single", kdl);
 }
 
@@ -443,7 +443,7 @@ fn snapshot_window_rules_complex() {
         ],
         next_id: 3,
     };
-    let kdl = generate_window_rules_kdl(&rules);
+    let kdl = generate_window_rules_kdl(&rules, false);
     assert_snapshot!("window_rules_complex", kdl);
 }
 

@@ -48,6 +48,7 @@ pub enum Message {
     LayoutExtras(LayoutExtrasMessage),
     Startup(StartupMessage),
     Tools(ToolsMessage),
+    Preferences(PreferencesMessage),
 
     // Save subsystem
     Save(SaveMessage),
@@ -712,6 +713,13 @@ pub enum ToolsMessage {
     // Action results
     ReloadCompleted(Result<(), String>),
     ValidateCompleted(Result<String, String>),
+}
+
+/// App preferences messages
+#[derive(Debug, Clone)]
+pub enum PreferencesMessage {
+    /// Toggle whether the settings app should float or tile
+    SetFloatSettingsApp(bool),
 }
 
 /// Save subsystem messages

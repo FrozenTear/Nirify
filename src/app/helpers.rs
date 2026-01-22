@@ -5,6 +5,178 @@
 use crate::types::{Color, ColorOrGradient, Gradient};
 use crate::views::widgets::GradientPickerMessage;
 
+/// Result of parsing a spawn command
+#[derive(Debug, Clone)]
+pub struct ParsedCommand {
+    /// The parsed arguments
+    pub args: Vec<String>,
+    /// Warning message if the command looks dangerous (but is still allowed)
+    pub warning: Option<String>,
+}
+
+/// Dangerous command patterns that warrant a warning
+const DANGEROUS_PATTERNS: &[(&str, &str)] = &[
+    ("rm", "removes files - be careful with arguments"),
+    ("sudo", "runs with elevated privileges"),
+    ("su", "switches user context"),
+    ("dd", "can overwrite disks"),
+    ("mkfs", "formats filesystems"),
+    ("chmod 777", "sets overly permissive permissions"),
+    (":(){", "fork bomb pattern detected"),
+    (">/dev/sd", "writes directly to disk device"),
+    ("| sh", "pipes to shell execution"),
+    ("| bash", "pipes to shell execution"),
+    ("; rm", "chained delete command"),
+    ("&& rm", "chained delete command"),
+];
+
+/// Parses a command string into arguments, handling quoted strings properly.
+///
+/// Supports:
+/// - Single quotes: 'hello world' -> "hello world"
+/// - Double quotes: "hello world" -> "hello world"
+/// - Escaped quotes within quotes
+/// - Unquoted arguments separated by whitespace
+///
+/// Returns a ParsedCommand with the args and an optional warning for dangerous commands.
+pub fn parse_spawn_command(command: &str) -> Result<ParsedCommand, String> {
+    let trimmed = command.trim();
+
+    if trimmed.is_empty() {
+        return Ok(ParsedCommand {
+            args: Vec::new(),
+            warning: None,
+        });
+    }
+
+    let mut args = Vec::new();
+    let mut current_arg = String::new();
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
+    let mut chars = trimmed.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '\'' if !in_double_quote => {
+                if in_single_quote {
+                    // End of single-quoted section
+                    in_single_quote = false;
+                } else {
+                    // Start of single-quoted section
+                    in_single_quote = true;
+                }
+            }
+            '"' if !in_single_quote => {
+                if in_double_quote {
+                    // End of double-quoted section
+                    in_double_quote = false;
+                } else {
+                    // Start of double-quoted section
+                    in_double_quote = true;
+                }
+            }
+            '\\' if in_double_quote => {
+                // Handle escape sequences in double quotes
+                if let Some(&next) = chars.peek() {
+                    match next {
+                        '"' | '\\' | '$' | '`' => {
+                            current_arg.push(chars.next().unwrap());
+                        }
+                        _ => {
+                            current_arg.push(c);
+                        }
+                    }
+                } else {
+                    current_arg.push(c);
+                }
+            }
+            ' ' | '\t' if !in_single_quote && !in_double_quote => {
+                // Whitespace outside quotes - end of argument
+                if !current_arg.is_empty() {
+                    args.push(std::mem::take(&mut current_arg));
+                }
+            }
+            _ => {
+                current_arg.push(c);
+            }
+        }
+    }
+
+    // Check for unclosed quotes
+    if in_single_quote {
+        return Err("Unclosed single quote in command".to_string());
+    }
+    if in_double_quote {
+        return Err("Unclosed double quote in command".to_string());
+    }
+
+    // Don't forget the last argument
+    if !current_arg.is_empty() {
+        args.push(current_arg);
+    }
+
+    // Check for dangerous patterns
+    let warning = check_dangerous_command(&args, trimmed);
+
+    Ok(ParsedCommand { args, warning })
+}
+
+/// Checks if a command contains dangerous patterns
+fn check_dangerous_command(args: &[String], full_command: &str) -> Option<String> {
+    if args.is_empty() {
+        return None;
+    }
+
+    let executable = &args[0];
+    let lower_command = full_command.to_lowercase();
+
+    for (pattern, description) in DANGEROUS_PATTERNS {
+        // Check if the pattern appears in the command
+        if lower_command.contains(&pattern.to_lowercase()) {
+            return Some(format!(
+                "Warning: '{}' - {}. Please verify this is intentional.",
+                pattern, description
+            ));
+        }
+    }
+
+    // Check for shell metacharacters that could be dangerous
+    if full_command.contains('`') {
+        return Some("Warning: Command contains backticks which may execute subcommands".to_string());
+    }
+
+    if full_command.contains("$(") {
+        return Some("Warning: Command contains $() which may execute subcommands".to_string());
+    }
+
+    // Warn about commands with many semicolons or pipes (potential command chaining)
+    let semicolons = full_command.matches(';').count();
+    let pipes = full_command.matches('|').count();
+    if semicolons > 2 || pipes > 3 {
+        return Some("Warning: Complex command with multiple operations - please verify".to_string());
+    }
+
+    // Basic executable validation - just check it doesn't start with suspicious paths
+    if executable.starts_with("/dev/") {
+        return Some("Warning: Executing from /dev is unusual - please verify".to_string());
+    }
+
+    None
+}
+
+/// Validates and parses a command for use in keybindings.
+/// Returns the parsed args, or an error message if the command is invalid.
+pub fn validate_spawn_command(command: &str) -> Result<Vec<String>, String> {
+    let parsed = parse_spawn_command(command)?;
+
+    // Log warning if present (but don't block the command)
+    if let Some(warning) = &parsed.warning {
+        log::warn!("Keybinding command: {}", warning);
+    }
+
+    Ok(parsed.args)
+}
+
 /// Formats a key press event into a niri-compatible key combo string
 /// e.g., "Mod+Shift+Return" or "Ctrl+Alt+Delete"
 pub fn format_key_combo(key: &iced::keyboard::Key, modifiers: iced::keyboard::Modifiers) -> String {
@@ -102,10 +274,9 @@ pub fn format_key_combo(key: &iced::keyboard::Key, modifiers: iced::keyboard::Mo
     parts.join("+")
 }
 
-impl super::App {
-    /// Helper to apply GradientPickerMessage to a ColorOrGradient field
-    pub(super) fn apply_gradient_message(&self, target: &mut ColorOrGradient, msg: GradientPickerMessage) {
-        match msg {
+/// Helper to apply GradientPickerMessage to a ColorOrGradient field
+pub fn apply_gradient_message(target: &mut ColorOrGradient, msg: GradientPickerMessage) {
+    match msg {
             GradientPickerMessage::ToggleSolidGradient(is_gradient) => {
                 *target = if is_gradient {
                     // Convert to gradient
@@ -160,10 +331,9 @@ impl super::App {
                     gradient.relative_to = relative_to;
                 }
             }
-            GradientPickerMessage::SetHueInterpolation(hue_interp) => {
-                if let ColorOrGradient::Gradient(gradient) = target {
-                    gradient.hue_interpolation = Some(hue_interp);
-                }
+        GradientPickerMessage::SetHueInterpolation(hue_interp) => {
+            if let ColorOrGradient::Gradient(gradient) = target {
+                gradient.hue_interpolation = Some(hue_interp);
             }
         }
     }

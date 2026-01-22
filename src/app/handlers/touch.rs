@@ -8,8 +8,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle touch settings messages
     pub(in crate::app) fn update_touch(&mut self, msg: TouchMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let touch = &mut settings.touch;
+        
+        let touch = &mut self.settings.touch;
 
         match msg {
             TouchMessage::SetOff(v) => touch.off = v,
@@ -44,9 +44,8 @@ impl super::super::App {
             }
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::Touch);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

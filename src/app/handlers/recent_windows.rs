@@ -7,8 +7,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle recent windows settings messages
     pub(in crate::app) fn update_recent_windows(&mut self, msg: RecentWindowsMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let recent = &mut settings.recent_windows;
+        
+        let recent = &mut self.settings.recent_windows;
 
         match msg {
             // Top-level settings
@@ -70,9 +70,8 @@ impl super::super::App {
             }
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::RecentWindows);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

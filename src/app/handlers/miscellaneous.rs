@@ -7,8 +7,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle miscellaneous settings messages
     pub(in crate::app) fn update_miscellaneous(&mut self, msg: MiscellaneousMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let misc = &mut settings.miscellaneous;
+        
+        let misc = &mut self.settings.miscellaneous;
 
         match msg {
             MiscellaneousMessage::SetPreferNoCsd(v) => misc.prefer_no_csd = v,
@@ -21,9 +21,8 @@ impl super::super::App {
             MiscellaneousMessage::SetXWaylandSatellite(v) => misc.xwayland_satellite = v,
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::Miscellaneous);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

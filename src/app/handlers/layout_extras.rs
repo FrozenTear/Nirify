@@ -8,8 +8,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle layout extras settings messages
     pub(in crate::app) fn update_layout_extras(&mut self, msg: LayoutExtrasMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let layout = &mut settings.layout_extras;
+        
+        let layout = &mut self.settings.layout_extras;
 
         match msg {
             // Shadow settings
@@ -96,9 +96,8 @@ impl super::super::App {
             LayoutExtrasMessage::SetDefaultColumnDisplay(v) => layout.default_column_display = v,
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::LayoutExtras);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

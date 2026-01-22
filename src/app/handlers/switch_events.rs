@@ -7,8 +7,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle switch events settings messages
     pub(in crate::app) fn update_switch_events(&mut self, msg: SwitchEventsMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let switch = &mut settings.switch_events;
+        
+        let switch = &mut self.settings.switch_events;
 
         // Helper to parse command string into Vec<String>
         fn parse_command(cmd: &str) -> Vec<String> {
@@ -35,9 +35,8 @@ impl super::super::App {
             }
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::SwitchEvents);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

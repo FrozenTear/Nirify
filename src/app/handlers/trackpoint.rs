@@ -7,8 +7,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle trackpoint settings messages
     pub(in crate::app) fn update_trackpoint(&mut self, msg: TrackpointMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let trackpoint = &mut settings.trackpoint;
+        
+        let trackpoint = &mut self.settings.trackpoint;
 
         match msg {
             TrackpointMessage::SetOff(v) => trackpoint.off = v,
@@ -22,9 +22,8 @@ impl super::super::App {
             TrackpointMessage::SetScrollButton(v) => trackpoint.scroll_button = v,
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::Trackpoint);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

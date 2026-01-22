@@ -7,8 +7,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle gestures settings messages
     pub(in crate::app) fn update_gestures(&mut self, msg: GesturesMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let gestures = &mut settings.gestures;
+        
+        let gestures = &mut self.settings.gestures;
 
         match msg {
             // Hot corners
@@ -31,9 +31,8 @@ impl super::super::App {
             GesturesMessage::SetDndWorkspaceMaxSpeed(v) => gestures.dnd_edge_workspace_switch.max_speed = v.clamp(100, 5000),
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::Gestures);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

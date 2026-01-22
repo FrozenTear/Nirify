@@ -8,8 +8,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle tablet settings messages
     pub(in crate::app) fn update_tablet(&mut self, msg: TabletMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let tablet = &mut settings.tablet;
+        
+        let tablet = &mut self.settings.tablet;
 
         match msg {
             TabletMessage::SetOff(v) => tablet.off = v,
@@ -45,9 +45,8 @@ impl super::super::App {
             }
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::Tablet);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

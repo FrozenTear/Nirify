@@ -268,7 +268,7 @@ fn write_all_settings(
     )?;
     write_config(
         &paths.window_rules_kdl,
-        &generate_window_rules_kdl(&settings.window_rules),
+        &generate_window_rules_kdl(&settings.window_rules, settings.preferences.float_settings_app),
         strategy,
     )?;
     write_config(
@@ -475,7 +475,7 @@ pub fn save_dirty(
             SettingsCategory::WindowRules => {
                 write_config(
                     &paths.window_rules_kdl,
-                    &generate_window_rules_kdl(&settings.window_rules),
+                    &generate_window_rules_kdl(&settings.window_rules, settings.preferences.float_settings_app),
                     strategy,
                 )?;
             }

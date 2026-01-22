@@ -8,7 +8,7 @@
 mod handlers;
 mod helpers;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use iced::widget::{column, container, text};
@@ -17,20 +17,20 @@ use iced::time;
 
 use crate::config::{ConfigPaths, DirtyTracker, Settings, SettingsCategory};
 use crate::messages::{DialogState, Message, Page, SaveMessage};
-use crate::save_manager::{SaveManager, SaveResult, ReloadResult};
+use crate::save_manager::{SaveResult, ReloadResult};
 use crate::views;
 use crate::theme::fonts;
 
 /// Main application state
 pub struct App {
-    /// Shared settings (preserved from Slint architecture)
-    settings: Arc<Mutex<Settings>>,
+    /// Settings - direct ownership (no mutex needed, iced is single-threaded)
+    settings: Settings,
 
     /// Config paths for loading/saving
     paths: Arc<ConfigPaths>,
 
     /// Tracks which settings categories have unsaved changes
-    dirty_tracker: Arc<DirtyTracker>,
+    dirty_tracker: DirtyTracker,
 
     /// Current active page
     current_page: Page,
@@ -53,8 +53,11 @@ pub struct App {
     /// Widget demo state for Phase 2 testing
     widget_demo_state: views::widget_demo::DemoState,
 
-    /// Save manager for debounced auto-save
-    save_manager: SaveManager,
+    /// Last time a change was made (for debounced save)
+    last_change_time: Option<std::time::Instant>,
+
+    /// Whether a save is currently in progress
+    save_in_progress: bool,
 
     /// Toast notification message
     toast: Option<String>,
@@ -76,8 +79,6 @@ pub struct App {
     selected_output_index: Option<usize>,
     /// Expanded sections in outputs view (section_name -> is_expanded)
     output_sections_expanded: std::collections::HashMap<String, bool>,
-    /// Cached outputs data for view borrowing (avoids mutex lock lifetime issues)
-    outputs_cache: crate::config::models::OutputSettings,
 
     // Layer Rules state
     /// Selected layer rule ID for list-detail view
@@ -94,12 +95,6 @@ pub struct App {
     window_rule_sections_expanded: std::collections::HashMap<(u32, String), bool>,
     /// Regex validation errors ((rule_id, field_name) -> error_message)
     window_rule_regex_errors: std::collections::HashMap<(u32, String), String>,
-    /// Cached window rules data for view borrowing
-    window_rules_cache: crate::config::models::WindowRulesSettings,
-
-    // Cursor state
-    /// Cached cursor data for view borrowing (avoids mutex lock lifetime issues)
-    cursor_cache: crate::config::models::CursorSettings,
 
     // Keybindings state
     /// Selected keybinding index for list-detail view
@@ -108,8 +103,6 @@ pub struct App {
     keybinding_sections_expanded: std::collections::HashMap<String, bool>,
     /// Which keybinding is currently capturing key input (if any)
     key_capture_active: Option<usize>,
-    /// Cached keybindings data for view borrowing
-    keybindings_cache: crate::config::models::KeybindingsSettings,
 
     // Calibration matrix state
     /// Cached formatted values for tablet calibration matrix (avoids memory leak in view)
@@ -142,30 +135,12 @@ impl App {
         let current_theme = settings.preferences.theme.parse::<crate::theme::AppTheme>()
             .unwrap_or_default();
 
-        let settings = Arc::new(Mutex::new(settings));
-
-        // Create dirty tracker
-        let dirty_tracker = Arc::new(DirtyTracker::new());
-
-        // Create save manager
-        let save_manager = SaveManager::new(
-            settings.clone(),
-            paths.clone(),
-            dirty_tracker.clone(),
-        );
-
-        // Clone data for view caches (avoids mutex lock lifetime issues)
-        let outputs_cache = settings.lock().expect("settings mutex poisoned").outputs.clone();
-        let keybindings_cache = settings.lock().expect("settings mutex poisoned").keybindings.clone();
-        let window_rules_cache = settings.lock().expect("settings mutex poisoned").window_rules.clone();
-        let cursor_cache = settings.lock().expect("settings mutex poisoned").cursor.clone();
-
-        // Initialize calibration matrix caches
+        // Initialize calibration matrix caches from settings
         let tablet_calibration_cache = crate::views::widgets::format_matrix_values(
-            settings.lock().expect("settings mutex poisoned").tablet.calibration_matrix
+            settings.tablet.calibration_matrix
         );
         let touch_calibration_cache = crate::views::widgets::format_matrix_values(
-            settings.lock().expect("settings mutex poisoned").touch.calibration_matrix
+            settings.touch.calibration_matrix
         );
 
         // Check initial niri connection status
@@ -178,7 +153,7 @@ impl App {
         let app = Self {
             settings,
             paths,
-            dirty_tracker,
+            dirty_tracker: DirtyTracker::new(),
             current_page: Page::Overview,
             search_query: String::new(),
             search_results: Vec::new(),
@@ -186,7 +161,8 @@ impl App {
             last_search_time: None,
             sidebar_expanded: true,
             widget_demo_state: views::widget_demo::DemoState::default(),
-            save_manager,
+            last_change_time: None,
+            save_in_progress: false,
             toast: None,
             toast_shown_at: None,
             dialog_state: DialogState::default(),
@@ -194,19 +170,15 @@ impl App {
             niri_status,
             selected_output_index: None,
             output_sections_expanded: std::collections::HashMap::new(),
-            outputs_cache,
             selected_layer_rule_id: None,
             layer_rule_sections_expanded: std::collections::HashMap::new(),
             layer_rule_regex_errors: std::collections::HashMap::new(),
             selected_window_rule_id: None,
             window_rule_sections_expanded: std::collections::HashMap::new(),
             window_rule_regex_errors: std::collections::HashMap::new(),
-            window_rules_cache,
             selected_keybinding_index: None,
             keybinding_sections_expanded: std::collections::HashMap::new(),
             key_capture_active: None,
-            keybindings_cache,
-            cursor_cache,
             tablet_calibration_cache,
             touch_calibration_cache,
             tools_state: views::tools::ToolsState::default(),
@@ -275,14 +247,12 @@ impl App {
             Message::ChangeTheme(theme) => {
                 self.current_theme = theme;
 
-                // Save theme to settings
-                let mut settings = self.settings.lock().expect("settings mutex poisoned");
-                settings.preferences.theme = theme.to_str().to_string();
-                drop(settings);
+                // Save theme to settings (direct access, no mutex needed)
+                self.settings.preferences.theme = theme.to_str().to_string();
 
                 // Mark preferences as dirty for auto-save
                 self.dirty_tracker.mark(SettingsCategory::Preferences);
-                self.save_manager.mark_changed();
+                self.mark_changed();
 
                 Task::none()
             }
@@ -314,21 +284,22 @@ impl App {
 
             // Save subsystem (Phase 4)
             Message::Save(SaveMessage::CheckSave) => {
-                if self.save_manager.should_save() {
+                if self.should_save() {
                     // Trigger async save
-                    self.save_manager.save_task().map(Message::SaveCompleted)
+                    self.save_task()
                 } else {
                     Task::none()
                 }
             }
 
             Message::SaveCompleted(result) => {
+                self.save_in_progress = false;
                 match result {
                     SaveResult::Success { files_written, .. } => {
                         self.toast = Some(format!("Saved {} file(s)", files_written));
                         self.toast_shown_at = Some(std::time::Instant::now());
                         // Trigger niri config reload
-                        SaveManager::reload_niri_config_task().map(Message::ReloadCompleted)
+                        self.reload_niri_config_task()
                     }
                     SaveResult::Error { message } => {
                         self.toast = Some(format!("Save failed: {}", message));
@@ -442,12 +413,11 @@ impl App {
                 if self.dirty_tracker.is_dirty() {
                     log::info!("Window closing with unsaved changes, performing blocking save...");
 
-                    // Clone settings and take dirty categories for blocking save
-                    let settings = self.settings.lock().expect("settings mutex poisoned").clone();
+                    // Take dirty categories for blocking save
                     let dirty = self.dirty_tracker.take();
 
                     // Perform blocking save (acceptable since typically <100ms)
-                    match crate::config::save_dirty(&self.paths, &settings, &dirty) {
+                    match crate::config::save_dirty(&self.paths, &self.settings, &dirty) {
                         Ok(count) => {
                             log::info!("Successfully saved {} file(s) before exit", count);
                         }
@@ -486,6 +456,7 @@ impl App {
             Message::LayoutExtras(msg) => self.update_layout_extras(msg),
             Message::Startup(msg) => self.update_startup(msg),
             Message::Tools(msg) => self.update_tools(msg),
+            Message::Preferences(msg) => self.update_preferences(msg),
 
             Message::None => Task::none(),
         }
@@ -608,60 +579,48 @@ impl App {
         let page_view = match self.current_page {
             Page::Overview => return self.overview_page(),
             Page::Appearance => {
-                let appearance = self.settings.lock().expect("settings mutex poisoned").appearance.clone();
-                views::appearance::view(appearance)
+                views::appearance::view(self.settings.appearance.clone())
             }
             Page::Behavior => {
-                let behavior = self.settings.lock().expect("settings mutex poisoned").behavior.clone();
-                views::behavior::view(behavior)
+                views::behavior::view(self.settings.behavior.clone())
             }
             Page::Keyboard => {
-                let keyboard = self.settings.lock().expect("settings mutex poisoned").keyboard.clone();
-                views::keyboard::view(keyboard)
+                views::keyboard::view(self.settings.keyboard.clone())
             }
             Page::Mouse => {
-                let mouse = self.settings.lock().expect("settings mutex poisoned").mouse.clone();
-                views::mouse::view(mouse)
+                views::mouse::view(self.settings.mouse.clone())
             }
             Page::Touchpad => {
-                let touchpad = self.settings.lock().expect("settings mutex poisoned").touchpad.clone();
-                views::touchpad::view(touchpad)
+                views::touchpad::view(self.settings.touchpad.clone())
             }
             Page::Trackpoint => {
-                let trackpoint = self.settings.lock().expect("settings mutex poisoned").trackpoint.clone();
-                views::trackpoint::view(trackpoint)
+                views::trackpoint::view(self.settings.trackpoint.clone())
             }
             Page::Trackball => {
-                let trackball = self.settings.lock().expect("settings mutex poisoned").trackball.clone();
-                views::trackball::view(trackball)
+                views::trackball::view(self.settings.trackball.clone())
             }
             Page::Tablet => {
-                let tablet = self.settings.lock().expect("settings mutex poisoned").tablet.clone();
-                return views::tablet::view(tablet, &self.tablet_calibration_cache);
+                return views::tablet::view(self.settings.tablet.clone(), &self.tablet_calibration_cache);
             }
             Page::Touch => {
-                let touch = self.settings.lock().expect("settings mutex poisoned").touch.clone();
-                return views::touch::view(touch, &self.touch_calibration_cache);
+                return views::touch::view(self.settings.touch.clone(), &self.touch_calibration_cache);
             }
             Page::Animations => return views::animations::view(),
             Page::Cursor => {
-                return views::cursor::view(&self.cursor_cache);
+                return views::cursor::view(&self.settings.cursor);
             }
             Page::LayoutExtras => {
-                let layout = self.settings.lock().expect("settings mutex poisoned").layout_extras.clone();
-                return views::layout_extras::view(&layout);
+                return views::layout_extras::view(&self.settings.layout_extras);
             }
             Page::Gestures => {
-                let gestures = self.settings.lock().expect("settings mutex poisoned").gestures.clone();
-                return views::gestures::view(&gestures);
+                return views::gestures::view(&self.settings.gestures);
             }
             Page::Workspaces => {
-                let workspaces = self.settings.lock().expect("settings mutex poisoned").workspaces.clone();
-                return views::workspaces::view(&workspaces);
+                return views::workspaces::view(&self.settings.workspaces);
             }
             Page::WindowRules => {
                 return views::window_rules::view(
-                    &self.window_rules_cache,
+                    &self.settings.window_rules,
                     self.selected_window_rule_id,
                     &self.window_rule_sections_expanded,
                     &self.window_rule_regex_errors,
@@ -670,7 +629,7 @@ impl App {
             Page::LayerRules => return views::layer_rules::view(),
             Page::Keybindings => {
                 return views::keybindings::view(
-                    &self.keybindings_cache,
+                    &self.settings.keybindings,
                     self.selected_keybinding_index,
                     &self.keybinding_sections_expanded,
                     self.key_capture_active,
@@ -678,42 +637,36 @@ impl App {
             }
             Page::Outputs => {
                 return views::outputs::view(
-                    &self.outputs_cache,
+                    &self.settings.outputs,
                     self.selected_output_index,
                     &self.output_sections_expanded,
                     &self.tools_state.outputs,  // IPC data for available modes
                 );
             }
             Page::Miscellaneous => {
-                let misc = self.settings.lock().expect("settings mutex poisoned").miscellaneous.clone();
-                return views::miscellaneous::view(&misc);
+                return views::miscellaneous::view(&self.settings.miscellaneous);
             }
             Page::Startup => {
-                let startup = self.settings.lock().expect("settings mutex poisoned").startup.clone();
-                return views::startup::view(&startup);
+                return views::startup::view(&self.settings.startup);
             }
             Page::Environment => {
-                let env = self.settings.lock().expect("settings mutex poisoned").environment.clone();
-                return views::environment::view(&env);
+                return views::environment::view(&self.settings.environment);
             }
             Page::Debug => {
-                let debug = self.settings.lock().expect("settings mutex poisoned").debug.clone();
-                return views::debug::view(&debug);
+                return views::debug::view(&self.settings.debug);
             }
             Page::SwitchEvents => {
-                let switch = self.settings.lock().expect("settings mutex poisoned").switch_events.clone();
-                return views::switch_events::view(&switch);
+                return views::switch_events::view(&self.settings.switch_events);
             }
             Page::RecentWindows => {
-                let recent = self.settings.lock().expect("settings mutex poisoned").recent_windows.clone();
-                return views::recent_windows::view(&recent);
+                return views::recent_windows::view(&self.settings.recent_windows);
             }
             Page::Tools => {
                 let niri_connected = matches!(
                     self.niri_status,
                     crate::views::status_bar::NiriStatus::Connected
                 );
-                return views::tools::view(&self.tools_state, niri_connected);
+                return views::tools::view(&self.tools_state, niri_connected, self.settings.preferences.float_settings_app);
             }
         };
 
@@ -733,7 +686,7 @@ impl App {
         use iced::widget::{pick_list, row};
         use iced::Alignment;
 
-        let settings = self.settings.lock().expect("settings mutex poisoned");
+        let settings = &self.settings;
 
         let summary = column![
             text("Welcome to Niri Settings").size(24),
@@ -821,6 +774,56 @@ impl App {
             .into()
     }
 
+    /// Mark that settings have changed (triggers debounced save)
+    pub(crate) fn mark_changed(&mut self) {
+        self.last_change_time = Some(std::time::Instant::now());
+    }
+
+    /// Check if we should save now (debounce: 300ms since last change)
+    fn should_save(&self) -> bool {
+        if self.save_in_progress || !self.dirty_tracker.is_dirty() {
+            return false;
+        }
+
+        match self.last_change_time {
+            Some(t) => t.elapsed() >= Duration::from_millis(300),
+            None => false,
+        }
+    }
+
+    /// Create an async save task
+    fn save_task(&mut self) -> Task<Message> {
+        self.save_in_progress = true;
+        let settings = self.settings.clone();
+        let dirty = self.dirty_tracker.take();
+        let paths = self.paths.clone();
+
+        Task::perform(
+            async move {
+                match crate::config::save_dirty(&paths, &settings, &dirty) {
+                    Ok(count) => SaveResult::Success {
+                        files_written: count,
+                        categories: dirty.into_iter().collect(),
+                    },
+                    Err(e) => SaveResult::Error { message: e.to_string() },
+                }
+            },
+            Message::SaveCompleted,
+        )
+    }
+
+    /// Create an async task to reload niri config
+    fn reload_niri_config_task(&self) -> Task<Message> {
+        Task::perform(
+            async move {
+                match crate::ipc::reload_config() {
+                    Ok(()) => ReloadResult::Success,
+                    Err(e) => ReloadResult::Error { message: e.to_string() },
+                }
+            },
+            Message::ReloadCompleted,
+        )
+    }
 }
 
 // Note: Default is not needed with iced::application() - it uses App::new() directly
@@ -830,5 +833,9 @@ pub fn run() -> iced::Result {
     iced::application(App::new, App::update, App::view)
         .subscription(App::subscription)
         .theme(|app: &App| app.current_theme.to_iced_theme())
+        .settings(iced::Settings {
+            id: Some("niri-settings".to_string()),
+            ..Default::default()
+        })
         .run()
 }

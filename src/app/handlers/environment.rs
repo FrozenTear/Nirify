@@ -7,8 +7,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle environment settings messages
     pub(in crate::app) fn update_environment(&mut self, msg: EnvironmentMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let env = &mut settings.environment;
+        
+        let env = &mut self.settings.environment;
 
         match msg {
             EnvironmentMessage::AddVariable => {
@@ -35,9 +35,8 @@ impl super::super::App {
             }
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::Environment);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

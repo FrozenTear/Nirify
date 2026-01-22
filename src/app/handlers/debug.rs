@@ -7,8 +7,8 @@ use iced::Task;
 impl super::super::App {
     /// Handle debug settings messages
     pub(in crate::app) fn update_debug(&mut self, msg: DebugMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
-        let debug = &mut settings.debug;
+        
+        let debug = &mut self.settings.debug;
 
         match msg {
             DebugMessage::SetExpertMode(v) => debug.expert_mode = v,
@@ -43,9 +43,8 @@ impl super::super::App {
             DebugMessage::SetForcePipewireInvalidModifier(v) => debug.force_pipewire_invalid_modifier = v,
         }
 
-        drop(settings);
         self.dirty_tracker.mark(SettingsCategory::Debug);
-        self.save_manager.mark_changed();
+        self.mark_changed();
         Task::none()
     }
 }

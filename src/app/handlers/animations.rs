@@ -8,28 +8,28 @@ use iced::Task;
 impl super::super::App {
     /// Updates animation settings
     pub(in crate::app) fn update_animations(&mut self, msg: AnimationsMessage) -> Task<Message> {
-        let mut settings = self.settings.lock().expect("settings mutex poisoned");
+        
 
         match msg {
             AnimationsMessage::ToggleSlowdown(enabled) => {
                 // Toggle between slowdown factor and normal speed (1.0)
                 if enabled {
                     // Enable slowdown (if it's at 1.0, set to default 3.0)
-                    if (settings.animations.slowdown - 1.0).abs() < 0.01 {
-                        settings.animations.slowdown = 3.0;
+                    if (self.settings.animations.slowdown - 1.0).abs() < 0.01 {
+                        self.settings.animations.slowdown = 3.0;
                     }
                 } else {
                     // Disable slowdown (set to 1.0 = normal speed)
-                    settings.animations.slowdown = 1.0;
+                    self.settings.animations.slowdown = 1.0;
                 }
             }
             AnimationsMessage::SetSlowdownFactor(value) => {
-                settings.animations.slowdown = value.clamp(0.1, 10.0) as f64;
+                self.settings.animations.slowdown = value.clamp(0.1, 10.0) as f64;
             }
             AnimationsMessage::SetAnimationEnabled(name, enabled) => {
                 // Parse animation name to AnimationId
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
-                    let anim_config = anim_id.get_mut(&mut settings.animations.per_animation);
+                    let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
                     anim_config.animation_type = if enabled {
                         AnimationType::Spring  // Default to spring when enabled
                     } else {
@@ -39,34 +39,33 @@ impl super::super::App {
             }
             AnimationsMessage::SetAnimationDuration(name, duration) => {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
-                    let anim_config = anim_id.get_mut(&mut settings.animations.per_animation);
+                    let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
                     anim_config.easing.duration_ms = duration.clamp(50, 5000);
                 }
             }
             AnimationsMessage::SetAnimationCurve(name, curve_name) => {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
-                    let anim_config = anim_id.get_mut(&mut settings.animations.per_animation);
+                    let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
                     anim_config.easing.curve = EasingCurve::from_kdl(&curve_name);
                 }
             }
             AnimationsMessage::SetAnimationSpringDampingRatio(name, ratio) => {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
-                    let anim_config = anim_id.get_mut(&mut settings.animations.per_animation);
+                    let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
                     anim_config.spring.damping_ratio = ratio.clamp(0.1, 2.0) as f64;
                 }
             }
             AnimationsMessage::SetAnimationSpringEpsilon(name, epsilon) => {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
-                    let anim_config = anim_id.get_mut(&mut settings.animations.per_animation);
+                    let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
                     anim_config.spring.epsilon = epsilon.clamp(0.0001, 1.0) as f64;
                 }
             }
         }
 
-        drop(settings);
 
         self.dirty_tracker.mark(SettingsCategory::Animations);
-        self.save_manager.mark_changed();
+        self.mark_changed();
 
         Task::none()
     }
