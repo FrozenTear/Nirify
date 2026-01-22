@@ -644,7 +644,14 @@ impl App {
                     &self.window_rule_regex_errors,
                 );
             }
-            Page::LayerRules => return views::layer_rules::view(),
+            Page::LayerRules => {
+                return views::layer_rules::view(
+                    &self.settings.layer_rules,
+                    self.selected_layer_rule_id,
+                    &self.layer_rule_sections_expanded,
+                    &self.layer_rule_regex_errors,
+                );
+            }
             Page::Keybindings => {
                 return views::keybindings::view(
                     &self.settings.keybindings,
