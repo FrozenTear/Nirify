@@ -2,16 +2,39 @@
 //!
 //! Shows advanced debug and development options for troubleshooting niri.
 
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{button, column, container, row, scrollable, text, text_input, toggler};
 use iced::{Element, Length};
 
 use super::widgets::*;
 use crate::config::models::DebugSettings;
-use crate::messages::Message;
+use crate::messages::{DebugMessage, Message};
 
 /// Creates the debug settings view
 pub fn view(settings: &DebugSettings) -> Element<'static, Message> {
-    let content = column![
+    // Clone values for closures
+    let expert_mode = settings.expert_mode;
+    let preview_render = settings.preview_render;
+    let enable_overlay_planes = settings.enable_overlay_planes;
+    let disable_cursor_plane = settings.disable_cursor_plane;
+    let disable_direct_scanout = settings.disable_direct_scanout;
+    let restrict_scanout = settings.restrict_primary_scanout_to_matching_format;
+    let render_drm = settings.render_drm_device.clone().unwrap_or_default();
+    let ignore_drm = settings.ignore_drm_devices.clone();
+    let wait_frame = settings.wait_for_frame_completion_before_queueing;
+    let disable_resize = settings.disable_resize_throttling;
+    let disable_trans = settings.disable_transactions;
+    let emulate_zero = settings.emulate_zero_presentation_time;
+    let skip_cursor = settings.skip_cursor_only_updates_during_vrr;
+    let dbus_non_session = settings.dbus_interfaces_in_non_session_instances;
+    let keep_panel = settings.keep_laptop_panel_on_when_lid_is_closed;
+    let disable_names = settings.disable_monitor_names;
+    let force_disable = settings.force_disable_connectors_on_resume;
+    let strict_focus = settings.strict_new_window_focus_policy;
+    let honor_xdg = settings.honor_xdg_activation_with_invalid_serial;
+    let deactivate = settings.deactivate_unfocused_windows;
+    let force_pipewire = settings.force_pipewire_invalid_modifier;
+
+    let mut content = column![
         section_header("Debug Settings"),
         info_text(
             "Advanced settings for debugging and development. \
@@ -21,99 +44,127 @@ pub fn view(settings: &DebugSettings) -> Element<'static, Message> {
 
         // Expert Mode
         subsection_header("Expert Mode"),
-        display_toggle("Expert Mode", settings.expert_mode),
+        toggle_setting("Expert Mode", expert_mode, DebugMessage::SetExpertMode),
         info_text("Enable to show potentially dangerous advanced settings across the app."),
         spacer(16.0),
 
         // Rendering Options
         subsection_header("Rendering Options"),
-        display_toggle("Preview Render", settings.preview_render),
-        display_toggle("Enable Overlay Planes", settings.enable_overlay_planes),
-        display_toggle("Disable Cursor Plane", settings.disable_cursor_plane),
-        display_toggle("Disable Direct Scanout", settings.disable_direct_scanout),
-        display_toggle("Restrict Primary Scanout to Matching Format", settings.restrict_primary_scanout_to_matching_format),
+        toggle_setting("Preview Render", preview_render, DebugMessage::SetPreviewRender),
+        toggle_setting("Enable Overlay Planes", enable_overlay_planes, DebugMessage::SetEnableOverlayPlanes),
+        toggle_setting("Disable Cursor Plane", disable_cursor_plane, DebugMessage::SetDisableCursorPlane),
+        toggle_setting("Disable Direct Scanout", disable_direct_scanout, DebugMessage::SetDisableDirectScanout),
+        toggle_setting("Restrict Scanout to Matching Format", restrict_scanout, DebugMessage::SetRestrictPrimaryScanoutToMatchingFormat),
         spacer(16.0),
 
         // Device Configuration
         subsection_header("Device Configuration"),
-        display_optional("Render DRM Device", settings.render_drm_device.as_deref()),
-        display_list("Ignored DRM Devices", &settings.ignore_drm_devices),
-        spacer(16.0),
+        string_setting("Render DRM Device", &render_drm, "e.g., /dev/dri/renderD128", |s| {
+            DebugMessage::SetRenderDrmDevice(if s.is_empty() { None } else { Some(s) })
+        }),
+    ]
+    .spacing(4);
 
+    // Ignored DRM devices list
+    content = content.push(text("Ignored DRM Devices").size(14));
+    if ignore_drm.is_empty() {
+        content = content.push(text("None").size(13).color([0.5, 0.5, 0.5]));
+    } else {
+        for (idx, device) in ignore_drm.iter().enumerate() {
+            content = content.push(
+                row![
+                    text(device.clone()).size(13).width(Length::Fill),
+                    button(text("×").size(14))
+                        .on_press(Message::Debug(DebugMessage::RemoveIgnoreDrmDevice(idx)))
+                        .padding([2, 8])
+                        .style(delete_button_style),
+                ]
+                .spacing(8)
+                .align_y(iced::Alignment::Center)
+            );
+        }
+    }
+    content = content.push(spacer(16.0));
+
+    content = content.push(column![
         // Performance & Synchronization
         subsection_header("Performance & Synchronization"),
-        display_toggle("Wait for Frame Completion Before Queueing", settings.wait_for_frame_completion_before_queueing),
-        display_toggle("Disable Resize Throttling", settings.disable_resize_throttling),
-        display_toggle("Disable Transactions", settings.disable_transactions),
-        display_toggle("Emulate Zero Presentation Time", settings.emulate_zero_presentation_time),
-        display_toggle("Skip Cursor-Only Updates During VRR", settings.skip_cursor_only_updates_during_vrr),
+        toggle_setting("Wait for Frame Completion", wait_frame, DebugMessage::SetWaitForFrameCompletionBeforeQueueing),
+        toggle_setting("Disable Resize Throttling", disable_resize, DebugMessage::SetDisableResizeThrottling),
+        toggle_setting("Disable Transactions", disable_trans, DebugMessage::SetDisableTransactions),
+        toggle_setting("Emulate Zero Presentation Time", emulate_zero, DebugMessage::SetEmulateZeroPresentationTime),
+        toggle_setting("Skip Cursor-Only Updates (VRR)", skip_cursor, DebugMessage::SetSkipCursorOnlyUpdatesDuringVrr),
         spacer(16.0),
 
         // Hardware & Compatibility
         subsection_header("Hardware & Compatibility"),
-        display_toggle("D-Bus Interfaces in Non-Session Instances", settings.dbus_interfaces_in_non_session_instances),
-        display_toggle("Keep Laptop Panel On When Lid is Closed", settings.keep_laptop_panel_on_when_lid_is_closed),
-        display_toggle("Disable Monitor Names", settings.disable_monitor_names),
-        display_toggle("Force Disable Connectors on Resume", settings.force_disable_connectors_on_resume),
+        toggle_setting("D-Bus in Non-Session Instances", dbus_non_session, DebugMessage::SetDbusInterfacesInNonSessionInstances),
+        toggle_setting("Keep Panel On (Lid Closed)", keep_panel, DebugMessage::SetKeepLaptopPanelOnWhenLidIsClosed),
+        toggle_setting("Disable Monitor Names", disable_names, DebugMessage::SetDisableMonitorNames),
+        toggle_setting("Force Disable Connectors on Resume", force_disable, DebugMessage::SetForceDisableConnectorsOnResume),
         spacer(16.0),
 
         // Window Behavior
         subsection_header("Window Behavior"),
-        display_toggle("Strict New Window Focus Policy", settings.strict_new_window_focus_policy),
-        display_toggle("Honor XDG Activation with Invalid Serial", settings.honor_xdg_activation_with_invalid_serial),
-        display_toggle("Deactivate Unfocused Windows", settings.deactivate_unfocused_windows),
+        toggle_setting("Strict New Window Focus Policy", strict_focus, DebugMessage::SetStrictNewWindowFocusPolicy),
+        toggle_setting("Honor XDG Activation (Invalid Serial)", honor_xdg, DebugMessage::SetHonorXdgActivationWithInvalidSerial),
+        toggle_setting("Deactivate Unfocused Windows", deactivate, DebugMessage::SetDeactivateUnfocusedWindows),
         spacer(16.0),
 
         // Screencasting
         subsection_header("Screencasting"),
-        display_toggle("Force PipeWire Invalid Modifier", settings.force_pipewire_invalid_modifier),
+        toggle_setting("Force PipeWire Invalid Modifier", force_pipewire, DebugMessage::SetForcePipewireInvalidModifier),
         spacer(16.0),
-
-        info_text("Edit debug.kdl directly to change these settings. Full editing UI coming in a future update."),
-    ]
-    .spacing(4);
+    ].spacing(4));
 
     scrollable(container(content).padding(20)).into()
 }
 
-/// Display a toggle value (read-only)
-fn display_toggle(label: &str, value: bool) -> Element<'static, Message> {
+/// Create a toggle setting row
+fn toggle_setting<F>(label: &str, value: bool, msg_fn: F) -> Element<'static, Message>
+where
+    F: Fn(bool) -> DebugMessage + 'static,
+{
     row![
-        text(label.to_string()).size(14).width(Length::Fixed(350.0)),
-        text(if value { "Yes" } else { "No" })
-            .size(14)
-            .color(if value { [0.5, 0.8, 0.5] } else { [0.6, 0.6, 0.6] }),
+        text(label.to_string()).size(14).width(Length::Fixed(300.0)),
+        toggler(value)
+            .on_toggle(move |v| Message::Debug(msg_fn(v)))
+            .size(20),
     ]
     .spacing(16)
+    .align_y(iced::Alignment::Center)
     .into()
 }
 
-/// Display an optional string value (read-only)
-fn display_optional(label: &str, value: Option<&str>) -> Element<'static, Message> {
+/// Create a string setting row
+fn string_setting<F>(label: &str, value: &str, placeholder: &str, msg_fn: F) -> Element<'static, Message>
+where
+    F: Fn(String) -> DebugMessage + 'static,
+{
+    let value_owned = value.to_string();
+    let placeholder_owned = placeholder.to_string();
+
     row![
-        text(label.to_string()).size(14).width(Length::Fixed(350.0)),
-        text(value.unwrap_or("Not set").to_string())
-            .size(14)
-            .color(if value.is_some() { [0.8, 0.8, 0.8] } else { [0.5, 0.5, 0.5] }),
+        text(label.to_string()).size(14).width(Length::Fixed(300.0)),
+        text_input(&placeholder_owned, &value_owned)
+            .on_input(move |s| Message::Debug(msg_fn(s)))
+            .padding(8)
+            .width(Length::Fixed(250.0)),
     ]
     .spacing(16)
+    .align_y(iced::Alignment::Center)
     .into()
 }
 
-/// Display a list of strings (read-only)
-fn display_list(label: &str, values: &[String]) -> Element<'static, Message> {
-    let display = if values.is_empty() {
-        "None".to_string()
-    } else {
-        values.join(", ")
+/// Style for delete buttons
+fn delete_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => iced::Color::from_rgba(0.6, 0.2, 0.2, 0.5),
+        _ => iced::Color::TRANSPARENT,
     };
-
-    row![
-        text(label.to_string()).size(14).width(Length::Fixed(350.0)),
-        text(display)
-            .size(14)
-            .color(if values.is_empty() { [0.5, 0.5, 0.5] } else { [0.8, 0.8, 0.8] }),
-    ]
-    .spacing(16)
-    .into()
+    button::Style {
+        background: Some(iced::Background::Color(bg)),
+        text_color: iced::Color::from_rgb(0.8, 0.4, 0.4),
+        ..Default::default()
+    }
 }

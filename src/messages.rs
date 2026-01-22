@@ -35,7 +35,10 @@ pub enum Message {
     LayerRules(LayerRulesMessage),
     Outputs(OutputsMessage),
     Keybindings(KeybindingsMessage),
-    // TODO: Add remaining 15 categories
+    Debug(DebugMessage),
+    Miscellaneous(MiscellaneousMessage),
+    Environment(EnvironmentMessage),
+    SwitchEvents(SwitchEventsMessage),
 
     // Save subsystem
     Save(SaveMessage),
@@ -445,6 +448,77 @@ pub enum KeybindingsMessage {
 
     // UI state
     ToggleSection(String),
+}
+
+/// Debug settings messages
+#[derive(Debug, Clone)]
+pub enum DebugMessage {
+    // Expert mode
+    SetExpertMode(bool),
+
+    // Rendering options
+    SetPreviewRender(bool),
+    SetEnableOverlayPlanes(bool),
+    SetDisableCursorPlane(bool),
+    SetDisableDirectScanout(bool),
+    SetRestrictPrimaryScanoutToMatchingFormat(bool),
+
+    // Device configuration
+    SetRenderDrmDevice(Option<String>),
+    AddIgnoreDrmDevice(String),
+    RemoveIgnoreDrmDevice(usize),
+
+    // Performance & synchronization
+    SetWaitForFrameCompletionBeforeQueueing(bool),
+    SetDisableResizeThrottling(bool),
+    SetDisableTransactions(bool),
+    SetEmulateZeroPresentationTime(bool),
+    SetSkipCursorOnlyUpdatesDuringVrr(bool),
+
+    // Hardware & compatibility
+    SetDbusInterfacesInNonSessionInstances(bool),
+    SetKeepLaptopPanelOnWhenLidIsClosed(bool),
+    SetDisableMonitorNames(bool),
+    SetForceDisableConnectorsOnResume(bool),
+
+    // Window behavior
+    SetStrictNewWindowFocusPolicy(bool),
+    SetHonorXdgActivationWithInvalidSerial(bool),
+    SetDeactivateUnfocusedWindows(bool),
+
+    // Screencasting
+    SetForcePipewireInvalidModifier(bool),
+}
+
+/// Miscellaneous settings messages
+#[derive(Debug, Clone)]
+pub enum MiscellaneousMessage {
+    SetPreferNoCsd(bool),
+    SetScreenshotPath(String),
+    SetDisablePrimaryClipboard(bool),
+    SetHotkeyOverlaySkipAtStartup(bool),
+    SetHotkeyOverlayHideNotBound(bool),
+    SetConfigNotificationDisableFailed(bool),
+    SetSpawnShAtStartup(bool),
+    SetXWaylandSatellite(crate::config::models::XWaylandSatelliteConfig),
+}
+
+/// Environment settings messages
+#[derive(Debug, Clone)]
+pub enum EnvironmentMessage {
+    AddVariable,
+    RemoveVariable(u32), // Variable ID
+    SetVariableName(u32, String),
+    SetVariableValue(u32, String),
+}
+
+/// Switch events settings messages
+#[derive(Debug, Clone)]
+pub enum SwitchEventsMessage {
+    SetLidCloseCommand(String),
+    SetLidOpenCommand(String),
+    SetTabletModeOnCommand(String),
+    SetTabletModeOffCommand(String),
 }
 
 /// Save subsystem messages

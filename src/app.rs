@@ -526,8 +526,159 @@ impl App {
                 Task::none()
             }
 
+            Message::Debug(msg) => self.update_debug(msg),
+            Message::Miscellaneous(msg) => self.update_miscellaneous(msg),
+            Message::Environment(msg) => self.update_environment(msg),
+            Message::SwitchEvents(msg) => self.update_switch_events(msg),
+
             Message::None => Task::none(),
         }
+    }
+
+    /// Handle debug settings messages
+    fn update_debug(&mut self, msg: crate::messages::DebugMessage) -> Task<Message> {
+        use crate::messages::DebugMessage;
+
+        let mut settings = self.settings.lock().unwrap();
+        let debug = &mut settings.debug;
+
+        match msg {
+            DebugMessage::SetExpertMode(v) => debug.expert_mode = v,
+            DebugMessage::SetPreviewRender(v) => debug.preview_render = v,
+            DebugMessage::SetEnableOverlayPlanes(v) => debug.enable_overlay_planes = v,
+            DebugMessage::SetDisableCursorPlane(v) => debug.disable_cursor_plane = v,
+            DebugMessage::SetDisableDirectScanout(v) => debug.disable_direct_scanout = v,
+            DebugMessage::SetRestrictPrimaryScanoutToMatchingFormat(v) => debug.restrict_primary_scanout_to_matching_format = v,
+            DebugMessage::SetRenderDrmDevice(v) => debug.render_drm_device = v,
+            DebugMessage::AddIgnoreDrmDevice(device) => {
+                if !device.is_empty() {
+                    debug.ignore_drm_devices.push(device);
+                }
+            }
+            DebugMessage::RemoveIgnoreDrmDevice(idx) => {
+                if idx < debug.ignore_drm_devices.len() {
+                    debug.ignore_drm_devices.remove(idx);
+                }
+            }
+            DebugMessage::SetWaitForFrameCompletionBeforeQueueing(v) => debug.wait_for_frame_completion_before_queueing = v,
+            DebugMessage::SetDisableResizeThrottling(v) => debug.disable_resize_throttling = v,
+            DebugMessage::SetDisableTransactions(v) => debug.disable_transactions = v,
+            DebugMessage::SetEmulateZeroPresentationTime(v) => debug.emulate_zero_presentation_time = v,
+            DebugMessage::SetSkipCursorOnlyUpdatesDuringVrr(v) => debug.skip_cursor_only_updates_during_vrr = v,
+            DebugMessage::SetDbusInterfacesInNonSessionInstances(v) => debug.dbus_interfaces_in_non_session_instances = v,
+            DebugMessage::SetKeepLaptopPanelOnWhenLidIsClosed(v) => debug.keep_laptop_panel_on_when_lid_is_closed = v,
+            DebugMessage::SetDisableMonitorNames(v) => debug.disable_monitor_names = v,
+            DebugMessage::SetForceDisableConnectorsOnResume(v) => debug.force_disable_connectors_on_resume = v,
+            DebugMessage::SetStrictNewWindowFocusPolicy(v) => debug.strict_new_window_focus_policy = v,
+            DebugMessage::SetHonorXdgActivationWithInvalidSerial(v) => debug.honor_xdg_activation_with_invalid_serial = v,
+            DebugMessage::SetDeactivateUnfocusedWindows(v) => debug.deactivate_unfocused_windows = v,
+            DebugMessage::SetForcePipewireInvalidModifier(v) => debug.force_pipewire_invalid_modifier = v,
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::Debug);
+        self.save_manager.mark_changed();
+        Task::none()
+    }
+
+    /// Handle miscellaneous settings messages
+    fn update_miscellaneous(&mut self, msg: crate::messages::MiscellaneousMessage) -> Task<Message> {
+        use crate::messages::MiscellaneousMessage;
+
+        let mut settings = self.settings.lock().unwrap();
+        let misc = &mut settings.miscellaneous;
+
+        match msg {
+            MiscellaneousMessage::SetPreferNoCsd(v) => misc.prefer_no_csd = v,
+            MiscellaneousMessage::SetScreenshotPath(v) => misc.screenshot_path = v,
+            MiscellaneousMessage::SetDisablePrimaryClipboard(v) => misc.disable_primary_clipboard = v,
+            MiscellaneousMessage::SetHotkeyOverlaySkipAtStartup(v) => misc.hotkey_overlay_skip_at_startup = v,
+            MiscellaneousMessage::SetHotkeyOverlayHideNotBound(v) => misc.hotkey_overlay_hide_not_bound = v,
+            MiscellaneousMessage::SetConfigNotificationDisableFailed(v) => misc.config_notification_disable_failed = v,
+            MiscellaneousMessage::SetSpawnShAtStartup(v) => misc.spawn_sh_at_startup = v,
+            MiscellaneousMessage::SetXWaylandSatellite(v) => misc.xwayland_satellite = v,
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::Miscellaneous);
+        self.save_manager.mark_changed();
+        Task::none()
+    }
+
+    /// Handle environment settings messages
+    fn update_environment(&mut self, msg: crate::messages::EnvironmentMessage) -> Task<Message> {
+        use crate::messages::EnvironmentMessage;
+
+        let mut settings = self.settings.lock().unwrap();
+        let env = &mut settings.environment;
+
+        match msg {
+            EnvironmentMessage::AddVariable => {
+                let id = env.next_id;
+                env.next_id += 1;
+                env.variables.push(crate::config::models::EnvironmentVariable {
+                    id,
+                    name: String::new(),
+                    value: String::new(),
+                });
+            }
+            EnvironmentMessage::RemoveVariable(id) => {
+                env.variables.retain(|v| v.id != id);
+            }
+            EnvironmentMessage::SetVariableName(id, name) => {
+                if let Some(var) = env.variables.iter_mut().find(|v| v.id == id) {
+                    var.name = name;
+                }
+            }
+            EnvironmentMessage::SetVariableValue(id, value) => {
+                if let Some(var) = env.variables.iter_mut().find(|v| v.id == id) {
+                    var.value = value;
+                }
+            }
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::Environment);
+        self.save_manager.mark_changed();
+        Task::none()
+    }
+
+    /// Handle switch events settings messages
+    fn update_switch_events(&mut self, msg: crate::messages::SwitchEventsMessage) -> Task<Message> {
+        use crate::messages::SwitchEventsMessage;
+
+        let mut settings = self.settings.lock().unwrap();
+        let switch = &mut settings.switch_events;
+
+        // Helper to parse command string into Vec<String>
+        fn parse_command(cmd: &str) -> Vec<String> {
+            if cmd.trim().is_empty() {
+                Vec::new()
+            } else {
+                // Simple split by whitespace - could be enhanced with proper shell parsing
+                cmd.split_whitespace().map(String::from).collect()
+            }
+        }
+
+        match msg {
+            SwitchEventsMessage::SetLidCloseCommand(cmd) => {
+                switch.lid_close.spawn = parse_command(&cmd);
+            }
+            SwitchEventsMessage::SetLidOpenCommand(cmd) => {
+                switch.lid_open.spawn = parse_command(&cmd);
+            }
+            SwitchEventsMessage::SetTabletModeOnCommand(cmd) => {
+                switch.tablet_mode_on.spawn = parse_command(&cmd);
+            }
+            SwitchEventsMessage::SetTabletModeOffCommand(cmd) => {
+                switch.tablet_mode_off.spawn = parse_command(&cmd);
+            }
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::SwitchEvents);
+        self.save_manager.mark_changed();
+        Task::none()
     }
 
     /// Returns the subscription for periodic save checks and keyboard capture
