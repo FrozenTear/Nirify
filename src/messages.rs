@@ -39,6 +39,7 @@ pub enum Message {
     Miscellaneous(MiscellaneousMessage),
     Environment(EnvironmentMessage),
     SwitchEvents(SwitchEventsMessage),
+    RecentWindows(RecentWindowsMessage),
 
     // Save subsystem
     Save(SaveMessage),
@@ -519,6 +520,34 @@ pub enum SwitchEventsMessage {
     SetLidOpenCommand(String),
     SetTabletModeOnCommand(String),
     SetTabletModeOffCommand(String),
+}
+
+/// Recent windows settings messages
+#[derive(Debug, Clone)]
+pub enum RecentWindowsMessage {
+    // Top-level
+    SetOff(bool),
+    SetDebounceMs(i32),
+    SetOpenDelayMs(i32),
+
+    // Highlight settings
+    SetActiveColor(String),  // Hex color
+    SetUrgentColor(String),  // Hex color
+    SetHighlightPadding(i32),
+    SetHighlightCornerRadius(i32),
+
+    // Preview settings
+    SetPreviewMaxHeight(i32),
+    SetPreviewMaxScale(f64),
+
+    // Keybind management
+    AddBind,
+    RemoveBind(usize),
+    SetBindKeyCombo(usize, String),
+    SetBindIsNext(usize, bool),
+    SetBindFilterAppId(usize, bool),
+    SetBindScope(usize, Option<crate::config::models::RecentWindowsScope>),
+    SetBindCooldown(usize, Option<i32>),
 }
 
 /// Save subsystem messages
