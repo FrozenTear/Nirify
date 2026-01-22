@@ -113,6 +113,17 @@ pub struct App {
     // Tools page state
     /// State for the Tools page (IPC data and loading states)
     tools_state: views::tools::ToolsState,
+
+    // Config editor state
+    /// State for the Config Editor page
+    config_editor_state: views::config_editor::ConfigEditorState,
+
+    // Backups state
+    /// State for the Backups page
+    backups_state: views::backups::BackupsState,
+
+    /// Pending restore index (for confirmation dialog)
+    pending_restore_idx: Option<usize>,
 }
 
 impl App {
@@ -182,6 +193,9 @@ impl App {
             tablet_calibration_cache,
             touch_calibration_cache,
             tools_state: views::tools::ToolsState::default(),
+            config_editor_state: views::config_editor::ConfigEditorState::default(),
+            backups_state: views::backups::BackupsState::default(),
+            pending_restore_idx: None,
         };
 
         (app, Task::none())
@@ -457,6 +471,8 @@ impl App {
             Message::Startup(msg) => self.update_startup(msg),
             Message::Tools(msg) => self.update_tools(msg),
             Message::Preferences(msg) => self.update_preferences(msg),
+            Message::ConfigEditor(msg) => self.update_config_editor(msg),
+            Message::Backups(msg) => self.update_backups(msg),
 
             Message::None => Task::none(),
         }
@@ -667,6 +683,12 @@ impl App {
                     crate::views::status_bar::NiriStatus::Connected
                 );
                 return views::tools::view(&self.tools_state, niri_connected, self.settings.preferences.float_settings_app);
+            }
+            Page::ConfigEditor => {
+                return views::config_editor::view(&self.config_editor_state);
+            }
+            Page::Backups => {
+                return views::backups::view(&self.backups_state);
             }
         };
 

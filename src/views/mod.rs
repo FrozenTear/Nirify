@@ -10,7 +10,9 @@ pub mod status_bar;
 
 pub mod animations;
 pub mod appearance;
+pub mod backups;
 pub mod behavior;
+pub mod config_editor;
 pub mod cursor;
 pub mod debug;
 pub mod environment;

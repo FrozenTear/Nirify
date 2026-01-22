@@ -49,6 +49,8 @@ pub enum Message {
     Startup(StartupMessage),
     Tools(ToolsMessage),
     Preferences(PreferencesMessage),
+    ConfigEditor(ConfigEditorMessage),
+    Backups(BackupsMessage),
 
     // Save subsystem
     Save(SaveMessage),
@@ -100,6 +102,8 @@ pub enum Page {
     SwitchEvents,
     RecentWindows,
     Tools,
+    ConfigEditor,
+    Backups,
 }
 
 impl Page {
@@ -132,6 +136,8 @@ impl Page {
             Page::SwitchEvents => "Switch Events",
             Page::RecentWindows => "Recent Windows",
             Page::Tools => "Tools",
+            Page::ConfigEditor => "Config Editor",
+            Page::Backups => "Backups",
         }
     }
 
@@ -152,6 +158,7 @@ impl Page {
             Page::Miscellaneous | Page::Startup | Page::Environment => PageCategory::System,
             Page::Debug | Page::SwitchEvents | Page::RecentWindows => PageCategory::Advanced,
             Page::Tools => PageCategory::System,
+            Page::ConfigEditor | Page::Backups => PageCategory::Advanced,
         }
     }
 }
@@ -720,6 +727,49 @@ pub enum ToolsMessage {
 pub enum PreferencesMessage {
     /// Toggle whether the settings app should float or tile
     SetFloatSettingsApp(bool),
+}
+
+/// Config editor messages
+#[derive(Debug, Clone)]
+pub enum ConfigEditorMessage {
+    /// Select a file to view by index
+    SelectFile(usize),
+    /// Refresh the current file
+    Refresh,
+    /// File content loaded
+    FileLoaded(Result<String, String>),
+}
+
+/// Backups management messages
+#[derive(Debug, Clone)]
+pub enum BackupsMessage {
+    /// Refresh the backup list
+    RefreshList,
+    /// Backup list loaded
+    ListLoaded(Result<Vec<BackupEntry>, String>),
+    /// Select a backup to preview
+    SelectBackup(usize),
+    /// Preview content loaded
+    PreviewLoaded(Result<String, String>),
+    /// Request to restore a backup
+    RestoreBackup(usize),
+    /// Show restore confirmation dialog
+    ConfirmRestore(usize),
+    /// Restore completed
+    RestoreCompleted(Result<(), String>),
+}
+
+/// Entry in the backups list
+#[derive(Debug, Clone)]
+pub struct BackupEntry {
+    /// Filename of the backup
+    pub filename: String,
+    /// Human-readable date
+    pub date: String,
+    /// Human-readable size
+    pub size: String,
+    /// Full path to the backup file
+    pub path: std::path::PathBuf,
 }
 
 /// Save subsystem messages
