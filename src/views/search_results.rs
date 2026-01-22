@@ -9,6 +9,7 @@ use crate::messages::Message;
 use crate::search::SearchResult;
 
 /// Creates the search results view
+/// Note: Takes owned copies of data to avoid lifetime issues without memory leaks
 pub fn view(results: &[SearchResult], query: &str) -> Element<'static, Message> {
     if query.trim().is_empty() || results.is_empty() {
         return container(
@@ -20,17 +21,19 @@ pub fn view(results: &[SearchResult], query: &str) -> Element<'static, Message> 
         .into();
     }
 
-    let query_static: &'static str = Box::leak(query.to_string().into_boxed_str());
     let result_count = results.len();
+    // Use owned String directly - text() accepts Into<String>
+    let header_text = format!(
+        "Found {} result{} for \"{}\"",
+        result_count,
+        if result_count == 1 { "" } else { "s" },
+        query
+    );
 
     let mut content = column![
-        text(format!("Found {} result{} for \"{}\"",
-            result_count,
-            if result_count == 1 { "" } else { "s" },
-            query_static
-        ))
-        .size(18)
-        .color([0.9, 0.9, 0.9]),
+        text(header_text)
+            .size(18)
+            .color([0.9, 0.9, 0.9]),
         text("Click a result to navigate to that page")
             .size(13)
             .color([0.6, 0.6, 0.6]),
@@ -38,16 +41,15 @@ pub fn view(results: &[SearchResult], query: &str) -> Element<'static, Message> 
     .spacing(12)
     .padding(20);
 
-    // Add search result items
+    // Add search result items - clone data to owned values
     for (index, result) in results.iter().enumerate() {
-        let page_title: &'static str = Box::leak(result.page_title.clone().into_boxed_str());
-        let matched_keywords = result.matched_keywords.join(", ");
-        let keywords_static: &'static str = Box::leak(matched_keywords.into_boxed_str());
+        let page_title = result.page_title.clone();
+        let keywords_text = format!("Keywords: {}", result.matched_keywords.join(", "));
 
         let result_item = button(
             column![
                 text(page_title).size(18),
-                text(format!("Keywords: {}", keywords_static))
+                text(keywords_text)
                     .size(13)
                     .color([0.6, 0.6, 0.6]),
             ]

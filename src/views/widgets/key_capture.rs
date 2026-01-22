@@ -41,25 +41,26 @@ pub fn key_capture_row<'a, Message: Clone + 'a>(
     state: &KeyCaptureState,
     on_change: impl Fn(KeyCaptureMessage) -> Message + 'a + Copy,
 ) -> Element<'a, Message> {
-    let display_text: &'static str = match state {
+    // Use owned String to avoid memory leaks (text() accepts Into<String>)
+    let display_text: String = match state {
         KeyCaptureState::Idle(binding) if binding.is_empty() => {
-            "Click to set..."
+            "Click to set...".to_string()
         }
         KeyCaptureState::Idle(binding) => {
-            Box::leak(binding.clone().into_boxed_str())
+            binding.clone()
         }
         KeyCaptureState::Capturing => {
-            "Press any key... (ESC to cancel)"
+            "Press any key... (ESC to cancel)".to_string()
         }
         KeyCaptureState::Captured(binding) => {
-            Box::leak(format!("{} (click Confirm)", binding).into_boxed_str())
+            format!("{} (click Confirm)", binding)
         }
     };
 
     let is_capturing = matches!(state, KeyCaptureState::Capturing);
 
     let capture_button = if is_capturing {
-        button(text(display_text))
+        button(text(display_text.clone()))
             .on_press(on_change(KeyCaptureMessage::CancelCapture))
             .padding([8, 16])
             .style(|_theme, _status| button::Style {
@@ -73,7 +74,7 @@ pub fn key_capture_row<'a, Message: Clone + 'a>(
                 ..Default::default()
             })
     } else {
-        button(text(display_text.to_string()))
+        button(text(display_text))
             .on_press(on_change(KeyCaptureMessage::StartCapture))
             .padding([8, 16])
     };

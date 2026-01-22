@@ -94,6 +94,10 @@ pub struct App {
     /// Cached window rules data for view borrowing
     window_rules_cache: crate::config::models::WindowRulesSettings,
 
+    // Cursor state
+    /// Cached cursor data for view borrowing (avoids mutex lock lifetime issues)
+    cursor_cache: crate::config::models::CursorSettings,
+
     // Keybindings state
     /// Selected keybinding index for list-detail view
     selected_keybinding_index: Option<usize>,
@@ -233,10 +237,11 @@ impl App {
             dirty_tracker.clone(),
         );
 
-        // Clone outputs and keybindings for view caches (avoids mutex lock lifetime issues)
+        // Clone data for view caches (avoids mutex lock lifetime issues)
         let outputs_cache = settings.lock().unwrap().outputs.clone();
         let keybindings_cache = settings.lock().unwrap().keybindings.clone();
         let window_rules_cache = settings.lock().unwrap().window_rules.clone();
+        let cursor_cache = settings.lock().unwrap().cursor.clone();
 
         // Check initial niri connection status
         let niri_status = if crate::ipc::is_niri_running() {
@@ -276,6 +281,7 @@ impl App {
             keybinding_sections_expanded: std::collections::HashMap::new(),
             key_capture_active: None,
             keybindings_cache,
+            cursor_cache,
         };
 
         (app, Task::none())
@@ -531,6 +537,13 @@ impl App {
             Message::Environment(msg) => self.update_environment(msg),
             Message::SwitchEvents(msg) => self.update_switch_events(msg),
             Message::RecentWindows(msg) => self.update_recent_windows(msg),
+            Message::Trackpoint(msg) => self.update_trackpoint(msg),
+            Message::Trackball(msg) => self.update_trackball(msg),
+            Message::Tablet(msg) => self.update_tablet(msg),
+            Message::Touch(msg) => self.update_touch(msg),
+            Message::Gestures(msg) => self.update_gestures(msg),
+            Message::LayoutExtras(msg) => self.update_layout_extras(msg),
+            Message::Startup(msg) => self.update_startup(msg),
 
             Message::None => Task::none(),
         }
@@ -755,6 +768,264 @@ impl App {
         Task::none()
     }
 
+    /// Handle trackpoint settings messages
+    fn update_trackpoint(&mut self, msg: crate::messages::TrackpointMessage) -> Task<Message> {
+        use crate::messages::TrackpointMessage;
+
+        let mut settings = self.settings.lock().unwrap();
+        let trackpoint = &mut settings.trackpoint;
+
+        match msg {
+            TrackpointMessage::SetOff(v) => trackpoint.off = v,
+            TrackpointMessage::SetNaturalScroll(v) => trackpoint.natural_scroll = v,
+            TrackpointMessage::SetAccelSpeed(v) => trackpoint.accel_speed = v.clamp(-1.0, 1.0) as f64,
+            TrackpointMessage::SetAccelProfile(v) => trackpoint.accel_profile = v,
+            TrackpointMessage::SetScrollMethod(v) => trackpoint.scroll_method = v,
+            TrackpointMessage::SetLeftHanded(v) => trackpoint.left_handed = v,
+            TrackpointMessage::SetMiddleEmulation(v) => trackpoint.middle_emulation = v,
+            TrackpointMessage::SetScrollButtonLock(v) => trackpoint.scroll_button_lock = v,
+            TrackpointMessage::SetScrollButton(v) => trackpoint.scroll_button = v,
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::Trackpoint);
+        self.save_manager.mark_changed();
+        Task::none()
+    }
+
+    /// Handle trackball settings messages
+    fn update_trackball(&mut self, msg: crate::messages::TrackballMessage) -> Task<Message> {
+        use crate::messages::TrackballMessage;
+
+        let mut settings = self.settings.lock().unwrap();
+        let trackball = &mut settings.trackball;
+
+        match msg {
+            TrackballMessage::SetOff(v) => trackball.off = v,
+            TrackballMessage::SetNaturalScroll(v) => trackball.natural_scroll = v,
+            TrackballMessage::SetAccelSpeed(v) => trackball.accel_speed = v.clamp(-1.0, 1.0) as f64,
+            TrackballMessage::SetAccelProfile(v) => trackball.accel_profile = v,
+            TrackballMessage::SetScrollMethod(v) => trackball.scroll_method = v,
+            TrackballMessage::SetLeftHanded(v) => trackball.left_handed = v,
+            TrackballMessage::SetMiddleEmulation(v) => trackball.middle_emulation = v,
+            TrackballMessage::SetScrollButtonLock(v) => trackball.scroll_button_lock = v,
+            TrackballMessage::SetScrollButton(v) => trackball.scroll_button = v,
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::Trackball);
+        self.save_manager.mark_changed();
+        Task::none()
+    }
+
+    /// Handle tablet settings messages
+    fn update_tablet(&mut self, msg: crate::messages::TabletMessage) -> Task<Message> {
+        use crate::messages::TabletMessage;
+
+        let mut settings = self.settings.lock().unwrap();
+        let tablet = &mut settings.tablet;
+
+        match msg {
+            TabletMessage::SetOff(v) => tablet.off = v,
+            TabletMessage::SetLeftHanded(v) => tablet.left_handed = v,
+            TabletMessage::SetMapToOutput(v) => tablet.map_to_output = v,
+            TabletMessage::SetCalibrationMatrix(v) => tablet.calibration_matrix = v,
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::Tablet);
+        self.save_manager.mark_changed();
+        Task::none()
+    }
+
+    /// Handle touch settings messages
+    fn update_touch(&mut self, msg: crate::messages::TouchMessage) -> Task<Message> {
+        use crate::messages::TouchMessage;
+
+        let mut settings = self.settings.lock().unwrap();
+        let touch = &mut settings.touch;
+
+        match msg {
+            TouchMessage::SetOff(v) => touch.off = v,
+            TouchMessage::SetMapToOutput(v) => touch.map_to_output = v,
+            TouchMessage::SetCalibrationMatrix(v) => touch.calibration_matrix = v,
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::Touch);
+        self.save_manager.mark_changed();
+        Task::none()
+    }
+
+    /// Handle gestures settings messages
+    fn update_gestures(&mut self, msg: crate::messages::GesturesMessage) -> Task<Message> {
+        use crate::messages::GesturesMessage;
+
+        let mut settings = self.settings.lock().unwrap();
+        let gestures = &mut settings.gestures;
+
+        match msg {
+            // Hot corners
+            GesturesMessage::SetHotCornersEnabled(v) => gestures.hot_corners.enabled = v,
+            GesturesMessage::SetHotCornerTopLeft(v) => gestures.hot_corners.top_left = v,
+            GesturesMessage::SetHotCornerTopRight(v) => gestures.hot_corners.top_right = v,
+            GesturesMessage::SetHotCornerBottomLeft(v) => gestures.hot_corners.bottom_left = v,
+            GesturesMessage::SetHotCornerBottomRight(v) => gestures.hot_corners.bottom_right = v,
+
+            // DnD edge view scroll
+            GesturesMessage::SetDndScrollEnabled(v) => gestures.dnd_edge_view_scroll.enabled = v,
+            GesturesMessage::SetDndScrollTriggerWidth(v) => gestures.dnd_edge_view_scroll.trigger_size = v.clamp(10, 200),
+            GesturesMessage::SetDndScrollDelayMs(v) => gestures.dnd_edge_view_scroll.delay_ms = v.clamp(0, 2000),
+            GesturesMessage::SetDndScrollMaxSpeed(v) => gestures.dnd_edge_view_scroll.max_speed = v.clamp(100, 5000),
+
+            // DnD edge workspace switch
+            GesturesMessage::SetDndWorkspaceEnabled(v) => gestures.dnd_edge_workspace_switch.enabled = v,
+            GesturesMessage::SetDndWorkspaceTriggerHeight(v) => gestures.dnd_edge_workspace_switch.trigger_size = v.clamp(10, 200),
+            GesturesMessage::SetDndWorkspaceDelayMs(v) => gestures.dnd_edge_workspace_switch.delay_ms = v.clamp(0, 2000),
+            GesturesMessage::SetDndWorkspaceMaxSpeed(v) => gestures.dnd_edge_workspace_switch.max_speed = v.clamp(100, 5000),
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::Gestures);
+        self.save_manager.mark_changed();
+        Task::none()
+    }
+
+    /// Handle layout extras settings messages
+    fn update_layout_extras(&mut self, msg: crate::messages::LayoutExtrasMessage) -> Task<Message> {
+        use crate::messages::LayoutExtrasMessage;
+        use crate::types::ColorOrGradient;
+
+        let mut settings = self.settings.lock().unwrap();
+        let layout = &mut settings.layout_extras;
+
+        match msg {
+            // Shadow settings
+            LayoutExtrasMessage::SetShadowEnabled(v) => layout.shadow.enabled = v,
+            LayoutExtrasMessage::SetShadowSoftness(v) => layout.shadow.softness = v.clamp(0, 100),
+            LayoutExtrasMessage::SetShadowSpread(v) => layout.shadow.spread = v.clamp(0, 100),
+            LayoutExtrasMessage::SetShadowOffsetX(v) => layout.shadow.offset_x = v.clamp(-100, 100),
+            LayoutExtrasMessage::SetShadowOffsetY(v) => layout.shadow.offset_y = v.clamp(-100, 100),
+            LayoutExtrasMessage::SetShadowDrawBehindWindow(v) => layout.shadow.draw_behind_window = v,
+            LayoutExtrasMessage::SetShadowColor(hex) => {
+                if let Some(color) = crate::types::Color::from_hex(&hex) {
+                    layout.shadow.color = color;
+                }
+            }
+            LayoutExtrasMessage::SetShadowInactiveColor(hex) => {
+                if let Some(color) = crate::types::Color::from_hex(&hex) {
+                    layout.shadow.inactive_color = color;
+                }
+            }
+
+            // Tab indicator
+            LayoutExtrasMessage::SetTabIndicatorEnabled(v) => layout.tab_indicator.enabled = v,
+            LayoutExtrasMessage::SetTabIndicatorHideWhenSingleTab(v) => layout.tab_indicator.hide_when_single_tab = v,
+            LayoutExtrasMessage::SetTabIndicatorPlaceWithinColumn(v) => layout.tab_indicator.place_within_column = v,
+            LayoutExtrasMessage::SetTabIndicatorGap(v) => layout.tab_indicator.gap = v.clamp(0, 50),
+            LayoutExtrasMessage::SetTabIndicatorWidth(v) => layout.tab_indicator.width = v.clamp(1, 50),
+            LayoutExtrasMessage::SetTabIndicatorLengthProportion(v) => layout.tab_indicator.length_proportion = v.clamp(0.1, 1.0),
+            LayoutExtrasMessage::SetTabIndicatorCornerRadius(v) => layout.tab_indicator.corner_radius = v.clamp(0, 50),
+            LayoutExtrasMessage::SetTabIndicatorGapsBetweenTabs(v) => layout.tab_indicator.gaps_between_tabs = v.clamp(0, 50),
+            LayoutExtrasMessage::SetTabIndicatorPosition(v) => layout.tab_indicator.position = v,
+            LayoutExtrasMessage::SetTabIndicatorActiveColor(hex) => {
+                if let Some(color) = crate::types::Color::from_hex(&hex) {
+                    layout.tab_indicator.active = ColorOrGradient::Color(color);
+                }
+            }
+            LayoutExtrasMessage::SetTabIndicatorInactiveColor(hex) => {
+                if let Some(color) = crate::types::Color::from_hex(&hex) {
+                    layout.tab_indicator.inactive = ColorOrGradient::Color(color);
+                }
+            }
+            LayoutExtrasMessage::SetTabIndicatorUrgentColor(hex) => {
+                if let Some(color) = crate::types::Color::from_hex(&hex) {
+                    layout.tab_indicator.urgent = ColorOrGradient::Color(color);
+                }
+            }
+
+            // Insert hint
+            LayoutExtrasMessage::SetInsertHintEnabled(v) => layout.insert_hint.enabled = v,
+            LayoutExtrasMessage::SetInsertHintColor(hex) => {
+                if let Some(color) = crate::types::Color::from_hex(&hex) {
+                    layout.insert_hint.color = ColorOrGradient::Color(color);
+                }
+            }
+
+            // Preset widths/heights
+            LayoutExtrasMessage::AddPresetWidth => {
+                layout.preset_column_widths.push(crate::config::models::PresetWidth::Proportion(0.5));
+            }
+            LayoutExtrasMessage::RemovePresetWidth(idx) => {
+                if idx < layout.preset_column_widths.len() {
+                    layout.preset_column_widths.remove(idx);
+                }
+            }
+            LayoutExtrasMessage::SetPresetWidth(idx, width) => {
+                if let Some(w) = layout.preset_column_widths.get_mut(idx) {
+                    *w = width;
+                }
+            }
+            LayoutExtrasMessage::AddPresetHeight => {
+                layout.preset_window_heights.push(crate::config::models::PresetHeight::Proportion(0.5));
+            }
+            LayoutExtrasMessage::RemovePresetHeight(idx) => {
+                if idx < layout.preset_window_heights.len() {
+                    layout.preset_window_heights.remove(idx);
+                }
+            }
+            LayoutExtrasMessage::SetPresetHeight(idx, height) => {
+                if let Some(h) = layout.preset_window_heights.get_mut(idx) {
+                    *h = height;
+                }
+            }
+
+            // Default column display
+            LayoutExtrasMessage::SetDefaultColumnDisplay(v) => layout.default_column_display = v,
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::LayoutExtras);
+        self.save_manager.mark_changed();
+        Task::none()
+    }
+
+    /// Handle startup commands messages
+    fn update_startup(&mut self, msg: crate::messages::StartupMessage) -> Task<Message> {
+        use crate::messages::StartupMessage;
+
+        let mut settings = self.settings.lock().unwrap();
+        let startup = &mut settings.startup;
+
+        match msg {
+            StartupMessage::AddCommand => {
+                let id = startup.next_id;
+                startup.next_id += 1;
+                startup.commands.push(crate::config::models::StartupCommand {
+                    id,
+                    command: vec![String::new()],
+                });
+            }
+            StartupMessage::RemoveCommand(id) => {
+                startup.commands.retain(|c| c.id != id);
+            }
+            StartupMessage::SetCommand(id, cmd) => {
+                if let Some(command) = startup.commands.iter_mut().find(|c| c.id == id) {
+                    // Split by whitespace for the command vector
+                    command.command = cmd.split_whitespace().map(String::from).collect();
+                    if command.command.is_empty() {
+                        command.command.push(String::new());
+                    }
+                }
+            }
+        }
+
+        drop(settings);
+        self.dirty_tracker.mark(crate::config::SettingsCategory::Startup);
+        self.save_manager.mark_changed();
+        Task::none()
+    }
+
     /// Returns the subscription for periodic save checks and keyboard capture
     pub fn subscription(&self) -> Subscription<Message> {
         use iced::keyboard;
@@ -890,16 +1161,30 @@ impl App {
                 let touchpad = self.settings.lock().unwrap().touchpad.clone();
                 views::touchpad::view(touchpad)
             }
-            Page::Trackpoint => return views::trackpoint::view(),
-            Page::Trackball => return views::trackball::view(),
-            Page::Tablet => return views::tablet::view(),
-            Page::Touch => return views::touch::view(),
+            Page::Trackpoint => {
+                let trackpoint = self.settings.lock().unwrap().trackpoint.clone();
+                views::trackpoint::view(trackpoint)
+            }
+            Page::Trackball => {
+                let trackball = self.settings.lock().unwrap().trackball.clone();
+                views::trackball::view(trackball)
+            }
+            Page::Tablet => {
+                let tablet = self.settings.lock().unwrap().tablet.clone();
+                views::tablet::view(tablet)
+            }
+            Page::Touch => {
+                let touch = self.settings.lock().unwrap().touch.clone();
+                views::touch::view(touch)
+            }
             Page::Animations => return views::animations::view(),
             Page::Cursor => {
-                let cursor = self.settings.lock().unwrap().cursor.clone();
-                views::cursor::view(cursor)
+                return views::cursor::view(&self.cursor_cache);
             }
-            Page::LayoutExtras => return views::layout_extras::view(),
+            Page::LayoutExtras => {
+                let layout = self.settings.lock().unwrap().layout_extras.clone();
+                return views::layout_extras::view(&layout);
+            }
             Page::Gestures => {
                 let gestures = self.settings.lock().unwrap().gestures.clone();
                 return views::gestures::view(&gestures);
@@ -1418,6 +1703,9 @@ impl App {
                 settings.cursor.hide_after_inactive_ms = value;
             }
         }
+
+        // Update cache for view borrowing
+        self.cursor_cache = settings.cursor.clone();
 
         drop(settings);
 

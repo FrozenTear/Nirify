@@ -40,6 +40,13 @@ pub enum Message {
     Environment(EnvironmentMessage),
     SwitchEvents(SwitchEventsMessage),
     RecentWindows(RecentWindowsMessage),
+    Trackpoint(TrackpointMessage),
+    Trackball(TrackballMessage),
+    Tablet(TabletMessage),
+    Touch(TouchMessage),
+    Gestures(GesturesMessage),
+    LayoutExtras(LayoutExtrasMessage),
+    Startup(StartupMessage),
 
     // Save subsystem
     Save(SaveMessage),
@@ -548,6 +555,125 @@ pub enum RecentWindowsMessage {
     SetBindFilterAppId(usize, bool),
     SetBindScope(usize, Option<crate::config::models::RecentWindowsScope>),
     SetBindCooldown(usize, Option<i32>),
+}
+
+/// Trackpoint settings messages
+#[derive(Debug, Clone)]
+pub enum TrackpointMessage {
+    SetOff(bool),
+    SetNaturalScroll(bool),
+    SetAccelSpeed(f32),
+    SetAccelProfile(AccelProfile),
+    SetScrollMethod(ScrollMethod),
+    SetLeftHanded(bool),
+    SetMiddleEmulation(bool),
+    SetScrollButtonLock(bool),
+    SetScrollButton(Option<i32>),
+}
+
+/// Trackball settings messages
+#[derive(Debug, Clone)]
+pub enum TrackballMessage {
+    SetOff(bool),
+    SetNaturalScroll(bool),
+    SetAccelSpeed(f32),
+    SetAccelProfile(AccelProfile),
+    SetScrollMethod(ScrollMethod),
+    SetLeftHanded(bool),
+    SetMiddleEmulation(bool),
+    SetScrollButtonLock(bool),
+    SetScrollButton(Option<i32>),
+}
+
+/// Tablet settings messages
+#[derive(Debug, Clone)]
+pub enum TabletMessage {
+    SetOff(bool),
+    SetLeftHanded(bool),
+    SetMapToOutput(String),
+    SetCalibrationMatrix(Option<[f64; 6]>),
+}
+
+/// Touch screen settings messages
+#[derive(Debug, Clone)]
+pub enum TouchMessage {
+    SetOff(bool),
+    SetMapToOutput(String),
+    SetCalibrationMatrix(Option<[f64; 6]>),
+}
+
+/// Gestures settings messages
+#[derive(Debug, Clone)]
+pub enum GesturesMessage {
+    // Hot corners
+    SetHotCornersEnabled(bool),
+    SetHotCornerTopLeft(bool),
+    SetHotCornerTopRight(bool),
+    SetHotCornerBottomLeft(bool),
+    SetHotCornerBottomRight(bool),
+
+    // DnD edge view scroll
+    SetDndScrollEnabled(bool),
+    SetDndScrollTriggerWidth(i32),
+    SetDndScrollDelayMs(i32),
+    SetDndScrollMaxSpeed(i32),
+
+    // DnD edge workspace switch
+    SetDndWorkspaceEnabled(bool),
+    SetDndWorkspaceTriggerHeight(i32),
+    SetDndWorkspaceDelayMs(i32),
+    SetDndWorkspaceMaxSpeed(i32),
+}
+
+/// Layout extras settings messages
+#[derive(Debug, Clone)]
+pub enum LayoutExtrasMessage {
+    // Shadow settings
+    SetShadowEnabled(bool),
+    SetShadowSoftness(i32),
+    SetShadowSpread(i32),
+    SetShadowOffsetX(i32),
+    SetShadowOffsetY(i32),
+    SetShadowDrawBehindWindow(bool),
+    SetShadowColor(String),
+    SetShadowInactiveColor(String),
+
+    // Tab indicator
+    SetTabIndicatorEnabled(bool),
+    SetTabIndicatorHideWhenSingleTab(bool),
+    SetTabIndicatorPlaceWithinColumn(bool),
+    SetTabIndicatorGap(i32),
+    SetTabIndicatorWidth(i32),
+    SetTabIndicatorLengthProportion(f32),
+    SetTabIndicatorCornerRadius(i32),
+    SetTabIndicatorGapsBetweenTabs(i32),
+    SetTabIndicatorPosition(crate::config::models::TabIndicatorPosition),
+    SetTabIndicatorActiveColor(String),
+    SetTabIndicatorInactiveColor(String),
+    SetTabIndicatorUrgentColor(String),
+
+    // Insert hint
+    SetInsertHintEnabled(bool),
+    SetInsertHintColor(String),
+
+    // Preset widths/heights
+    AddPresetWidth,
+    RemovePresetWidth(usize),
+    SetPresetWidth(usize, crate::config::models::PresetWidth),
+    AddPresetHeight,
+    RemovePresetHeight(usize),
+    SetPresetHeight(usize, crate::config::models::PresetHeight),
+
+    // Default column display
+    SetDefaultColumnDisplay(crate::config::models::DefaultColumnDisplay),
+}
+
+/// Startup commands messages
+#[derive(Debug, Clone)]
+pub enum StartupMessage {
+    AddCommand,
+    RemoveCommand(u32), // Command ID
+    SetCommand(u32, String),
 }
 
 /// Save subsystem messages

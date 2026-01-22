@@ -19,7 +19,7 @@ pub mod optional_picker;
 pub mod setting_row;
 
 // Re-export commonly used helpers
-pub use calibration_matrix::{calibration_matrix, CalibrationMatrixMessage};
+pub use calibration_matrix::{calibration_matrix, format_matrix_values, CalibrationMatrixMessage};
 pub use color_picker::{color_picker_row, color_picker_with_swatches};
 pub use expandable_section::expandable_section;
 pub use file_path::{browse_task, file_path_picker, FilePathMessage, FilePickerType};

@@ -25,7 +25,8 @@ pub enum CalibrationMatrixMessage {
 pub fn calibration_matrix<'a, Message: Clone + 'a>(
     label: &'a str,
     description: &'a str,
-    matrix: Option<[f64; 6]>,
+    _matrix: Option<[f64; 6]>,  // Preserved for API compatibility
+    formatted_values: &'a [String; 6],  // Pre-formatted strings to avoid memory leak
     on_change: impl Fn(CalibrationMatrixMessage) -> Message + 'a + Copy,
 ) -> Element<'a, Message> {
     let mut content = column![
@@ -34,24 +35,21 @@ pub fn calibration_matrix<'a, Message: Clone + 'a>(
     ]
     .spacing(8);
 
-    // Get matrix values or use identity matrix as default
-    let values = matrix.unwrap_or([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
-
-    // Create 2x3 grid
+    // Create 2x3 grid using pre-formatted values
     let matrix_grid = column![
         // First row: a, b, c
         row![
-            matrix_input("a", values[0], 0, on_change),
-            matrix_input("b", values[1], 1, on_change),
-            matrix_input("c", values[2], 2, on_change),
+            matrix_input("a", &formatted_values[0], 0, on_change),
+            matrix_input("b", &formatted_values[1], 1, on_change),
+            matrix_input("c", &formatted_values[2], 2, on_change),
         ]
         .spacing(8)
         .align_y(Alignment::Center),
         // Second row: d, e, f
         row![
-            matrix_input("d", values[3], 3, on_change),
-            matrix_input("e", values[4], 4, on_change),
-            matrix_input("f", values[5], 5, on_change),
+            matrix_input("d", &formatted_values[3], 3, on_change),
+            matrix_input("e", &formatted_values[4], 4, on_change),
+            matrix_input("f", &formatted_values[5], 5, on_change),
         ]
         .spacing(8)
         .align_y(Alignment::Center),
@@ -99,20 +97,29 @@ pub fn calibration_matrix<'a, Message: Clone + 'a>(
         .into()
 }
 
+/// Helper to format calibration matrix values for display
+pub fn format_matrix_values(matrix: Option<[f64; 6]>) -> [String; 6] {
+    let values = matrix.unwrap_or([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
+    [
+        format!("{:.4}", values[0]),
+        format!("{:.4}", values[1]),
+        format!("{:.4}", values[2]),
+        format!("{:.4}", values[3]),
+        format!("{:.4}", values[4]),
+        format!("{:.4}", values[5]),
+    ]
+}
+
 /// Creates a single matrix value input field
 fn matrix_input<'a, Message: Clone + 'a>(
     label: &'a str,
-    value: f64,
+    value_str: &'a str,  // Pre-formatted string to avoid memory leak
     index: usize,
     on_change: impl Fn(CalibrationMatrixMessage) -> Message + 'a + Copy,
 ) -> Element<'a, Message> {
-    // Format value with 4 decimal places
-    let value_str = format!("{:.4}", value);
-    let value_static: &'static str = Box::leak(value_str.into_boxed_str());
-
     column![
         text(label).size(12).color([0.7, 0.7, 0.7]),
-        text_input("0.0", value_static)
+        text_input("0.0", value_str)
             .on_input(move |input| on_change(CalibrationMatrixMessage::SetValue(index, input)))
             .padding(8)
             .width(Length::Fixed(100.0)),

@@ -26,11 +26,13 @@ pub struct DemoState {
     pub color_value: Color,
     pub gradient_value: ColorOrGradient,
     pub calibration_matrix: Option<[f64; 6]>,
+    pub calibration_matrix_formatted: [String; 6],  // Pre-formatted for widget
     pub file_path: String,
 }
 
 impl Default for DemoState {
     fn default() -> Self {
+        let matrix = Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]); // Identity matrix
         Self {
             toggle_value: true,
             slider_value: 10.0,
@@ -38,7 +40,8 @@ impl Default for DemoState {
             text_value: "Hello World".to_string(),
             color_value: Color::from_hex("#7fc8ff").unwrap_or_default(),
             gradient_value: ColorOrGradient::Gradient(Gradient::default()),
-            calibration_matrix: Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]), // Identity matrix
+            calibration_matrix: matrix,
+            calibration_matrix_formatted: format_matrix_values(matrix),
             file_path: "/home/user/example.txt".to_string(),
         }
     }
@@ -120,6 +123,7 @@ pub fn view<'a>(state: &'a DemoState) -> Element<'a, Message> {
             "Tablet Calibration Matrix",
             "2x3 transformation matrix for tablet and touch screen calibration (libinput format)",
             state.calibration_matrix,
+            &state.calibration_matrix_formatted,
             |_| Message::None,
         ),
         spacer(8.0),

@@ -2,15 +2,32 @@
 //!
 //! Configure hot corners and drag-and-drop edge triggers.
 
-use iced::widget::{column, container, scrollable, text};
+use iced::widget::{column, container, scrollable};
 use iced::Element;
 
 use super::widgets::*;
 use crate::config::models::GestureSettings;
-use crate::messages::Message;
+use crate::messages::{GesturesMessage, Message};
 
 /// Creates the gestures settings view
 pub fn view(settings: &GestureSettings) -> Element<'static, Message> {
+    // Clone values for closures
+    let hot_corners_enabled = settings.hot_corners.enabled;
+    let hot_corner_tl = settings.hot_corners.top_left;
+    let hot_corner_tr = settings.hot_corners.top_right;
+    let hot_corner_bl = settings.hot_corners.bottom_left;
+    let hot_corner_br = settings.hot_corners.bottom_right;
+
+    let dnd_scroll_enabled = settings.dnd_edge_view_scroll.enabled;
+    let dnd_scroll_trigger = settings.dnd_edge_view_scroll.trigger_size;
+    let dnd_scroll_delay = settings.dnd_edge_view_scroll.delay_ms;
+    let dnd_scroll_speed = settings.dnd_edge_view_scroll.max_speed;
+
+    let dnd_workspace_enabled = settings.dnd_edge_workspace_switch.enabled;
+    let dnd_workspace_trigger = settings.dnd_edge_workspace_switch.trigger_size;
+    let dnd_workspace_delay = settings.dnd_edge_workspace_switch.delay_ms;
+    let dnd_workspace_speed = settings.dnd_edge_workspace_switch.max_speed;
+
     let content = column![
         section_header("Gestures"),
         info_text(
@@ -22,64 +39,117 @@ pub fn view(settings: &GestureSettings) -> Element<'static, Message> {
         subsection_header("Hot Corners"),
         info_text("Trigger overview mode by moving the cursor to screen corners."),
         spacer(8.0),
-        display_toggle("Enabled", settings.hot_corners.enabled),
-        display_toggle("Top Left", settings.hot_corners.top_left),
-        display_toggle("Top Right", settings.hot_corners.top_right),
-        display_toggle("Bottom Left", settings.hot_corners.bottom_left),
-        display_toggle("Bottom Right", settings.hot_corners.bottom_right),
+        toggle_row(
+            "Enable hot corners",
+            "Allow triggering overview from screen corners",
+            hot_corners_enabled,
+            |value| Message::Gestures(GesturesMessage::SetHotCornersEnabled(value)),
+        ),
+        toggle_row(
+            "Top Left",
+            "Trigger from top-left corner",
+            hot_corner_tl,
+            |value| Message::Gestures(GesturesMessage::SetHotCornerTopLeft(value)),
+        ),
+        toggle_row(
+            "Top Right",
+            "Trigger from top-right corner",
+            hot_corner_tr,
+            |value| Message::Gestures(GesturesMessage::SetHotCornerTopRight(value)),
+        ),
+        toggle_row(
+            "Bottom Left",
+            "Trigger from bottom-left corner",
+            hot_corner_bl,
+            |value| Message::Gestures(GesturesMessage::SetHotCornerBottomLeft(value)),
+        ),
+        toggle_row(
+            "Bottom Right",
+            "Trigger from bottom-right corner",
+            hot_corner_br,
+            |value| Message::Gestures(GesturesMessage::SetHotCornerBottomRight(value)),
+        ),
         spacer(16.0),
 
         // DnD Edge View Scroll Section
         subsection_header("DnD Edge View Scroll"),
         info_text("Scroll the view when dragging items to screen edges."),
         spacer(8.0),
-        display_toggle("Enabled", settings.dnd_edge_view_scroll.enabled),
-        display_value("Trigger Width", &format!("{} px", settings.dnd_edge_view_scroll.trigger_size)),
-        display_value("Delay", &format!("{} ms", settings.dnd_edge_view_scroll.delay_ms)),
-        display_value("Max Speed", &format!("{} px/s", settings.dnd_edge_view_scroll.max_speed)),
+        toggle_row(
+            "Enable edge scroll",
+            "Scroll view when dragging to left/right edges",
+            dnd_scroll_enabled,
+            |value| Message::Gestures(GesturesMessage::SetDndScrollEnabled(value)),
+        ),
+        slider_row_int(
+            "Trigger width",
+            "Edge zone width in pixels",
+            dnd_scroll_trigger,
+            10,
+            200,
+            " px",
+            |value| Message::Gestures(GesturesMessage::SetDndScrollTriggerWidth(value)),
+        ),
+        slider_row_int(
+            "Delay",
+            "Delay before scroll starts",
+            dnd_scroll_delay,
+            0,
+            2000,
+            " ms",
+            |value| Message::Gestures(GesturesMessage::SetDndScrollDelayMs(value)),
+        ),
+        slider_row_int(
+            "Max speed",
+            "Maximum scroll speed",
+            dnd_scroll_speed,
+            100,
+            5000,
+            " px/s",
+            |value| Message::Gestures(GesturesMessage::SetDndScrollMaxSpeed(value)),
+        ),
         spacer(16.0),
 
         // DnD Edge Workspace Switch Section
         subsection_header("DnD Edge Workspace Switch"),
         info_text("Switch workspaces when dragging items to screen top/bottom edges."),
         spacer(8.0),
-        display_toggle("Enabled", settings.dnd_edge_workspace_switch.enabled),
-        display_value("Trigger Height", &format!("{} px", settings.dnd_edge_workspace_switch.trigger_size)),
-        display_value("Delay", &format!("{} ms", settings.dnd_edge_workspace_switch.delay_ms)),
-        display_value("Max Speed", &format!("{} px/s", settings.dnd_edge_workspace_switch.max_speed)),
-        spacer(16.0),
-
-        info_text("Full gesture editing UI coming in a future update. Edit gestures.kdl directly for now."),
+        toggle_row(
+            "Enable workspace switch",
+            "Switch workspace when dragging to top/bottom edges",
+            dnd_workspace_enabled,
+            |value| Message::Gestures(GesturesMessage::SetDndWorkspaceEnabled(value)),
+        ),
+        slider_row_int(
+            "Trigger height",
+            "Edge zone height in pixels",
+            dnd_workspace_trigger,
+            10,
+            200,
+            " px",
+            |value| Message::Gestures(GesturesMessage::SetDndWorkspaceTriggerHeight(value)),
+        ),
+        slider_row_int(
+            "Delay",
+            "Delay before workspace switch",
+            dnd_workspace_delay,
+            0,
+            2000,
+            " ms",
+            |value| Message::Gestures(GesturesMessage::SetDndWorkspaceDelayMs(value)),
+        ),
+        slider_row_int(
+            "Max speed",
+            "Maximum switch speed",
+            dnd_workspace_speed,
+            100,
+            5000,
+            " px/s",
+            |value| Message::Gestures(GesturesMessage::SetDndWorkspaceMaxSpeed(value)),
+        ),
+        spacer(32.0),
     ]
     .spacing(4);
 
     scrollable(container(content).padding(20)).into()
-}
-
-/// Display a toggle value (read-only for now)
-fn display_toggle(label: &str, value: bool) -> Element<'static, Message> {
-    use iced::widget::row;
-    use iced::Length;
-
-    row![
-        text(label.to_string()).size(14).width(Length::Fixed(150.0)),
-        text(if value { "Yes" } else { "No" })
-            .size(14)
-            .color(if value { [0.5, 0.8, 0.5] } else { [0.6, 0.6, 0.6] }),
-    ]
-    .spacing(16)
-    .into()
-}
-
-/// Display a value (read-only)
-fn display_value(label: &str, value: &str) -> Element<'static, Message> {
-    use iced::widget::row;
-    use iced::Length;
-
-    row![
-        text(label.to_string()).size(14).width(Length::Fixed(150.0)),
-        text(value.to_string()).size(14).color([0.8, 0.8, 0.8]),
-    ]
-    .spacing(16)
-    .into()
 }
