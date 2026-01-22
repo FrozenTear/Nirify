@@ -37,13 +37,9 @@ pub fn view(
         colors.success
     };
 
-    let status = row![
-        text(status_text)
-            .size(12)
-            .color(status_color),
-    ]
-    .spacing(8)
-    .align_y(Alignment::Center);
+    let status = row![text(status_text).size(12).color(status_color),]
+        .spacing(8)
+        .align_y(Alignment::Center);
 
     // Niri connection status
     let (niri_icon, niri_text, niri_color) = match niri_status {
@@ -64,11 +60,7 @@ pub fn view(
 
     if let Some(ref message) = save_status {
         content = content.push(text("•").size(12).color(colors.text_tertiary));
-        content = content.push(
-            text(message.clone())
-                .size(12)
-                .color(colors.text_secondary)
-        );
+        content = content.push(text(message.clone()).size(12).color(colors.text_secondary));
     }
 
     // Theme selector - cycles through available themes
@@ -80,7 +72,7 @@ pub fn view(
                 .color(colors.text_secondary)
         ]
         .spacing(6)
-        .align_y(Alignment::Center)
+        .align_y(Alignment::Center),
     )
     .padding([4, 10])
     .style(theme_button_style)
@@ -88,12 +80,10 @@ pub fn view(
 
     // App info and theme selector on the right
     let right_section = row![
-        text("niri settings v0.1.0")
+        text(format!("niri settings v{}", env!("CARGO_PKG_VERSION")))
             .size(12)
             .color(colors.text_tertiary),
-        text("•")
-            .size(12)
-            .color(colors.text_tertiary),
+        text("•").size(12).color(colors.text_tertiary),
         theme_button,
     ]
     .spacing(12)
@@ -103,8 +93,7 @@ pub fn view(
         .width(Length::Fill)
         .align_x(iced::alignment::Horizontal::Right);
 
-    let content = row![content, right_container]
-        .align_y(Alignment::Center);
+    let content = row![content, right_container].align_y(Alignment::Center);
 
     container(content)
         .width(Length::Fill)
