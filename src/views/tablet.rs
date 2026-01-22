@@ -10,7 +10,7 @@ use crate::config::models::TabletSettings;
 use crate::messages::{Message, TabletMessage};
 
 /// Creates the tablet settings view
-pub fn view(settings: TabletSettings, calibration_cache: &[String; 6]) -> Element<'_, Message> {
+pub fn view<'a>(settings: &'a TabletSettings, calibration_cache: &'a [String; 6]) -> Element<'a, Message> {
     let off = settings.off;
     let left_handed = settings.left_handed;
     let map_to_output = settings.map_to_output.clone();

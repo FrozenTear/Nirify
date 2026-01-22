@@ -11,7 +11,7 @@ use crate::messages::{Message, TrackpointMessage};
 use crate::types::{AccelProfile, ScrollMethod};
 
 /// Creates the trackpoint settings view
-pub fn view(settings: TrackpointSettings) -> Element<'static, Message> {
+pub fn view(settings: &TrackpointSettings) -> Element<'_, Message> {
     let off = settings.off;
     let natural_scroll = settings.natural_scroll;
     let accel_speed = settings.accel_speed;

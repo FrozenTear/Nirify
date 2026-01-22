@@ -27,11 +27,11 @@ fn text_input_row<'a, Message: Clone + 'a>(
 }
 
 /// Creates the keyboard settings view
-pub fn view(settings: KeyboardSettings) -> Element<'static, Message> {
-    let xkb_layout = settings.xkb_layout;
+pub fn view(settings: &KeyboardSettings) -> Element<'_, Message> {
+    let xkb_layout = settings.xkb_layout.clone();
     let repeat_rate = settings.repeat_rate;
     let repeat_delay = settings.repeat_delay;
-    let track_layout = settings.track_layout;
+    let track_layout = settings.track_layout.clone();
 
     let content = column![
         section_header("Keyboard Layout"),

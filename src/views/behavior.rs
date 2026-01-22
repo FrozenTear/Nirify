@@ -10,7 +10,7 @@ use crate::messages::{BehaviorMessage, Message};
 use crate::types::{CenterFocusedColumn, ModKey, WarpMouseMode};
 
 /// Creates the behavior settings view
-pub fn view(settings: BehaviorSettings) -> Element<'static, Message> {
+pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
     let focus_follows_mouse = settings.focus_follows_mouse;
     let warp_mouse_to_focus = settings.warp_mouse_to_focus;
     let workspace_auto_back_and_forth = settings.workspace_auto_back_and_forth;

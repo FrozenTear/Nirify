@@ -11,7 +11,7 @@ use crate::messages::{Message, TrackballMessage};
 use crate::types::{AccelProfile, ScrollMethod};
 
 /// Creates the trackball settings view
-pub fn view(settings: TrackballSettings) -> Element<'static, Message> {
+pub fn view(settings: &TrackballSettings) -> Element<'_, Message> {
     let off = settings.off;
     let natural_scroll = settings.natural_scroll;
     let accel_speed = settings.accel_speed;

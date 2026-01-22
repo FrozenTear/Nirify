@@ -8,9 +8,7 @@ use crate::config::models::AppearanceSettings;
 use crate::messages::{AppearanceMessage, Message};
 
 /// Creates the appearance settings view
-///
-/// Takes ownership of AppearanceSettings to avoid lifetime issues (it's cheap to clone)
-pub fn view(settings: AppearanceSettings) -> Element<'static, Message> {
+pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
     // Capture settings state for rendering
     let focus_ring_enabled = settings.focus_ring_enabled;
     let border_enabled = settings.border_enabled;

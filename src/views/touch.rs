@@ -10,7 +10,7 @@ use crate::config::models::TouchSettings;
 use crate::messages::{Message, TouchMessage};
 
 /// Creates the touch settings view
-pub fn view(settings: TouchSettings, calibration_cache: &[String; 6]) -> Element<'_, Message> {
+pub fn view<'a>(settings: &'a TouchSettings, calibration_cache: &'a [String; 6]) -> Element<'a, Message> {
     let off = settings.off;
     let map_to_output = settings.map_to_output.clone();
     let matrix_values = settings.calibration_matrix;

@@ -9,7 +9,7 @@ use crate::messages::{Message, TouchpadMessage};
 use crate::types::{AccelProfile, ClickMethod, ScrollMethod, TapButtonMap};
 
 /// Creates the touchpad settings view
-pub fn view(settings: TouchpadSettings) -> Element<'static, Message> {
+pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
     let tap = settings.tap;
     let dwt = settings.dwt;
     let dwtp = settings.dwtp;

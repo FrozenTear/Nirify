@@ -595,31 +595,31 @@ impl App {
         let page_view = match self.current_page {
             Page::Overview => return self.overview_page(),
             Page::Appearance => {
-                views::appearance::view(self.settings.appearance.clone())
+                views::appearance::view(&self.settings.appearance)
             }
             Page::Behavior => {
-                views::behavior::view(self.settings.behavior.clone())
+                views::behavior::view(&self.settings.behavior)
             }
             Page::Keyboard => {
-                views::keyboard::view(self.settings.keyboard.clone())
+                views::keyboard::view(&self.settings.keyboard)
             }
             Page::Mouse => {
-                views::mouse::view(self.settings.mouse.clone())
+                views::mouse::view(&self.settings.mouse)
             }
             Page::Touchpad => {
-                views::touchpad::view(self.settings.touchpad.clone())
+                views::touchpad::view(&self.settings.touchpad)
             }
             Page::Trackpoint => {
-                views::trackpoint::view(self.settings.trackpoint.clone())
+                views::trackpoint::view(&self.settings.trackpoint)
             }
             Page::Trackball => {
-                views::trackball::view(self.settings.trackball.clone())
+                views::trackball::view(&self.settings.trackball)
             }
             Page::Tablet => {
-                return views::tablet::view(self.settings.tablet.clone(), &self.tablet_calibration_cache);
+                return views::tablet::view(&self.settings.tablet, &self.tablet_calibration_cache);
             }
             Page::Touch => {
-                return views::touch::view(self.settings.touch.clone(), &self.touch_calibration_cache);
+                return views::touch::view(&self.settings.touch, &self.touch_calibration_cache);
             }
             Page::Animations => {
                 return views::animations::view(&self.settings.animations);
