@@ -177,6 +177,81 @@ pub fn validate_spawn_command(command: &str) -> Result<Vec<String>, String> {
     Ok(parsed.args)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_simple_command() {
+        let result = parse_spawn_command("alacritty").unwrap();
+        assert_eq!(result.args, vec!["alacritty"]);
+        assert!(result.warning.is_none());
+    }
+
+    #[test]
+    fn test_command_with_args() {
+        let result = parse_spawn_command("alacritty -e htop").unwrap();
+        assert_eq!(result.args, vec!["alacritty", "-e", "htop"]);
+    }
+
+    #[test]
+    fn test_double_quoted_string() {
+        let result = parse_spawn_command(r#"alacritty -e "echo hello world""#).unwrap();
+        assert_eq!(result.args, vec!["alacritty", "-e", "echo hello world"]);
+    }
+
+    #[test]
+    fn test_single_quoted_string() {
+        let result = parse_spawn_command("alacritty -e 'echo hello world'").unwrap();
+        assert_eq!(result.args, vec!["alacritty", "-e", "echo hello world"]);
+    }
+
+    #[test]
+    fn test_mixed_quotes() {
+        let result = parse_spawn_command(r#"sh -c "echo 'hello world'""#).unwrap();
+        assert_eq!(result.args, vec!["sh", "-c", "echo 'hello world'"]);
+    }
+
+    #[test]
+    fn test_escaped_quote_in_double() {
+        let result = parse_spawn_command(r#"echo "say \"hello\"""#).unwrap();
+        assert_eq!(result.args, vec!["echo", r#"say "hello""#]);
+    }
+
+    #[test]
+    fn test_unclosed_quote_error() {
+        let result = parse_spawn_command(r#"echo "unclosed"#);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unclosed"));
+    }
+
+    #[test]
+    fn test_empty_command() {
+        let result = parse_spawn_command("").unwrap();
+        assert!(result.args.is_empty());
+    }
+
+    #[test]
+    fn test_dangerous_rm_warning() {
+        let result = parse_spawn_command("rm -rf /tmp/test").unwrap();
+        assert!(result.warning.is_some());
+        assert!(result.warning.unwrap().contains("rm"));
+    }
+
+    #[test]
+    fn test_dangerous_sudo_warning() {
+        let result = parse_spawn_command("sudo reboot").unwrap();
+        assert!(result.warning.is_some());
+        assert!(result.warning.unwrap().contains("sudo"));
+    }
+
+    #[test]
+    fn test_safe_command_no_warning() {
+        let result = parse_spawn_command("firefox https://example.com").unwrap();
+        assert!(result.warning.is_none());
+    }
+}
+
 /// Formats a key press event into a niri-compatible key combo string
 /// e.g., "Mod+Shift+Return" or "Ctrl+Alt+Delete"
 pub fn format_key_combo(key: &iced::keyboard::Key, modifiers: iced::keyboard::Modifiers) -> String {

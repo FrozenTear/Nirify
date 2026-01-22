@@ -1,5 +1,6 @@
 //! Keybindings settings message handler
 
+use crate::app::helpers::{parse_spawn_command, validate_spawn_command};
 use crate::config::SettingsCategory;
 use crate::config::models::KeybindAction;
 use crate::messages::{KeybindingsMessage as M, Message};
@@ -8,7 +9,7 @@ use iced::Task;
 impl super::super::App {
     /// Updates keybindings settings
     pub(in crate::app) fn update_keybindings(&mut self, msg: M) -> Task<Message> {
-        
+
 
         match msg {
             M::AddKeybinding => {
@@ -73,31 +74,49 @@ impl super::super::App {
             M::UpdateAction(idx, action_str) => {
                 if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
                     if action_str == "spawn" || action_str.starts_with("spawn ") {
-                        let args: Vec<String> = if action_str == "spawn" {
-                            Vec::new()
+                        let command_part = if action_str == "spawn" {
+                            ""
                         } else {
-                            action_str.strip_prefix("spawn ")
-                                .unwrap_or("")
-                                .split_whitespace()
-                                .map(String::from)
-                                .collect()
+                            action_str.strip_prefix("spawn ").unwrap_or("")
                         };
-                        binding.action = KeybindAction::Spawn(args);
+
+                        // Use proper command parsing with quote handling
+                        match validate_spawn_command(command_part) {
+                            Ok(args) => {
+                                binding.action = KeybindAction::Spawn(args);
+                                log::info!("Updated action for binding {}", idx);
+                            }
+                            Err(e) => {
+                                log::warn!("Invalid spawn command for binding {}: {}", idx, e);
+                                // Still set it but with empty args - user can fix it
+                                binding.action = KeybindAction::Spawn(Vec::new());
+                            }
+                        }
                     } else {
                         binding.action = KeybindAction::NiriAction(action_str);
+                        log::info!("Updated action for binding {}", idx);
                     }
-                    log::info!("Updated action for binding {}", idx);
                 }
             }
 
             M::SetCommand(idx, command) => {
                 if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
-                    let args: Vec<String> = command
-                        .split_whitespace()
-                        .map(String::from)
-                        .collect();
-                    binding.action = KeybindAction::Spawn(args);
-                    log::info!("Updated command for binding {}", idx);
+                    // Use proper command parsing with quote handling and validation
+                    match parse_spawn_command(&command) {
+                        Ok(parsed) => {
+                            if let Some(warning) = &parsed.warning {
+                                log::warn!("Keybinding {}: {}", idx, warning);
+                                // Could show toast warning to user here
+                            }
+                            binding.action = KeybindAction::Spawn(parsed.args);
+                            log::info!("Updated command for binding {}", idx);
+                        }
+                        Err(e) => {
+                            log::error!("Failed to parse command for binding {}: {}", idx, e);
+                            // Don't update if parsing fails completely
+                            return Task::none();
+                        }
+                    }
                 }
             }
 
