@@ -50,6 +50,15 @@ fn generate_single_animation_kdl(
                 indent, name, indent, easing.duration_ms, indent, curve_str, indent
             ))
         }
+        AnimationType::CustomShader => {
+            // Custom GLSL shader - only valid for window-open, window-close, window-resize
+            config.custom_shader.as_ref().map(|code| {
+                format!(
+                    "{}{} {{\n{}    custom-shader r\"\n{}\n\"\n{}}}\n",
+                    indent, name, indent, code, indent
+                )
+            })
+        }
     }
 }
 

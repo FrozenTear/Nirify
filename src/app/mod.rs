@@ -621,7 +621,9 @@ impl App {
             Page::Touch => {
                 return views::touch::view(self.settings.touch.clone(), &self.touch_calibration_cache);
             }
-            Page::Animations => return views::animations::view(),
+            Page::Animations => {
+                return views::animations::view(&self.settings.animations);
+            }
             Page::Cursor => {
                 return views::cursor::view(&self.settings.cursor);
             }
@@ -857,6 +859,13 @@ pub fn run() -> iced::Result {
         .theme(|app: &App| app.current_theme.to_iced_theme())
         .settings(iced::Settings {
             id: Some("niri-settings".to_string()),
+            ..Default::default()
+        })
+        .window(iced::window::Settings {
+            platform_specific: iced::window::settings::PlatformSpecific {
+                application_id: "niri-settings".to_string(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .run()

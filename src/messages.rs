@@ -294,12 +294,20 @@ pub enum AnimationsMessage {
     ToggleSlowdown(bool),
     SetSlowdownFactor(f32),
 
-    // Per-animation messages (20 animation types)
+    // Per-animation messages (11 animation types)
     SetAnimationEnabled(String, bool), // (animation_name, enabled)
     SetAnimationDuration(String, i32),  // (animation_name, duration_ms)
     SetAnimationCurve(String, String),  // (animation_name, curve_name)
     SetAnimationSpringDampingRatio(String, f32),
     SetAnimationSpringEpsilon(String, f32),
+
+    // Animation type selection (Default, Off, Spring, Easing, CustomShader)
+    SetAnimationType(String, i32), // (animation_name, type_index: 0=Default, 1=Off, 2=Spring, 3=Easing, 4=CustomShader)
+
+    // Custom shader support (only for window-open, window-close, window-resize)
+    SetCustomShader(String, String), // (animation_name, shader_code)
+    ClearCustomShader(String),       // (animation_name)
+    InsertShaderTemplate(String),    // (animation_name) - inserts default function signature
 }
 
 /// Cursor settings messages

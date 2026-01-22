@@ -19,6 +19,8 @@ pub enum AnimationType {
     Spring,
     /// Easing curve animation
     Easing,
+    /// Custom GLSL shader (only for window-open, window-close, window-resize)
+    CustomShader,
 }
 
 /// Animation identifier for indexed callbacks
@@ -94,6 +96,25 @@ impl AnimationId {
             Self::ExitConfirmation => &per_anim.exit_confirmation_open_close,
             Self::ScreenshotUi => &per_anim.screenshot_ui_open,
             Self::RecentWindows => &per_anim.recent_windows_close,
+        }
+    }
+
+    /// Check if this animation supports custom GLSL shaders
+    /// Only window-open, window-close, and window-resize support custom shaders
+    pub fn supports_custom_shader(&self) -> bool {
+        matches!(
+            self,
+            Self::WindowOpen | Self::WindowClose | Self::WindowResize
+        )
+    }
+
+    /// Get the required GLSL function name for custom shaders
+    pub fn shader_function_name(&self) -> Option<&'static str> {
+        match self {
+            Self::WindowOpen => Some("open_color"),
+            Self::WindowClose => Some("close_color"),
+            Self::WindowResize => Some("resize_color"),
+            _ => None,
         }
     }
 }
@@ -221,12 +242,15 @@ impl Default for EasingParams {
 /// Configuration for a single animation
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SingleAnimationConfig {
-    /// Animation type (Default, Off, Spring, Easing)
+    /// Animation type (Default, Off, Spring, Easing, CustomShader)
     pub animation_type: AnimationType,
     /// Spring parameters (used when animation_type == Spring)
     pub spring: SpringParams,
     /// Easing parameters (used when animation_type == Easing)
     pub easing: EasingParams,
+    /// Custom GLSL shader code (used when animation_type == CustomShader)
+    /// Only supported for window-open, window-close, and window-resize animations
+    pub custom_shader: Option<String>,
 }
 
 /// Per-animation configuration for all niri animations

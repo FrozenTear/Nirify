@@ -61,6 +61,55 @@ impl super::super::App {
                     anim_config.spring.epsilon = epsilon.clamp(0.0001, 1.0) as f64;
                 }
             }
+            AnimationsMessage::SetAnimationType(name, type_index) => {
+                if let Some(anim_id) = Self::parse_animation_name(&name) {
+                    let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
+                    anim_config.animation_type = match type_index {
+                        0 => AnimationType::Default,
+                        1 => AnimationType::Off,
+                        2 => AnimationType::Spring,
+                        3 => AnimationType::Easing,
+                        4 if anim_id.supports_custom_shader() => AnimationType::CustomShader,
+                        _ => AnimationType::Default,
+                    };
+                }
+            }
+            AnimationsMessage::SetCustomShader(name, code) => {
+                if let Some(anim_id) = Self::parse_animation_name(&name) {
+                    if anim_id.supports_custom_shader() {
+                        let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
+                        anim_config.custom_shader = Some(code);
+                        anim_config.animation_type = AnimationType::CustomShader;
+                    }
+                }
+            }
+            AnimationsMessage::ClearCustomShader(name) => {
+                if let Some(anim_id) = Self::parse_animation_name(&name) {
+                    let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
+                    anim_config.custom_shader = None;
+                    // Revert to default if clearing shader
+                    if anim_config.animation_type == AnimationType::CustomShader {
+                        anim_config.animation_type = AnimationType::Default;
+                    }
+                }
+            }
+            AnimationsMessage::InsertShaderTemplate(name) => {
+                if let Some(anim_id) = Self::parse_animation_name(&name) {
+                    if let Some(func_name) = anim_id.shader_function_name() {
+                        let template = format!(
+                            r#"vec4 {}(vec3 coords_geo, vec3 size_geo) {{
+    float progress = niri_clamped_progress;
+    // Your GLSL code here
+    return vec4(1.0);
+}}"#,
+                            func_name
+                        );
+                        let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
+                        anim_config.custom_shader = Some(template);
+                        anim_config.animation_type = AnimationType::CustomShader;
+                    }
+                }
+            }
         }
 
 

@@ -66,6 +66,18 @@ pub fn parse_single_animation(children: &KdlDocument) -> SingleAnimationConfig {
         return config;
     }
 
+    // Check for custom-shader (raw GLSL code)
+    // Only supported for window-open, window-close, window-resize
+    if let Some(shader_node) = children.get("custom-shader") {
+        if let Some(first_entry) = shader_node.entries().first() {
+            if let Some(code) = first_entry.value().as_string() {
+                config.animation_type = AnimationType::CustomShader;
+                config.custom_shader = Some(code.to_string());
+                return config;
+            }
+        }
+    }
+
     // Check for spring
     if let Some(spring) = parse_spring_params(children) {
         config.animation_type = AnimationType::Spring;
