@@ -542,6 +542,14 @@ impl App {
         let niri_check = time::every(Duration::from_secs(5))
             .map(|_| Message::CheckNiriStatus);
 
+        // Toast auto-clear check (every 500ms, only when toast is showing)
+        let toast_check = if self.toast.is_some() {
+            Some(time::every(Duration::from_millis(500))
+                .map(|_| Message::ClearToast))
+        } else {
+            None
+        };
+
         // Keyboard capture subscription (only active when capturing)
         if self.key_capture_active.is_some() {
             let key_capture = keyboard::listen().map(|event| {
@@ -570,9 +578,17 @@ impl App {
                 }
             });
 
-            Subscription::batch([save_check, niri_check, key_capture])
+            let mut subs = vec![save_check, niri_check, key_capture];
+            if let Some(toast) = toast_check {
+                subs.push(toast);
+            }
+            Subscription::batch(subs)
         } else {
-            Subscription::batch([save_check, niri_check])
+            let mut subs = vec![save_check, niri_check];
+            if let Some(toast) = toast_check {
+                subs.push(toast);
+            }
+            Subscription::batch(subs)
         }
     }
 
