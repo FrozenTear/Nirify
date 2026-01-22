@@ -65,10 +65,10 @@ pub fn view<'a>(
         empty_detail_view()
     };
 
-    // Horizontal split layout
+    // Horizontal split layout (responsive 1:2 ratio)
     row![
         container(list_panel)
-            .width(Length::Fixed(300.0))
+            .width(Length::FillPortion(1))
             .height(Length::Fill)
             .style(|_theme| {
                 container::Style {
@@ -77,7 +77,7 @@ pub fn view<'a>(
                 }
             }),
         container(detail_panel)
-            .width(Length::Fill)
+            .width(Length::FillPortion(2))
             .height(Length::Fill)
             .padding(20),
     ]
@@ -132,7 +132,7 @@ fn keybinding_list<'a>(
             container(
                 text("No keybindings configured\nClick + to add one")
                     .size(13)
-                    .color([0.6, 0.6, 0.6])
+                    .color([0.75, 0.75, 0.75])
                     .center()
             )
             .padding(20)
@@ -176,7 +176,7 @@ fn keybinding_list<'a>(
                         .align_y(Alignment::Center),
                         text(action_preview)
                             .size(11)
-                            .color([0.6, 0.6, 0.6]),
+                            .color([0.75, 0.75, 0.75]),
                     ]
                     .spacing(2)
                 )
@@ -213,7 +213,7 @@ fn empty_detail_view() -> Element<'static, Message> {
         column![
             text("Select a keybinding to edit")
                 .size(16)
-                .color([0.6, 0.6, 0.6]),
+                .color([0.75, 0.75, 0.75]),
             spacer(12.0),
             text("Or click + to add a new one")
                 .size(13)
@@ -297,7 +297,7 @@ fn keybinding_detail_view<'a>(
             // Overlay title
             column![
                 text("Hotkey Overlay Title").size(14),
-                text("Optional title shown in niri's hotkey overlay").size(11).color([0.6, 0.6, 0.6]),
+                text("Optional title shown in niri's hotkey overlay").size(11).color([0.75, 0.75, 0.75]),
                 text_input(
                     "Leave empty for auto-generated",
                     binding.hotkey_overlay_title.as_deref().unwrap_or("")
@@ -315,7 +315,7 @@ fn keybinding_detail_view<'a>(
             row![
                 column![
                     text("Allow when locked").size(14),
-                    text("Binding works even when screen is locked").size(11).color([0.6, 0.6, 0.6]),
+                    text("Binding works even when screen is locked").size(11).color([0.75, 0.75, 0.75]),
                 ]
                 .width(Length::Fill),
                 toggler(binding.allow_when_locked)
@@ -328,7 +328,7 @@ fn keybinding_detail_view<'a>(
             row![
                 column![
                     text("Repeat when held").size(14),
-                    text("Action repeats while key is held down").size(11).color([0.6, 0.6, 0.6]),
+                    text("Action repeats while key is held down").size(11).color([0.75, 0.75, 0.75]),
                 ]
                 .width(Length::Fill),
                 toggler(binding.repeat)
@@ -341,12 +341,12 @@ fn keybinding_detail_view<'a>(
             if let Some(cooldown) = binding.cooldown_ms {
                 column![
                     text("Cooldown").size(14),
-                    text(format!("{} ms between activations", cooldown)).size(11).color([0.6, 0.6, 0.6]),
+                    text(format!("{} ms between activations", cooldown)).size(11).color([0.75, 0.75, 0.75]),
                 ]
             } else {
                 column![
                     text("Cooldown").size(14),
-                    text("No cooldown set").size(11).color([0.6, 0.6, 0.6]),
+                    text("No cooldown set").size(11).color([0.75, 0.75, 0.75]),
                 ]
             },
         ]

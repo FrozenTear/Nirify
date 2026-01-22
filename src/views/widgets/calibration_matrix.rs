@@ -89,7 +89,7 @@ pub fn calibration_matrix<'a, Message: Clone + 'a>(
     content = content.push(
         text("Note: Identity matrix [1 0 0; 0 1 0] means no transformation")
             .size(11)
-            .color([0.6, 0.6, 0.6])
+            .color([0.75, 0.75, 0.75])
     );
 
     container(content)

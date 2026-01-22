@@ -32,10 +32,10 @@ pub fn view<'a>(
         empty_detail_view()
     };
 
-    // Horizontal split layout
+    // Horizontal split layout (responsive 1:2 ratio)
     row![
         container(list_panel)
-            .width(Length::Fixed(280.0))
+            .width(Length::FillPortion(1))
             .height(Length::Fill)
             .style(|_theme| {
                 container::Style {
@@ -44,7 +44,7 @@ pub fn view<'a>(
                 }
             }),
         container(detail_panel)
-            .width(Length::Fill)
+            .width(Length::FillPortion(2))
             .height(Length::Fill)
             .padding(20),
     ]
@@ -88,7 +88,7 @@ fn rule_list(settings: &WindowRulesSettings, selected_id: Option<u32>) -> Elemen
             container(
                 text("No window rules defined\nClick + to add one")
                     .size(13)
-                    .color([0.6, 0.6, 0.6])
+                    .color([0.75, 0.75, 0.75])
                     .center()
             )
             .padding(20)
@@ -159,7 +159,7 @@ fn rule_list(settings: &WindowRulesSettings, selected_id: Option<u32>) -> Elemen
                         .align_y(Alignment::Center),
                         text(match_summary)
                             .size(11)
-                            .color([0.6, 0.6, 0.6]),
+                            .color([0.75, 0.75, 0.75]),
                     ]
                     .spacing(2)
                 )
@@ -196,7 +196,7 @@ fn empty_detail_view() -> Element<'static, Message> {
         column![
             text("Select a window rule to edit")
                 .size(16)
-                .color([0.6, 0.6, 0.6]),
+                .color([0.75, 0.75, 0.75]),
             spacer(8.0),
             text("Window rules let you configure per-application behavior")
                 .size(13)
@@ -213,7 +213,7 @@ fn empty_detail_view() -> Element<'static, Message> {
 fn rule_detail_view<'a>(
     rule: &'a WindowRule,
     sections_expanded: &'a HashMap<(u32, String), bool>,
-    _regex_errors: &'a HashMap<(u32, String), String>,
+    regex_errors: &'a HashMap<(u32, String), String>,
 ) -> Element<'a, Message> {
     let id = rule.id;
 
@@ -318,18 +318,38 @@ fn rule_detail_view<'a>(
                             ]
                             .spacing(8)
                             .align_y(Alignment::Center),
-                            column![
-                                text("App ID (regex)").size(14),
-                                text_input("e.g., firefox", &app_id_value)
-                                    .on_input(move |value| Message::WindowRules(WindowRulesMessage::SetMatchAppId(id, match_idx, if value.is_empty() { None } else { Some(value) })))
-                                    .padding(8),
-                            ].spacing(4),
-                            column![
-                                text("Title (regex)").size(14),
-                                text_input("e.g., .*YouTube.*", &title_value)
-                                    .on_input(move |value| Message::WindowRules(WindowRulesMessage::SetMatchTitle(id, match_idx, if value.is_empty() { None } else { Some(value) })))
-                                    .padding(8),
-                            ].spacing(4),
+                            {
+                                let app_id_error_key = (id, format!("app_id_{}", match_idx));
+                                let app_id_error = regex_errors.get(&app_id_error_key);
+                                let mut app_id_col = column![
+                                    text("App ID (regex)").size(14),
+                                    text_input("e.g., firefox", &app_id_value)
+                                        .on_input(move |value| Message::WindowRules(WindowRulesMessage::SetMatchAppId(id, match_idx, if value.is_empty() { None } else { Some(value) })))
+                                        .padding(8),
+                                ].spacing(4);
+                                if let Some(error) = app_id_error {
+                                    app_id_col = app_id_col.push(
+                                        text(error).size(12).color([0.9, 0.4, 0.4])
+                                    );
+                                }
+                                app_id_col
+                            },
+                            {
+                                let title_error_key = (id, format!("title_{}", match_idx));
+                                let title_error = regex_errors.get(&title_error_key);
+                                let mut title_col = column![
+                                    text("Title (regex)").size(14),
+                                    text_input("e.g., .*YouTube.*", &title_value)
+                                        .on_input(move |value| Message::WindowRules(WindowRulesMessage::SetMatchTitle(id, match_idx, if value.is_empty() { None } else { Some(value) })))
+                                        .padding(8),
+                                ].spacing(4);
+                                if let Some(error) = title_error {
+                                    title_col = title_col.push(
+                                        text(error).size(12).color([0.9, 0.4, 0.4])
+                                    );
+                                }
+                                title_col
+                            },
                             optional_bool_picker(
                                 "Is floating",
                                 "Match only floating/tiled windows",
@@ -543,7 +563,7 @@ fn optional_slider_row<'a, M: Clone + 'a>(
         row![
             column![
                 text(label).size(14),
-                text(description).size(12).color([0.6, 0.6, 0.6]),
+                text(description).size(12).color([0.75, 0.75, 0.75]),
             ]
             .width(Length::Fill),
             iced::widget::toggler(is_enabled)
@@ -591,7 +611,7 @@ fn optional_slider_row_int<'a, M: Clone + 'a>(
         row![
             column![
                 text(label).size(14),
-                text(description).size(12).color([0.6, 0.6, 0.6]),
+                text(description).size(12).color([0.75, 0.75, 0.75]),
             ]
             .width(Length::Fill),
             iced::widget::toggler(is_enabled)

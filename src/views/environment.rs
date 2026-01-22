@@ -29,7 +29,7 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
                 column![
                     text("No environment variables configured")
                         .size(14)
-                        .color([0.6, 0.6, 0.6]),
+                        .color([0.75, 0.75, 0.75]),
                     spacer(8.0),
                     text("Click the button below to add your first variable")
                         .size(13)
@@ -63,7 +63,7 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
                         .align_y(Alignment::Center),
                         row![
                             column![
-                                text("Name").size(12).color([0.6, 0.6, 0.6]),
+                                text("Name").size(12).color([0.75, 0.75, 0.75]),
                                 text_input("VARIABLE_NAME", &var_name)
                                     .on_input(move |s| Message::Environment(EnvironmentMessage::SetVariableName(var_id, s)))
                                     .padding(8)
@@ -72,7 +72,7 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
                             ]
                             .spacing(4),
                             column![
-                                text("Value").size(12).color([0.6, 0.6, 0.6]),
+                                text("Value").size(12).color([0.75, 0.75, 0.75]),
                                 text_input("value", &var_value)
                                     .on_input(move |s| Message::Environment(EnvironmentMessage::SetVariableValue(var_id, s)))
                                     .padding(8)
@@ -125,13 +125,13 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
     content = content.push(info_text("Examples of commonly used environment variables:"));
     content = content.push(spacer(4.0));
     content = content.push(text("DISPLAY").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
-    content = content.push(text("  X11 display (e.g., \":0\")").size(12).color([0.6, 0.6, 0.6]));
+    content = content.push(text("  X11 display (e.g., \":0\")").size(12).color([0.75, 0.75, 0.75]));
     content = content.push(text("WAYLAND_DISPLAY").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
-    content = content.push(text("  Wayland display socket (e.g., \"wayland-1\")").size(12).color([0.6, 0.6, 0.6]));
+    content = content.push(text("  Wayland display socket (e.g., \"wayland-1\")").size(12).color([0.75, 0.75, 0.75]));
     content = content.push(text("XDG_CURRENT_DESKTOP").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
-    content = content.push(text("  Desktop environment name (e.g., \"niri\")").size(12).color([0.6, 0.6, 0.6]));
+    content = content.push(text("  Desktop environment name (e.g., \"niri\")").size(12).color([0.75, 0.75, 0.75]));
     content = content.push(text("GTK_THEME").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
-    content = content.push(text("  GTK theme name (e.g., \"Adwaita:dark\")").size(12).color([0.6, 0.6, 0.6]));
+    content = content.push(text("  GTK theme name (e.g., \"Adwaita:dark\")").size(12).color([0.75, 0.75, 0.75]));
 
     scrollable(container(content).padding(20)).into()
 }

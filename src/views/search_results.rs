@@ -13,7 +13,7 @@ use crate::search::SearchResult;
 pub fn view(results: &[SearchResult], query: &str) -> Element<'static, Message> {
     if query.trim().is_empty() || results.is_empty() {
         return container(
-            text("No results found").size(16).color([0.6, 0.6, 0.6])
+            text("No results found").size(16).color([0.75, 0.75, 0.75])
         )
         .padding(40)
         .width(Length::Fill)
@@ -36,7 +36,7 @@ pub fn view(results: &[SearchResult], query: &str) -> Element<'static, Message> 
             .color([0.9, 0.9, 0.9]),
         text("Click a result to navigate to that page")
             .size(13)
-            .color([0.6, 0.6, 0.6]),
+            .color([0.75, 0.75, 0.75]),
     ]
     .spacing(12)
     .padding(20);
@@ -51,7 +51,7 @@ pub fn view(results: &[SearchResult], query: &str) -> Element<'static, Message> 
                 text(page_title).size(18),
                 text(keywords_text)
                     .size(13)
-                    .color([0.6, 0.6, 0.6]),
+                    .color([0.75, 0.75, 0.75]),
             ]
             .spacing(6)
             .padding(16)

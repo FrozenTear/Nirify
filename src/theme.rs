@@ -340,8 +340,9 @@ pub fn nav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> button:
                 background: Some(iced::Background::Color(base_bg)),
                 text_color,
                 border: Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
+                    // Subtle border on inactive buttons to indicate focusability
+                    color: if active { Color::TRANSPARENT } else { colors.border_subtle },
+                    width: if active { 0.0 } else { 1.0 },
                     radius: 8.0.into(),
                 },
                 shadow: Shadow {

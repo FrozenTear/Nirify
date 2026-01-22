@@ -26,8 +26,30 @@ pub struct SearchIndex {
 struct SearchEntry {
     page: Page,
     page_title: &'static str,
+    page_title_lower: String,  // Pre-computed lowercase for faster search
+    #[allow(dead_code)]  // Kept for potential display/debug use
     category: &'static str,
+    category_lower: String,  // Pre-computed lowercase for faster search
     keywords: &'static [&'static str],
+}
+
+impl SearchEntry {
+    /// Creates a new SearchEntry with pre-computed lowercase values
+    fn new(
+        page: Page,
+        page_title: &'static str,
+        category: &'static str,
+        keywords: &'static [&'static str],
+    ) -> Self {
+        Self {
+            page,
+            page_title,
+            page_title_lower: page_title.to_lowercase(),
+            category,
+            category_lower: category.to_lowercase(),
+            keywords,
+        }
+    }
 }
 
 impl SearchIndex {
@@ -36,259 +58,259 @@ impl SearchIndex {
         Self {
             entries: vec![
                 // VISUAL CATEGORY
-                SearchEntry {
-                    page: Page::Appearance,
-                    page_title: "Appearance",
-                    category: "Visual",
-                    keywords: &[
+                SearchEntry::new(
+                    Page::Appearance,
+                    "Appearance",
+                    "Visual",
+                    &[
                         "appearance", "theme", "colors", "focus", "ring", "border", "gaps",
                         "spacing", "corner", "radius", "rounded", "style", "visual", "look",
                         "active", "inactive", "urgent", "window", "decoration", "gradient",
                         "background", "highlight",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Animations,
-                    page_title: "Animations",
-                    category: "Visual",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Animations,
+                    "Animations",
+                    "Visual",
+                    &[
                         "animations", "animate", "motion", "transition", "duration", "spring",
                         "slowdown", "window", "horizontal", "vertical", "workspace", "switch",
                         "movement", "easing", "curve", "speed", "smooth", "effects",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Cursor,
-                    page_title: "Cursor",
-                    category: "Visual",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Cursor,
+                    "Cursor",
+                    "Visual",
+                    &[
                         "cursor", "mouse", "pointer", "xcursor", "theme", "size", "hide",
                         "timeout", "visibility", "arrow", "hand", "icon",
                     ],
-                },
+                ),
 
                 // SYSTEM CATEGORY
-                SearchEntry {
-                    page: Page::Behavior,
-                    page_title: "Behavior",
-                    category: "System",
-                    keywords: &[
+                SearchEntry::new(
+                    Page::Behavior,
+                    "Behavior",
+                    "System",
+                    &[
                         "behavior", "behaviour", "focus", "mouse", "warp", "workspace", "column",
                         "center", "width", "proportion", "fixed", "struts", "reserved", "area",
                         "space", "modifier", "mod", "key", "super", "alt", "ctrl", "auto",
                         "back", "forth", "single", "empty", "settings", "general",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Miscellaneous,
-                    page_title: "Miscellaneous",
-                    category: "System",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Miscellaneous,
+                    "Miscellaneous",
+                    "System",
+                    &[
                         "miscellaneous", "misc", "prefer", "no", "csd", "server", "side",
                         "decoration", "screenshot", "path", "directory", "other", "various",
                         "settings", "options",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Debug,
-                    page_title: "Debug",
-                    category: "System",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Debug,
+                    "Debug",
+                    "System",
+                    &[
                         "debug", "diagnostics", "log", "logging", "troubleshoot", "developer",
                         "preview", "render", "damage", "fps", "monitor", "wait", "present",
                         "off", "screen", "dbus", "interface", "testing",
                     ],
-                },
+                ),
 
                 // INPUT CATEGORY
-                SearchEntry {
-                    page: Page::Keyboard,
-                    page_title: "Keyboard",
-                    category: "Input",
-                    keywords: &[
+                SearchEntry::new(
+                    Page::Keyboard,
+                    "Keyboard",
+                    "Input",
+                    &[
                         "keyboard", "keys", "layout", "xkb", "model", "rules", "variant",
                         "options", "keymap", "repeat", "rate", "delay", "track", "typing",
                         "input", "method", "language",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Mouse,
-                    page_title: "Mouse",
-                    category: "Input",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Mouse,
+                    "Mouse",
+                    "Input",
+                    &[
                         "mouse", "pointer", "acceleration", "speed", "accel", "profile",
                         "flat", "adaptive", "scroll", "button", "natural", "left", "handed",
                         "middle", "emulation", "click", "dwt", "disable", "while", "typing",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Touchpad,
-                    page_title: "Touchpad",
-                    category: "Input",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Touchpad,
+                    "Touchpad",
+                    "Input",
+                    &[
                         "touchpad", "trackpad", "tap", "click", "gesture", "scroll", "natural",
                         "two", "finger", "edge", "dwt", "disable", "while", "typing", "dwtp",
                         "palm", "drag", "lock", "acceleration", "speed", "left", "handed",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Trackpoint,
-                    page_title: "Trackpoint",
-                    category: "Input",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Trackpoint,
+                    "Trackpoint",
+                    "Input",
+                    &[
                         "trackpoint", "pointing", "stick", "thinkpad", "acceleration", "speed",
                         "scroll", "button",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Trackball,
-                    page_title: "Trackball",
-                    category: "Input",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Trackball,
+                    "Trackball",
+                    "Input",
+                    &[
                         "trackball", "ball", "mouse", "scroll", "button", "acceleration",
                         "speed", "angle", "rotation",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Tablet,
-                    page_title: "Tablet",
-                    category: "Input",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Tablet,
+                    "Tablet",
+                    "Input",
+                    &[
                         "tablet", "stylus", "pen", "drawing", "wacom", "map", "output",
                         "monitor", "screen", "calibration", "matrix", "left", "handed",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Touch,
-                    page_title: "Touch",
-                    category: "Input",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Touch,
+                    "Touch",
+                    "Input",
+                    &[
                         "touch", "touchscreen", "screen", "finger", "tap", "gesture", "map",
                         "output", "monitor", "calibration", "matrix",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Gestures,
-                    page_title: "Gestures",
-                    category: "Input",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Gestures,
+                    "Gestures",
+                    "Input",
+                    &[
                         "gestures", "swipe", "pinch", "workspace", "switch", "fingers",
                         "touchpad", "multitouch",
                     ],
-                },
+                ),
 
                 // LAYOUT CATEGORY
-                SearchEntry {
-                    page: Page::Workspaces,
-                    page_title: "Workspaces",
-                    category: "Layout",
-                    keywords: &[
+                SearchEntry::new(
+                    Page::Workspaces,
+                    "Workspaces",
+                    "Layout",
+                    &[
                         "workspaces", "workspace", "virtual", "desktop", "switch", "move",
                         "monitor", "output", "count", "number", "layout", "organize",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Outputs,
-                    page_title: "Outputs",
-                    category: "Layout",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Outputs,
+                    "Outputs",
+                    "Layout",
+                    &[
                         "outputs", "output", "monitor", "display", "screen", "resolution",
                         "position", "scale", "transform", "rotation", "mode", "refresh",
                         "rate", "vrr", "variable", "adaptive", "sync",
                     ],
-                },
-                SearchEntry {
-                    page: Page::LayoutExtras,
-                    page_title: "Layout Extras",
-                    category: "Layout",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::LayoutExtras,
+                    "Layout Extras",
+                    "Layout",
+                    &[
                         "layout", "extras", "always", "center", "single", "column", "struts",
                         "reserved", "space", "area",
                     ],
-                },
+                ),
 
                 // RULES CATEGORY
-                SearchEntry {
-                    page: Page::WindowRules,
-                    page_title: "Window Rules",
-                    category: "Rules",
-                    keywords: &[
+                SearchEntry::new(
+                    Page::WindowRules,
+                    "Window Rules",
+                    "Rules",
+                    &[
                         "window", "rules", "app", "application", "match", "id", "title",
                         "class", "default", "column", "width", "open", "fullscreen",
                         "maximized", "floating", "position", "size", "opacity", "border",
                         "focus", "ring", "block", "out", "from",
                     ],
-                },
-                SearchEntry {
-                    page: Page::LayerRules,
-                    page_title: "Layer Rules",
-                    category: "Rules",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::LayerRules,
+                    "Layer Rules",
+                    "Rules",
+                    &[
                         "layer", "rules", "shell", "namespace", "match", "waybar", "panel",
                         "bar", "overlay", "background", "bottom", "top", "exclusion", "zone",
                         "keyboard", "interactivity", "block", "out",
                     ],
-                },
+                ),
 
                 // ADVANCED CATEGORY
-                SearchEntry {
-                    page: Page::Keybindings,
-                    page_title: "Keybindings",
-                    category: "Advanced",
-                    keywords: &[
+                SearchEntry::new(
+                    Page::Keybindings,
+                    "Keybindings",
+                    "Advanced",
+                    &[
                         "keybindings", "keybinding", "shortcuts", "keyboard", "hotkeys",
                         "bindings", "keys", "combination", "modifier", "ctrl", "alt", "super",
                         "shift", "action", "command", "spawn", "close", "quit", "focus",
                         "move", "resize", "workspace", "switch",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Startup,
-                    page_title: "Startup",
-                    category: "Advanced",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Startup,
+                    "Startup",
+                    "Advanced",
+                    &[
                         "startup", "autostart", "launch", "run", "command", "exec", "execute",
                         "program", "application", "boot", "start",
                     ],
-                },
-                SearchEntry {
-                    page: Page::Environment,
-                    page_title: "Environment",
-                    category: "Advanced",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::Environment,
+                    "Environment",
+                    "Advanced",
+                    &[
                         "environment", "variables", "env", "var", "export", "path", "wayland",
                         "display", "xdg", "session", "system",
                     ],
-                },
-                SearchEntry {
-                    page: Page::SwitchEvents,
-                    page_title: "Switch Events",
-                    category: "Advanced",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::SwitchEvents,
+                    "Switch Events",
+                    "Advanced",
+                    &[
                         "switch", "events", "lid", "close", "open", "tablet", "mode",
                         "action", "laptop", "suspend", "sleep", "lock",
                     ],
-                },
-                SearchEntry {
-                    page: Page::RecentWindows,
-                    page_title: "Recent Windows",
-                    category: "Advanced",
-                    keywords: &[
+                ),
+                SearchEntry::new(
+                    Page::RecentWindows,
+                    "Recent Windows",
+                    "Advanced",
+                    &[
                         "recent", "windows", "history", "previous", "last", "window",
                         "switcher", "alt", "tab",
                     ],
-                },
+                ),
 
                 // OVERVIEW
-                SearchEntry {
-                    page: Page::Overview,
-                    page_title: "Overview",
-                    category: "System",
-                    keywords: &[
+                SearchEntry::new(
+                    Page::Overview,
+                    "Overview",
+                    "System",
+                    &[
                         "overview", "summary", "dashboard", "home", "main", "start",
                         "settings", "configuration", "niri",
                     ],
-                },
+                ),
             ],
         }
     }
@@ -308,14 +330,14 @@ impl SearchIndex {
                 let mut score = 0u32;
                 let mut matched_keywords = Vec::new();
 
-                // Check page title
-                if entry.page_title.to_lowercase().contains(&query_lower) {
+                // Check page title (use pre-computed lowercase)
+                if entry.page_title_lower.contains(&query_lower) {
                     score += 100;
                     matched_keywords.push(entry.page_title.to_string());
                 }
 
-                // Check category
-                if entry.category.to_lowercase().contains(&query_lower) {
+                // Check category (use pre-computed lowercase)
+                if entry.category_lower.contains(&query_lower) {
                     score += 50;
                 }
 

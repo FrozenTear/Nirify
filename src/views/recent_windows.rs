@@ -72,7 +72,7 @@ pub fn view(settings: &RecentWindowsSettings) -> Element<'static, Message> {
         content = content.push(
             text("No custom keybindings configured - using defaults")
                 .size(14)
-                .color([0.6, 0.6, 0.6])
+                .color([0.75, 0.75, 0.75])
         );
     } else {
         for (idx, bind) in binds.iter().enumerate() {
@@ -89,7 +89,7 @@ pub fn view(settings: &RecentWindowsSettings) -> Element<'static, Message> {
                         row![
                             text(format!("Keybinding #{}", idx + 1))
                                 .size(13)
-                                .color([0.6, 0.6, 0.6]),
+                                .color([0.75, 0.75, 0.75]),
                             button(text("×").size(14))
                                 .on_press(Message::RecentWindows(RecentWindowsMessage::RemoveBind(idx)))
                                 .padding([2, 8])
@@ -292,7 +292,12 @@ where
 
     // Parse color for preview swatch
     let parsed_color = crate::types::Color::from_hex(&hex_owned)
-        .map(|c| iced::Color::from_rgba(c.r as f32, c.g as f32, c.b as f32, c.a as f32))
+        .map(|c| iced::Color::from_rgba(
+            c.r as f32 / 255.0,
+            c.g as f32 / 255.0,
+            c.b as f32 / 255.0,
+            c.a as f32 / 255.0,
+        ))
         .unwrap_or(iced::Color::from_rgb(0.5, 0.5, 0.5));
 
     row![

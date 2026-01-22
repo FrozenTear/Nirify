@@ -199,7 +199,7 @@ fn wizard_config_setup<'a>() -> Column<'a, Message> {
         }),
         text("Your original config will be backed up before any changes.")
             .size(12)
-            .color([0.6, 0.6, 0.6]),
+            .color([0.75, 0.75, 0.75]),
         row![
             button(text("Back"))
                 .on_press(Message::WizardBack)
@@ -264,7 +264,7 @@ fn wizard_complete<'a>() -> Column<'a, Message> {
             .color([0.7, 0.7, 0.7]),
         text("Changes are saved automatically after a short delay.")
             .size(12)
-            .color([0.6, 0.6, 0.6]),
+            .color([0.75, 0.75, 0.75]),
         button(text("Get Started"))
             .on_press(Message::CloseDialog)
             .padding([10, 32])
@@ -352,7 +352,7 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
                     text(&suggestion.description).size(13),
                     text(format!("{} rules can be merged", suggestion.rule_count))
                         .size(11)
-                        .color([0.6, 0.6, 0.6]),
+                        .color([0.75, 0.75, 0.75]),
                 ]
                 .spacing(4)
             )

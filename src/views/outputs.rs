@@ -1,13 +1,33 @@
 //! Outputs (displays) settings view - list-detail implementation
 
-use iced::widget::{button, column, container, row, scrollable, text, text_input};
+use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input};
 use iced::{Alignment, Element, Length};
 use std::collections::HashMap;
 
 use super::widgets::*;
 use crate::config::models::{OutputConfig, OutputSettings};
+use crate::ipc::FullOutputInfo;
 use crate::messages::{Message, OutputsMessage};
 use crate::types::{Transform, VrrMode};
+
+/// Represents an available display mode for dropdown selection
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModeOption {
+    /// The mode string (e.g., "1920x1080@60.00")
+    pub mode_string: String,
+    /// Whether this is the preferred/native mode
+    pub is_preferred: bool,
+}
+
+impl std::fmt::Display for ModeOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_preferred {
+            write!(f, "{} (preferred)", self.mode_string)
+        } else {
+            write!(f, "{}", self.mode_string)
+        }
+    }
+}
 
 /// Creates the outputs settings view with list-detail pattern
 /// Returns Element<'_> because text_input widgets borrow from settings
@@ -15,6 +35,7 @@ pub fn view<'a>(
     settings: &'a OutputSettings,
     selected_output_index: Option<usize>,
     sections_expanded: &'a HashMap<String, bool>,
+    available_outputs: &'a [FullOutputInfo],
 ) -> Element<'a, Message> {
     // Left panel: List of outputs
     let list_panel = output_list(settings, selected_output_index);
@@ -22,7 +43,7 @@ pub fn view<'a>(
     // Right panel: Detail view for selected output
     let detail_panel = if let Some(idx) = selected_output_index {
         if let Some(output) = settings.outputs.get(idx) {
-            output_detail_view(output, idx, sections_expanded)
+            output_detail_view(output, idx, sections_expanded, available_outputs)
         } else {
             empty_detail_view()
         }
@@ -30,10 +51,10 @@ pub fn view<'a>(
         empty_detail_view()
     };
 
-    // Horizontal split layout
+    // Horizontal split layout (responsive 1:2 ratio)
     row![
         container(list_panel)
-            .width(Length::Fixed(250.0))
+            .width(Length::FillPortion(1))
             .height(Length::Fill)
             .style(|_theme| {
                 container::Style {
@@ -42,7 +63,7 @@ pub fn view<'a>(
                 }
             }),
         container(detail_panel)
-            .width(Length::Fill)
+            .width(Length::FillPortion(2))
             .height(Length::Fill)
             .padding(20),
     ]
@@ -82,7 +103,7 @@ fn output_list<'a>(settings: &'a OutputSettings, selected_index: Option<usize>) 
             container(
                 text("No outputs configured\nClick + to add one")
                     .size(13)
-                    .color([0.6, 0.6, 0.6])
+                    .color([0.75, 0.75, 0.75])
                     .center()
             )
             .padding(20)
@@ -171,10 +192,71 @@ fn empty_detail_view() -> Element<'static, Message> {
     container(
         text("Select an output to configure")
             .size(16)
-            .color([0.6, 0.6, 0.6])
+            .color([0.75, 0.75, 0.75])
     )
     .center(Length::Fill)
     .into()
+}
+
+/// Get available modes for an output by matching its name with IPC data
+fn get_available_modes(output_name: &str, available_outputs: &[FullOutputInfo]) -> Vec<ModeOption> {
+    // Find matching output from IPC data
+    let ipc_output = available_outputs.iter().find(|o| o.name == output_name);
+
+    if let Some(ipc_out) = ipc_output {
+        ipc_out.modes.iter().map(|mode| {
+            let refresh_hz = mode.refresh_rate as f64 / 1000.0;
+            ModeOption {
+                mode_string: format!("{}x{}@{:.2}", mode.width, mode.height, refresh_hz),
+                is_preferred: mode.is_preferred,
+            }
+        }).collect()
+    } else {
+        Vec::new()
+    }
+}
+
+/// Create the mode selection row - dropdown if modes available, text input as fallback
+fn mode_row<'a>(idx: usize, current_mode: &'a str, available_modes: &[ModeOption]) -> Element<'a, Message> {
+    if available_modes.is_empty() {
+        // No IPC data - fall back to text input
+        text_input_row(
+            "Mode",
+            "Resolution and refresh rate (e.g., 1920x1080@60)",
+            current_mode,
+            move |value| Message::Outputs(OutputsMessage::SetMode(idx, value)),
+        )
+    } else {
+        // Have available modes - show dropdown
+        let mode_strings: Vec<String> = available_modes.iter().map(|m| m.to_string()).collect();
+
+        // Find the currently selected mode (match by mode_string prefix, ignoring " (preferred)" suffix)
+        let selected: Option<String> = mode_strings.iter()
+            .find(|m| m.starts_with(current_mode) || current_mode.starts_with(&m.split(" (").next().unwrap_or("")))
+            .cloned();
+
+        column![
+            row![
+                text("Mode").size(14).width(Length::FillPortion(1)),
+                pick_list(
+                    mode_strings.clone(),
+                    selected,
+                    move |selected_str: String| {
+                        // Extract just the mode string without " (preferred)" suffix
+                        let mode = selected_str.split(" (").next().unwrap_or(&selected_str).to_string();
+                        Message::Outputs(OutputsMessage::SetMode(idx, mode))
+                    },
+                )
+                .width(Length::FillPortion(2))
+                .padding(8),
+            ]
+            .spacing(12)
+            .align_y(Alignment::Center),
+            text("Resolution and refresh rate").size(12).color([0.75, 0.75, 0.75]),
+        ]
+        .spacing(4)
+        .into()
+    }
 }
 
 /// Detail view for a selected output
@@ -183,6 +265,7 @@ fn output_detail_view<'a>(
     output: &'a OutputConfig,
     idx: usize,
     sections_expanded: &HashMap<String, bool>,
+    available_outputs: &[FullOutputInfo],
 ) -> Element<'a, Message> {
     let basic_expanded = sections_expanded.get("basic").copied().unwrap_or(true);
     let hot_corners_expanded = sections_expanded.get("hot_corners").copied().unwrap_or(false);
@@ -191,6 +274,9 @@ fn output_detail_view<'a>(
     // Extract text values with proper lifetimes
     let mode_str = output.mode.as_str();
     let modeline_str = output.modeline.as_deref().unwrap_or("");
+
+    // Get available modes from IPC data
+    let available_modes = get_available_modes(&output.name, available_outputs);
 
     let mut content = column![
         // Header with output name and delete button
@@ -246,12 +332,8 @@ fn output_detail_view<'a>(
                 "x",
                 move |value| Message::Outputs(OutputsMessage::SetScale(idx, value as f64)),
             ),
-            text_input_row(
-                "Mode",
-                "Resolution and refresh rate (e.g., 1920x1080@60)",
-                mode_str,
-                move |value| Message::Outputs(OutputsMessage::SetMode(idx, value)),
-            ),
+            // Mode selection - dropdown if modes available, text input as fallback
+            mode_row(idx, mode_str, &available_modes),
             slider_row_int(
                 "Position X",
                 "Horizontal position in the global coordinate space",
@@ -332,7 +414,7 @@ fn output_detail_view<'a>(
                 info_text("Configure which corners trigger overview mode on this output"),
                 text("Hot corners not configured for this output")
                     .size(13)
-                    .color([0.6, 0.6, 0.6]),
+                    .color([0.75, 0.75, 0.75]),
                 button(text("Enable Hot Corners").size(14))
                     .on_press(Message::Outputs(OutputsMessage::SetHotCornersEnabled(idx, Some(true))))
                     .padding([8, 16]),

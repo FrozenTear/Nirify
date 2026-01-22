@@ -113,6 +113,10 @@ pub struct App {
     tablet_calibration_cache: [String; 6],
     /// Cached formatted values for touch calibration matrix (avoids memory leak in view)
     touch_calibration_cache: [String; 6],
+
+    // Tools page state
+    /// State for the Tools page (IPC data and loading states)
+    tools_state: views::tools::ToolsState,
 }
 
 /// Formats a key press event into a niri-compatible key combo string
@@ -299,6 +303,7 @@ impl App {
             cursor_cache,
             tablet_calibration_cache,
             touch_calibration_cache,
+            tools_state: views::tools::ToolsState::default(),
         };
 
         (app, Task::none())
@@ -310,6 +315,19 @@ impl App {
             // Navigation
             Message::NavigateToPage(page) => {
                 self.current_page = page;
+                // Auto-refresh IPC outputs when navigating to Outputs page
+                if page == Page::Outputs {
+                    let is_connected = matches!(
+                        self.niri_status,
+                        crate::views::status_bar::NiriStatus::Connected
+                    );
+                    if is_connected {
+                        return Task::perform(
+                            async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
+                            |result| Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(result)),
+                        );
+                    }
+                }
                 Task::none()
             }
 
@@ -561,6 +579,7 @@ impl App {
             Message::Gestures(msg) => self.update_gestures(msg),
             Message::LayoutExtras(msg) => self.update_layout_extras(msg),
             Message::Startup(msg) => self.update_startup(msg),
+            Message::Tools(msg) => self.update_tools(msg),
 
             Message::None => Task::none(),
         }
@@ -1097,12 +1116,160 @@ impl App {
         Task::none()
     }
 
+    /// Handle tools page messages (IPC operations)
+    fn update_tools(&mut self, msg: crate::messages::ToolsMessage) -> Task<Message> {
+        use crate::messages::ToolsMessage;
+
+        match msg {
+            // Query triggers - spawn async tasks
+            ToolsMessage::RefreshWindows => {
+                self.tools_state.loading_windows = true;
+                self.tools_state.last_error = None;
+                Task::perform(
+                    async { crate::ipc::get_windows().map_err(|e| e.to_string()) },
+                    |result| Message::Tools(ToolsMessage::WindowsLoaded(result)),
+                )
+            }
+            ToolsMessage::RefreshWorkspaces => {
+                self.tools_state.loading_workspaces = true;
+                self.tools_state.last_error = None;
+                Task::perform(
+                    async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
+                    |result| Message::Tools(ToolsMessage::WorkspacesLoaded(result)),
+                )
+            }
+            ToolsMessage::RefreshOutputs => {
+                self.tools_state.loading_outputs = true;
+                self.tools_state.last_error = None;
+                Task::perform(
+                    async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
+                    |result| Message::Tools(ToolsMessage::OutputsLoaded(result)),
+                )
+            }
+            ToolsMessage::RefreshFocusedWindow => {
+                self.tools_state.last_error = None;
+                Task::perform(
+                    async { crate::ipc::get_focused_window().map_err(|e| e.to_string()) },
+                    |result| Message::Tools(ToolsMessage::FocusedWindowLoaded(result)),
+                )
+            }
+            ToolsMessage::RefreshVersion => {
+                self.tools_state.loading_version = true;
+                self.tools_state.last_error = None;
+                Task::perform(
+                    async { crate::ipc::get_version().map_err(|e| e.to_string()) },
+                    |result| Message::Tools(ToolsMessage::VersionLoaded(result)),
+                )
+            }
+
+            // Query results
+            ToolsMessage::WindowsLoaded(result) => {
+                self.tools_state.loading_windows = false;
+                match result {
+                    Ok(windows) => {
+                        self.tools_state.windows = windows;
+                    }
+                    Err(e) => {
+                        self.tools_state.last_error = Some(e);
+                    }
+                }
+                Task::none()
+            }
+            ToolsMessage::WorkspacesLoaded(result) => {
+                self.tools_state.loading_workspaces = false;
+                match result {
+                    Ok(workspaces) => {
+                        self.tools_state.workspaces = workspaces;
+                    }
+                    Err(e) => {
+                        self.tools_state.last_error = Some(e);
+                    }
+                }
+                Task::none()
+            }
+            ToolsMessage::OutputsLoaded(result) => {
+                self.tools_state.loading_outputs = false;
+                match result {
+                    Ok(outputs) => {
+                        self.tools_state.outputs = outputs;
+                    }
+                    Err(e) => {
+                        self.tools_state.last_error = Some(e);
+                    }
+                }
+                Task::none()
+            }
+            ToolsMessage::FocusedWindowLoaded(result) => {
+                match result {
+                    Ok(window) => {
+                        self.tools_state.focused_window = window;
+                    }
+                    Err(e) => {
+                        self.tools_state.last_error = Some(e);
+                    }
+                }
+                Task::none()
+            }
+            ToolsMessage::VersionLoaded(result) => {
+                self.tools_state.loading_version = false;
+                match result {
+                    Ok(version) => {
+                        self.tools_state.version = Some(version);
+                    }
+                    Err(e) => {
+                        self.tools_state.last_error = Some(e);
+                    }
+                }
+                Task::none()
+            }
+
+            // Actions
+            ToolsMessage::ReloadConfig => {
+                self.tools_state.reloading = true;
+                self.tools_state.last_error = None;
+                Task::perform(
+                    async { crate::ipc::reload_config().map_err(|e| e.to_string()) },
+                    |result| Message::Tools(ToolsMessage::ReloadCompleted(result)),
+                )
+            }
+            ToolsMessage::ValidateConfig => {
+                self.tools_state.validating = true;
+                self.tools_state.last_error = None;
+                self.tools_state.validation_result = None;
+                Task::perform(
+                    async { crate::ipc::validate_config().map_err(|e| e.to_string()) },
+                    |result| Message::Tools(ToolsMessage::ValidateCompleted(result)),
+                )
+            }
+
+            // Action results
+            ToolsMessage::ReloadCompleted(result) => {
+                self.tools_state.reloading = false;
+                match result {
+                    Ok(()) => {
+                        self.toast = Some("Config reloaded successfully".to_string());
+                        self.toast_shown_at = Some(std::time::Instant::now());
+                    }
+                    Err(e) => {
+                        self.tools_state.last_error = Some(format!("Reload failed: {}", e));
+                    }
+                }
+                Task::none()
+            }
+            ToolsMessage::ValidateCompleted(result) => {
+                self.tools_state.validating = false;
+                self.tools_state.validation_result = Some(result);
+                Task::none()
+            }
+        }
+    }
+
     /// Returns the subscription for periodic save checks and keyboard capture
     pub fn subscription(&self) -> Subscription<Message> {
         use iced::keyboard;
 
-        // Base subscription: periodic save checks (every 50ms)
-        let save_check = time::every(Duration::from_millis(50))
+        // Base subscription: periodic save checks (every 200ms - sufficient with 300ms debounce)
+        let save_check = time::every(Duration::from_millis(200))
             .map(|_| Message::Save(SaveMessage::CheckSave));
 
         // Niri status check (every 5 seconds)
@@ -1286,6 +1453,7 @@ impl App {
                     &self.outputs_cache,
                     self.selected_output_index,
                     &self.output_sections_expanded,
+                    &self.tools_state.outputs,  // IPC data for available modes
                 );
             }
             Page::Miscellaneous => {
@@ -1311,6 +1479,13 @@ impl App {
             Page::RecentWindows => {
                 let recent = self.settings.lock().expect("settings mutex poisoned").recent_windows.clone();
                 return views::recent_windows::view(&recent);
+            }
+            Page::Tools => {
+                let niri_connected = matches!(
+                    self.niri_status,
+                    crate::views::status_bar::NiriStatus::Connected
+                );
+                return views::tools::view(&self.tools_state, niri_connected);
             }
         };
 
@@ -1352,7 +1527,7 @@ impl App {
             ]
             .spacing(12)
             .align_y(Alignment::Center),
-            text("Choose your preferred color theme for the application").size(12).color([0.6, 0.6, 0.6]),
+            text("Choose your preferred color theme for the application").size(12).color([0.75, 0.75, 0.75]),
             text("").size(16),
 
             // Current Settings Summary
@@ -1996,6 +2171,22 @@ impl App {
             }
 
             M::SetMatchAppId(id, match_idx, value) => {
+                // Validate regex syntax using regex-syntax crate
+                let error_key = (id, format!("app_id_{}", match_idx));
+                if let Some(ref regex_str) = value {
+                    if !regex_str.is_empty() {
+                        if let Err(e) = regex_syntax::Parser::new().parse(regex_str) {
+                            self.window_rule_regex_errors.insert(error_key.clone(), format!("Invalid regex: {}", e));
+                        } else {
+                            self.window_rule_regex_errors.remove(&error_key);
+                        }
+                    } else {
+                        self.window_rule_regex_errors.remove(&error_key);
+                    }
+                } else {
+                    self.window_rule_regex_errors.remove(&error_key);
+                }
+
                 if let Some(rule) = settings.window_rules.rules.iter_mut().find(|r| r.id == id) {
                     if let Some(m) = rule.matches.get_mut(match_idx) {
                         m.app_id = value;
@@ -2004,6 +2195,22 @@ impl App {
             }
 
             M::SetMatchTitle(id, match_idx, value) => {
+                // Validate regex syntax using regex-syntax crate
+                let error_key = (id, format!("title_{}", match_idx));
+                if let Some(ref regex_str) = value {
+                    if !regex_str.is_empty() {
+                        if let Err(e) = regex_syntax::Parser::new().parse(regex_str) {
+                            self.window_rule_regex_errors.insert(error_key.clone(), format!("Invalid regex: {}", e));
+                        } else {
+                            self.window_rule_regex_errors.remove(&error_key);
+                        }
+                    } else {
+                        self.window_rule_regex_errors.remove(&error_key);
+                    }
+                } else {
+                    self.window_rule_regex_errors.remove(&error_key);
+                }
+
                 if let Some(rule) = settings.window_rules.rules.iter_mut().find(|r| r.id == id) {
                     if let Some(m) = rule.matches.get_mut(match_idx) {
                         m.title = value;
@@ -2493,7 +2700,18 @@ impl App {
 
             M::SelectOutput(idx) => {
                 self.selected_output_index = Some(idx);
-                // Don't mark dirty for UI-only changes
+                // Auto-refresh IPC outputs to get available modes for dropdown
+                // Only refresh if connected to niri
+                let is_connected = matches!(
+                    self.niri_status,
+                    crate::views::status_bar::NiriStatus::Connected
+                );
+                if is_connected {
+                    return Task::perform(
+                        async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
+                        |result| Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(result)),
+                    );
+                }
                 return Task::none();
             }
 

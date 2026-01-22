@@ -196,7 +196,12 @@ where
 
     // Parse color for preview swatch
     let parsed_color = crate::types::Color::from_hex(&hex_owned)
-        .map(|c| iced::Color::from_rgba(c.r as f32, c.g as f32, c.b as f32, c.a as f32))
+        .map(|c| iced::Color::from_rgba(
+            c.r as f32 / 255.0,
+            c.g as f32 / 255.0,
+            c.b as f32 / 255.0,
+            c.a as f32 / 255.0,
+        ))
         .unwrap_or(iced::Color::from_rgb(0.5, 0.5, 0.5));
 
     row![

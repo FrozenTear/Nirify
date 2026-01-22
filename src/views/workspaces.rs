@@ -28,7 +28,7 @@ pub fn view(settings: &WorkspacesSettings) -> Element<'static, Message> {
                 column![
                     text("No named workspaces defined")
                         .size(14)
-                        .color([0.6, 0.6, 0.6]),
+                        .color([0.75, 0.75, 0.75]),
                     spacer(8.0),
                     text("Click the button below to add your first workspace")
                         .size(13)
@@ -124,7 +124,7 @@ pub fn view(settings: &WorkspacesSettings) -> Element<'static, Message> {
                         .align_y(Alignment::Center),
                         row![
                             column![
-                                text("Name").size(13).color([0.6, 0.6, 0.6]),
+                                text("Name").size(13).color([0.75, 0.75, 0.75]),
                                 text_input("Workspace name", &ws_name)
                                     .on_input(move |name| Message::Workspaces(WorkspacesMessage::UpdateWorkspaceName(idx, name)))
                                     .padding(8),
@@ -132,7 +132,7 @@ pub fn view(settings: &WorkspacesSettings) -> Element<'static, Message> {
                             .spacing(4)
                             .width(Length::Fill),
                             column![
-                                text("Pin to output (optional)").size(13).color([0.6, 0.6, 0.6]),
+                                text("Pin to output (optional)").size(13).color([0.75, 0.75, 0.75]),
                                 text_input("e.g., HDMI-1", &ws_output)
                                     .on_input(move |output| Message::Workspaces(WorkspacesMessage::UpdateWorkspaceOutput(idx, if output.is_empty() { None } else { Some(output) })))
                                     .padding(8),

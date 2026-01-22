@@ -47,6 +47,7 @@ pub enum Message {
     Gestures(GesturesMessage),
     LayoutExtras(LayoutExtrasMessage),
     Startup(StartupMessage),
+    Tools(ToolsMessage),
 
     // Save subsystem
     Save(SaveMessage),
@@ -97,6 +98,7 @@ pub enum Page {
     Debug,
     SwitchEvents,
     RecentWindows,
+    Tools,
 }
 
 impl Page {
@@ -128,6 +130,7 @@ impl Page {
             Page::Debug => "Debug",
             Page::SwitchEvents => "Switch Events",
             Page::RecentWindows => "Recent Windows",
+            Page::Tools => "Tools",
         }
     }
 
@@ -147,6 +150,7 @@ impl Page {
             Page::Outputs => PageCategory::System,
             Page::Miscellaneous | Page::Startup | Page::Environment => PageCategory::System,
             Page::Debug | Page::SwitchEvents | Page::RecentWindows => PageCategory::Advanced,
+            Page::Tools => PageCategory::System,
         }
     }
 }
@@ -682,6 +686,32 @@ pub enum StartupMessage {
     AddCommand,
     RemoveCommand(u32), // Command ID
     SetCommand(u32, String),
+}
+
+/// Tools page messages for IPC operations
+#[derive(Debug, Clone)]
+pub enum ToolsMessage {
+    // Query actions
+    RefreshWindows,
+    RefreshWorkspaces,
+    RefreshOutputs,
+    RefreshFocusedWindow,
+    RefreshVersion,
+
+    // Action results (for async Task completion)
+    WindowsLoaded(Result<Vec<crate::ipc::WindowInfo>, String>),
+    WorkspacesLoaded(Result<Vec<crate::ipc::WorkspaceInfo>, String>),
+    OutputsLoaded(Result<Vec<crate::ipc::FullOutputInfo>, String>),
+    FocusedWindowLoaded(Result<Option<crate::ipc::WindowInfo>, String>),
+    VersionLoaded(Result<String, String>),
+
+    // IPC actions
+    ReloadConfig,
+    ValidateConfig,
+
+    // Action results
+    ReloadCompleted(Result<(), String>),
+    ValidateCompleted(Result<String, String>),
 }
 
 /// Save subsystem messages

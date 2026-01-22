@@ -30,7 +30,7 @@ pub fn view(settings: &StartupSettings) -> Element<'static, Message> {
                 column![
                     text("No startup commands configured")
                         .size(14)
-                        .color([0.6, 0.6, 0.6]),
+                        .color([0.75, 0.75, 0.75]),
                     spacer(8.0),
                     text("Click the button below to add your first command")
                         .size(13)
@@ -62,7 +62,7 @@ pub fn view(settings: &StartupSettings) -> Element<'static, Message> {
                         .spacing(8)
                         .align_y(Alignment::Center),
                         row![
-                            text("Command").size(12).color([0.6, 0.6, 0.6]),
+                            text("Command").size(12).color([0.75, 0.75, 0.75]),
                             text_input("e.g., waybar", &cmd_display)
                                 .on_input(move |s| Message::Startup(StartupMessage::SetCommand(cmd_id, s)))
                                 .padding(8)

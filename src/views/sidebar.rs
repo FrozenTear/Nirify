@@ -25,7 +25,7 @@ pub fn view(current_page: Page) -> Element<'static, Message> {
         sidebar = sidebar.push(
             text(category.name())
                 .size(12)
-                .color([0.6, 0.6, 0.6])
+                .color([0.75, 0.75, 0.75])
         );
 
         // Pages in this category

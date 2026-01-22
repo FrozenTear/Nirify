@@ -27,6 +27,7 @@ pub mod sidebar;
 pub mod startup;
 pub mod switch_events;
 pub mod tablet;
+pub mod tools;
 pub mod touch;
 pub mod touchpad;
 pub mod trackball;

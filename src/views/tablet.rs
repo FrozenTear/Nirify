@@ -35,7 +35,7 @@ pub fn view(settings: TabletSettings, calibration_cache: &[String; 6]) -> Elemen
         ),
         column![
             text("Map to output").size(14),
-            text("Output name (e.g., eDP-1, HDMI-A-1)").size(12).color([0.6, 0.6, 0.6]),
+            text("Output name (e.g., eDP-1, HDMI-A-1)").size(12).color([0.75, 0.75, 0.75]),
             text_input("Leave empty for default", &map_to_output)
                 .on_input(|value| Message::Tablet(TabletMessage::SetMapToOutput(value)))
                 .padding(8),
