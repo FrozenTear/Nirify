@@ -6,8 +6,22 @@ use iced::{Alignment, Element, Length};
 use crate::messages::Message;
 use crate::theme::{status_bar_style, AppTheme, NiriColors};
 
+/// Niri connection status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NiriStatus {
+    #[default]
+    Unknown,
+    Connected,
+    Disconnected,
+}
+
 /// Creates the status bar at the bottom of the window
-pub fn view(dirty: bool, save_status: Option<String>, current_theme: AppTheme) -> Element<'static, Message> {
+pub fn view(
+    dirty: bool,
+    save_status: Option<String>,
+    current_theme: AppTheme,
+    niri_status: NiriStatus,
+) -> Element<'static, Message> {
     let colors = NiriColors::default();
 
     // Status indicator
@@ -31,8 +45,22 @@ pub fn view(dirty: bool, save_status: Option<String>, current_theme: AppTheme) -
     .spacing(8)
     .align_y(Alignment::Center);
 
+    // Niri connection status
+    let (niri_icon, niri_text, niri_color) = match niri_status {
+        NiriStatus::Connected => ("⬤", "niri", colors.success),
+        NiriStatus::Disconnected => ("○", "niri (not running)", colors.error),
+        NiriStatus::Unknown => ("◌", "niri (checking...)", colors.text_tertiary),
+    };
+
+    let niri_indicator = row![
+        text(niri_icon).size(10).color(niri_color),
+        text(niri_text).size(12).color(niri_color),
+    ]
+    .spacing(4)
+    .align_y(Alignment::Center);
+
     // Optional save status message (e.g., "Saved 3 files")
-    let mut content = row![status].spacing(16).padding([8, 20]);
+    let mut content = row![status, niri_indicator].spacing(16).padding([8, 20]);
 
     if let Some(ref message) = save_status {
         content = content.push(text("•").size(12).color(colors.text_tertiary));

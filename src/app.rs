@@ -56,11 +56,17 @@ pub struct App {
     /// Toast notification message
     toast: Option<String>,
 
+    /// When the toast was shown (for auto-clear)
+    toast_shown_at: Option<std::time::Instant>,
+
     /// Active modal dialog (if any)
     dialog_state: DialogState,
 
     /// Current theme
     current_theme: crate::theme::AppTheme,
+
+    /// Niri compositor connection status
+    niri_status: crate::views::status_bar::NiriStatus,
 
     // Outputs state
     /// Selected output index for list-detail view
@@ -232,6 +238,13 @@ impl App {
         let keybindings_cache = settings.lock().unwrap().keybindings.clone();
         let window_rules_cache = settings.lock().unwrap().window_rules.clone();
 
+        // Check initial niri connection status
+        let niri_status = if crate::ipc::is_niri_running() {
+            crate::views::status_bar::NiriStatus::Connected
+        } else {
+            crate::views::status_bar::NiriStatus::Disconnected
+        };
+
         let app = Self {
             settings,
             paths,
@@ -245,8 +258,10 @@ impl App {
             widget_demo_state: views::widget_demo::DemoState::default(),
             save_manager,
             toast: None,
+            toast_shown_at: None,
             dialog_state: DialogState::default(),
             current_theme,
+            niri_status,
             selected_output_index: None,
             output_sections_expanded: std::collections::HashMap::new(),
             outputs_cache,
@@ -364,15 +379,28 @@ impl App {
                 match result {
                     SaveResult::Success { files_written, .. } => {
                         self.toast = Some(format!("Saved {} file(s)", files_written));
+                        self.toast_shown_at = Some(std::time::Instant::now());
                         // Trigger niri config reload
                         SaveManager::reload_niri_config_task().map(Message::ReloadCompleted)
                     }
                     SaveResult::Error { message } => {
                         self.toast = Some(format!("Save failed: {}", message));
+                        self.toast_shown_at = Some(std::time::Instant::now());
                         Task::none()
                     }
                     SaveResult::NothingToSave => Task::none(),
                 }
+            }
+
+            Message::ClearToast => {
+                // Only clear if toast has been shown for at least 3 seconds
+                if let Some(shown_at) = self.toast_shown_at {
+                    if shown_at.elapsed() >= std::time::Duration::from_secs(3) {
+                        self.toast = None;
+                        self.toast_shown_at = None;
+                    }
+                }
+                Task::none()
             }
 
             Message::ReloadCompleted(result) => {
@@ -489,6 +517,15 @@ impl App {
                 Task::none()
             }
 
+            Message::CheckNiriStatus => {
+                self.niri_status = if crate::ipc::is_niri_running() {
+                    crate::views::status_bar::NiriStatus::Connected
+                } else {
+                    crate::views::status_bar::NiriStatus::Disconnected
+                };
+                Task::none()
+            }
+
             Message::None => Task::none(),
         }
     }
@@ -497,9 +534,13 @@ impl App {
     pub fn subscription(&self) -> Subscription<Message> {
         use iced::keyboard;
 
-        // Base subscription: periodic save checks
+        // Base subscription: periodic save checks (every 50ms)
         let save_check = time::every(Duration::from_millis(50))
             .map(|_| Message::Save(SaveMessage::CheckSave));
+
+        // Niri status check (every 5 seconds)
+        let niri_check = time::every(Duration::from_secs(5))
+            .map(|_| Message::CheckNiriStatus);
 
         // Keyboard capture subscription (only active when capturing)
         if self.key_capture_active.is_some() {
@@ -529,9 +570,9 @@ impl App {
                 }
             });
 
-            Subscription::batch([save_check, key_capture])
+            Subscription::batch([save_check, niri_check, key_capture])
         } else {
-            save_check
+            Subscription::batch([save_check, niri_check])
         }
     }
 
@@ -556,7 +597,7 @@ impl App {
         // Status bar (bottom)
         let is_dirty = self.dirty_tracker.is_dirty();
         let save_status = self.toast.clone();
-        let status_bar = views::status_bar::view(is_dirty, save_status, self.current_theme);
+        let status_bar = views::status_bar::view(is_dirty, save_status, self.current_theme, self.niri_status);
 
         // Stack everything vertically
         let layout = column![

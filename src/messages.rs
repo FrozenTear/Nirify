@@ -53,6 +53,8 @@ pub enum Message {
 
     // System
     WindowCloseRequested,
+    CheckNiriStatus,
+    ClearToast,
     None, // No-op message
 }
 
@@ -477,6 +479,11 @@ pub enum DialogState {
     },
     Consolidation {
         suggestions: Vec<ConsolidationSuggestion>,
+    },
+    DiffView {
+        title: String,
+        before: String,
+        after: String,
     },
 }
 

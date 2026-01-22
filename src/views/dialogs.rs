@@ -33,6 +33,7 @@ pub fn view<'a>(dialog: &'a DialogState) -> Option<Element<'a, Message>> {
             warnings,
         } => Some(import_summary_dialog(*imported_count, *defaulted_count, warnings)),
         DialogState::Consolidation { suggestions } => Some(consolidation_dialog(suggestions)),
+        DialogState::DiffView { title, before, after } => Some(diff_view_dialog(title, before, after)),
     }
 }
 
@@ -390,6 +391,127 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
     );
 
     dialog_container(content)
+}
+
+/// Diff view dialog showing before/after config changes
+fn diff_view_dialog<'a>(title: &'a str, before: &'a str, after: &'a str) -> Element<'a, Message> {
+    let content = column![
+        text(title).size(24),
+        text("Compare configuration changes before applying")
+            .size(13)
+            .color([0.7, 0.7, 0.7]),
+        row![
+            // Before panel
+            column![
+                text("Before").size(14).color([0.9, 0.5, 0.5]),
+                scrollable(
+                    container(
+                        text(before)
+                            .size(12)
+                            .font(iced::Font::MONOSPACE)
+                    )
+                    .padding(12)
+                    .width(Length::Fill)
+                    .style(|_theme| container::Style {
+                        background: Some(iced::Background::Color(IcedColor::from_rgb(0.12, 0.10, 0.10))),
+                        border: Border {
+                            color: IcedColor::from_rgb(0.4, 0.25, 0.25),
+                            width: 1.0,
+                            radius: 4.0.into(),
+                        },
+                        ..Default::default()
+                    })
+                )
+                .height(Length::Fixed(300.0))
+            ]
+            .spacing(8)
+            .width(Length::Fill),
+            // After panel
+            column![
+                text("After").size(14).color([0.5, 0.9, 0.5]),
+                scrollable(
+                    container(
+                        text(after)
+                            .size(12)
+                            .font(iced::Font::MONOSPACE)
+                    )
+                    .padding(12)
+                    .width(Length::Fill)
+                    .style(|_theme| container::Style {
+                        background: Some(iced::Background::Color(IcedColor::from_rgb(0.10, 0.12, 0.10))),
+                        border: Border {
+                            color: IcedColor::from_rgb(0.25, 0.4, 0.25),
+                            width: 1.0,
+                            radius: 4.0.into(),
+                        },
+                        ..Default::default()
+                    })
+                )
+                .height(Length::Fixed(300.0))
+            ]
+            .spacing(8)
+            .width(Length::Fill),
+        ]
+        .spacing(16),
+        row![
+            button(text("Close"))
+                .on_press(Message::CloseDialog)
+                .padding([8, 24])
+                .style(|_theme, _status| button::Style {
+                    background: Some(iced::Background::Color(IcedColor::from_rgb(0.3, 0.3, 0.3))),
+                    text_color: IcedColor::from_rgb(1.0, 1.0, 1.0),
+                    border: Border {
+                        radius: 4.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+            button(text("Apply Changes"))
+                .on_press(Message::DialogConfirm)
+                .padding([8, 24])
+                .style(|_theme, _status| button::Style {
+                    background: Some(iced::Background::Color(IcedColor::from_rgb(0.3, 0.6, 0.9))),
+                    text_color: IcedColor::from_rgb(1.0, 1.0, 1.0),
+                    border: Border {
+                        radius: 4.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+        ]
+        .spacing(12)
+    ]
+    .spacing(16);
+
+    // Use wider dialog for diff view
+    let dialog = container(content)
+        .padding(32)
+        .width(Length::Fixed(900.0))
+        .max_height(600.0)
+        .style(|_theme| container::Style {
+            background: Some(iced::Background::Color(IcedColor::from_rgb(0.18, 0.18, 0.20))),
+            border: Border {
+                color: IcedColor::from_rgb(0.4, 0.4, 0.4),
+                width: 2.0,
+                radius: 12.0.into(),
+            },
+            ..Default::default()
+        });
+
+    container(dialog)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center(Length::Fill)
+        .style(|_theme: &iced::Theme| container::Style {
+            background: Some(iced::Background::Color(IcedColor {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.7,
+            })),
+            ..Default::default()
+        })
+        .into()
 }
 
 /// Wraps content in a dialog container with backdrop
