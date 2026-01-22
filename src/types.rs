@@ -130,7 +130,18 @@ pub enum ModKey {
     Mod5,
 }
 
+impl std::fmt::Display for ModKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_kdl())
+    }
+}
+
 impl ModKey {
+    /// Returns all possible values for UI pickers
+    pub fn all() -> &'static [Self] {
+        &[Self::Super, Self::Alt, Self::Ctrl, Self::Shift, Self::Mod3, Self::Mod5]
+    }
+
     /// Convert to KDL string representation
     pub fn to_kdl(&self) -> &'static str {
         match self {
@@ -170,6 +181,21 @@ pub enum AccelProfile {
     Flat,
 }
 
+impl std::fmt::Display for AccelProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Adaptive => write!(f, "Adaptive"),
+            Self::Flat => write!(f, "Flat"),
+        }
+    }
+}
+
+impl AccelProfile {
+    pub fn all() -> &'static [Self] {
+        &[Self::Adaptive, Self::Flat]
+    }
+}
+
 /// Scroll method for touchpad input devices.
 ///
 /// Determines how scrolling gestures are interpreted on the touchpad.
@@ -187,6 +213,23 @@ pub enum ScrollMethod {
     NoScroll,
 }
 
+impl std::fmt::Display for ScrollMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TwoFinger => write!(f, "Two Finger"),
+            Self::Edge => write!(f, "Edge"),
+            Self::OnButtonDown => write!(f, "On Button Down"),
+            Self::NoScroll => write!(f, "No Scroll"),
+        }
+    }
+}
+
+impl ScrollMethod {
+    pub fn all() -> &'static [Self] {
+        &[Self::TwoFinger, Self::Edge, Self::OnButtonDown, Self::NoScroll]
+    }
+}
+
 /// Click method for touchpad tap-to-click behavior.
 ///
 /// Determines how multi-finger taps are interpreted as mouse button clicks.
@@ -198,6 +241,21 @@ pub enum ClickMethod {
     ButtonAreas,
     /// Click buttons based on finger count (1=left, 2=right, 3=middle)
     Clickfinger,
+}
+
+impl std::fmt::Display for ClickMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ButtonAreas => write!(f, "Button Areas"),
+            Self::Clickfinger => write!(f, "Clickfinger"),
+        }
+    }
+}
+
+impl ClickMethod {
+    pub fn all() -> &'static [Self] {
+        &[Self::ButtonAreas, Self::Clickfinger]
+    }
 }
 
 /// Mouse warping behavior when focus changes between windows.
@@ -212,6 +270,22 @@ pub enum WarpMouseMode {
     CenterXY,
     /// Always warp to window center on any focus change
     CenterXYAlways,
+}
+
+impl std::fmt::Display for WarpMouseMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Off => write!(f, "Off"),
+            Self::CenterXY => write!(f, "Center (Keyboard Only)"),
+            Self::CenterXYAlways => write!(f, "Center (Always)"),
+        }
+    }
+}
+
+impl WarpMouseMode {
+    pub fn all() -> &'static [Self] {
+        &[Self::Off, Self::CenterXY, Self::CenterXYAlways]
+    }
 }
 
 /// Behavior for centering the focused column in the viewport.
@@ -229,7 +303,21 @@ pub enum CenterFocusedColumn {
     Always,
 }
 
+impl std::fmt::Display for CenterFocusedColumn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Never => write!(f, "Never"),
+            Self::OnOverflow => write!(f, "On Overflow"),
+            Self::Always => write!(f, "Always"),
+        }
+    }
+}
+
 impl CenterFocusedColumn {
+    pub fn all() -> &'static [Self] {
+        &[Self::Never, Self::OnOverflow, Self::Always]
+    }
+
     /// Convert to KDL string representation
     pub fn to_kdl(&self) -> &'static str {
         match self {
@@ -263,6 +351,21 @@ pub enum TapButtonMap {
     LeftMiddleRight,
 }
 
+impl std::fmt::Display for TapButtonMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LeftRightMiddle => write!(f, "Left-Right-Middle"),
+            Self::LeftMiddleRight => write!(f, "Left-Middle-Right"),
+        }
+    }
+}
+
+impl TapButtonMap {
+    pub fn all() -> &'static [Self] {
+        &[Self::LeftRightMiddle, Self::LeftMiddleRight]
+    }
+}
+
 /// Monitor output transform (rotation and flip).
 ///
 /// Controls the orientation and mirroring of display output.
@@ -288,6 +391,36 @@ pub enum Transform {
     Flipped270,
 }
 
+impl std::fmt::Display for Transform {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Normal => write!(f, "Normal"),
+            Self::Rotate90 => write!(f, "90°"),
+            Self::Rotate180 => write!(f, "180°"),
+            Self::Rotate270 => write!(f, "270°"),
+            Self::Flipped => write!(f, "Flipped"),
+            Self::Flipped90 => write!(f, "Flipped + 90°"),
+            Self::Flipped180 => write!(f, "Flipped + 180°"),
+            Self::Flipped270 => write!(f, "Flipped + 270°"),
+        }
+    }
+}
+
+impl Transform {
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::Normal,
+            Self::Rotate90,
+            Self::Rotate180,
+            Self::Rotate270,
+            Self::Flipped,
+            Self::Flipped90,
+            Self::Flipped180,
+            Self::Flipped270,
+        ]
+    }
+}
+
 /// Variable Refresh Rate (VRR/FreeSync/G-Sync) mode for monitors.
 ///
 /// Controls adaptive sync behavior to reduce screen tearing and stuttering.
@@ -301,6 +434,22 @@ pub enum VrrMode {
     On,
     /// VRR enabled only when an application requests it
     OnDemand,
+}
+
+impl std::fmt::Display for VrrMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Off => write!(f, "Off"),
+            Self::On => write!(f, "On"),
+            Self::OnDemand => write!(f, "On Demand"),
+        }
+    }
+}
+
+impl VrrMode {
+    pub fn all() -> &'static [Self] {
+        &[Self::Off, Self::On, Self::OnDemand]
+    }
 }
 
 // ============================================================================
@@ -317,7 +466,22 @@ pub enum ColorSpace {
     Oklch,
 }
 
+impl std::fmt::Display for ColorSpace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Srgb => write!(f, "sRGB"),
+            Self::SrgbLinear => write!(f, "sRGB Linear"),
+            Self::Oklab => write!(f, "Oklab"),
+            Self::Oklch => write!(f, "Oklch"),
+        }
+    }
+}
+
 impl ColorSpace {
+    pub fn all() -> &'static [Self] {
+        &[Self::Srgb, Self::SrgbLinear, Self::Oklab, Self::Oklch]
+    }
+
     /// Convert to KDL string representation
     pub fn to_kdl(&self) -> &'static str {
         match self {
@@ -350,7 +514,22 @@ pub enum HueInterpolation {
     Decreasing,
 }
 
+impl std::fmt::Display for HueInterpolation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Shorter => write!(f, "Shorter Hue"),
+            Self::Longer => write!(f, "Longer Hue"),
+            Self::Increasing => write!(f, "Increasing Hue"),
+            Self::Decreasing => write!(f, "Decreasing Hue"),
+        }
+    }
+}
+
 impl HueInterpolation {
+    pub fn all() -> &'static [Self] {
+        &[Self::Shorter, Self::Longer, Self::Increasing, Self::Decreasing]
+    }
+
     /// Convert to KDL string representation
     pub fn to_kdl(&self) -> &'static str {
         match self {
@@ -385,7 +564,20 @@ pub enum GradientRelativeTo {
     WorkspaceView,
 }
 
+impl std::fmt::Display for GradientRelativeTo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Window => write!(f, "Window"),
+            Self::WorkspaceView => write!(f, "Workspace View"),
+        }
+    }
+}
+
 impl GradientRelativeTo {
+    pub fn all() -> &'static [Self] {
+        &[Self::Window, Self::WorkspaceView]
+    }
+
     /// Convert to KDL string representation
     pub fn to_kdl(&self) -> &'static str {
         match self {

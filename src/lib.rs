@@ -1,15 +1,17 @@
+//! Niri Settings - Native settings application for niri Wayland compositor
+//!
+//! Built with iced 0.14
+
+pub mod app;
 pub mod config;
 pub mod constants;
-pub mod diff;
-pub mod handlers;
-pub mod hardware;
-pub mod ipc;
+pub mod messages;
+pub mod save_manager;
+pub mod search;
+pub mod theme;
 pub mod types;
-pub mod ui;
-pub mod wizard;
+pub mod views;
+pub mod ipc;
 
-pub use config::models::Settings;
-pub use config::paths::ConfigPaths;
-
-// Include Slint-generated code in the library so it's accessible everywhere
-slint::include_modules!();
+// Re-export config types
+pub use config::{ConfigPaths, DirtyTracker, Settings, SettingsCategory};

@@ -58,6 +58,7 @@ pub struct ConfigPaths {
     pub debug_kdl: PathBuf,
     pub switch_events_kdl: PathBuf,
     pub recent_windows_kdl: PathBuf,
+    pub preferences_kdl: PathBuf,
 }
 
 impl ConfigPaths {
@@ -101,6 +102,7 @@ impl ConfigPaths {
         let debug_kdl = advanced_dir.join("debug.kdl");
         let switch_events_kdl = advanced_dir.join("switch-events.kdl");
         let recent_windows_kdl = advanced_dir.join("recent-windows.kdl");
+        let preferences_kdl = advanced_dir.join("preferences.kdl");
 
         Ok(Self {
             niri_config: niri_dir.join("config.kdl"),
@@ -146,6 +148,7 @@ impl ConfigPaths {
             debug_kdl,
             switch_events_kdl,
             recent_windows_kdl,
+            preferences_kdl,
         })
     }
 

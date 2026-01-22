@@ -9,11 +9,10 @@
 //! - **Sync functions** (e.g., `reload_config()`) block the calling thread until complete.
 //!   Use these for initialization or when blocking is acceptable.
 //!
-//! - **Async functions** in [`async_ops`] (e.g., `reload_config_async()`) run on background
-//!   threads and deliver results via callbacks on the UI thread. Use these from UI callbacks
-//!   to prevent freezes.
+//! - **Async functions** will be reimplemented with iced Task system in Phase 4.
 
-pub mod async_ops;
+// TODO: Phase 4 - Reimplement async_ops with iced Task system
+// pub mod async_ops;
 
 use log::{debug, info, warn};
 use serde::Deserialize;
@@ -123,38 +122,46 @@ pub struct WindowInfo {
 }
 
 // Response wrapper types for proper JSON parsing
-// Using a struct-based approach for more robust parsing
-#[derive(Deserialize)]
-struct NiriOkResponse<T> {
-    #[serde(rename = "Ok")]
-    ok: T,
-}
+// Test-only helper functions for parsing niri responses
+#[cfg(test)]
+mod test_helpers {
+    use super::*;
 
-#[derive(Debug, Deserialize)]
-struct NiriErrResponse {
-    #[serde(rename = "Err")]
-    err: serde_json::Value,
-}
+    #[derive(Deserialize)]
+    pub struct NiriOkResponse<T> {
+        #[serde(rename = "Ok")]
+        pub ok: T,
+    }
 
-// Helper function to parse responses - tries Ok first, then Err
-fn parse_niri_response<T: serde::de::DeserializeOwned>(
-    response: &str,
-) -> Result<T, (Option<serde_json::Value>, Option<serde_json::Error>)> {
-    // First try to parse as an Ok response
-    match serde_json::from_str::<NiriOkResponse<T>>(response) {
-        Ok(ok_resp) => return Ok(ok_resp.ok),
-        Err(ok_err) => {
-            // Then try to parse as an Err response
-            if let Ok(err_resp) = serde_json::from_str::<NiriErrResponse>(response) {
-                return Err((Some(err_resp.err), None));
+    #[derive(Debug, Deserialize)]
+    pub struct NiriErrResponse {
+        #[serde(rename = "Err")]
+        pub err: serde_json::Value,
+    }
+
+    // Helper function to parse responses - tries Ok first, then Err
+    pub fn parse_niri_response<T: serde::de::DeserializeOwned>(
+        response: &str,
+    ) -> Result<T, (Option<serde_json::Value>, Option<serde_json::Error>)> {
+        // First try to parse as an Ok response
+        match serde_json::from_str::<NiriOkResponse<T>>(response) {
+            Ok(ok_resp) => return Ok(ok_resp.ok),
+            Err(ok_err) => {
+                // Then try to parse as an Err response
+                if let Ok(err_resp) = serde_json::from_str::<NiriErrResponse>(response) {
+                    return Err((Some(err_resp.err), None));
+                }
+                // If neither works, return the Ok parse error (more informative)
+                Err((None, Some(ok_err)))
             }
-            // If neither works, return the Ok parse error (more informative)
-            Err((None, Some(ok_err)))
         }
     }
 }
 
-// Keep the old enum for backwards compatibility in some code paths
+#[cfg(test)]
+use test_helpers::*;
+
+// Response parsing using untagged enum
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum NiriResponse<T> {

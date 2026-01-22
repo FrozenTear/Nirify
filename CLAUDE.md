@@ -4,9 +4,65 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Native Rust settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor. Uses Slint for UI and manages KDL config files without modifying the user's main config directly.
+Native Rust settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor. Uses **iced 0.14** for UI and manages KDL config files without modifying the user's main config directly.
 
 **Target users**: Non-technical users who don't want to edit KDL config files manually.
+
+**Important**: This project is currently in migration from Slint to iced. The old Slint code structure is documented below but is being replaced with iced's Elm Architecture pattern.
+
+## Iced UI Framework
+
+This project uses **iced 0.14**, a cross-platform GUI library for Rust inspired by Elm.
+
+**Comprehensive iced documentation**: See `docs/ICED_API.md` for complete API reference, including:
+- The Elm Architecture pattern (State, Messages, Update, View)
+- Complete widget catalog with examples
+- Theming and styling guide
+- Tasks and async operations
+- Subscriptions for continuous events
+- Best practices and performance optimization
+- What's new in iced 0.14
+
+### Key iced Concepts
+
+- **The Elm Architecture**: State → Messages → Update → View
+- **Single source of truth**: All state in one struct
+- **Pure functions**: Update logic is testable without UI
+- **Reactive rendering**: Only redraws when state changes (iced 0.14)
+- **Type safety**: Rust's type system prevents impossible states
+
+### Quick Reference
+
+```rust
+// Minimal iced 0.14 application
+use iced::widget::{button, column, text};
+
+pub fn run() -> iced::Result {
+    iced::run(App::update, App::view)
+}
+
+#[derive(Default)]
+struct App { counter: i32 }
+
+#[derive(Debug, Clone, Copy)]
+enum Message { Increment }
+
+impl App {
+    fn update(&mut self, message: Message) {
+        match message {
+            Message::Increment => self.counter += 1,
+        }
+    }
+
+    fn view(&self) -> iced::Element<Message> {
+        column![
+            text(self.counter),
+            button("Increment").on_press(Message::Increment),
+        ]
+        .into()
+    }
+}
+```
 
 ## Build Commands
 
@@ -85,19 +141,38 @@ ui/                            # Slint UI files
 
 ## Conventions
 
-### Slint
+### iced (New Architecture)
 
-- Uses `cosmic-dark` style (set in `build.rs`)
-- Two-way bindings with `<=>` for settings
-- Callbacks use kebab-case (`on-value-changed`)
-- Slint uses `i32` for integers, not `i64`
-- All `.slint` files compiled via `build.rs`
+- **The Elm Architecture**: State, Messages, Update, View
+- **Pure functions**: Update logic separated from UI
+- **Immutable patterns**: State changes only in `update()` method
+- **Type-safe messages**: Enums with `#[derive(Debug, Clone)]`
+- **Widgets are values**: Created in `view()`, produce messages via callbacks
+- **Reactive rendering**: UI only redraws when state changes
 
-### Rust-Slint Bridge
+### iced Code Style
+
+```rust
+// State: All application data
+#[derive(Default)]
+struct App { /* fields */ }
+
+// Messages: All possible events
+#[derive(Debug, Clone)]
+enum Message { /* variants */ }
+
+// Update: Handle state changes
+fn update(&mut self, message: Message) { /* logic */ }
+
+// View: Construct UI from state
+fn view(&self) -> Element<Message> { /* widgets */ }
+```
+
+### Old Slint Architecture (Being Replaced)
 
 - Settings stored in `Arc<Mutex<Settings>>`
 - Callbacks clone Arc and lock when needed
-- Use `Rc<SaveManager>` for debounced saves (not `Arc` - Slint is single-threaded)
+- Use `Rc<SaveManager>` for debounced saves
 
 ### KDL
 
@@ -122,7 +197,7 @@ ui/                            # Slint UI files
 
 | Crate | Purpose |
 |-------|---------|
-| slint 1.14 | UI framework |
+| iced 0.14 | UI framework (pure Rust, GPU-accelerated) |
 | kdl 6.5 | KDL config parsing |
 | dirs 6.0 | XDG paths |
 | anyhow | Error handling |
@@ -133,5 +208,8 @@ ui/                            # Slint UI files
 ## Links
 
 - [Niri](https://github.com/YaLTeR/niri)
-- [Slint Docs](https://slint.dev/docs)
+- [iced Website](https://iced.rs/)
+- [iced Documentation](https://book.iced.rs/)
+- [iced GitHub](https://github.com/iced-rs/iced)
 - [KDL Spec](https://kdl.dev)
+- **API Reference**: `docs/ICED_API.md` (comprehensive iced 0.14 guide)

@@ -46,6 +46,7 @@ mod input;
 mod keybindings;
 mod layout_extras;
 mod misc;
+mod preferences;
 mod rules;
 mod system;
 mod workspaces;
@@ -69,6 +70,7 @@ pub use input::{
 pub use keybindings::load_keybindings;
 pub use layout_extras::{load_layout_extras, parse_layout_extras_from_children};
 pub use misc::{load_misc, parse_misc_from_doc};
+pub use preferences::{load_preferences, parse_preferences_from_doc};
 pub use rules::{
     extract_name_from_leading_comment, has_flag_in_node, load_layer_rules, load_window_rules,
     parse_layer_rule_node_children,
@@ -562,6 +564,12 @@ pub fn load_settings_with_result(paths: &ConfigPaths) -> LoadResult {
         parse_recent_windows_from_doc,
         &mut result.settings
     );
+    load_and_track!(
+        &paths.preferences_kdl,
+        "advanced/preferences.kdl",
+        parse_preferences_from_doc,
+        &mut result.settings
+    );
 
     // Validate and clamp all values to valid ranges
     result.settings.validate();
@@ -684,6 +692,7 @@ animations {
             debug_kdl: advanced_dir.join("debug.kdl"),
             switch_events_kdl: advanced_dir.join("switch-events.kdl"),
             recent_windows_kdl: advanced_dir.join("recent-windows.kdl"),
+            preferences_kdl: advanced_dir.join("preferences.kdl"),
         };
 
         // Create custom settings with non-default values
