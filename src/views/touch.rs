@@ -10,9 +10,10 @@ use crate::config::models::TouchSettings;
 use crate::messages::{Message, TouchMessage};
 
 /// Creates the touch settings view
-pub fn view(settings: TouchSettings) -> Element<'static, Message> {
+pub fn view(settings: TouchSettings, calibration_cache: &[String; 6]) -> Element<'_, Message> {
     let off = settings.off;
     let map_to_output = settings.map_to_output.clone();
+    let matrix_values = settings.calibration_matrix;
 
     let content = column![
         section_header("Touch Settings"),
@@ -43,11 +44,20 @@ pub fn view(settings: TouchSettings) -> Element<'static, Message> {
         .padding(12),
         spacer(16.0),
 
-        subsection_header("Calibration Matrix"),
-        info_text(
+        calibration_matrix(
+            "Calibration Matrix",
             "Advanced: Calibration matrix for libinput (6 values). \
-             This can be used to correct misaligned touch input. \
-             Leave empty to use default calibration."
+             This transforms touch coordinates and can correct misaligned touch input.",
+            matrix_values,
+            calibration_cache,
+            |msg| match msg {
+                CalibrationMatrixMessage::SetValue(idx, val) =>
+                    Message::Touch(TouchMessage::SetCalibrationValue(idx, val)),
+                CalibrationMatrixMessage::Clear =>
+                    Message::Touch(TouchMessage::ClearCalibration),
+                CalibrationMatrixMessage::Reset =>
+                    Message::Touch(TouchMessage::ResetCalibration),
+            },
         ),
         spacer(32.0),
     ]

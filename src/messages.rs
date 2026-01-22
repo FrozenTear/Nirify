@@ -592,6 +592,10 @@ pub enum TabletMessage {
     SetLeftHanded(bool),
     SetMapToOutput(String),
     SetCalibrationMatrix(Option<[f64; 6]>),
+    // Calibration matrix individual value changes
+    SetCalibrationValue(usize, String), // (index 0-5, value as string)
+    ClearCalibration,
+    ResetCalibration,
 }
 
 /// Touch screen settings messages
@@ -600,6 +604,10 @@ pub enum TouchMessage {
     SetOff(bool),
     SetMapToOutput(String),
     SetCalibrationMatrix(Option<[f64; 6]>),
+    // Calibration matrix individual value changes
+    SetCalibrationValue(usize, String), // (index 0-5, value as string)
+    ClearCalibration,
+    ResetCalibration,
 }
 
 /// Gestures settings messages
@@ -684,8 +692,9 @@ pub enum SaveMessage {
 }
 
 /// Dialog state
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum DialogState {
+    #[default]
     None,
     Error {
         title: String,
@@ -716,11 +725,6 @@ pub enum DialogState {
     },
 }
 
-impl Default for DialogState {
-    fn default() -> Self {
-        Self::None
-    }
-}
 
 /// First-run wizard steps
 #[derive(Debug, Clone, PartialEq)]

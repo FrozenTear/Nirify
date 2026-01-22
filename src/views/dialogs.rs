@@ -345,7 +345,7 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
     .spacing(12);
 
     // Add suggestion items (simplified for now)
-    for (_idx, suggestion) in suggestions.iter().enumerate() {
+    for suggestion in suggestions.iter() {
         content = content.push(
             container(
                 column![

@@ -79,7 +79,7 @@ pub fn view(settings: &RecentWindowsSettings) -> Element<'static, Message> {
             let key_combo = bind.key_combo.clone();
             let is_next = bind.is_next;
             let filter_app = bind.filter_app_id;
-            let scope = bind.scope.clone();
+            let scope = bind.scope;
             let cooldown = bind.cooldown_ms;
 
             content = content.push(

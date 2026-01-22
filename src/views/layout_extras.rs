@@ -216,7 +216,7 @@ where
                 }
             }),
         text_input("#RRGGBB", &hex_owned)
-            .on_input(move |s| msg_fn(s))
+            .on_input(msg_fn)
             .padding(6)
             .font(fonts::MONO_FONT)
             .width(Length::Fixed(100.0)),

@@ -103,6 +103,7 @@ pub fn slider_row<'a, Message: Clone + 'a>(
 ///     AppearanceMessage::SetFocusRingWidth,
 /// )
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn slider_row_with_state<'a, Message: Clone + 'a>(
     label: &'a str,
     description: &'a str,
@@ -140,7 +141,7 @@ pub fn slider_row_with_state<'a, Message: Clone + 'a>(
     } else {
         container(content).style(|_theme| {
             container::Style {
-                text_color: Some(iced::Color::from_rgb(0.5, 0.5, 0.5).into()),
+                text_color: Some(iced::Color::from_rgb(0.5, 0.5, 0.5)),
                 ..Default::default()
             }
         }).into()
@@ -207,6 +208,7 @@ pub fn slider_row_int<'a, Message: Clone + 'a>(
 ///     KeyboardMessage::SetRepeatRate,
 /// )
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn slider_row_int_with_state<'a, Message: Clone + 'a>(
     label: &'a str,
     description: &'a str,
@@ -244,7 +246,7 @@ pub fn slider_row_int_with_state<'a, Message: Clone + 'a>(
     } else {
         container(content).style(|_theme| {
             container::Style {
-                text_color: Some(iced::Color::from_rgb(0.5, 0.5, 0.5).into()),
+                text_color: Some(iced::Color::from_rgb(0.5, 0.5, 0.5)),
                 ..Default::default()
             }
         }).into()

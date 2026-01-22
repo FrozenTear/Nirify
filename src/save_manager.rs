@@ -19,7 +19,7 @@ impl SaveGuard {
     /// Attempts to acquire the save guard. Returns None if a save is already in progress.
     fn new(flag: Arc<Mutex<bool>>) -> Option<Self> {
         {
-            let mut lock = flag.lock().unwrap();
+            let mut lock = flag.lock().expect("save_in_progress mutex poisoned");
             if *lock {
                 return None; // Already saving
             }
@@ -75,13 +75,13 @@ impl SaveManager {
 
     /// Records that a change was made (resets the debounce timer)
     pub fn mark_changed(&self) {
-        *self.last_change.lock().unwrap() = Some(Instant::now());
+        *self.last_change.lock().expect("last_change mutex poisoned") = Some(Instant::now());
     }
 
     /// Checks if enough time has elapsed to trigger a save
     pub fn should_save(&self) -> bool {
         // Don't save if already saving
-        if *self.save_in_progress.lock().unwrap() {
+        if *self.save_in_progress.lock().expect("save_in_progress mutex poisoned") {
             debug!("Save already in progress, skipping");
             return false;
         }
@@ -92,7 +92,7 @@ impl SaveManager {
         }
 
         // Check if 300ms has elapsed since last change
-        if let Some(last) = *self.last_change.lock().unwrap() {
+        if let Some(last) = *self.last_change.lock().expect("last_change mutex poisoned") {
             let elapsed = Instant::now().duration_since(last);
             if elapsed >= Duration::from_millis(300) {
                 debug!("Debounce timeout reached ({:?}), triggering save", elapsed);
@@ -137,7 +137,7 @@ impl SaveManager {
 
             // Clone settings for async save (releases lock immediately)
             let settings_snapshot = {
-                settings.lock().unwrap().clone()
+                settings.lock().expect("settings mutex poisoned").clone()
             };
 
             // Perform actual save (async I/O, no locks held)

@@ -107,6 +107,12 @@ pub struct App {
     key_capture_active: Option<usize>,
     /// Cached keybindings data for view borrowing
     keybindings_cache: crate::config::models::KeybindingsSettings,
+
+    // Calibration matrix state
+    /// Cached formatted values for tablet calibration matrix (avoids memory leak in view)
+    tablet_calibration_cache: [String; 6],
+    /// Cached formatted values for touch calibration matrix (avoids memory leak in view)
+    touch_calibration_cache: [String; 6],
 }
 
 /// Formats a key press event into a niri-compatible key combo string
@@ -223,7 +229,8 @@ impl App {
         log::info!("Settings loaded successfully");
 
         // Parse theme from settings
-        let current_theme = crate::theme::AppTheme::from_str(&settings.preferences.theme);
+        let current_theme = settings.preferences.theme.parse::<crate::theme::AppTheme>()
+            .unwrap_or_default();
 
         let settings = Arc::new(Mutex::new(settings));
 
@@ -238,10 +245,18 @@ impl App {
         );
 
         // Clone data for view caches (avoids mutex lock lifetime issues)
-        let outputs_cache = settings.lock().unwrap().outputs.clone();
-        let keybindings_cache = settings.lock().unwrap().keybindings.clone();
-        let window_rules_cache = settings.lock().unwrap().window_rules.clone();
-        let cursor_cache = settings.lock().unwrap().cursor.clone();
+        let outputs_cache = settings.lock().expect("settings mutex poisoned").outputs.clone();
+        let keybindings_cache = settings.lock().expect("settings mutex poisoned").keybindings.clone();
+        let window_rules_cache = settings.lock().expect("settings mutex poisoned").window_rules.clone();
+        let cursor_cache = settings.lock().expect("settings mutex poisoned").cursor.clone();
+
+        // Initialize calibration matrix caches
+        let tablet_calibration_cache = crate::views::widgets::format_matrix_values(
+            settings.lock().expect("settings mutex poisoned").tablet.calibration_matrix
+        );
+        let touch_calibration_cache = crate::views::widgets::format_matrix_values(
+            settings.lock().expect("settings mutex poisoned").touch.calibration_matrix
+        );
 
         // Check initial niri connection status
         let niri_status = if crate::ipc::is_niri_running() {
@@ -282,6 +297,8 @@ impl App {
             key_capture_active: None,
             keybindings_cache,
             cursor_cache,
+            tablet_calibration_cache,
+            touch_calibration_cache,
         };
 
         (app, Task::none())
@@ -335,7 +352,7 @@ impl App {
                 self.current_theme = theme;
 
                 // Save theme to settings
-                let mut settings = self.settings.lock().unwrap();
+                let mut settings = self.settings.lock().expect("settings mutex poisoned");
                 settings.preferences.theme = theme.to_str().to_string();
                 drop(settings);
 
@@ -502,7 +519,7 @@ impl App {
                     log::info!("Window closing with unsaved changes, performing blocking save...");
 
                     // Clone settings and take dirty categories for blocking save
-                    let settings = self.settings.lock().unwrap().clone();
+                    let settings = self.settings.lock().expect("settings mutex poisoned").clone();
                     let dirty = self.dirty_tracker.take();
 
                     // Perform blocking save (acceptable since typically <100ms)
@@ -553,7 +570,7 @@ impl App {
     fn update_debug(&mut self, msg: crate::messages::DebugMessage) -> Task<Message> {
         use crate::messages::DebugMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let debug = &mut settings.debug;
 
         match msg {
@@ -599,7 +616,7 @@ impl App {
     fn update_miscellaneous(&mut self, msg: crate::messages::MiscellaneousMessage) -> Task<Message> {
         use crate::messages::MiscellaneousMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let misc = &mut settings.miscellaneous;
 
         match msg {
@@ -623,7 +640,7 @@ impl App {
     fn update_environment(&mut self, msg: crate::messages::EnvironmentMessage) -> Task<Message> {
         use crate::messages::EnvironmentMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let env = &mut settings.environment;
 
         match msg {
@@ -661,7 +678,7 @@ impl App {
     fn update_switch_events(&mut self, msg: crate::messages::SwitchEventsMessage) -> Task<Message> {
         use crate::messages::SwitchEventsMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let switch = &mut settings.switch_events;
 
         // Helper to parse command string into Vec<String>
@@ -699,7 +716,7 @@ impl App {
     fn update_recent_windows(&mut self, msg: crate::messages::RecentWindowsMessage) -> Task<Message> {
         use crate::messages::RecentWindowsMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let recent = &mut settings.recent_windows;
 
         match msg {
@@ -772,7 +789,7 @@ impl App {
     fn update_trackpoint(&mut self, msg: crate::messages::TrackpointMessage) -> Task<Message> {
         use crate::messages::TrackpointMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let trackpoint = &mut settings.trackpoint;
 
         match msg {
@@ -797,7 +814,7 @@ impl App {
     fn update_trackball(&mut self, msg: crate::messages::TrackballMessage) -> Task<Message> {
         use crate::messages::TrackballMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let trackball = &mut settings.trackball;
 
         match msg {
@@ -822,14 +839,41 @@ impl App {
     fn update_tablet(&mut self, msg: crate::messages::TabletMessage) -> Task<Message> {
         use crate::messages::TabletMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let tablet = &mut settings.tablet;
 
         match msg {
             TabletMessage::SetOff(v) => tablet.off = v,
             TabletMessage::SetLeftHanded(v) => tablet.left_handed = v,
             TabletMessage::SetMapToOutput(v) => tablet.map_to_output = v,
-            TabletMessage::SetCalibrationMatrix(v) => tablet.calibration_matrix = v,
+            TabletMessage::SetCalibrationMatrix(v) => {
+                tablet.calibration_matrix = v;
+                // Update cache
+                self.tablet_calibration_cache = crate::views::widgets::format_matrix_values(v);
+            }
+            TabletMessage::SetCalibrationValue(idx, value) => {
+                if idx < 6 {
+                    // Update cache immediately for responsive UI
+                    self.tablet_calibration_cache[idx] = value.clone();
+                    // Parse and update actual matrix
+                    if let Ok(val) = value.parse::<f64>() {
+                        let matrix = tablet.calibration_matrix
+                            .get_or_insert([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
+                        matrix[idx] = val;
+                    }
+                }
+            }
+            TabletMessage::ClearCalibration => {
+                tablet.calibration_matrix = None;
+                // Update cache to show identity (default display)
+                self.tablet_calibration_cache = crate::views::widgets::format_matrix_values(None);
+            }
+            TabletMessage::ResetCalibration => {
+                tablet.calibration_matrix = Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
+                self.tablet_calibration_cache = crate::views::widgets::format_matrix_values(
+                    Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+                );
+            }
         }
 
         drop(settings);
@@ -842,13 +886,40 @@ impl App {
     fn update_touch(&mut self, msg: crate::messages::TouchMessage) -> Task<Message> {
         use crate::messages::TouchMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let touch = &mut settings.touch;
 
         match msg {
             TouchMessage::SetOff(v) => touch.off = v,
             TouchMessage::SetMapToOutput(v) => touch.map_to_output = v,
-            TouchMessage::SetCalibrationMatrix(v) => touch.calibration_matrix = v,
+            TouchMessage::SetCalibrationMatrix(v) => {
+                touch.calibration_matrix = v;
+                // Update cache
+                self.touch_calibration_cache = crate::views::widgets::format_matrix_values(v);
+            }
+            TouchMessage::SetCalibrationValue(idx, value) => {
+                if idx < 6 {
+                    // Update cache immediately for responsive UI
+                    self.touch_calibration_cache[idx] = value.clone();
+                    // Parse and update actual matrix
+                    if let Ok(val) = value.parse::<f64>() {
+                        let matrix = touch.calibration_matrix
+                            .get_or_insert([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
+                        matrix[idx] = val;
+                    }
+                }
+            }
+            TouchMessage::ClearCalibration => {
+                touch.calibration_matrix = None;
+                // Update cache to show identity (default display)
+                self.touch_calibration_cache = crate::views::widgets::format_matrix_values(None);
+            }
+            TouchMessage::ResetCalibration => {
+                touch.calibration_matrix = Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
+                self.touch_calibration_cache = crate::views::widgets::format_matrix_values(
+                    Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+                );
+            }
         }
 
         drop(settings);
@@ -861,7 +932,7 @@ impl App {
     fn update_gestures(&mut self, msg: crate::messages::GesturesMessage) -> Task<Message> {
         use crate::messages::GesturesMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let gestures = &mut settings.gestures;
 
         match msg {
@@ -896,7 +967,7 @@ impl App {
         use crate::messages::LayoutExtrasMessage;
         use crate::types::ColorOrGradient;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let layout = &mut settings.layout_extras;
 
         match msg {
@@ -994,7 +1065,7 @@ impl App {
     fn update_startup(&mut self, msg: crate::messages::StartupMessage) -> Task<Message> {
         use crate::messages::StartupMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let startup = &mut settings.startup;
 
         match msg {
@@ -1142,55 +1213,55 @@ impl App {
         let page_view = match self.current_page {
             Page::Overview => return self.overview_page(),
             Page::Appearance => {
-                let appearance = self.settings.lock().unwrap().appearance.clone();
+                let appearance = self.settings.lock().expect("settings mutex poisoned").appearance.clone();
                 views::appearance::view(appearance)
             }
             Page::Behavior => {
-                let behavior = self.settings.lock().unwrap().behavior.clone();
+                let behavior = self.settings.lock().expect("settings mutex poisoned").behavior.clone();
                 views::behavior::view(behavior)
             }
             Page::Keyboard => {
-                let keyboard = self.settings.lock().unwrap().keyboard.clone();
+                let keyboard = self.settings.lock().expect("settings mutex poisoned").keyboard.clone();
                 views::keyboard::view(keyboard)
             }
             Page::Mouse => {
-                let mouse = self.settings.lock().unwrap().mouse.clone();
+                let mouse = self.settings.lock().expect("settings mutex poisoned").mouse.clone();
                 views::mouse::view(mouse)
             }
             Page::Touchpad => {
-                let touchpad = self.settings.lock().unwrap().touchpad.clone();
+                let touchpad = self.settings.lock().expect("settings mutex poisoned").touchpad.clone();
                 views::touchpad::view(touchpad)
             }
             Page::Trackpoint => {
-                let trackpoint = self.settings.lock().unwrap().trackpoint.clone();
+                let trackpoint = self.settings.lock().expect("settings mutex poisoned").trackpoint.clone();
                 views::trackpoint::view(trackpoint)
             }
             Page::Trackball => {
-                let trackball = self.settings.lock().unwrap().trackball.clone();
+                let trackball = self.settings.lock().expect("settings mutex poisoned").trackball.clone();
                 views::trackball::view(trackball)
             }
             Page::Tablet => {
-                let tablet = self.settings.lock().unwrap().tablet.clone();
-                views::tablet::view(tablet)
+                let tablet = self.settings.lock().expect("settings mutex poisoned").tablet.clone();
+                return views::tablet::view(tablet, &self.tablet_calibration_cache);
             }
             Page::Touch => {
-                let touch = self.settings.lock().unwrap().touch.clone();
-                views::touch::view(touch)
+                let touch = self.settings.lock().expect("settings mutex poisoned").touch.clone();
+                return views::touch::view(touch, &self.touch_calibration_cache);
             }
             Page::Animations => return views::animations::view(),
             Page::Cursor => {
                 return views::cursor::view(&self.cursor_cache);
             }
             Page::LayoutExtras => {
-                let layout = self.settings.lock().unwrap().layout_extras.clone();
+                let layout = self.settings.lock().expect("settings mutex poisoned").layout_extras.clone();
                 return views::layout_extras::view(&layout);
             }
             Page::Gestures => {
-                let gestures = self.settings.lock().unwrap().gestures.clone();
+                let gestures = self.settings.lock().expect("settings mutex poisoned").gestures.clone();
                 return views::gestures::view(&gestures);
             }
             Page::Workspaces => {
-                let workspaces = self.settings.lock().unwrap().workspaces.clone();
+                let workspaces = self.settings.lock().expect("settings mutex poisoned").workspaces.clone();
                 return views::workspaces::view(&workspaces);
             }
             Page::WindowRules => {
@@ -1218,27 +1289,27 @@ impl App {
                 );
             }
             Page::Miscellaneous => {
-                let misc = self.settings.lock().unwrap().miscellaneous.clone();
+                let misc = self.settings.lock().expect("settings mutex poisoned").miscellaneous.clone();
                 return views::miscellaneous::view(&misc);
             }
             Page::Startup => {
-                let startup = self.settings.lock().unwrap().startup.clone();
+                let startup = self.settings.lock().expect("settings mutex poisoned").startup.clone();
                 return views::startup::view(&startup);
             }
             Page::Environment => {
-                let env = self.settings.lock().unwrap().environment.clone();
+                let env = self.settings.lock().expect("settings mutex poisoned").environment.clone();
                 return views::environment::view(&env);
             }
             Page::Debug => {
-                let debug = self.settings.lock().unwrap().debug.clone();
+                let debug = self.settings.lock().expect("settings mutex poisoned").debug.clone();
                 return views::debug::view(&debug);
             }
             Page::SwitchEvents => {
-                let switch = self.settings.lock().unwrap().switch_events.clone();
+                let switch = self.settings.lock().expect("settings mutex poisoned").switch_events.clone();
                 return views::switch_events::view(&switch);
             }
             Page::RecentWindows => {
-                let recent = self.settings.lock().unwrap().recent_windows.clone();
+                let recent = self.settings.lock().expect("settings mutex poisoned").recent_windows.clone();
                 return views::recent_windows::view(&recent);
             }
         };
@@ -1259,7 +1330,7 @@ impl App {
         use iced::widget::{pick_list, row};
         use iced::Alignment;
 
-        let settings = self.settings.lock().unwrap();
+        let settings = self.settings.lock().expect("settings mutex poisoned");
 
         let summary = column![
             text("Welcome to Niri Settings").size(24),
@@ -1351,7 +1422,7 @@ impl App {
     fn update_appearance(&mut self, msg: crate::messages::AppearanceMessage) -> Task<Message> {
         use crate::messages::AppearanceMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             // Focus ring
@@ -1424,8 +1495,8 @@ impl App {
                     match target {
                         ColorOrGradient::Color(color) => {
                             ColorOrGradient::Gradient(Gradient {
-                                from: color.clone(),
-                                to: color.clone(),
+                                from: *color,
+                                to: *color,
                                 angle: 0,
                                 ..Default::default()
                             })
@@ -1437,7 +1508,7 @@ impl App {
                     match target {
                         ColorOrGradient::Color(_) => target.clone(),
                         ColorOrGradient::Gradient(gradient) => {
-                            ColorOrGradient::Color(gradient.from.clone())
+                            ColorOrGradient::Color(gradient.from)
                         }
                     }
                 };
@@ -1484,7 +1555,7 @@ impl App {
     fn update_behavior(&mut self, msg: crate::messages::BehaviorMessage) -> Task<Message> {
         use crate::messages::BehaviorMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             BehaviorMessage::ToggleFocusFollowsMouse(value) => {
@@ -1543,7 +1614,7 @@ impl App {
     fn update_keyboard(&mut self, msg: crate::messages::KeyboardMessage) -> Task<Message> {
         use crate::messages::KeyboardMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             KeyboardMessage::SetXkbLayout(value) => {
@@ -1581,7 +1652,7 @@ impl App {
     fn update_mouse(&mut self, msg: crate::messages::MouseMessage) -> Task<Message> {
         use crate::messages::MouseMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             MouseMessage::ToggleOffOnTouchpad(value) => {
@@ -1625,7 +1696,7 @@ impl App {
     fn update_touchpad(&mut self, msg: crate::messages::TouchpadMessage) -> Task<Message> {
         use crate::messages::TouchpadMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             TouchpadMessage::ToggleTapToClick(value) => {
@@ -1687,7 +1758,7 @@ impl App {
     fn update_cursor(&mut self, msg: crate::messages::CursorMessage) -> Task<Message> {
         use crate::messages::CursorMessage;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             CursorMessage::SetTheme(value) => {
@@ -1720,7 +1791,7 @@ impl App {
         use crate::messages::AnimationsMessage;
         use crate::config::models::{AnimationType, EasingCurve};
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             AnimationsMessage::ToggleSlowdown(enabled) => {
@@ -1808,7 +1879,7 @@ impl App {
         use crate::messages::WorkspacesMessage;
         use crate::config::models::NamedWorkspace;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             WorkspacesMessage::AddWorkspace => {
@@ -1864,7 +1935,7 @@ impl App {
         use crate::messages::WindowRulesMessage as M;
         use crate::config::models::{WindowRule, WindowRuleMatch};
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
         let mut should_mark_dirty = true;
 
         match msg {
@@ -2090,7 +2161,7 @@ impl App {
     fn update_keybindings(&mut self, msg: crate::messages::KeybindingsMessage) -> Task<Message> {
         use crate::messages::KeybindingsMessage as M;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             M::AddKeybinding => {
@@ -2233,13 +2304,15 @@ impl App {
     fn update_layer_rules(&mut self, msg: crate::messages::LayerRulesMessage) -> Task<Message> {
         use crate::messages::LayerRulesMessage as M;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             M::AddRule => {
                 // Create a new rule with default values
-                let mut new_rule = crate::config::models::LayerRule::default();
-                new_rule.id = settings.layer_rules.next_id;
+                let new_rule = crate::config::models::LayerRule {
+                    id: settings.layer_rules.next_id,
+                    ..Default::default()
+                };
                 settings.layer_rules.next_id += 1;
                 settings.layer_rules.rules.push(new_rule.clone());
                 self.selected_layer_rule_id = Some(new_rule.id);
@@ -2395,7 +2468,7 @@ impl App {
     fn update_outputs(&mut self, msg: crate::messages::OutputsMessage) -> Task<Message> {
         use crate::messages::OutputsMessage as M;
 
-        let mut settings = self.settings.lock().unwrap();
+        let mut settings = self.settings.lock().expect("settings mutex poisoned");
 
         match msg {
             M::AddOutput => {

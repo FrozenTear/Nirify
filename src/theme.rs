@@ -50,9 +50,10 @@ pub mod fonts {
 }
 
 /// Application theme variants
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AppTheme {
     /// Default niri theme with warm amber/teal palette
+    #[default]
     NiriAmber,
     /// Catppuccin Latte - Light, creamy pastels
     CatppuccinLatte,
@@ -78,11 +79,6 @@ pub enum AppTheme {
     SolarizedLight,
 }
 
-impl Default for AppTheme {
-    fn default() -> Self {
-        Self::NiriAmber
-    }
-}
 
 impl AppTheme {
     /// Returns the iced Theme for this app theme
@@ -158,26 +154,29 @@ impl std::fmt::Display for AppTheme {
     }
 }
 
-impl AppTheme {
-    /// Parses a theme from a string (for persistence)
-    pub fn from_str(s: &str) -> Self {
+impl std::str::FromStr for AppTheme {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "NiriAmber" => Self::NiriAmber,
-            "CatppuccinLatte" => Self::CatppuccinLatte,
-            "CatppuccinFrappe" => Self::CatppuccinFrappe,
-            "CatppuccinMacchiato" => Self::CatppuccinMacchiato,
-            "CatppuccinMocha" => Self::CatppuccinMocha,
-            "Dracula" => Self::Dracula,
-            "Nord" => Self::Nord,
-            "GruvboxDark" => Self::GruvboxDark,
-            "GruvboxLight" => Self::GruvboxLight,
-            "TokyoNight" => Self::TokyoNight,
-            "SolarizedDark" => Self::SolarizedDark,
-            "SolarizedLight" => Self::SolarizedLight,
-            _ => Self::default(),
+            "NiriAmber" => Ok(Self::NiriAmber),
+            "CatppuccinLatte" => Ok(Self::CatppuccinLatte),
+            "CatppuccinFrappe" => Ok(Self::CatppuccinFrappe),
+            "CatppuccinMacchiato" => Ok(Self::CatppuccinMacchiato),
+            "CatppuccinMocha" => Ok(Self::CatppuccinMocha),
+            "Dracula" => Ok(Self::Dracula),
+            "Nord" => Ok(Self::Nord),
+            "GruvboxDark" => Ok(Self::GruvboxDark),
+            "GruvboxLight" => Ok(Self::GruvboxLight),
+            "TokyoNight" => Ok(Self::TokyoNight),
+            "SolarizedDark" => Ok(Self::SolarizedDark),
+            "SolarizedLight" => Ok(Self::SolarizedLight),
+            _ => Ok(Self::default()),
         }
     }
+}
 
+impl AppTheme {
     /// Converts theme to a string (for persistence)
     pub fn to_str(self) -> &'static str {
         match self {

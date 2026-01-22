@@ -10,10 +10,11 @@ use crate::config::models::TabletSettings;
 use crate::messages::{Message, TabletMessage};
 
 /// Creates the tablet settings view
-pub fn view(settings: TabletSettings) -> Element<'static, Message> {
+pub fn view(settings: TabletSettings, calibration_cache: &[String; 6]) -> Element<'_, Message> {
     let off = settings.off;
     let left_handed = settings.left_handed;
     let map_to_output = settings.map_to_output.clone();
+    let matrix_values = settings.calibration_matrix;
 
     let content = column![
         section_header("Tablet Settings"),
@@ -52,10 +53,20 @@ pub fn view(settings: TabletSettings) -> Element<'static, Message> {
         ),
         spacer(16.0),
 
-        subsection_header("Calibration Matrix"),
-        info_text(
+        calibration_matrix(
+            "Calibration Matrix",
             "Advanced: Calibration matrix for libinput (6 values). \
-             Leave empty to use default calibration."
+             This transforms touch coordinates: [x', y'] = [a b c; d e f] * [x, y, 1]",
+            matrix_values,
+            calibration_cache,
+            |msg| match msg {
+                CalibrationMatrixMessage::SetValue(idx, val) =>
+                    Message::Tablet(TabletMessage::SetCalibrationValue(idx, val)),
+                CalibrationMatrixMessage::Clear =>
+                    Message::Tablet(TabletMessage::ClearCalibration),
+                CalibrationMatrixMessage::Reset =>
+                    Message::Tablet(TabletMessage::ResetCalibration),
+            },
         ),
         spacer(32.0),
     ]
