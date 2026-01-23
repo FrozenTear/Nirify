@@ -349,6 +349,11 @@ pub enum WindowRulesMessage {
     SetMatchTitle(u32, usize, Option<String>),        // (rule_id, match_index, value)
     SetMatchIsFloating(u32, usize, Option<bool>),     // (rule_id, match_index, value)
     SetMatchIsFocused(u32, usize, Option<bool>),      // (rule_id, match_index, value)
+    SetMatchIsActive(u32, usize, Option<bool>),       // (rule_id, match_index, value)
+    SetMatchIsActiveInColumn(u32, usize, Option<bool>), // (rule_id, match_index, value) v0.1.6+
+    SetMatchIsWindowCastTarget(u32, usize, Option<bool>), // (rule_id, match_index, value) v25.02+
+    SetMatchIsUrgent(u32, usize, Option<bool>),       // (rule_id, match_index, value) v25.05+
+    SetMatchAtStartup(u32, usize, Option<bool>),      // (rule_id, match_index, value) v0.1.6+
 
     // Opening behavior
     SetOpenBehavior(u32, crate::config::models::OpenBehavior),

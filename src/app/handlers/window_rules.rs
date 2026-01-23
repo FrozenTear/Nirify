@@ -132,6 +132,46 @@ impl super::super::App {
                 }
             }
 
+            M::SetMatchIsActive(id, match_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.rules.iter_mut().find(|r| r.id == id) {
+                    if let Some(m) = rule.matches.get_mut(match_idx) {
+                        m.is_active = value;
+                    }
+                }
+            }
+
+            M::SetMatchIsActiveInColumn(id, match_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.rules.iter_mut().find(|r| r.id == id) {
+                    if let Some(m) = rule.matches.get_mut(match_idx) {
+                        m.is_active_in_column = value;
+                    }
+                }
+            }
+
+            M::SetMatchIsWindowCastTarget(id, match_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.rules.iter_mut().find(|r| r.id == id) {
+                    if let Some(m) = rule.matches.get_mut(match_idx) {
+                        m.is_window_cast_target = value;
+                    }
+                }
+            }
+
+            M::SetMatchIsUrgent(id, match_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.rules.iter_mut().find(|r| r.id == id) {
+                    if let Some(m) = rule.matches.get_mut(match_idx) {
+                        m.is_urgent = value;
+                    }
+                }
+            }
+
+            M::SetMatchAtStartup(id, match_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.rules.iter_mut().find(|r| r.id == id) {
+                    if let Some(m) = rule.matches.get_mut(match_idx) {
+                        m.at_startup = value;
+                    }
+                }
+            }
+
             M::SetOpenBehavior(id, behavior) => {
                 if let Some(rule) = self.settings.window_rules.rules.iter_mut().find(|r| r.id == id) {
                     rule.open_behavior = behavior;

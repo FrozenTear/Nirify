@@ -356,6 +356,42 @@ fn rule_detail_view<'a>(
                                 rule_match.is_floating,
                                 move |value| Message::WindowRules(WindowRulesMessage::SetMatchIsFloating(id, match_idx, value)),
                             ),
+                            optional_bool_picker(
+                                "Is focused",
+                                "Match only when window has keyboard focus",
+                                rule_match.is_focused,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetMatchIsFocused(id, match_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "Is active",
+                                "Match window with active border/focus ring",
+                                rule_match.is_active,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetMatchIsActive(id, match_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "Is active in column",
+                                "Match last-focused window in its column (v0.1.6+)",
+                                rule_match.is_active_in_column,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetMatchIsActiveInColumn(id, match_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "Is window cast target",
+                                "Match window being screencast/recorded (v25.02+)",
+                                rule_match.is_window_cast_target,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetMatchIsWindowCastTarget(id, match_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "Is urgent",
+                                "Match window requesting attention (v25.05+)",
+                                rule_match.is_urgent,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetMatchIsUrgent(id, match_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "At startup only",
+                                "Match only during first 60 seconds after niri launch (v0.1.6+)",
+                                rule_match.at_startup,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetMatchAtStartup(id, match_idx, value)),
+                            ),
                         ]
                         .spacing(8)
                     )
