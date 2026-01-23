@@ -1,9 +1,28 @@
+# Rust build artifacts
 /target
-/ui-backup-fluent
 
-# Backup folders
-/backup-pre-refactor/
+# Claude Code local settings
+/.claude/
+
+# Documentation (WIP - remove from ignore when finalized)
+/docs/
+UI_UX_DESIGN_GUIDE.md
+
+# Coverage reports (cargo-llvm-cov)
+lcov.info
+coverage/
 
 # Review files (internal only)
 *review*.md
 *REVIEW*.md
+
+# Editor/IDE
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
