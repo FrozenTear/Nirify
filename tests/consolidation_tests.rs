@@ -3,8 +3,8 @@
 //! Tests the full flow from detecting consolidation opportunities
 //! to applying merges and verifying the results.
 
-use niri_settings::config::analyze_rules;
-use niri_settings::config::models::{
+use nirify::config::analyze_rules;
+use nirify::config::models::{
     LayerRule, LayerRuleMatch, Settings, WindowRule, WindowRuleMatch,
 };
 
@@ -189,7 +189,7 @@ fn test_ignores_multi_match_rules() {
 /// Apply window rule consolidation directly (mimics wizard.rs logic)
 fn apply_window_consolidation(
     settings: &mut Settings,
-    suggestion: &niri_settings::config::ConsolidationSuggestion,
+    suggestion: &nirify::config::ConsolidationSuggestion,
 ) {
     let first_id = suggestion.rule_ids.first().copied().unwrap();
 
@@ -217,7 +217,7 @@ fn apply_window_consolidation(
 /// Apply layer rule consolidation directly
 fn apply_layer_consolidation(
     settings: &mut Settings,
-    suggestion: &niri_settings::config::ConsolidationSuggestion,
+    suggestion: &nirify::config::ConsolidationSuggestion,
 ) {
     let first_id = suggestion.rule_ids.first().copied().unwrap();
 

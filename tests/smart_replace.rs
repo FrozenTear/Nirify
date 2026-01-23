@@ -5,7 +5,7 @@
 
 mod common;
 
-use niri_settings::config::smart_replace_config;
+use nirify::config::smart_replace_config;
 use std::fs;
 use tempfile::tempdir;
 

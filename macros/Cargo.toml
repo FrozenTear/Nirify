@@ -1,8 +1,8 @@
 [package]
-name = "niri-settings-macros"
+name = "nirify-macros"
 version = "0.1.0"
 edition = "2021"
-description = "Procedural macros for niri-settings"
+description = "Procedural macros for nirify"
 
 [lib]
 proc-macro = true

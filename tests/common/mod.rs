@@ -6,7 +6,7 @@
 // so tests that don't use these helpers emit dead_code warnings.
 #![allow(dead_code)]
 
-use niri_settings::config::ConfigPaths;
+use nirify::config::ConfigPaths;
 use std::fs;
 use std::path::Path;
 

@@ -1,4 +1,4 @@
-use niri_settings_macros::SlintIndex;
+use nirify_macros::SlintIndex;
 
 /// Represents a color in RGBA format
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

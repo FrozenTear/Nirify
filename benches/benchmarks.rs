@@ -5,9 +5,9 @@
 //! Results are output to target/criterion/report/index.html
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use niri_settings::config::models::*;
-use niri_settings::config::storage::*;
-use niri_settings::config::{
+use nirify::config::models::*;
+use nirify::config::storage::*;
+use nirify::config::{
     load_settings, save_dirty, save_settings, DirtyTracker, Settings, SettingsCategory,
 };
 use std::collections::HashSet;
@@ -245,7 +245,7 @@ fn bench_settings_clone(c: &mut Criterion) {
 // ============================================================================
 
 fn bench_color_parsing(c: &mut Criterion) {
-    use niri_settings::types::Color;
+    use nirify::types::Color;
 
     let mut group = c.benchmark_group("color_parsing");
 
@@ -282,7 +282,7 @@ fn bench_color_parsing(c: &mut Criterion) {
 // HELPER FUNCTIONS
 // ============================================================================
 
-fn create_test_paths(base: &std::path::Path) -> niri_settings::config::ConfigPaths {
+fn create_test_paths(base: &std::path::Path) -> nirify::config::ConfigPaths {
     use std::fs;
 
     let managed_dir = base.to_path_buf();
@@ -292,7 +292,7 @@ fn create_test_paths(base: &std::path::Path) -> niri_settings::config::ConfigPat
     fs::create_dir_all(&input_dir).unwrap();
     fs::create_dir_all(&advanced_dir).unwrap();
 
-    niri_settings::config::ConfigPaths {
+    nirify::config::ConfigPaths {
         niri_config: base.join("config.kdl"),
         managed_dir: managed_dir.clone(),
         input_dir: input_dir.clone(),

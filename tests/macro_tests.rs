@@ -5,7 +5,7 @@
 
 mod common;
 
-use niri_settings::config::{DirtyTracker, Settings, SettingsCategory};
+use nirify::config::{DirtyTracker, Settings, SettingsCategory};
 use std::sync::Arc;
 
 /// Verify that all SettingsCategory variants have corresponding Settings fields

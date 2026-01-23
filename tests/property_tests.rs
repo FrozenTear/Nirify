@@ -6,14 +6,14 @@
 mod common;
 
 use common::create_test_paths;
-use niri_settings::config::models::{AppearanceSettings, BehaviorSettings, Settings};
-use niri_settings::config::storage::{
+use nirify::config::models::{AppearanceSettings, BehaviorSettings, Settings};
+use nirify::config::storage::{
     generate_appearance_kdl, generate_behavior_kdl, generate_cursor_kdl, generate_keyboard_kdl,
     generate_mouse_kdl,
 };
-use niri_settings::config::{load_settings, save_settings};
-use niri_settings::constants::*;
-use niri_settings::types::Color;
+use nirify::config::{load_settings, save_settings};
+use nirify::constants::*;
+use nirify::types::Color;
 use proptest::prelude::*;
 use tempfile::tempdir;
 
@@ -227,7 +227,7 @@ proptest! {
         repeat_delay in 100i32..2000,
         repeat_rate in 1i32..100,
     ) {
-        use niri_settings::config::models::KeyboardSettings;
+        use nirify::config::models::KeyboardSettings;
 
         let keyboard = KeyboardSettings {
             repeat_delay,
@@ -248,7 +248,7 @@ proptest! {
         scroll_factor in 0.1f64..10.0,
         natural_scroll in any::<bool>(),
     ) {
-        use niri_settings::config::models::MouseSettings;
+        use nirify::config::models::MouseSettings;
 
         let mouse = MouseSettings {
             accel_speed,
@@ -269,7 +269,7 @@ proptest! {
         size in 16i32..64,
         hide_when_typing in any::<bool>(),
     ) {
-        use niri_settings::config::models::CursorSettings;
+        use nirify::config::models::CursorSettings;
 
         let cursor = CursorSettings {
             size,
@@ -338,7 +338,7 @@ proptest! {
     /// XKB layout strings should be handled correctly
     #[test]
     fn xkb_layout_roundtrip(layout in "[a-z]{2,5}") {
-        use niri_settings::config::models::KeyboardSettings;
+        use nirify::config::models::KeyboardSettings;
 
         let keyboard = KeyboardSettings {
             xkb_layout: layout.clone(),
@@ -359,7 +359,7 @@ proptest! {
     /// Cursor theme names should be handled correctly
     #[test]
     fn cursor_theme_roundtrip(theme in "[A-Za-z][A-Za-z0-9_-]{0,30}") {
-        use niri_settings::config::models::CursorSettings;
+        use nirify::config::models::CursorSettings;
 
         let cursor = CursorSettings {
             theme: theme.clone(),

@@ -8,7 +8,7 @@
 mod common;
 
 use common::create_test_paths;
-use niri_settings::config::{
+use nirify::config::{
     check_config_health, load_settings, save_settings, ConfigFileStatus, Settings,
 };
 use std::fs;
@@ -231,7 +231,7 @@ fn test_atomic_write_leaves_no_temp_files() {
     // Perform multiple writes
     for i in 0..10 {
         let content = format!("// Write number {}\nlayout {{ gaps {} }}", i, i);
-        niri_settings::config::storage::atomic_write(&file, &content).unwrap();
+        nirify::config::storage::atomic_write(&file, &content).unwrap();
     }
 
     // Count files in directory
@@ -264,7 +264,7 @@ fn test_atomic_write_concurrent_safety() {
             thread::spawn(move || {
                 for j in 0..10 {
                     let content = format!("// Thread {} write {}\nlayout {{ gaps {} }}", i, j, i);
-                    niri_settings::config::storage::atomic_write(&file, &content).unwrap();
+                    nirify::config::storage::atomic_write(&file, &content).unwrap();
                     thread::yield_now();
                 }
             })
@@ -387,7 +387,7 @@ layout {
     // Should load and clamp to valid ranges
     let loaded = load_settings(&paths);
 
-    use niri_settings::constants::*;
+    use nirify::constants::*;
     // Note: inner=-999 is read (backwards compat), then clamped to min
     assert_eq!(loaded.appearance.gaps, GAP_SIZE_MIN);
     assert_eq!(loaded.appearance.focus_ring_width, FOCUS_RING_WIDTH_MAX);

@@ -10,7 +10,7 @@
 mod common;
 
 use common::create_test_paths;
-use niri_settings::config::{
+use nirify::config::{
     check_config_health, load_settings, repair_corrupted_configs, save_settings, ConfigFileStatus,
     Settings,
 };
@@ -185,7 +185,7 @@ layout {
 
 #[test]
 fn test_window_rules_lifecycle() {
-    use niri_settings::config::models::{OpenBehavior, WindowRule, WindowRuleMatch};
+    use nirify::config::models::{OpenBehavior, WindowRule, WindowRuleMatch};
 
     let dir = tempdir().unwrap();
     let paths = create_test_paths(dir.path());
@@ -223,8 +223,8 @@ fn test_window_rules_lifecycle() {
 
 #[test]
 fn test_output_settings_lifecycle() {
-    use niri_settings::config::models::OutputConfig;
-    use niri_settings::types::{Transform, VrrMode};
+    use nirify::config::models::OutputConfig;
+    use nirify::types::{Transform, VrrMode};
 
     let dir = tempdir().unwrap();
     let paths = create_test_paths(dir.path());

@@ -8,7 +8,7 @@
 mod common;
 
 use common::create_test_paths;
-use niri_settings::config::{
+use nirify::config::{
     load_settings, save_dirty, save_settings, DirtyTracker, Settings, SettingsCategory,
 };
 use std::collections::HashSet;

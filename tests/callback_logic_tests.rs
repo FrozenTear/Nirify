@@ -11,10 +11,10 @@
 mod common;
 
 use common::create_test_paths;
-use niri_settings::config::{
+use nirify::config::{
     load_settings, save_dirty, save_settings, DirtyTracker, Settings, SettingsCategory,
 };
-use niri_settings::constants::*;
+use nirify::constants::*;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tempfile::tempdir;

@@ -1,6 +1,6 @@
 //! Animation settings and types
 
-use niri_settings_macros::SlintIndex;
+use nirify_macros::SlintIndex;
 
 use crate::constants::{
     DAMPING_RATIO_DEFAULT, EASING_DURATION_DEFAULT, EPSILON_DEFAULT, STIFFNESS_DEFAULT,

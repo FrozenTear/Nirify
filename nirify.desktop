@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Nirify
+GenericName=Settings manager for niri
+Comment=Graphical configuration tool for the niri Wayland compositor
+Exec=nirify
+Type=Application
+Categories=Settings;DesktopSettings;
+Keywords=niri;wayland;compositor;settings;config;tweaks;
+Icon=nirify
+Terminal=false

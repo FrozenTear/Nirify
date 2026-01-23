@@ -2,7 +2,7 @@
 //!
 //! Tests for importing settings from user's existing niri config.kdl
 
-use niri_settings::config::{import_from_niri_config, import_from_niri_config_with_result};
+use nirify::config::{import_from_niri_config, import_from_niri_config_with_result};
 use std::fs;
 use tempfile::tempdir;
 

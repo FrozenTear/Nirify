@@ -2,7 +2,7 @@
 
 use crate::constants::{DEFAULT_COLUMN_FIXED, DEFAULT_COLUMN_PROPORTION, STRUT_SIZE_MIN};
 use crate::types::{CenterFocusedColumn, ModKey, WarpMouseMode};
-use niri_settings_macros::SlintIndex;
+use nirify_macros::SlintIndex;
 
 /// Behavior settings (focus, workspace layout, struts)
 #[derive(Debug, Clone, PartialEq)]

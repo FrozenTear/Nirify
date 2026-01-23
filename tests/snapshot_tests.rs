@@ -8,9 +8,9 @@
 //! Accept changes with: cargo insta accept
 
 use insta::assert_snapshot;
-use niri_settings::config::models::*;
-use niri_settings::config::storage::*;
-use niri_settings::types::*;
+use nirify::config::models::*;
+use nirify::config::storage::*;
+use nirify::types::*;
 
 // ============================================================================
 // APPEARANCE SNAPSHOTS

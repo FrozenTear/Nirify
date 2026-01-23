@@ -1,4 +1,4 @@
-//! Procedural macros for niri-settings
+//! Procedural macros for nirify
 //!
 //! This crate provides derive macros to reduce boilerplate code.
 

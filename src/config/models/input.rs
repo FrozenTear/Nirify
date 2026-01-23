@@ -2,7 +2,7 @@
 
 use crate::constants::{DEFAULT_REPEAT_DELAY, DEFAULT_REPEAT_RATE};
 use crate::types::{AccelProfile, ClickMethod, PointerDeviceSettings, ScrollMethod, TapButtonMap};
-use niri_settings_macros::SlintIndex;
+use nirify_macros::SlintIndex;
 
 /// Keyboard settings
 #[derive(Debug, Clone, PartialEq)]

@@ -2,5 +2,5 @@
 
 fn main() -> iced::Result {
     env_logger::init();
-    niri_settings::app::run()
+    nirify::app::run()
 }

@@ -1,19 +1,19 @@
 [package]
-name = "niri-settings"
+name = "nirify"
 version = "0.2.0"
 edition = "2021"
 rust-version = "1.82"
 description = "A native settings application for the niri Wayland compositor"
 license = "GPL-3.0"
-authors = ["niri-settings contributors"]
-keywords = ["wayland", "niri", "settings", "gui"]
+authors = ["nirify contributors"]
+keywords = ["wayland", "niri", "settings", "gui", "nirify"]
 categories = ["gui", "config"]
 
 [workspace]
 members = ["macros"]
 
 [dependencies]
-niri-settings-macros = { path = "macros" }
+nirify-macros = { path = "macros" }
 # Iced UI framework
 iced = { version = "0.14", features = ["tokio", "debug"] }
 tokio = { version = "1.0", features = ["rt-multi-thread"] }

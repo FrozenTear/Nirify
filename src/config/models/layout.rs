@@ -2,7 +2,7 @@
 
 use crate::constants::DEFAULT_OVERVIEW_ZOOM;
 use crate::types::{CenterFocusedColumn, Color, ColorOrGradient};
-use niri_settings_macros::SlintIndex;
+use nirify_macros::SlintIndex;
 
 /// Workspace shadow settings for overview (v25.05+)
 #[derive(Debug, Clone, PartialEq)]

@@ -1,7 +1,7 @@
 //! Window rules and layer rules
 
 use crate::types::ColorOrGradient;
-use niri_settings_macros::SlintIndex;
+use nirify_macros::SlintIndex;
 
 use super::layout::{DefaultColumnDisplay, ShadowSettings, TabIndicatorSettings};
 
