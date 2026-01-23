@@ -7,6 +7,9 @@
 # Documentation (WIP - remove from ignore when finalized)
 /docs/
 UI_UX_DESIGN_GUIDE.md
+COMPILE_OPTIMIZATION.md
+PROGRESS.md
+PROGRESS_NOTES.md
 
 # Coverage reports (cargo-llvm-cov)
 lcov.info
