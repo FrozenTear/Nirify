@@ -8,6 +8,8 @@
 
 use std::collections::HashMap;
 
+use iced::widget::text_editor;
+
 use crate::messages::{DialogState, Page};
 use crate::views;
 
@@ -79,6 +81,8 @@ pub struct UiState {
     pub tools_state: views::tools::ToolsState,
     /// State for the Config Editor page
     pub config_editor_state: views::config_editor::ConfigEditorState,
+    /// Text editor content for Config Editor (stored here because Content isn't Clone)
+    pub config_editor_content: text_editor::Content,
     /// State for the Backups page
     pub backups_state: views::backups::BackupsState,
     /// Pending restore index (for confirmation dialog)

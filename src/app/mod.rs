@@ -774,7 +774,7 @@ impl App {
                 return views::preferences::view(self.settings.preferences.float_settings_app);
             }
             Page::ConfigEditor => {
-                return views::config_editor::view(&self.ui.config_editor_state);
+                return views::config_editor::view(&self.ui.config_editor_state, &self.ui.config_editor_content);
             }
             Page::Backups => {
                 return views::backups::view(&self.ui.backups_state);

@@ -32,6 +32,8 @@
 //! - **IDE Navigation**: Easy to find all messages for a specific feature
 //! - **Testing**: Categories can be unit tested independently
 
+use iced::widget::text_editor;
+
 use crate::types::{AccelProfile, CenterFocusedColumn, ClickMethod, ModKey, ScrollMethod, TapButtonMap, WarpMouseMode};
 use crate::config::ColumnWidthType;
 use crate::views::widgets::GradientPickerMessage;
@@ -897,6 +899,16 @@ pub enum ConfigEditorMessage {
     Refresh,
     /// File content loaded
     FileLoaded(Result<String, String>),
+    /// Toggle edit mode on/off
+    ToggleEditMode(bool),
+    /// Editor action (edit, cursor movement, etc.)
+    EditorAction(text_editor::Action),
+    /// Save edited content to file
+    SaveEdits,
+    /// Discard changes and exit edit mode
+    DiscardEdits,
+    /// Save completed
+    SaveCompleted(Result<(), String>),
 }
 
 /// Backups management messages
