@@ -1,4 +1,4 @@
-# Makefile for niri-settings
+# Makefile for nirify
 # A native settings application for the niri Wayland compositor
 
 PREFIX ?= /usr/local
@@ -14,14 +14,14 @@ build:
 	cargo build --release
 
 install:
-	install -Dm755 target/release/niri-settings $(BINDIR)/niri-settings
-	install -Dm644 resources/niri-settings.desktop $(DATADIR)/applications/niri-settings.desktop
-	install -Dm644 resources/icons/niri-settings.svg $(DATADIR)/icons/hicolor/scalable/apps/niri-settings.svg
+	install -Dm755 target/release/nirify $(BINDIR)/nirify
+	install -Dm644 nirify.desktop $(DATADIR)/applications/nirify.desktop
+	install -Dm644 resources/icons/nirify.svg $(DATADIR)/icons/hicolor/scalable/apps/nirify.svg
 
 uninstall:
-	rm -f $(BINDIR)/niri-settings
-	rm -f $(DATADIR)/applications/niri-settings.desktop
-	rm -f $(DATADIR)/icons/hicolor/scalable/apps/niri-settings.svg
+	rm -f $(BINDIR)/nirify
+	rm -f $(DATADIR)/applications/nirify.desktop
+	rm -f $(DATADIR)/icons/hicolor/scalable/apps/nirify.svg
 
 clean:
 	cargo clean
