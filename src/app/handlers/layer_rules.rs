@@ -7,11 +7,8 @@ use iced::Task;
 impl super::super::App {
     /// Updates layer rules settings
     pub(in crate::app) fn update_layer_rules(&mut self, msg: M) -> Task<Message> {
-        
-
         match msg {
             M::AddRule => {
-                // Create a new rule with default values
                 let new_rule = crate::config::models::LayerRule {
                     id: self.settings.layer_rules.next_id,
                     ..Default::default()
@@ -23,7 +20,7 @@ impl super::super::App {
             }
 
             M::DeleteRule(rule_id) => {
-                self.settings.layer_rules.rules.retain(|r| r.id != rule_id);
+                self.settings.layer_rules.remove(rule_id);
                 if self.selected_layer_rule_id == Some(rule_id) {
                     self.selected_layer_rule_id = self.settings.layer_rules.rules.first().map(|r| r.id);
                 }
@@ -35,7 +32,7 @@ impl super::super::App {
             }
 
             M::DuplicateRule(rule_id) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter().find(|r| r.id == rule_id).cloned() {
+                if let Some(rule) = self.settings.layer_rules.find(rule_id).cloned() {
                     let mut new_rule = rule;
                     new_rule.id = self.settings.layer_rules.next_id;
                     self.settings.layer_rules.next_id += 1;
@@ -64,19 +61,19 @@ impl super::super::App {
             }
 
             M::SetRuleName(rule_id, name) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     rule.name = name;
                 }
             }
 
             M::AddMatch(rule_id) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     rule.matches.push(crate::config::models::LayerRuleMatch::default());
                 }
             }
 
             M::RemoveMatch(rule_id, match_idx) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     if match_idx < rule.matches.len() {
                         rule.matches.remove(match_idx);
                     }
@@ -84,7 +81,7 @@ impl super::super::App {
             }
 
             M::SetMatchNamespace(rule_id, match_idx, namespace) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     if let Some(match_data) = rule.matches.get_mut(match_idx) {
                         match_data.namespace = if namespace.is_empty() { None } else { Some(namespace) };
                     }
@@ -92,7 +89,7 @@ impl super::super::App {
             }
 
             M::SetMatchAtStartup(rule_id, match_idx, value) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     if let Some(match_data) = rule.matches.get_mut(match_idx) {
                         match_data.at_startup = value;
                     }
@@ -100,37 +97,37 @@ impl super::super::App {
             }
 
             M::SetBlockOutFrom(rule_id, value) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     rule.block_out_from = value;
                 }
             }
 
             M::SetOpacity(rule_id, value) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     rule.opacity = value;
                 }
             }
 
             M::SetCornerRadius(rule_id, value) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     rule.geometry_corner_radius = value;
                 }
             }
 
             M::SetPlaceWithinBackdrop(rule_id, value) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     rule.place_within_backdrop = value;
                 }
             }
 
             M::SetBabaIsFloat(rule_id, value) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     rule.baba_is_float = value;
                 }
             }
 
             M::SetShadow(rule_id, value) => {
-                if let Some(rule) = self.settings.layer_rules.rules.iter_mut().find(|r| r.id == rule_id) {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     rule.shadow = value;
                 }
             }
