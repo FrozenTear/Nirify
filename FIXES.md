@@ -134,9 +134,9 @@
 
 | # | Task | Status | Commit |
 |---|------|--------|--------|
-| 1 | Remove view clones | [ ] | |
-| 2 | Layer rules view | [ ] | |
-| 3 | Window rule match types | [ ] | |
+| 1 | Remove view clones | [x] | 9743f6c |
+| 2 | Layer rules view | [x] | ab464c4 |
+| 3 | Window rule match types | [x] | 656eac2 |
 | 4 | Rule finder helpers | [ ] | |
 | 5 | Split UI state | [ ] | |
 | 6 | Error handling | [ ] | |
