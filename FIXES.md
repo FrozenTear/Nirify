@@ -137,8 +137,8 @@
 | 1 | Remove view clones | [x] | 9743f6c |
 | 2 | Layer rules view | [x] | ab464c4 |
 | 3 | Window rule match types | [x] | 656eac2 |
-| 4 | Rule finder helpers | [ ] | |
-| 5 | Split UI state | [ ] | |
+| 4 | Rule finder helpers | [x] | 5daf8ba |
+| 5 | Split UI state | [ ] | (deferred - 178 changes) |
 | 6 | Error handling | [ ] | |
 | 7 | Stubbed handlers | [ ] | |
 | 8 | Pre-save validation | [ ] | |
