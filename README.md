@@ -35,8 +35,8 @@ A native settings application for the [niri](https://github.com/YaLTeR/niri) Way
 
 ```bash
 # Clone the repository
-git clone https://github.com/FrozenTear/niri-tweaks
-cd niri-tweaks
+git clone https://github.com/FrozenTear/nirify
+cd nirify
 
 # Build in release mode
 cargo build --release

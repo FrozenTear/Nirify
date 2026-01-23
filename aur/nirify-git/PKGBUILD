@@ -1,0 +1,41 @@
+# Maintainer: Your Name <your.email@example.com>
+pkgname=nirify-git
+pkgver=0.2.0.r0.g0000000
+pkgrel=1
+pkgdesc="A native settings application for the niri Wayland compositor"
+arch=('x86_64' 'aarch64')
+url="https://github.com/FrozenTear/nirify"
+license=('GPL-3.0-only')
+depends=('gcc-libs' 'glibc')
+makedepends=('git' 'cargo')
+provides=('nirify')
+conflicts=('nirify' 'nirify-bin')
+source=("git+${url}.git")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd nirify
+    git describe --long --tags --abbrev=7 2>/dev/null | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' ||
+    printf "0.2.0.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+prepare() {
+    cd nirify
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd nirify
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo build --frozen --release
+}
+
+package() {
+    cd nirify
+    install -Dm755 "target/release/nirify" "$pkgdir/usr/bin/nirify"
+    install -Dm644 "nirify.desktop" "$pkgdir/usr/share/applications/nirify.desktop"
+    install -Dm644 "resources/icons/nirify.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/nirify.svg"
+    install -Dm644 "LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
