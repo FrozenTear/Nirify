@@ -8,8 +8,6 @@ Native Rust settings application for the [niri](https://github.com/YaLTeR/niri) 
 
 **Target users**: Non-technical users who don't want to edit KDL config files manually.
 
-**Important**: This project is currently in migration from Slint to iced. The old Slint code structure is documented below but is being replaced with iced's Elm Architecture pattern.
-
 ## Iced UI Framework
 
 This project uses **iced 0.14**, a cross-platform GUI library for Rust inspired by Elm.
@@ -89,90 +87,72 @@ The app doesn't edit `config.kdl` directly. Instead:
 
 ```
 src/
-├── main.rs                    # App initialization, wizard, close handling
-├── lib.rs                     # Library exports (re-exports MainWindow from Slint)
-├── constants.rs               # Value bounds (MIN/MAX), defaults
-├── types.rs                   # Shared enums (AccelProfile, ModKey, Color, etc.)
+├── main.rs                    # App entry point
+├── lib.rs                     # Library exports
+├── app/
+│   ├── mod.rs                 # App struct, update(), view()
+│   ├── ui_state.rs            # UI-only state (selections, dialogs, etc.)
+│   └── handlers/              # Message handlers (one file per settings category)
+├── views/                     # View functions (pure UI construction)
+│   ├── mod.rs                 # View exports
+│   ├── widgets/               # Reusable widget components
+│   └── <category>.rs          # One file per settings page
+├── messages.rs                # All Message enums
 ├── config/
-│   ├── models.rs              # Settings struct hierarchy (Settings -> AppearanceSettings, etc.)
-│   ├── paths.rs               # XDG path resolution, include line detection
-│   ├── parser.rs              # KDL parsing utilities
-│   ├── loader/                # Load settings from KDL files (one file per category)
-│   └── storage/               # Save settings to KDL files (one file per category)
-├── ui/
-│   ├── window.rs              # Window state management
-│   ├── search.rs              # Search keyword -> category mapping
-│   └── bridge/
-│       ├── mod.rs             # setup_callbacks() entry point
-│       ├── callbacks/         # UI event handlers (one file per settings page)
-│       ├── sync.rs            # sync_ui_from_settings() - populate UI from Settings
-│       ├── converters.rs      # Slint <-> Rust type conversions
-│       ├── indices.rs         # Enum <-> combobox index mappings
-│       ├── macros.rs          # Callback registration helpers
-│       └── save_manager.rs    # 300ms debounced auto-save
-└── ipc/
-    └── mod.rs                 # Niri socket communication (reload_config)
-
-ui/                            # Slint UI files
-├── main.slint                 # Main window, sidebar navigation
-├── styles.slint               # Theme colors (Catppuccin Mocha)
-├── pages/                     # One .slint file per settings page
-├── widgets/                   # Reusable components (ToggleRow, SliderRow, etc.)
-└── dialogs/                   # First-run wizard, error dialog
+│   ├── models/                # Settings struct hierarchy
+│   ├── loader/                # Load settings from KDL files
+│   ├── storage/               # Save settings to KDL files
+│   ├── paths.rs               # XDG path resolution
+│   └── validation.rs          # Pre-save validation
+├── ipc/
+│   ├── mod.rs                 # Niri socket communication (sync)
+│   └── tasks.rs               # Async IPC helpers returning iced::Task
+├── save_manager.rs            # Debounced auto-save
+├── search.rs                  # Search indexing
+├── theme.rs                   # Theme definitions
+├── types.rs                   # Shared enums (AccelProfile, ModKey, Color, etc.)
+└── constants.rs               # Value bounds (MIN/MAX), defaults
 ```
 
 ### Key Patterns
 
-**Settings flow**: `config/loader/` reads KDL → `Settings` struct → `bridge/sync.rs` populates UI → user changes trigger callbacks → `bridge/callbacks/` updates Settings → `SaveManager` debounces → `config/storage/` writes KDL
-
-**Callback macros** (in `bridge/macros.rs`): Use these to reduce boilerplate:
-- `register_bool_callback!` - Toggle switches
-- `register_clamped_callback!` - Sliders with min/max
-- `register_string_callback!` - Text inputs
-- `register_color_callback!` - Color pickers
+**Settings flow**: User interaction → Message → `update()` handler → modify `Settings` → mark dirty → `SaveManager` debounces → `config/storage/` writes KDL
 
 **Adding a new setting**:
-1. Add field to appropriate struct in `config/models.rs`
+1. Add field to appropriate struct in `config/models/<category>.rs`
 2. Add loader in `config/loader/<category>.rs`
 3. Add storage in `config/storage/<category>.rs`
-4. Add UI in `ui/pages/<category>.slint`
-5. Add callback in `ui/bridge/callbacks/<category>.rs`
-6. Add sync in `ui/bridge/sync.rs`
+4. Add message variant in `messages.rs`
+5. Add handler in `app/handlers/<category>.rs`
+6. Add UI in `views/<category>.rs`
+
+**Async IPC**: Use helpers from `ipc::tasks` module:
+```rust
+Message::CheckNiri => crate::ipc::tasks::check_niri_running(Message::NiriStatusChecked)
+```
 
 ## Conventions
-
-### iced (New Architecture)
-
-- **The Elm Architecture**: State, Messages, Update, View
-- **Pure functions**: Update logic separated from UI
-- **Immutable patterns**: State changes only in `update()` method
-- **Type-safe messages**: Enums with `#[derive(Debug, Clone)]`
-- **Widgets are values**: Created in `view()`, produce messages via callbacks
-- **Reactive rendering**: UI only redraws when state changes
 
 ### iced Code Style
 
 ```rust
 // State: All application data
-#[derive(Default)]
-struct App { /* fields */ }
+struct App {
+    settings: Settings,
+    ui: UiState,
+    // ...
+}
 
 // Messages: All possible events
 #[derive(Debug, Clone)]
 enum Message { /* variants */ }
 
-// Update: Handle state changes
-fn update(&mut self, message: Message) { /* logic */ }
+// Update: Handle state changes, return Task for async work
+fn update(&mut self, message: Message) -> Task<Message> { /* logic */ }
 
-// View: Construct UI from state
+// View: Construct UI from state (pure function)
 fn view(&self) -> Element<Message> { /* widgets */ }
 ```
-
-### Old Slint Architecture (Being Replaced)
-
-- Settings stored in `Arc<Mutex<Settings>>`
-- Callbacks clone Arc and lock when needed
-- Use `Rc<SaveManager>` for debounced saves
 
 ### KDL
 
@@ -204,6 +184,7 @@ fn view(&self) -> Element<Message> { /* widgets */ }
 | thiserror | Custom error types |
 | log/env_logger | Logging |
 | chrono | Timestamps for backups |
+| tokio | Async runtime for iced Tasks |
 
 ## Links
 
