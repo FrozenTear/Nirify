@@ -9,9 +9,9 @@ impl super::super::App {
     pub(in crate::app) fn update_config_editor(&mut self, msg: ConfigEditorMessage) -> Task<Message> {
         match msg {
             ConfigEditorMessage::SelectFile(idx) => {
-                self.config_editor_state.selected_file = Some(idx);
-                self.config_editor_state.loading = true;
-                self.config_editor_state.file_content = None;
+                self.ui.config_editor_state.selected_file = Some(idx);
+                self.ui.config_editor_state.loading = true;
+                self.ui.config_editor_state.file_content = None;
 
                 // Load the file asynchronously
                 let paths = self.paths.clone();
@@ -26,8 +26,8 @@ impl super::super::App {
             }
 
             ConfigEditorMessage::Refresh => {
-                if let Some(idx) = self.config_editor_state.selected_file {
-                    self.config_editor_state.loading = true;
+                if let Some(idx) = self.ui.config_editor_state.selected_file {
+                    self.ui.config_editor_state.loading = true;
 
                     let paths = self.paths.clone();
                     let filename = CONFIG_FILES[idx].to_string();
@@ -44,8 +44,8 @@ impl super::super::App {
             }
 
             ConfigEditorMessage::FileLoaded(result) => {
-                self.config_editor_state.loading = false;
-                self.config_editor_state.file_content = Some(result);
+                self.ui.config_editor_state.loading = false;
+                self.ui.config_editor_state.file_content = Some(result);
                 Task::none()
             }
         }

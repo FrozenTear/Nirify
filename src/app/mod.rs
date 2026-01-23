@@ -7,6 +7,9 @@
 
 mod handlers;
 mod helpers;
+mod ui_state;
+
+pub use ui_state::UiState;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,26 +35,8 @@ pub struct App {
     /// Tracks which settings categories have unsaved changes
     dirty_tracker: DirtyTracker,
 
-    /// Current active page
-    current_page: Page,
-
-    /// Search query (for Phase 9)
-    search_query: String,
-
-    /// Search results
-    search_results: Vec<crate::search::SearchResult>,
-
-    /// Search index
+    /// Search index (domain data, not UI state)
     search_index: crate::search::SearchIndex,
-
-    /// Last search timestamp for debouncing
-    last_search_time: Option<std::time::Instant>,
-
-    /// Whether sidebar is expanded (for responsive design)
-    sidebar_expanded: bool,
-
-    /// Widget demo state for Phase 2 testing
-    widget_demo_state: views::widget_demo::DemoState,
 
     /// Last time a change was made (for debounced save)
     last_change_time: Option<std::time::Instant>,
@@ -59,71 +44,8 @@ pub struct App {
     /// Whether a save is currently in progress
     save_in_progress: bool,
 
-    /// Toast notification message
-    toast: Option<String>,
-
-    /// When the toast was shown (for auto-clear)
-    toast_shown_at: Option<std::time::Instant>,
-
-    /// Active modal dialog (if any)
-    dialog_state: DialogState,
-
-    /// Current theme
-    current_theme: crate::theme::AppTheme,
-
-    /// Niri compositor connection status
-    niri_status: crate::views::status_bar::NiriStatus,
-
-    // Outputs state
-    /// Selected output index for list-detail view
-    selected_output_index: Option<usize>,
-    /// Expanded sections in outputs view (section_name -> is_expanded)
-    output_sections_expanded: std::collections::HashMap<String, bool>,
-
-    // Layer Rules state
-    /// Selected layer rule ID for list-detail view
-    selected_layer_rule_id: Option<u32>,
-    /// Expanded sections in layer rules view ((rule_id, section_name) -> is_expanded)
-    layer_rule_sections_expanded: std::collections::HashMap<(u32, String), bool>,
-    /// Regex validation errors ((rule_id, field_name) -> error_message)
-    layer_rule_regex_errors: std::collections::HashMap<(u32, String), String>,
-
-    // Window Rules state
-    /// Selected window rule ID for list-detail view
-    selected_window_rule_id: Option<u32>,
-    /// Expanded sections in window rules view ((rule_id, section_name) -> is_expanded)
-    window_rule_sections_expanded: std::collections::HashMap<(u32, String), bool>,
-    /// Regex validation errors ((rule_id, field_name) -> error_message)
-    window_rule_regex_errors: std::collections::HashMap<(u32, String), String>,
-
-    // Keybindings state
-    /// Selected keybinding index for list-detail view
-    selected_keybinding_index: Option<usize>,
-    /// Expanded sections in keybindings view
-    keybinding_sections_expanded: std::collections::HashMap<String, bool>,
-    /// Which keybinding is currently capturing key input (if any)
-    key_capture_active: Option<usize>,
-
-    // Calibration matrix state
-    /// Cached formatted values for tablet calibration matrix (avoids memory leak in view)
-    tablet_calibration_cache: [String; 6],
-    /// Cached formatted values for touch calibration matrix (avoids memory leak in view)
-    touch_calibration_cache: [String; 6],
-
-    // Tools page state
-    /// State for the Tools page (IPC data and loading states)
-    tools_state: views::tools::ToolsState,
-
-    // Config editor state
-    /// State for the Config Editor page
-    config_editor_state: views::config_editor::ConfigEditorState,
-
-    // Backups state
-    /// State for the Backups page
-    backups_state: views::backups::BackupsState,
-
-    /// Pending restore index (for confirmation dialog)
-    pending_restore_idx: Option<usize>,
+    /// UI-only state (selections, expansions, dialogs, etc.)
+    ui: UiState,
 }
 
 impl App {
@@ -161,41 +83,18 @@ impl App {
             crate::views::status_bar::NiriStatus::Disconnected
         };
 
+        // Create UI state
+        let mut ui = UiState::new(current_theme, tablet_calibration_cache, touch_calibration_cache);
+        ui.niri_status = niri_status;
+
         let app = Self {
             settings,
             paths,
             dirty_tracker: DirtyTracker::new(),
-            current_page: Page::Overview,
-            search_query: String::new(),
-            search_results: Vec::new(),
             search_index: crate::search::SearchIndex::new(),
-            last_search_time: None,
-            sidebar_expanded: true,
-            widget_demo_state: views::widget_demo::DemoState::default(),
             last_change_time: None,
             save_in_progress: false,
-            toast: None,
-            toast_shown_at: None,
-            dialog_state: DialogState::default(),
-            current_theme,
-            niri_status,
-            selected_output_index: None,
-            output_sections_expanded: std::collections::HashMap::new(),
-            selected_layer_rule_id: None,
-            layer_rule_sections_expanded: std::collections::HashMap::new(),
-            layer_rule_regex_errors: std::collections::HashMap::new(),
-            selected_window_rule_id: None,
-            window_rule_sections_expanded: std::collections::HashMap::new(),
-            window_rule_regex_errors: std::collections::HashMap::new(),
-            selected_keybinding_index: None,
-            keybinding_sections_expanded: std::collections::HashMap::new(),
-            key_capture_active: None,
-            tablet_calibration_cache,
-            touch_calibration_cache,
-            tools_state: views::tools::ToolsState::default(),
-            config_editor_state: views::config_editor::ConfigEditorState::default(),
-            backups_state: views::backups::BackupsState::default(),
-            pending_restore_idx: None,
+            ui,
         };
 
         (app, Task::none())
@@ -206,11 +105,11 @@ impl App {
         match message {
             // Navigation
             Message::NavigateToPage(page) => {
-                self.current_page = page;
+                self.ui.current_page = page;
                 // Auto-refresh IPC outputs when navigating to Outputs page
                 if page == Page::Outputs {
                     let is_connected = matches!(
-                        self.niri_status,
+                        self.ui.niri_status,
                         crate::views::status_bar::NiriStatus::Connected
                     );
                     if is_connected {
@@ -224,42 +123,42 @@ impl App {
             }
 
             Message::ToggleSidebar => {
-                self.sidebar_expanded = !self.sidebar_expanded;
+                self.ui.sidebar_expanded = !self.ui.sidebar_expanded;
                 Task::none()
             }
 
             // Search (Phase 9)
             Message::SearchQueryChanged(query) => {
-                self.search_query = query;
-                self.last_search_time = Some(std::time::Instant::now());
+                self.ui.search_query = query;
+                self.ui.last_search_time = Some(std::time::Instant::now());
 
                 // Perform search immediately
-                self.search_results = self.search_index.search(&self.search_query);
+                self.ui.search_results = self.search_index.search(&self.ui.search_query);
 
                 Task::none()
             }
 
             Message::SearchResultSelected(index) => {
                 // Navigate to the selected page
-                if let Some(result) = self.search_results.get(index) {
-                    self.current_page = result.page;
+                if let Some(result) = self.ui.search_results.get(index) {
+                    self.ui.current_page = result.page;
                     // Clear search after navigation
-                    self.search_query.clear();
-                    self.search_results.clear();
+                    self.ui.search_query.clear();
+                    self.ui.search_results.clear();
                 }
                 Task::none()
             }
 
             Message::ClearSearch => {
-                self.search_query.clear();
-                self.search_results.clear();
-                self.last_search_time = None;
+                self.ui.search_query.clear();
+                self.ui.search_results.clear();
+                self.ui.last_search_time = None;
                 Task::none()
             }
 
             // Theme
             Message::ChangeTheme(theme) => {
-                self.current_theme = theme;
+                self.ui.current_theme = theme;
 
                 // Save theme to settings (direct access, no mutex needed)
                 self.settings.preferences.theme = theme.to_str().to_string();
@@ -310,14 +209,14 @@ impl App {
                 self.save_in_progress = false;
                 match result {
                     SaveResult::Success { files_written, .. } => {
-                        self.toast = Some(format!("Saved {} file(s)", files_written));
-                        self.toast_shown_at = Some(std::time::Instant::now());
+                        self.ui.toast = Some(format!("Saved {} file(s)", files_written));
+                        self.ui.toast_shown_at = Some(std::time::Instant::now());
                         // Trigger niri config reload
                         self.reload_niri_config_task()
                     }
                     SaveResult::Error { message } => {
-                        self.toast = Some(format!("Save failed: {}", message));
-                        self.toast_shown_at = Some(std::time::Instant::now());
+                        self.ui.toast = Some(format!("Save failed: {}", message));
+                        self.ui.toast_shown_at = Some(std::time::Instant::now());
                         Task::none()
                     }
                     SaveResult::NothingToSave => Task::none(),
@@ -326,10 +225,10 @@ impl App {
 
             Message::ClearToast => {
                 // Only clear if toast has been shown for at least 3 seconds
-                if let Some(shown_at) = self.toast_shown_at {
+                if let Some(shown_at) = self.ui.toast_shown_at {
                     if shown_at.elapsed() >= std::time::Duration::from_secs(3) {
-                        self.toast = None;
-                        self.toast_shown_at = None;
+                        self.ui.toast = None;
+                        self.ui.toast_shown_at = None;
                     }
                 }
                 Task::none()
@@ -350,18 +249,18 @@ impl App {
 
             // Dialogs (Phase 8)
             Message::ShowDialog(dialog_state) => {
-                self.dialog_state = dialog_state;
+                self.ui.dialog_state = dialog_state;
                 Task::none()
             }
 
             Message::CloseDialog => {
-                self.dialog_state = DialogState::None;
+                self.ui.dialog_state = DialogState::None;
                 Task::none()
             }
 
             Message::DialogConfirm => {
                 // Handle confirmation based on current dialog type
-                match &self.dialog_state {
+                match &self.ui.dialog_state {
                     DialogState::Confirm { on_confirm, .. } => {
                         use crate::messages::ConfirmAction;
                         match on_confirm {
@@ -370,14 +269,14 @@ impl App {
                                 let rule_id = *rule_id;
                                 if self.settings.window_rules.remove(rule_id) {
                                     log::info!("Deleted window rule {}", rule_id);
-                                    if self.selected_window_rule_id == Some(rule_id) {
-                                        self.selected_window_rule_id = self.settings.window_rules.rules.first().map(|r| r.id);
+                                    if self.ui.selected_window_rule_id == Some(rule_id) {
+                                        self.ui.selected_window_rule_id = self.settings.window_rules.rules.first().map(|r| r.id);
                                     }
                                     self.dirty_tracker.mark(crate::config::SettingsCategory::WindowRules);
                                 } else if self.settings.layer_rules.remove(rule_id) {
                                     log::info!("Deleted layer rule {}", rule_id);
-                                    if self.selected_layer_rule_id == Some(rule_id) {
-                                        self.selected_layer_rule_id = self.settings.layer_rules.rules.first().map(|r| r.id);
+                                    if self.ui.selected_layer_rule_id == Some(rule_id) {
+                                        self.ui.selected_layer_rule_id = self.settings.layer_rules.rules.first().map(|r| r.id);
                                     }
                                     self.dirty_tracker.mark(crate::config::SettingsCategory::LayerRules);
                                 }
@@ -406,42 +305,42 @@ impl App {
                         log::warn!("DialogConfirm called on non-confirm dialog");
                     }
                 }
-                self.dialog_state = DialogState::None;
+                self.ui.dialog_state = DialogState::None;
                 Task::none()
             }
 
             Message::WizardNext => {
                 // Progress wizard to next step
-                if let DialogState::FirstRunWizard { step } = &self.dialog_state {
+                if let DialogState::FirstRunWizard { step } = &self.ui.dialog_state {
                     use crate::messages::WizardStep;
                     let next_step = match step {
                         WizardStep::Welcome => WizardStep::ConfigSetup,
                         WizardStep::ConfigSetup => WizardStep::ImportResults,
                         WizardStep::ImportResults => WizardStep::Complete,
                         WizardStep::Complete => {
-                            self.dialog_state = DialogState::None;
+                            self.ui.dialog_state = DialogState::None;
                             return Task::none();
                         }
                     };
-                    self.dialog_state = DialogState::FirstRunWizard { step: next_step };
+                    self.ui.dialog_state = DialogState::FirstRunWizard { step: next_step };
                 }
                 Task::none()
             }
 
             Message::WizardBack => {
                 // Go back to previous wizard step
-                if let DialogState::FirstRunWizard { step } = &self.dialog_state {
+                if let DialogState::FirstRunWizard { step } = &self.ui.dialog_state {
                     use crate::messages::WizardStep;
                     let prev_step = match step {
                         WizardStep::Welcome => {
-                            self.dialog_state = DialogState::None;
+                            self.ui.dialog_state = DialogState::None;
                             return Task::none();
                         }
                         WizardStep::ConfigSetup => WizardStep::Welcome,
                         WizardStep::ImportResults => WizardStep::ConfigSetup,
                         WizardStep::Complete => WizardStep::ImportResults,
                     };
-                    self.dialog_state = DialogState::FirstRunWizard { step: prev_step };
+                    self.ui.dialog_state = DialogState::FirstRunWizard { step: prev_step };
                 }
                 Task::none()
             }
@@ -453,7 +352,7 @@ impl App {
                 // Ensure directories exist
                 if let Err(e) = self.paths.ensure_directories() {
                     log::error!("Failed to create directories: {}", e);
-                    self.dialog_state = DialogState::Error {
+                    self.ui.dialog_state = DialogState::Error {
                         title: "Setup Error".to_string(),
                         message: "Failed to create configuration directories.".to_string(),
                         details: Some(e.to_string()),
@@ -464,7 +363,7 @@ impl App {
                 // Add include line to user's config.kdl
                 if let Err(e) = self.paths.add_include_line() {
                     log::error!("Failed to add include line: {}", e);
-                    self.dialog_state = DialogState::Error {
+                    self.ui.dialog_state = DialogState::Error {
                         title: "Setup Error".to_string(),
                         message: "Failed to add include line to config.kdl.".to_string(),
                         details: Some(e.to_string()),
@@ -479,8 +378,8 @@ impl App {
                 log::info!("Wizard: Config setup complete");
 
                 // Progress to next step
-                if let DialogState::FirstRunWizard { .. } = &self.dialog_state {
-                    self.dialog_state = DialogState::FirstRunWizard {
+                if let DialogState::FirstRunWizard { .. } = &self.ui.dialog_state {
+                    self.ui.dialog_state = DialogState::FirstRunWizard {
                         step: crate::messages::WizardStep::ImportResults,
                     };
                 }
@@ -489,7 +388,7 @@ impl App {
 
             Message::ConsolidationApply => {
                 // Apply selected consolidation suggestions
-                if let DialogState::Consolidation { suggestions } = &self.dialog_state {
+                if let DialogState::Consolidation { suggestions } = &self.ui.dialog_state {
                     let selected: Vec<_> = suggestions.iter()
                         .filter(|s| s.selected)
                         .collect();
@@ -518,7 +417,7 @@ impl App {
                         self.mark_changed();
                     }
                 }
-                self.dialog_state = DialogState::None;
+                self.ui.dialog_state = DialogState::None;
                 Task::none()
             }
 
@@ -550,7 +449,7 @@ impl App {
             }
 
             Message::CheckNiriStatus => {
-                self.niri_status = if crate::ipc::is_niri_running() {
+                self.ui.niri_status = if crate::ipc::is_niri_running() {
                     crate::views::status_bar::NiriStatus::Connected
                 } else {
                     crate::views::status_bar::NiriStatus::Disconnected
@@ -593,7 +492,7 @@ impl App {
             .map(|_| Message::CheckNiriStatus);
 
         // Toast auto-clear check (every 500ms, only when toast is showing)
-        let toast_check = if self.toast.is_some() {
+        let toast_check = if self.ui.toast.is_some() {
             Some(time::every(Duration::from_millis(500))
                 .map(|_| Message::ClearToast))
         } else {
@@ -601,7 +500,7 @@ impl App {
         };
 
         // Keyboard capture subscription (only active when capturing)
-        if self.key_capture_active.is_some() {
+        if self.ui.key_capture_active.is_some() {
             let key_capture = keyboard::listen().map(|event| {
                 match event {
                     keyboard::Event::KeyPressed { key, modifiers, .. } => {
@@ -647,23 +546,23 @@ impl App {
         use iced::widget::column;
 
         // Primary navigation bar (top)
-        let primary_nav = views::navigation::primary_nav(self.current_page, &self.search_query);
+        let primary_nav = views::navigation::primary_nav(self.ui.current_page, &self.ui.search_query);
 
         // Secondary navigation bar (sub-tabs)
-        let secondary_nav = views::navigation::secondary_nav(self.current_page);
+        let secondary_nav = views::navigation::secondary_nav(self.ui.current_page);
 
         // Main content area (or search results if searching)
-        let content_area = if !self.search_query.is_empty() && !self.search_results.is_empty() {
+        let content_area = if !self.ui.search_query.is_empty() && !self.ui.search_results.is_empty() {
             // Show search results in the content area
-            views::search_results::view(&self.search_results, &self.search_query)
+            views::search_results::view(&self.ui.search_results, &self.ui.search_query)
         } else {
             self.page_content()
         };
 
         // Status bar (bottom)
         let is_dirty = self.dirty_tracker.is_dirty();
-        let save_status = self.toast.clone();
-        let status_bar = views::status_bar::view(is_dirty, save_status, self.current_theme, self.niri_status);
+        let save_status = self.ui.toast.clone();
+        let status_bar = views::status_bar::view(is_dirty, save_status, self.ui.current_theme, self.ui.niri_status);
 
         // Stack everything vertically
         let layout = column![
@@ -679,7 +578,7 @@ impl App {
             .height(Length::Fill);
 
         // If there's an active dialog, render it on top
-        if let Some(dialog) = views::dialogs::view(&self.dialog_state) {
+        if let Some(dialog) = views::dialogs::view(&self.ui.dialog_state) {
             // For now, use iced's Stack widget or similar approach
             // Since iced doesn't have perfect z-layering, dialogs handle their own backdrop
             dialog
@@ -693,7 +592,7 @@ impl App {
         use iced::widget::scrollable;
 
         // Get the page-specific content (without the page title - nav shows it)
-        let page_view = match self.current_page {
+        let page_view = match self.ui.current_page {
             Page::Overview => return self.overview_page(),
             Page::Appearance => {
                 views::appearance::view(&self.settings.appearance)
@@ -717,10 +616,10 @@ impl App {
                 views::trackball::view(&self.settings.trackball)
             }
             Page::Tablet => {
-                return views::tablet::view(&self.settings.tablet, &self.tablet_calibration_cache);
+                return views::tablet::view(&self.settings.tablet, &self.ui.tablet_calibration_cache);
             }
             Page::Touch => {
-                return views::touch::view(&self.settings.touch, &self.touch_calibration_cache);
+                return views::touch::view(&self.settings.touch, &self.ui.touch_calibration_cache);
             }
             Page::Animations => {
                 return views::animations::view(&self.settings.animations);
@@ -740,33 +639,33 @@ impl App {
             Page::WindowRules => {
                 return views::window_rules::view(
                     &self.settings.window_rules,
-                    self.selected_window_rule_id,
-                    &self.window_rule_sections_expanded,
-                    &self.window_rule_regex_errors,
+                    self.ui.selected_window_rule_id,
+                    &self.ui.window_rule_sections_expanded,
+                    &self.ui.window_rule_regex_errors,
                 );
             }
             Page::LayerRules => {
                 return views::layer_rules::view(
                     &self.settings.layer_rules,
-                    self.selected_layer_rule_id,
-                    &self.layer_rule_sections_expanded,
-                    &self.layer_rule_regex_errors,
+                    self.ui.selected_layer_rule_id,
+                    &self.ui.layer_rule_sections_expanded,
+                    &self.ui.layer_rule_regex_errors,
                 );
             }
             Page::Keybindings => {
                 return views::keybindings::view(
                     &self.settings.keybindings,
-                    self.selected_keybinding_index,
-                    &self.keybinding_sections_expanded,
-                    self.key_capture_active,
+                    self.ui.selected_keybinding_index,
+                    &self.ui.keybinding_sections_expanded,
+                    self.ui.key_capture_active,
                 );
             }
             Page::Outputs => {
                 return views::outputs::view(
                     &self.settings.outputs,
-                    self.selected_output_index,
-                    &self.output_sections_expanded,
-                    &self.tools_state.outputs,  // IPC data for available modes
+                    self.ui.selected_output_index,
+                    &self.ui.output_sections_expanded,
+                    &self.ui.tools_state.outputs,  // IPC data for available modes
                 );
             }
             Page::Miscellaneous => {
@@ -789,16 +688,16 @@ impl App {
             }
             Page::Tools => {
                 let niri_connected = matches!(
-                    self.niri_status,
+                    self.ui.niri_status,
                     crate::views::status_bar::NiriStatus::Connected
                 );
-                return views::tools::view(&self.tools_state, niri_connected, self.settings.preferences.float_settings_app);
+                return views::tools::view(&self.ui.tools_state, niri_connected, self.settings.preferences.float_settings_app);
             }
             Page::ConfigEditor => {
-                return views::config_editor::view(&self.config_editor_state);
+                return views::config_editor::view(&self.ui.config_editor_state);
             }
             Page::Backups => {
-                return views::backups::view(&self.backups_state);
+                return views::backups::view(&self.ui.backups_state);
             }
         };
 
@@ -832,11 +731,11 @@ impl App {
                 text("Theme:").size(14).width(Length::Fixed(100.0)),
                 pick_list(
                     crate::theme::AppTheme::all(),
-                    Some(self.current_theme),
+                    Some(self.ui.current_theme),
                     Message::ChangeTheme,
                 )
                 .placeholder("Select theme...")
-                .width(Length::Fixed(200.0)),
+                .width(Length::Fixed(260.0)),
             ]
             .spacing(12)
             .align_y(Alignment::Center),
@@ -896,7 +795,7 @@ impl App {
         .spacing(6);
 
         // Combine summary with widget demo
-        let page_view = column![summary, views::widget_demo::view(&self.widget_demo_state),]
+        let page_view = column![summary, views::widget_demo::view(&self.ui.widget_demo_state),]
             .spacing(20);
 
         container(page_view)
@@ -964,7 +863,7 @@ impl App {
 pub fn run() -> iced::Result {
     iced::application(App::new, App::update, App::view)
         .subscription(App::subscription)
-        .theme(|app: &App| app.current_theme.to_iced_theme())
+        .theme(|app: &App| app.ui.current_theme.to_iced_theme())
         .settings(iced::Settings {
             id: Some("niri-settings".to_string()),
             ..Default::default()

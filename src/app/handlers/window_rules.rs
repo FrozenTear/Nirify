@@ -20,18 +20,18 @@ impl super::super::App {
                     ..Default::default()
                 };
                 self.settings.window_rules.rules.push(new_rule);
-                self.selected_window_rule_id = Some(new_id);
+                self.ui.selected_window_rule_id = Some(new_id);
             }
 
             M::DeleteRule(id) => {
                 self.settings.window_rules.remove(id);
-                if self.selected_window_rule_id == Some(id) {
-                    self.selected_window_rule_id = self.settings.window_rules.rules.first().map(|r| r.id);
+                if self.ui.selected_window_rule_id == Some(id) {
+                    self.ui.selected_window_rule_id = self.settings.window_rules.rules.first().map(|r| r.id);
                 }
             }
 
             M::SelectRule(id) => {
-                self.selected_window_rule_id = Some(id);
+                self.ui.selected_window_rule_id = Some(id);
                 should_mark_dirty = false;
             }
 
@@ -43,7 +43,7 @@ impl super::super::App {
                     new_rule.id = new_id;
                     new_rule.name = format!("{} (copy)", new_rule.name);
                     self.settings.window_rules.rules.push(new_rule);
-                    self.selected_window_rule_id = Some(new_id);
+                    self.ui.selected_window_rule_id = Some(new_id);
                 }
             }
 
@@ -257,8 +257,8 @@ impl super::super::App {
 
             M::ToggleSection(id, section) => {
                 let key = (id, section);
-                let current = self.window_rule_sections_expanded.get(&key).copied().unwrap_or(false);
-                self.window_rule_sections_expanded.insert(key, !current);
+                let current = self.ui.window_rule_sections_expanded.get(&key).copied().unwrap_or(false);
+                self.ui.window_rule_sections_expanded.insert(key, !current);
                 should_mark_dirty = false;
             }
         }
@@ -276,13 +276,13 @@ impl super::super::App {
         match regex_str {
             Some(s) if !s.is_empty() => {
                 if let Err(e) = regex_syntax::Parser::new().parse(s) {
-                    self.window_rule_regex_errors.insert(error_key.clone(), format!("Invalid regex: {}", e));
+                    self.ui.window_rule_regex_errors.insert(error_key.clone(), format!("Invalid regex: {}", e));
                 } else {
-                    self.window_rule_regex_errors.remove(error_key);
+                    self.ui.window_rule_regex_errors.remove(error_key);
                 }
             }
             _ => {
-                self.window_rule_regex_errors.remove(error_key);
+                self.ui.window_rule_regex_errors.remove(error_key);
             }
         }
     }

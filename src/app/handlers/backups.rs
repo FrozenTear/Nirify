@@ -9,8 +9,8 @@ impl super::super::App {
     pub(in crate::app) fn update_backups(&mut self, msg: BackupsMessage) -> Task<Message> {
         match msg {
             BackupsMessage::RefreshList => {
-                self.backups_state.loading_list = true;
-                self.backups_state.status_message = None;
+                self.ui.backups_state.loading_list = true;
+                self.ui.backups_state.status_message = None;
 
                 let backup_dir = self.paths.backup_dir.clone();
 
@@ -23,30 +23,30 @@ impl super::super::App {
             }
 
             BackupsMessage::ListLoaded(result) => {
-                self.backups_state.loading_list = false;
+                self.ui.backups_state.loading_list = false;
                 match result {
                     Ok(backups) => {
                         let count = backups.len();
-                        self.backups_state.backups = backups;
-                        self.backups_state.status_message = Some(format!("Found {} backup(s)", count));
+                        self.ui.backups_state.backups = backups;
+                        self.ui.backups_state.status_message = Some(format!("Found {} backup(s)", count));
                         // Clear selection when list refreshes
-                        self.backups_state.selected_backup = None;
-                        self.backups_state.preview_content = None;
+                        self.ui.backups_state.selected_backup = None;
+                        self.ui.backups_state.preview_content = None;
                     }
                     Err(e) => {
-                        self.backups_state.status_message = Some(format!("Error: {}", e));
+                        self.ui.backups_state.status_message = Some(format!("Error: {}", e));
                     }
                 }
                 Task::none()
             }
 
             BackupsMessage::SelectBackup(idx) => {
-                self.backups_state.selected_backup = Some(idx);
-                self.backups_state.loading_preview = true;
-                self.backups_state.preview_content = None;
+                self.ui.backups_state.selected_backup = Some(idx);
+                self.ui.backups_state.loading_preview = true;
+                self.ui.backups_state.preview_content = None;
 
                 // Load preview
-                if let Some(backup) = self.backups_state.backups.get(idx) {
+                if let Some(backup) = self.ui.backups_state.backups.get(idx) {
                     let path = backup.path.clone();
 
                     Task::perform(
@@ -57,21 +57,21 @@ impl super::super::App {
                         |result| Message::Backups(BackupsMessage::PreviewLoaded(result)),
                     )
                 } else {
-                    self.backups_state.loading_preview = false;
+                    self.ui.backups_state.loading_preview = false;
                     Task::none()
                 }
             }
 
             BackupsMessage::PreviewLoaded(result) => {
-                self.backups_state.loading_preview = false;
-                self.backups_state.preview_content = Some(result);
+                self.ui.backups_state.loading_preview = false;
+                self.ui.backups_state.preview_content = Some(result);
                 Task::none()
             }
 
             BackupsMessage::ConfirmRestore(idx) => {
-                if let Some(backup) = self.backups_state.backups.get(idx) {
+                if let Some(backup) = self.ui.backups_state.backups.get(idx) {
                     // Show confirmation dialog
-                    self.dialog_state = DialogState::Confirm {
+                    self.ui.dialog_state = DialogState::Confirm {
                         title: "Restore Backup".to_string(),
                         message: format!(
                             "Are you sure you want to restore '{}'?\n\n\
@@ -83,16 +83,16 @@ impl super::super::App {
                         on_confirm: crate::messages::ConfirmAction::ResetSettings, // We'll handle this specially
                     };
                     // Store the index for later
-                    self.pending_restore_idx = Some(idx);
+                    self.ui.pending_restore_idx = Some(idx);
                 }
                 Task::none()
             }
 
             BackupsMessage::RestoreBackup(idx) => {
-                self.backups_state.restoring = true;
-                self.backups_state.status_message = Some("Restoring...".to_string());
+                self.ui.backups_state.restoring = true;
+                self.ui.backups_state.status_message = Some("Restoring...".to_string());
 
-                if let Some(backup) = self.backups_state.backups.get(idx) {
+                if let Some(backup) = self.ui.backups_state.backups.get(idx) {
                     let backup_path = backup.path.clone();
                     let config_path = self.paths.niri_config.clone();
                     let backup_dir = self.paths.backup_dir.clone();
@@ -104,22 +104,22 @@ impl super::super::App {
                         |result| Message::Backups(BackupsMessage::RestoreCompleted(result)),
                     )
                 } else {
-                    self.backups_state.restoring = false;
-                    self.backups_state.status_message = Some("Error: Backup not found".to_string());
+                    self.ui.backups_state.restoring = false;
+                    self.ui.backups_state.status_message = Some("Error: Backup not found".to_string());
                     Task::none()
                 }
             }
 
             BackupsMessage::RestoreCompleted(result) => {
-                self.backups_state.restoring = false;
+                self.ui.backups_state.restoring = false;
                 match result {
                     Ok(()) => {
-                        self.backups_state.status_message = Some("Backup restored successfully!".to_string());
-                        self.toast = Some("Backup restored! Restart niri-settings to see changes.".to_string());
-                        self.toast_shown_at = Some(std::time::Instant::now());
+                        self.ui.backups_state.status_message = Some("Backup restored successfully!".to_string());
+                        self.ui.toast = Some("Backup restored! Restart niri-settings to see changes.".to_string());
+                        self.ui.toast_shown_at = Some(std::time::Instant::now());
                     }
                     Err(e) => {
-                        self.backups_state.status_message = Some(format!("Failed to restore: {}", e));
+                        self.ui.backups_state.status_message = Some(format!("Failed to restore: {}", e));
                     }
                 }
                 Task::none()

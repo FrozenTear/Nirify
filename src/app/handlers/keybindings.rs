@@ -20,15 +20,15 @@ impl super::super::App {
                     ..Default::default()
                 };
                 self.settings.keybindings.bindings.push(new_binding);
-                self.selected_keybinding_index = Some(self.settings.keybindings.bindings.len() - 1);
+                self.ui.selected_keybinding_index = Some(self.settings.keybindings.bindings.len() - 1);
                 log::info!("Added new keybinding");
             }
 
             M::RemoveKeybinding(idx) => {
                 if idx < self.settings.keybindings.bindings.len() {
                     self.settings.keybindings.bindings.remove(idx);
-                    if self.selected_keybinding_index == Some(idx) {
-                        self.selected_keybinding_index = if self.settings.keybindings.bindings.is_empty() {
+                    if self.ui.selected_keybinding_index == Some(idx) {
+                        self.ui.selected_keybinding_index = if self.settings.keybindings.bindings.is_empty() {
                             None
                         } else {
                             Some(0)
@@ -39,7 +39,7 @@ impl super::super::App {
             }
 
             M::SelectKeybinding(idx) => {
-                self.selected_keybinding_index = Some(idx);
+                self.ui.selected_keybinding_index = Some(idx);
                 // Don't mark dirty for UI-only changes
                 return Task::none();
             }
@@ -50,23 +50,23 @@ impl super::super::App {
             }
 
             M::StartKeyCapture(idx) => {
-                self.key_capture_active = Some(idx);
+                self.ui.key_capture_active = Some(idx);
                 // Don't mark dirty for UI-only changes
                 return Task::none();
             }
 
             M::CapturedKey(key_combo) => {
-                if let Some(idx) = self.key_capture_active {
+                if let Some(idx) = self.ui.key_capture_active {
                     if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
                         binding.key_combo = key_combo;
                         log::info!("Captured key combo for binding {}", idx);
                     }
                 }
-                self.key_capture_active = None;
+                self.ui.key_capture_active = None;
             }
 
             M::CancelKeyCapture => {
-                self.key_capture_active = None;
+                self.ui.key_capture_active = None;
                 // Don't mark dirty for UI-only changes
                 return Task::none();
             }
@@ -149,8 +149,8 @@ impl super::super::App {
             }
 
             M::ToggleSection(section) => {
-                let expanded = self.keybinding_sections_expanded.get(&section).copied().unwrap_or(false);
-                self.keybinding_sections_expanded.insert(section, !expanded);
+                let expanded = self.ui.keybinding_sections_expanded.get(&section).copied().unwrap_or(false);
+                self.ui.keybinding_sections_expanded.insert(section, !expanded);
                 // Don't mark dirty for UI-only changes
                 return Task::none();
             }

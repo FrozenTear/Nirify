@@ -74,8 +74,9 @@ pub enum Message {
 }
 
 /// Page navigation enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Page {
+    #[default]
     Overview,
     Appearance,
     Behavior,

@@ -47,7 +47,13 @@
 **Problem:** App struct has 129 fields mixing domain and UI state
 **Fix:** Extract UI-only state into separate `UiState` struct
 
-**Status:** [ ] Not Started
+**Implementation:**
+- Created `src/app/ui_state.rs` with `UiState` struct containing 26 UI-only fields
+- App struct now has just 6 fields: settings, paths, dirty_tracker, search_index, last_change_time, save_in_progress, ui
+- Updated ~38 field references across 9 files
+- Clean separation: domain state (settings) vs UI state (selections, dialogs, etc.)
+
+**Status:** [x] Completed
 
 ---
 
@@ -168,7 +174,7 @@
 | 2 | Layer rules view | [x] | ab464c4 |
 | 3 | Window rule match types | [x] | 656eac2 |
 | 4 | Rule finder helpers | [x] | 5daf8ba |
-| 5 | Split UI state | [ ] | (deferred - 178 changes) |
+| 5 | Split UI state | [x] | (38 changes, UiState) |
 | 6 | Error handling | [x] | (audit only - no fixes needed) |
 | 7 | Stubbed handlers | [x] | (basic impl) |
 | 8 | Pre-save validation | [x] | (integrated) |

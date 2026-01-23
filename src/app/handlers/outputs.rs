@@ -12,15 +12,15 @@ impl super::super::App {
         match msg {
             M::AddOutput => {
                 self.settings.outputs.outputs.push(crate::config::models::OutputConfig::default());
-                self.selected_output_index = Some(self.settings.outputs.outputs.len() - 1);
+                self.ui.selected_output_index = Some(self.settings.outputs.outputs.len() - 1);
                 log::info!("Added new output");
             }
 
             M::RemoveOutput(idx) => {
                 if idx < self.settings.outputs.outputs.len() {
                     self.settings.outputs.outputs.remove(idx);
-                    if self.selected_output_index == Some(idx) {
-                        self.selected_output_index = if self.settings.outputs.outputs.is_empty() {
+                    if self.ui.selected_output_index == Some(idx) {
+                        self.ui.selected_output_index = if self.settings.outputs.outputs.is_empty() {
                             None
                         } else {
                             Some(0)
@@ -31,11 +31,11 @@ impl super::super::App {
             }
 
             M::SelectOutput(idx) => {
-                self.selected_output_index = Some(idx);
+                self.ui.selected_output_index = Some(idx);
                 // Auto-refresh IPC outputs to get available modes for dropdown
                 // Only refresh if connected to niri
                 let is_connected = matches!(
-                    self.niri_status,
+                    self.ui.niri_status,
                     crate::views::status_bar::NiriStatus::Connected
                 );
                 if is_connected {
@@ -191,8 +191,8 @@ impl super::super::App {
             }
 
             M::ToggleSection(section_name) => {
-                let expanded = self.output_sections_expanded.get(&section_name).copied().unwrap_or(true);
-                self.output_sections_expanded.insert(section_name, !expanded);
+                let expanded = self.ui.output_sections_expanded.get(&section_name).copied().unwrap_or(true);
+                self.ui.output_sections_expanded.insert(section_name, !expanded);
                 // Don't mark dirty for UI-only changes
                 return Task::none();
             }
