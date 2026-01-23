@@ -102,6 +102,9 @@ pub fn view(state: &ToolsState, niri_connected: bool) -> Element<'_, Message> {
 
     let mut reload_btn = button(text(reload_label).size(14)).padding([8, 16]);
     let mut validate_btn = button(text(validate_label).size(14)).padding([8, 16]);
+    let consolidate_btn = button(text("Consolidate Rules").size(14))
+        .padding([8, 16])
+        .on_press(Message::AnalyzeConsolidation);
 
     if niri_connected && !state.reloading {
         reload_btn = reload_btn.on_press(Message::Tools(ToolsMessage::ReloadConfig));
@@ -111,9 +114,13 @@ pub fn view(state: &ToolsState, niri_connected: bool) -> Element<'_, Message> {
     }
 
     content = content.push(
-        row![reload_btn, validate_btn,]
+        row![reload_btn, validate_btn, consolidate_btn]
             .spacing(12)
             .padding([8, 0]),
+    );
+
+    content = content.push(
+        info_text("Consolidate Rules analyzes window and layer rules to find merge opportunities.")
     );
 
     // Show validation result if available

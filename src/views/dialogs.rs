@@ -8,7 +8,7 @@
 //! - Consolidation dialog
 //! - Import summary dialog
 
-use iced::widget::{button, column, container, row, scrollable, text, Column};
+use iced::widget::{button, checkbox, column, container, row, scrollable, text, Column};
 use iced::{Alignment, Border, Color as IcedColor, Element, Length};
 
 use crate::messages::{ConfirmAction, ConsolidationSuggestion, DialogState, Message, WizardStep};
@@ -332,10 +332,14 @@ fn import_summary_dialog<'a>(
 /// Consolidation dialog
 fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Element<'a, Message> {
     let suggestion_count = suggestions.len();
+    let selected_count = suggestions.iter().filter(|s| s.selected).count();
 
     let mut content = column![
         text("Rule Consolidation Suggestions").size(24),
-        text(format!("Found {} opportunities to merge similar rules", suggestion_count))
+        text(format!(
+            "Found {} opportunities to merge similar rules ({} selected)",
+            suggestion_count, selected_count
+        ))
             .size(14)
             .color([0.8, 0.8, 0.8]),
         text("Select suggestions to apply:")
@@ -344,21 +348,52 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
     ]
     .spacing(12);
 
-    // Add suggestion items (simplified for now)
-    for suggestion in suggestions.iter() {
+    // Add suggestion items with checkboxes
+    for (index, suggestion) in suggestions.iter().enumerate() {
+        let rule_type = if suggestion.is_window_rule { "window" } else { "layer" };
+        let patterns_preview = if suggestion.patterns.len() <= 3 {
+            suggestion.patterns.join(", ")
+        } else {
+            format!(
+                "{}, ... ({} more)",
+                suggestion.patterns[..2].join(", "),
+                suggestion.patterns.len() - 2
+            )
+        };
+
+        let bg_color = if suggestion.selected {
+            IcedColor::from_rgb(0.2, 0.25, 0.2)
+        } else {
+            IcedColor::from_rgb(0.15, 0.15, 0.15)
+        };
+
         content = content.push(
             container(
-                column![
-                    text(&suggestion.description).size(13),
-                    text(format!("{} rules can be merged", suggestion.rule_count))
-                        .size(11)
-                        .color([0.75, 0.75, 0.75]),
+                row![
+                    checkbox(suggestion.selected)
+                        .on_toggle(move |_| Message::ConsolidationToggle(index)),
+                    column![
+                        text(&suggestion.description).size(13),
+                        text(format!("Type: {} rules", rule_type))
+                            .size(11)
+                            .color([0.6, 0.7, 0.6]),
+                        text(format!("Patterns: {}", patterns_preview))
+                            .size(11)
+                            .color([0.6, 0.6, 0.6]),
+                        text(format!("Merged: {}", suggestion.merged_pattern))
+                            .size(11)
+                            .color([0.5, 0.7, 0.9]),
+                    ]
+                    .spacing(2)
+                    .width(Length::Fill),
                 ]
-                .spacing(4)
+                .spacing(12)
+                .align_y(Alignment::Center)
             )
             .padding(12)
-            .style(|_theme| container::Style {
-                background: Some(iced::Background::Color(IcedColor::from_rgb(0.15, 0.15, 0.15))),
+            .width(Length::Fill)
+            .style(move |_theme| container::Style {
+                background: Some(iced::Background::Color(bg_color)),
                 border: Border {
                     color: IcedColor::from_rgb(0.3, 0.3, 0.3),
                     width: 1.0,
@@ -369,23 +404,41 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
         );
     }
 
+    // Buttons row
+    let has_selection = selected_count > 0;
+    let apply_btn = if has_selection {
+        button(text(format!("Apply {} Selected", selected_count)))
+            .on_press(Message::ConsolidationApply)
+            .padding([8, 24])
+            .style(|_theme, _status| button::Style {
+                background: Some(iced::Background::Color(IcedColor::from_rgb(0.3, 0.6, 0.9))),
+                text_color: IcedColor::from_rgb(1.0, 1.0, 1.0),
+                border: Border {
+                    radius: 4.0.into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+    } else {
+        button(text("Apply Selected"))
+            .padding([8, 24])
+            .style(|_theme, _status| button::Style {
+                background: Some(iced::Background::Color(IcedColor::from_rgb(0.3, 0.3, 0.3))),
+                text_color: IcedColor::from_rgb(0.5, 0.5, 0.5),
+                border: Border {
+                    radius: 4.0.into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+    };
+
     content = content.push(
         row![
             button(text("Dismiss"))
                 .on_press(Message::CloseDialog)
                 .padding([8, 24]),
-            button(text("Apply Selected"))
-                .on_press(Message::ConsolidationApply)
-                .padding([8, 24])
-                .style(|_theme, _status| button::Style {
-                    background: Some(iced::Background::Color(IcedColor::from_rgb(0.3, 0.6, 0.9))),
-                    text_color: IcedColor::from_rgb(1.0, 1.0, 1.0),
-                    border: Border {
-                        radius: 4.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }),
+            apply_btn,
         ]
         .spacing(12)
     );

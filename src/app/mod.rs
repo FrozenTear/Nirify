@@ -386,35 +386,107 @@ impl App {
                 Task::none()
             }
 
+            Message::AnalyzeConsolidation => {
+                // Analyze rules for consolidation opportunities
+                let analysis = crate::config::analyze_rules(
+                    &self.settings.window_rules.rules,
+                    &self.settings.layer_rules.rules,
+                );
+
+                if analysis.has_suggestions() {
+                    // Convert config suggestions to UI suggestions
+                    let mut suggestions = Vec::new();
+
+                    // Add window rule suggestions
+                    for s in &analysis.window_suggestions {
+                        suggestions.push(crate::messages::ConsolidationSuggestion {
+                            description: s.description.clone(),
+                            rule_ids: s.rule_ids.clone(),
+                            rule_count: s.rule_ids.len(),
+                            patterns: s.patterns.clone(),
+                            merged_pattern: s.merged_pattern.clone(),
+                            is_window_rule: true,
+                            selected: true, // Select all by default
+                        });
+                    }
+
+                    // Add layer rule suggestions
+                    for s in &analysis.layer_suggestions {
+                        suggestions.push(crate::messages::ConsolidationSuggestion {
+                            description: s.description.clone(),
+                            rule_ids: s.rule_ids.clone(),
+                            rule_count: s.rule_ids.len(),
+                            patterns: s.patterns.clone(),
+                            merged_pattern: s.merged_pattern.clone(),
+                            is_window_rule: false,
+                            selected: true, // Select all by default
+                        });
+                    }
+
+                    log::info!(
+                        "Found {} consolidation suggestions ({} window, {} layer)",
+                        suggestions.len(),
+                        analysis.window_suggestions.len(),
+                        analysis.layer_suggestions.len()
+                    );
+
+                    self.ui.dialog_state = DialogState::Consolidation { suggestions };
+                } else {
+                    log::info!("No consolidation opportunities found");
+                    self.ui.toast = Some("No consolidation opportunities found".to_string());
+                    self.ui.toast_shown_at = Some(std::time::Instant::now());
+                }
+                Task::none()
+            }
+
+            Message::ConsolidationToggle(index) => {
+                // Toggle selection of a consolidation suggestion
+                if let DialogState::Consolidation { suggestions } = &mut self.ui.dialog_state {
+                    if let Some(suggestion) = suggestions.get_mut(index) {
+                        suggestion.selected = !suggestion.selected;
+                    }
+                }
+                Task::none()
+            }
+
             Message::ConsolidationApply => {
                 // Apply selected consolidation suggestions
                 if let DialogState::Consolidation { suggestions } = &self.ui.dialog_state {
+                    // Clone selected suggestions to avoid borrow issues
                     let selected: Vec<_> = suggestions.iter()
                         .filter(|s| s.selected)
+                        .cloned()
                         .collect();
 
                     if selected.is_empty() {
                         log::info!("No consolidation suggestions selected");
                     } else {
                         log::info!("Applying {} consolidation suggestions", selected.len());
-                        // For each selected suggestion, we would merge the rules
-                        // This is a complex operation that would need to:
-                        // 1. Find the rules matching the patterns
-                        // 2. Create a merged rule with the combined pattern
-                        // 3. Remove the original rules
-                        // 4. Add the merged rule
-                        // For now, just log the intent - full implementation
-                        // would require more infrastructure for rule merging
-                        for suggestion in &selected {
-                            log::info!(
-                                "Would merge {} rules: {} -> {}",
-                                suggestion.rule_count,
-                                suggestion.patterns.join(", "),
-                                suggestion.merged_pattern
-                            );
+
+                        let mut window_rules_changed = false;
+                        let mut layer_rules_changed = false;
+
+                        for suggestion in selected {
+                            if suggestion.is_window_rule {
+                                self.apply_window_rule_consolidation(&suggestion);
+                                window_rules_changed = true;
+                            } else {
+                                self.apply_layer_rule_consolidation(&suggestion);
+                                layer_rules_changed = true;
+                            }
                         }
-                        // Mark as changed to trigger UI refresh
+
+                        // Mark affected categories as dirty
+                        if window_rules_changed {
+                            self.dirty_tracker.mark(crate::config::SettingsCategory::WindowRules);
+                        }
+                        if layer_rules_changed {
+                            self.dirty_tracker.mark(crate::config::SettingsCategory::LayerRules);
+                        }
+
                         self.mark_changed();
+                        self.ui.toast = Some("Rules consolidated successfully".to_string());
+                        self.ui.toast_shown_at = Some(std::time::Instant::now());
                     }
                 }
                 self.ui.dialog_state = DialogState::None;
@@ -862,6 +934,90 @@ impl App {
             },
             Message::ReloadCompleted,
         )
+    }
+
+    /// Apply window rule consolidation - merge multiple rules into one
+    fn apply_window_rule_consolidation(&mut self, suggestion: &crate::messages::ConsolidationSuggestion) {
+        use crate::config::models::WindowRuleMatch;
+
+        // Get the first rule ID to keep (will be modified to use merged pattern)
+        let Some(&first_id) = suggestion.rule_ids.first() else { return };
+
+        // Find the first rule and update its match pattern
+        if let Some(rule) = self.settings
+            .window_rules
+            .rules
+            .iter_mut()
+            .find(|r| r.id == first_id)
+        {
+            // Update the match to use the merged regex pattern
+            if !rule.matches.is_empty() {
+                rule.matches[0].app_id = Some(suggestion.merged_pattern.clone());
+            } else {
+                rule.matches.push(WindowRuleMatch {
+                    app_id: Some(suggestion.merged_pattern.clone()),
+                    ..Default::default()
+                });
+            }
+
+            // Update the name to reflect consolidation
+            rule.name = format!("Merged: {}", suggestion.patterns.join(", "));
+        }
+
+        // Remove all other rules that were consolidated
+        let other_ids: Vec<u32> = suggestion.rule_ids.iter().skip(1).copied().collect();
+        self.settings
+            .window_rules
+            .rules
+            .retain(|r| !other_ids.contains(&r.id));
+
+        log::info!(
+            "Consolidated {} window rules into one with pattern: {}",
+            suggestion.rule_ids.len(),
+            suggestion.merged_pattern
+        );
+    }
+
+    /// Apply layer rule consolidation - merge multiple rules into one
+    fn apply_layer_rule_consolidation(&mut self, suggestion: &crate::messages::ConsolidationSuggestion) {
+        use crate::config::models::LayerRuleMatch;
+
+        // Get the first rule ID to keep
+        let Some(&first_id) = suggestion.rule_ids.first() else { return };
+
+        // Find the first rule and update its match pattern
+        if let Some(rule) = self.settings
+            .layer_rules
+            .rules
+            .iter_mut()
+            .find(|r| r.id == first_id)
+        {
+            // Update the match to use the merged regex pattern
+            if !rule.matches.is_empty() {
+                rule.matches[0].namespace = Some(suggestion.merged_pattern.clone());
+            } else {
+                rule.matches.push(LayerRuleMatch {
+                    namespace: Some(suggestion.merged_pattern.clone()),
+                    ..Default::default()
+                });
+            }
+
+            // Update the name to reflect consolidation
+            rule.name = format!("Merged: {}", suggestion.patterns.join(", "));
+        }
+
+        // Remove all other rules that were consolidated
+        let other_ids: Vec<u32> = suggestion.rule_ids.iter().skip(1).copied().collect();
+        self.settings
+            .layer_rules
+            .rules
+            .retain(|r| !other_ids.contains(&r.id));
+
+        log::info!(
+            "Consolidated {} layer rules into one with pattern: {}",
+            suggestion.rule_ids.len(),
+            suggestion.merged_pattern
+        );
     }
 }
 

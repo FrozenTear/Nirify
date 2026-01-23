@@ -121,6 +121,11 @@ pub enum Message {
     WizardNext,
     WizardBack,
     WizardSetupConfig,
+    /// Analyze rules and show consolidation dialog if suggestions found
+    AnalyzeConsolidation,
+    /// Toggle selection of a consolidation suggestion
+    ConsolidationToggle(usize),
+    /// Apply selected consolidation suggestions
     ConsolidationApply,
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -975,8 +980,16 @@ pub enum ConfirmAction {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConsolidationSuggestion {
     pub description: String,
+    /// IDs of rules that can be merged
+    pub rule_ids: Vec<u32>,
+    /// Number of rules that can be merged
     pub rule_count: usize,
+    /// Original patterns (app_ids or namespaces) being merged
     pub patterns: Vec<String>,
+    /// The suggested merged regex pattern
     pub merged_pattern: String,
+    /// Whether this is a window rule (true) or layer rule (false)
+    pub is_window_rule: bool,
+    /// Whether this suggestion is selected for merging
     pub selected: bool,
 }
