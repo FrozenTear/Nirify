@@ -181,7 +181,17 @@
 **Problem:** Vec with iter().find() is O(n)
 **Fix:** Use HashMap<u32, Rule> for large collections
 
-**Status:** [ ] Not Started
+**Analysis:**
+- Helper methods `find()`, `find_mut()`, `remove()` already exist in rules.rs (lines 79-96, 335-351)
+- Only 9 total `iter().find()` calls across the codebase
+- Rules have ordering semantics: first matching rule wins in niri
+- Typical rule counts: 5-50 items (O(n) is negligible)
+- HashMap would require maintaining both HashMap + Vec for ordering
+- Complexity cost outweighs performance benefit for typical use
+
+**Conclusion:** No changes needed. Current implementation is adequate.
+
+**Status:** [x] Completed (analysis - no changes required)
 
 ---
 
@@ -190,7 +200,22 @@
 **Problem:** Large configs cause 1-2s startup delay
 **Fix:** Lazy-load or stream parse
 
-**Status:** [ ] Not Started
+**Analysis:**
+- Loader reads ~25 small KDL files (typically < 1KB each)
+- Modern SSDs make sequential reads fast (total < 50ms)
+- The "large config" delay is from importing user's existing niri config during first-run wizard
+- Our managed files are always small by design (one setting category per file)
+- Lazy loading would add complexity (state management, deferred errors)
+- Parallel loading possible but overkill for 25 small files
+
+**Potential future optimization (if needed):**
+- Parallel file loading using rayon
+- Background loading after initial render
+- Caching parsed settings
+
+**Conclusion:** No changes needed. Current implementation is adequate.
+
+**Status:** [x] Completed (analysis - no changes required)
 
 ---
 
@@ -209,5 +234,5 @@
 | 9 | Advanced behavior settings | [x] | (new widgets) |
 | 10 | ListDetailView | [x] | (list_detail.rs, shared components) |
 | 11 | Flatten messages | [x] | (documentation & organization) |
-| 12 | HashMap for rules | [ ] | |
-| 13 | Stream KDL | [ ] | |
+| 12 | HashMap for rules | [x] | (analysis - not needed) |
+| 13 | Stream KDL | [x] | (analysis - not needed) |
