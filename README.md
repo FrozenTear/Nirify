@@ -1,4 +1,4 @@
-# Niri Settings
+# Nirify
 
 A native settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor, built with Rust and [iced](https://iced.rs/).
 
@@ -42,7 +42,7 @@ cd niri-tweaks
 cargo build --release
 
 # Run the application
-./target/release/niri-settings
+./target/release/nirify
 ```
 
 ## Installation
@@ -63,17 +63,17 @@ sudo make uninstall
 ```
 
 This installs:
-- Binary to `$PREFIX/bin/niri-settings`
-- Desktop entry to `$PREFIX/share/applications/niri-settings.desktop`
-- Icon to `$PREFIX/share/icons/hicolor/scalable/apps/niri-settings.svg`
+- Binary to `$PREFIX/bin/nirify`
+- Desktop entry to `$PREFIX/share/applications/nirify.desktop`
+- Icon to `$PREFIX/share/icons/hicolor/scalable/apps/nirify.svg`
 
 ### Manual Installation
 
 ```bash
 cargo build --release
-sudo install -Dm755 target/release/niri-settings /usr/local/bin/niri-settings
-sudo install -Dm644 resources/niri-settings.desktop /usr/local/share/applications/niri-settings.desktop
-sudo install -Dm644 resources/icons/niri-settings.svg /usr/local/share/icons/hicolor/scalable/apps/niri-settings.svg
+sudo install -Dm755 target/release/nirify /usr/local/bin/nirify
+sudo install -Dm644 nirify.desktop /usr/local/share/applications/nirify.desktop
+sudo install -Dm644 resources/icons/nirify.svg /usr/local/share/icons/hicolor/scalable/apps/nirify.svg
 ```
 
 ## First Run
@@ -81,21 +81,21 @@ sudo install -Dm644 resources/icons/niri-settings.svg /usr/local/share/icons/hic
 On first launch, a setup wizard will guide you through connecting the app to your niri config:
 
 1. **Automatic setup** (recommended): Click "Add Automatically" and the app will:
-   - Create a timestamped backup of your `config.kdl` in `~/.config/niri/.backup/`
-   - Reorganize your config to use niri-settings for managed options
+   - Create a timestamped backup of your `config.kdl` in `~/.config/niri/nirify/.backup/`
+   - Reorganize your config to use Nirify for managed options
    - Preserve any custom settings you've added
 
 2. **Manual setup**: Add this line to your `~/.config/niri/config.kdl`:
    ```kdl
-   include "~/.config/niri/niri-settings/main.kdl"
+   include "~/.config/niri/nirify/main.kdl"
    ```
 
 ## Configuration Structure
 
-Niri Settings manages configuration files in `~/.config/niri/niri-settings/`:
+Nirify manages configuration files in `~/.config/niri/nirify/`:
 
 ```
-~/.config/niri/niri-settings/
+~/.config/niri/nirify/
 ├── main.kdl              # Entry point (includes all other files)
 ├── preferences.kdl       # App preferences (theme, float behavior)
 ├── appearance.kdl        # Gaps, focus ring, borders, corner radius
