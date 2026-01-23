@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use super::widgets::*;
 use crate::config::models::{KeybindAction, Keybinding, KeybindingsSettings};
 use crate::messages::{KeybindingsMessage, Message};
+use crate::types::ModKey;
 
 /// Common niri actions for quick selection
 const COMMON_ACTIONS: &[&str] = &[
@@ -191,6 +192,11 @@ fn keybinding_detail_view<'a>(
             key_capture_display(binding, idx, is_capturing),
             spacer(8.0),
             info_text("Click the button above to capture a new key combination"),
+            spacer(12.0),
+            // Modifier toggles
+            text("Modifiers").size(14),
+            modifier_toggles(binding, idx),
+            info_text("Toggle modifiers to quickly adjust the key combination"),
         ]
         .spacing(8),
     ));
@@ -441,4 +447,113 @@ fn action_editor<'a>(binding: &'a Keybinding, idx: usize) -> Element<'a, Message
     }
 
     content.into()
+}
+
+/// Parse modifiers from a key combo string
+fn parse_modifiers_from_combo(key_combo: &str) -> Vec<ModKey> {
+    let mut modifiers = Vec::new();
+
+    for part in key_combo.split('+') {
+        let trimmed = part.trim();
+        match trimmed.to_lowercase().as_str() {
+            "mod" | "super" => {
+                if !modifiers.contains(&ModKey::Super) {
+                    modifiers.push(ModKey::Super);
+                }
+            }
+            "ctrl" | "control" => {
+                if !modifiers.contains(&ModKey::Ctrl) {
+                    modifiers.push(ModKey::Ctrl);
+                }
+            }
+            "shift" => {
+                if !modifiers.contains(&ModKey::Shift) {
+                    modifiers.push(ModKey::Shift);
+                }
+            }
+            "alt" => {
+                if !modifiers.contains(&ModKey::Alt) {
+                    modifiers.push(ModKey::Alt);
+                }
+            }
+            _ => {} // Not a modifier we handle here, skip
+        }
+    }
+
+    modifiers
+}
+
+/// Modifier toggle buttons for quick editing
+fn modifier_toggles<'a>(binding: &'a Keybinding, idx: usize) -> Element<'a, Message> {
+    let current_mods = parse_modifiers_from_combo(&binding.key_combo);
+
+    let has_mod = current_mods.contains(&ModKey::Super);
+    let has_ctrl = current_mods.contains(&ModKey::Ctrl);
+    let has_shift = current_mods.contains(&ModKey::Shift);
+    let has_alt = current_mods.contains(&ModKey::Alt);
+
+    row![
+        modifier_toggle_button("Mod", has_mod, idx, ModKey::Super, &current_mods),
+        modifier_toggle_button("Ctrl", has_ctrl, idx, ModKey::Ctrl, &current_mods),
+        modifier_toggle_button("Shift", has_shift, idx, ModKey::Shift, &current_mods),
+        modifier_toggle_button("Alt", has_alt, idx, ModKey::Alt, &current_mods),
+    ]
+    .spacing(8)
+    .into()
+}
+
+/// Single modifier toggle button
+fn modifier_toggle_button<'a>(
+    label: &'a str,
+    is_active: bool,
+    idx: usize,
+    modifier: ModKey,
+    current_mods: &[ModKey],
+) -> Element<'a, Message> {
+    // Build new modifiers list by toggling this modifier
+    let new_mods: Vec<ModKey> = if is_active {
+        current_mods.iter().filter(|m| **m != modifier).cloned().collect()
+    } else {
+        let mut mods = current_mods.to_vec();
+        mods.push(modifier);
+        mods
+    };
+
+    button(
+        text(label)
+            .size(13)
+            .color(if is_active { [1.0, 1.0, 1.0] } else { [0.6, 0.6, 0.6] })
+    )
+    .on_press(Message::Keybindings(KeybindingsMessage::UpdateModifiers(idx, new_mods)))
+    .padding([6, 12])
+    .style(move |_theme, status| {
+        let bg = if is_active {
+            match status {
+                button::Status::Hovered => iced::Color::from_rgba(0.3, 0.5, 0.7, 0.7),
+                button::Status::Pressed => iced::Color::from_rgba(0.4, 0.6, 0.8, 0.8),
+                _ => iced::Color::from_rgba(0.2, 0.4, 0.6, 0.6),
+            }
+        } else {
+            match status {
+                button::Status::Hovered => iced::Color::from_rgba(0.3, 0.3, 0.3, 0.5),
+                button::Status::Pressed => iced::Color::from_rgba(0.35, 0.35, 0.35, 0.6),
+                _ => iced::Color::from_rgba(0.2, 0.2, 0.2, 0.4),
+            }
+        };
+        button::Style {
+            background: Some(iced::Background::Color(bg)),
+            text_color: if is_active { iced::Color::WHITE } else { iced::Color::from_rgb(0.6, 0.6, 0.6) },
+            border: iced::Border {
+                color: if is_active {
+                    iced::Color::from_rgba(0.4, 0.6, 0.8, 0.5)
+                } else {
+                    iced::Color::from_rgba(0.3, 0.3, 0.3, 0.3)
+                },
+                width: 1.0,
+                radius: 4.0.into(),
+            },
+            ..Default::default()
+        }
+    })
+    .into()
 }

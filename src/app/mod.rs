@@ -691,7 +691,10 @@ impl App {
                     self.ui.niri_status,
                     crate::views::status_bar::NiriStatus::Connected
                 );
-                return views::tools::view(&self.ui.tools_state, niri_connected, self.settings.preferences.float_settings_app);
+                return views::tools::view(&self.ui.tools_state, niri_connected);
+            }
+            Page::Preferences => {
+                return views::preferences::view(self.settings.preferences.float_settings_app);
             }
             Page::ConfigEditor => {
                 return views::config_editor::view(&self.ui.config_editor_state);

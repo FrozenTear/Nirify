@@ -4,7 +4,107 @@ use crate::app::helpers::{parse_spawn_command, validate_spawn_command};
 use crate::config::SettingsCategory;
 use crate::config::models::KeybindAction;
 use crate::messages::{KeybindingsMessage as M, Message};
+use crate::types::ModKey;
 use iced::Task;
+
+/// Known modifier prefixes in niri keybindings
+const MODIFIER_PREFIXES: &[&str] = &["Mod", "Super", "Ctrl", "Control", "Shift", "Alt", "Mod3", "Mod5"];
+
+/// Extract the base key from a key combo string (e.g., "Mod+Shift+Return" -> "Return")
+fn extract_base_key(key_combo: &str) -> String {
+    if key_combo.is_empty() {
+        return String::new();
+    }
+
+    // Split by + and find the last non-modifier part
+    let parts: Vec<&str> = key_combo.split('+').collect();
+
+    // Work backwards to find the first non-modifier
+    for part in parts.iter().rev() {
+        let trimmed = part.trim();
+        if !MODIFIER_PREFIXES.iter().any(|m| m.eq_ignore_ascii_case(trimmed)) {
+            return trimmed.to_string();
+        }
+    }
+
+    // If all parts are modifiers, return empty (unusual but possible)
+    String::new()
+}
+
+/// Build a key combo string from modifiers and a base key
+fn build_key_combo(modifiers: &[ModKey], base_key: &str) -> String {
+    if base_key.is_empty() && modifiers.is_empty() {
+        return String::new();
+    }
+
+    let mut parts = Vec::new();
+
+    // Add modifiers in a consistent order
+    for modifier in modifiers {
+        let mod_str = match modifier {
+            ModKey::Super => "Mod",  // niri uses "Mod" for Super
+            ModKey::Ctrl => "Ctrl",
+            ModKey::Shift => "Shift",
+            ModKey::Alt => "Alt",
+            ModKey::Mod3 => "Mod3",
+            ModKey::Mod5 => "Mod5",
+        };
+        if !parts.contains(&mod_str) {
+            parts.push(mod_str);
+        }
+    }
+
+    // Add the base key
+    if !base_key.is_empty() {
+        parts.push(base_key);
+    }
+
+    parts.join("+")
+}
+
+/// Parse modifiers from an existing key combo string
+pub fn parse_modifiers(key_combo: &str) -> Vec<ModKey> {
+    let mut modifiers = Vec::new();
+
+    for part in key_combo.split('+') {
+        let trimmed = part.trim();
+        match trimmed.to_lowercase().as_str() {
+            "mod" | "super" => {
+                if !modifiers.contains(&ModKey::Super) {
+                    modifiers.push(ModKey::Super);
+                }
+            }
+            "ctrl" | "control" => {
+                if !modifiers.contains(&ModKey::Ctrl) {
+                    modifiers.push(ModKey::Ctrl);
+                }
+            }
+            "shift" => {
+                if !modifiers.contains(&ModKey::Shift) {
+                    modifiers.push(ModKey::Shift);
+                }
+            }
+            "alt" => {
+                if !modifiers.contains(&ModKey::Alt) {
+                    modifiers.push(ModKey::Alt);
+                }
+            }
+            "mod3" => {
+                if !modifiers.contains(&ModKey::Mod3) {
+                    modifiers.push(ModKey::Mod3);
+                }
+            }
+            "mod5" => {
+                if !modifiers.contains(&ModKey::Mod5) {
+                    modifiers.push(ModKey::Mod5);
+                }
+            }
+            _ => {} // Not a modifier, skip
+        }
+    }
+
+    modifiers
+}
 
 impl super::super::App {
     /// Updates keybindings settings
@@ -44,9 +144,16 @@ impl super::super::App {
                 return Task::none();
             }
 
-            M::UpdateModifiers(_idx, _modifiers) => {
-                // TODO: Implement modifier updates
-                log::info!("UpdateModifiers not yet implemented");
+            M::UpdateModifiers(idx, modifiers) => {
+                if let Some(binding) = self.settings.keybindings.bindings.get_mut(idx) {
+                    // Parse existing key_combo to extract the base key
+                    let base_key = extract_base_key(&binding.key_combo);
+
+                    // Build new key_combo with the provided modifiers
+                    let new_combo = build_key_combo(&modifiers, &base_key);
+                    binding.key_combo = new_combo;
+                    log::info!("Updated modifiers for binding {}: {:?}", idx, modifiers);
+                }
             }
 
             M::StartKeyCapture(idx) => {

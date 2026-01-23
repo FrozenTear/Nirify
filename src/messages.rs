@@ -163,6 +163,7 @@ pub enum Page {
     SwitchEvents,
     RecentWindows,
     Tools,
+    Preferences,
     ConfigEditor,
     Backups,
 }
@@ -197,6 +198,7 @@ impl Page {
             Page::SwitchEvents => "Switch Events",
             Page::RecentWindows => "Recent Windows",
             Page::Tools => "Tools",
+            Page::Preferences => "Preferences",
             Page::ConfigEditor => "Config Editor",
             Page::Backups => "Backups",
         }
@@ -218,7 +220,7 @@ impl Page {
             Page::Outputs => PageCategory::System,
             Page::Miscellaneous | Page::Startup | Page::Environment => PageCategory::System,
             Page::Debug | Page::SwitchEvents | Page::RecentWindows => PageCategory::Advanced,
-            Page::Tools => PageCategory::System,
+            Page::Tools | Page::Preferences => PageCategory::System,
             Page::ConfigEditor | Page::Backups => PageCategory::Advanced,
         }
     }

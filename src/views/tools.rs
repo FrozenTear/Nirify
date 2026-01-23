@@ -3,12 +3,12 @@
 //! IPC tools for interacting with niri - query windows, workspaces,
 //! outputs, reload config, and validate config.
 
-use iced::widget::{button, column, container, row, scrollable, text, toggler, Column};
+use iced::widget::{button, column, container, row, scrollable, text, Column};
 use iced::{Alignment, Element, Length};
 
 use super::widgets::*;
 use crate::ipc::{FullOutputInfo, WindowInfo, WorkspaceInfo};
-use crate::messages::{Message, PreferencesMessage, ToolsMessage};
+use crate::messages::{Message, ToolsMessage};
 
 /// State for the tools page (cached IPC data)
 #[derive(Debug, Clone, Default)]
@@ -39,7 +39,7 @@ pub struct ToolsState {
 }
 
 /// Creates the tools view
-pub fn view(state: &ToolsState, niri_connected: bool, float_settings_app: bool) -> Element<'_, Message> {
+pub fn view(state: &ToolsState, niri_connected: bool) -> Element<'_, Message> {
     let mut content = column![
         section_header("Niri Tools"),
         info_text(
@@ -48,43 +48,6 @@ pub fn view(state: &ToolsState, niri_connected: bool, float_settings_app: bool) 
         ),
     ]
     .spacing(4);
-
-    // App Preferences section
-    content = content.push(spacer(16.0));
-    content = content.push(subsection_header("App Preferences"));
-
-    let float_toggle = toggler(float_settings_app)
-        .label("Float this app")
-        .on_toggle(|v| Message::Preferences(PreferencesMessage::SetFloatSettingsApp(v)));
-
-    content = content.push(
-        container(
-            row![
-                column![
-                    text("Window Mode").size(14),
-                    text("When enabled, this settings app floats above other windows. When disabled, it tiles normally.")
-                        .size(12)
-                        .color([0.5, 0.5, 0.5]),
-                ]
-                .spacing(2)
-                .width(Length::Fill),
-                float_toggle,
-            ]
-            .spacing(16)
-            .align_y(Alignment::Center)
-            .padding([12, 16])
-        )
-        .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(iced::Color::from_rgba(
-                0.2, 0.2, 0.2, 0.5,
-            ))),
-            border: iced::Border {
-                radius: 8.0.into(),
-                ..Default::default()
-            },
-            ..Default::default()
-        }),
-    );
 
     content = content.push(spacer(16.0));
 
