@@ -87,6 +87,14 @@ impl App {
         let mut ui = UiState::new(current_theme, tablet_calibration_cache, touch_calibration_cache);
         ui.niri_status = niri_status;
 
+        // Check if this is the first run and show the wizard
+        if paths.is_first_run() {
+            log::info!("First run detected - showing setup wizard");
+            ui.dialog_state = DialogState::FirstRunWizard {
+                step: crate::messages::WizardStep::Welcome,
+            };
+        }
+
         let app = Self {
             settings,
             paths,
@@ -318,7 +326,15 @@ impl App {
                     let next_step = match step {
                         WizardStep::Welcome => WizardStep::ConfigSetup,
                         WizardStep::ConfigSetup => WizardStep::ImportResults,
-                        WizardStep::ImportResults => WizardStep::Complete,
+                        WizardStep::ImportResults => {
+                            // Check if there are consolidation suggestions
+                            if !self.ui.wizard_suggestions.is_empty() {
+                                WizardStep::Consolidation
+                            } else {
+                                WizardStep::Complete
+                            }
+                        }
+                        WizardStep::Consolidation => WizardStep::Complete,
                         WizardStep::Complete => {
                             self.ui.dialog_state = DialogState::None;
                             return Task::none();
@@ -340,7 +356,15 @@ impl App {
                         }
                         WizardStep::ConfigSetup => WizardStep::Welcome,
                         WizardStep::ImportResults => WizardStep::ConfigSetup,
-                        WizardStep::Complete => WizardStep::ImportResults,
+                        WizardStep::Consolidation => WizardStep::ImportResults,
+                        WizardStep::Complete => {
+                            // Go back to Consolidation if there are suggestions, otherwise ImportResults
+                            if !self.ui.wizard_suggestions.is_empty() {
+                                WizardStep::Consolidation
+                            } else {
+                                WizardStep::ImportResults
+                            }
+                        }
                     };
                     self.ui.dialog_state = DialogState::FirstRunWizard { step: prev_step };
                 }
@@ -379,12 +403,90 @@ impl App {
 
                 log::info!("Wizard: Config setup complete");
 
+                // Analyze rules for consolidation opportunities
+                let analysis = crate::config::analyze_rules(
+                    &self.settings.window_rules.rules,
+                    &self.settings.layer_rules.rules,
+                );
+
+                // Store suggestions for wizard consolidation step
+                self.ui.wizard_suggestions.clear();
+                if analysis.has_suggestions() {
+                    for s in &analysis.window_suggestions {
+                        self.ui.wizard_suggestions.push(crate::messages::ConsolidationSuggestion {
+                            description: s.description.clone(),
+                            rule_ids: s.rule_ids.clone(),
+                            rule_count: s.rule_ids.len(),
+                            patterns: s.patterns.clone(),
+                            merged_pattern: s.merged_pattern.clone(),
+                            is_window_rule: true,
+                            selected: true, // Pre-select in wizard
+                        });
+                    }
+                    for s in &analysis.layer_suggestions {
+                        self.ui.wizard_suggestions.push(crate::messages::ConsolidationSuggestion {
+                            description: s.description.clone(),
+                            rule_ids: s.rule_ids.clone(),
+                            rule_count: s.rule_ids.len(),
+                            patterns: s.patterns.clone(),
+                            merged_pattern: s.merged_pattern.clone(),
+                            is_window_rule: false,
+                            selected: true, // Pre-select in wizard
+                        });
+                    }
+                    log::info!("Wizard: Found {} consolidation suggestions", self.ui.wizard_suggestions.len());
+                }
+
                 // Progress to next step
                 if let DialogState::FirstRunWizard { .. } = &self.ui.dialog_state {
                     self.ui.dialog_state = DialogState::FirstRunWizard {
                         step: crate::messages::WizardStep::ImportResults,
                     };
                 }
+                Task::none()
+            }
+
+            Message::WizardConsolidationToggle(index) => {
+                // Toggle selection of a wizard consolidation suggestion
+                if let Some(suggestion) = self.ui.wizard_suggestions.get_mut(index) {
+                    suggestion.selected = !suggestion.selected;
+                }
+                Task::none()
+            }
+
+            Message::WizardConsolidationApply => {
+                // Apply selected wizard consolidation suggestions
+                let selected: Vec<_> = self.ui.wizard_suggestions.iter()
+                    .filter(|s| s.selected)
+                    .cloned()
+                    .collect();
+
+                if !selected.is_empty() {
+                    log::info!("Wizard: Applying {} consolidation suggestions", selected.len());
+
+                    for suggestion in &selected {
+                        if suggestion.is_window_rule {
+                            self.apply_window_rule_consolidation(suggestion);
+                        } else {
+                            self.apply_layer_rule_consolidation(suggestion);
+                        }
+                    }
+                }
+
+                // Clear suggestions and move to complete
+                self.ui.wizard_suggestions.clear();
+                self.ui.dialog_state = DialogState::FirstRunWizard {
+                    step: crate::messages::WizardStep::Complete,
+                };
+                Task::none()
+            }
+
+            Message::WizardConsolidationSkip => {
+                // Skip consolidation, clear suggestions and move to complete
+                self.ui.wizard_suggestions.clear();
+                self.ui.dialog_state = DialogState::FirstRunWizard {
+                    step: crate::messages::WizardStep::Complete,
+                };
                 Task::none()
             }
 
@@ -657,7 +759,7 @@ impl App {
             .height(Length::Fill);
 
         // If there's an active dialog, render it on top
-        if let Some(dialog) = views::dialogs::view(&self.ui.dialog_state) {
+        if let Some(dialog) = views::dialogs::view(&self.ui.dialog_state, &self.ui.wizard_suggestions) {
             // For now, use iced's Stack widget or similar approach
             // Since iced doesn't have perfect z-layering, dialogs handle their own backdrop
             dialog

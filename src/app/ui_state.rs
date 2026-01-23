@@ -87,6 +87,8 @@ pub struct UiState {
     pub backups_state: views::backups::BackupsState,
     /// Pending restore index (for confirmation dialog)
     pub pending_restore_idx: Option<usize>,
+    /// Consolidation suggestions for the first-run wizard
+    pub wizard_suggestions: Vec<crate::messages::ConsolidationSuggestion>,
 }
 
 impl UiState {
