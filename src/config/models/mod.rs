@@ -13,6 +13,7 @@ mod keybindings;
 mod layout;
 mod misc;
 mod output;
+mod preferences;
 mod recent_windows;
 mod rules;
 mod startup;
@@ -30,6 +31,7 @@ pub use keybindings::*;
 pub use layout::*;
 pub use misc::*;
 pub use output::*;
+pub use preferences::*;
 pub use recent_windows::*;
 pub use rules::*;
 pub use startup::*;
@@ -82,6 +84,8 @@ pub struct Settings {
     pub switch_events: SwitchEventsSettings,
     /// Recent windows switcher settings (v25.05+)
     pub recent_windows: RecentWindowsSettings,
+    /// Application preferences (not niri config)
+    pub preferences: PreferencesSettings,
 }
 
 impl Settings {

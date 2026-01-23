@@ -30,6 +30,7 @@ mod input;
 mod keybindings;
 mod layout_extras;
 mod misc;
+mod preferences;
 mod rules;
 mod system;
 mod workspaces;
@@ -49,6 +50,7 @@ pub use input::{
 pub use keybindings::generate_keybindings_kdl;
 pub use layout_extras::generate_layout_extras_kdl;
 pub use misc::generate_misc_kdl;
+pub use preferences::generate_preferences_kdl;
 pub use rules::{generate_layer_rules_kdl, generate_window_rules_kdl};
 pub use system::{
     generate_debug_kdl, generate_environment_kdl, generate_recent_windows_kdl,
@@ -266,7 +268,7 @@ fn write_all_settings(
     )?;
     write_config(
         &paths.window_rules_kdl,
-        &generate_window_rules_kdl(&settings.window_rules),
+        &generate_window_rules_kdl(&settings.window_rules, settings.preferences.float_settings_app),
         strategy,
     )?;
     write_config(
@@ -292,6 +294,11 @@ fn write_all_settings(
     write_config(
         &paths.recent_windows_kdl,
         &generate_recent_windows_kdl(&settings.recent_windows),
+        strategy,
+    )?;
+    write_config(
+        &paths.preferences_kdl,
+        &generate_preferences_kdl(&settings.preferences),
         strategy,
     )?;
 
@@ -468,7 +475,7 @@ pub fn save_dirty(
             SettingsCategory::WindowRules => {
                 write_config(
                     &paths.window_rules_kdl,
-                    &generate_window_rules_kdl(&settings.window_rules),
+                    &generate_window_rules_kdl(&settings.window_rules, settings.preferences.float_settings_app),
                     strategy,
                 )?;
             }
@@ -511,6 +518,13 @@ pub fn save_dirty(
                 write_config(
                     &paths.recent_windows_kdl,
                     &generate_recent_windows_kdl(&settings.recent_windows),
+                    strategy,
+                )?;
+            }
+            SettingsCategory::Preferences => {
+                write_config(
+                    &paths.preferences_kdl,
+                    &generate_preferences_kdl(&settings.preferences),
                     strategy,
                 )?;
             }

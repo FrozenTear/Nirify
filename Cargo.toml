@@ -1,6 +1,6 @@
 [package]
 name = "niri-settings"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.82"
 description = "A native settings application for the niri Wayland compositor"
@@ -14,16 +14,9 @@ members = ["macros"]
 
 [dependencies]
 niri-settings-macros = { path = "macros" }
-# Use minimal Slint features for faster builds
-# backend-winit-wayland: Native Wayland support (no X11/Qt overhead)
-# renderer-femtovg: OpenGL rendering (faster than software)
-# compat-1-2: API compatibility
-slint = { version = "1.14", default-features = false, features = [
-    "std",
-    "backend-winit-wayland",
-    "renderer-femtovg",
-    "compat-1-2"
-] }
+# Iced UI framework
+iced = { version = "0.14", features = ["tokio", "debug"] }
+tokio = { version = "1.0", features = ["rt-multi-thread"] }
 kdl = { version = "6.5", features = ["v1-fallback"] }
 dirs = "6.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -36,9 +29,7 @@ log = "0.4"
 env_logger = "0.11"
 rfd = "0.15"
 paste = "1.0"
-
-[build-dependencies]
-slint-build = "1.14"
+regex-syntax = "0.8"
 
 [dev-dependencies]
 tempfile = "3.23"
@@ -55,7 +46,7 @@ harness = false
 [profile.dev]
 opt-level = 0
 
-# Compile dependencies with optimizations (makes Slint much faster to build/run)
+# Compile dependencies with optimizations (makes iced much faster to build/run)
 [profile.dev.package."*"]
 opt-level = 2
 

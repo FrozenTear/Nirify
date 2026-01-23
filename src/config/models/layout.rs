@@ -92,6 +92,17 @@ pub enum TabIndicatorPosition {
     Bottom,
 }
 
+impl std::fmt::Display for TabIndicatorPosition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TabIndicatorPosition::Left => write!(f, "Left"),
+            TabIndicatorPosition::Right => write!(f, "Right"),
+            TabIndicatorPosition::Top => write!(f, "Top"),
+            TabIndicatorPosition::Bottom => write!(f, "Bottom"),
+        }
+    }
+}
+
 /// Tab indicator settings
 #[derive(Debug, Clone, PartialEq)]
 pub struct TabIndicatorSettings {
@@ -166,6 +177,15 @@ pub enum DefaultColumnDisplay {
     Normal,
     /// Tabbed display (windows stacked as tabs)
     Tabbed,
+}
+
+impl std::fmt::Display for DefaultColumnDisplay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DefaultColumnDisplay::Normal => write!(f, "Normal"),
+            DefaultColumnDisplay::Tabbed => write!(f, "Tabbed"),
+        }
+    }
 }
 
 /// Layout extras settings

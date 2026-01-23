@@ -50,6 +50,21 @@ pub enum ColumnWidthType {
     Fixed,
 }
 
+impl std::fmt::Display for ColumnWidthType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Proportion => write!(f, "Proportion"),
+            Self::Fixed => write!(f, "Fixed"),
+        }
+    }
+}
+
+impl ColumnWidthType {
+    pub fn all() -> &'static [Self] {
+        &[Self::Proportion, Self::Fixed]
+    }
+}
+
 impl Default for BehaviorSettings {
     fn default() -> Self {
         Self {

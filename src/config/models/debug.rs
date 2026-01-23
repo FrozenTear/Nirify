@@ -1,5 +1,52 @@
 //! Debug settings for niri
 
+/// Preview render mode for debugging
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PreviewRenderMode {
+    /// Preview render is disabled
+    #[default]
+    Off,
+    /// Render as if screencasting (portals only)
+    Screencast,
+    /// Render as if screen capturing (screenshots + screencasts)
+    ScreenCapture,
+}
+
+impl PreviewRenderMode {
+    /// Convert to KDL string value
+    pub fn to_kdl(&self) -> Option<&'static str> {
+        match self {
+            Self::Off => None,
+            Self::Screencast => Some("screencast"),
+            Self::ScreenCapture => Some("screen-capture"),
+        }
+    }
+
+    /// Parse from KDL string
+    pub fn from_kdl(s: &str) -> Self {
+        match s {
+            "screencast" => Self::Screencast,
+            "screen-capture" => Self::ScreenCapture,
+            _ => Self::Off,
+        }
+    }
+
+    /// All variants for UI picker
+    pub fn all() -> &'static [Self] {
+        &[Self::Off, Self::Screencast, Self::ScreenCapture]
+    }
+}
+
+impl std::fmt::Display for PreviewRenderMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Off => write!(f, "Off"),
+            Self::Screencast => write!(f, "Screencast"),
+            Self::ScreenCapture => write!(f, "Screen Capture"),
+        }
+    }
+}
+
 /// Debug settings for niri
 ///
 /// These are advanced settings primarily for debugging and development.
@@ -11,8 +58,8 @@ pub struct DebugSettings {
     pub expert_mode: bool,
 
     // Rendering options
-    /// Render monitors the same way as for screencast
-    pub preview_render: bool,
+    /// Render monitors as if recording (for testing screencast appearance)
+    pub preview_render: PreviewRenderMode,
     /// Enable direct scanout into overlay planes
     pub enable_overlay_planes: bool,
     /// Disable cursor plane usage

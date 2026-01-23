@@ -133,13 +133,13 @@ fn test_dirty_tracker_thread_safety() {
     assert_eq!(tracker.dirty_count(), 4);
 }
 
-/// Verify category count matches the documented 25 categories
+/// Verify category count matches the documented 26 categories
 #[test]
 fn test_all_categories_count() {
     assert_eq!(
         SettingsCategory::all().len(),
-        25,
-        "Expected 25 settings categories"
+        26,
+        "Expected 26 settings categories (including Preferences)"
     );
 }
 

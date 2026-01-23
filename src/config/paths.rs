@@ -58,6 +58,7 @@ pub struct ConfigPaths {
     pub debug_kdl: PathBuf,
     pub switch_events_kdl: PathBuf,
     pub recent_windows_kdl: PathBuf,
+    pub preferences_kdl: PathBuf,
 }
 
 impl ConfigPaths {
@@ -101,6 +102,7 @@ impl ConfigPaths {
         let debug_kdl = advanced_dir.join("debug.kdl");
         let switch_events_kdl = advanced_dir.join("switch-events.kdl");
         let recent_windows_kdl = advanced_dir.join("recent-windows.kdl");
+        let preferences_kdl = advanced_dir.join("preferences.kdl");
 
         Ok(Self {
             niri_config: niri_dir.join("config.kdl"),
@@ -146,6 +148,7 @@ impl ConfigPaths {
             debug_kdl,
             switch_events_kdl,
             recent_windows_kdl,
+            preferences_kdl,
         })
     }
 
@@ -216,6 +219,58 @@ impl ConfigPaths {
             }
         }
         false
+    }
+
+    /// Add the include line to the user's config.kdl
+    ///
+    /// Creates a backup of the original file and adds the include line at the end.
+    /// Returns Ok(()) if successful or if the include line already exists.
+    pub fn add_include_line(&self) -> Result<(), ConfigError> {
+        use std::fs;
+        use std::io::Write;
+
+        // Check if include already exists
+        if self.has_include_line() {
+            log::info!("Include line already present in config.kdl");
+            return Ok(());
+        }
+
+        // Create backup
+        if self.niri_config.exists() {
+            let backup_name = format!(
+                "config.kdl.backup.{}",
+                chrono::Local::now().format("%Y%m%d_%H%M%S")
+            );
+            let backup_path = self.backup_dir.join(backup_name);
+            fs::create_dir_all(&self.backup_dir)?;
+            fs::copy(&self.niri_config, &backup_path)?;
+            log::info!("Created backup at {:?}", backup_path);
+        }
+
+        // Read existing content
+        let existing_content = if self.niri_config.exists() {
+            fs::read_to_string(&self.niri_config)?
+        } else {
+            String::new()
+        };
+
+        // Append include line
+        let include_line = format!(
+            "\n// Managed by niri-settings - do not remove this line\ninclude \"~/.config/niri/{}/main.kdl\"\n",
+            crate::constants::CONFIG_DIR_NAME
+        );
+
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&self.niri_config)?;
+
+        file.write_all(existing_content.as_bytes())?;
+        file.write_all(include_line.as_bytes())?;
+
+        log::info!("Added include line to {:?}", self.niri_config);
+        Ok(())
     }
 }
 

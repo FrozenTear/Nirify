@@ -70,6 +70,8 @@ pub enum SettingsCategory {
     SwitchEvents,
     /// advanced/recent-windows.kdl - recent window switcher
     RecentWindows,
+    /// advanced/preferences.kdl - app preferences (theme, etc.)
+    Preferences,
 }
 
 impl SettingsCategory {
@@ -101,6 +103,7 @@ impl SettingsCategory {
             SettingsCategory::Debug,
             SettingsCategory::SwitchEvents,
             SettingsCategory::RecentWindows,
+            SettingsCategory::Preferences,
         ]
     }
 
@@ -132,6 +135,7 @@ impl SettingsCategory {
             SettingsCategory::Debug => "Debug",
             SettingsCategory::SwitchEvents => "Switch Events",
             SettingsCategory::RecentWindows => "Recent Windows",
+            SettingsCategory::Preferences => "Preferences",
         }
     }
 }
@@ -335,7 +339,7 @@ mod tests {
 
     #[test]
     fn test_category_all_count() {
-        // Ensure we have all 25 categories
-        assert_eq!(SettingsCategory::all().len(), 25);
+        // Ensure we have all 26 categories
+        assert_eq!(SettingsCategory::all().len(), 26);
     }
 }

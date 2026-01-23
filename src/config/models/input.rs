@@ -50,6 +50,8 @@ pub struct MouseSettings {
     pub accel_speed: f64,
     pub accel_profile: AccelProfile,
     pub scroll_factor: f64,
+    /// Optional separate horizontal scroll factor (if different from vertical)
+    pub scroll_factor_horizontal: Option<f64>,
     pub scroll_method: ScrollMethod,
     pub middle_emulation: bool,
     /// Mouse button for on-button-down scrolling (device-dependent)
@@ -67,6 +69,7 @@ impl Default for MouseSettings {
             accel_speed: 0.0,
             accel_profile: AccelProfile::Adaptive,
             scroll_factor: 1.0,
+            scroll_factor_horizontal: None,
             scroll_method: ScrollMethod::NoScroll, // Mouse doesn't use scroll method by default
             middle_emulation: false,
             scroll_button: None,
@@ -90,6 +93,8 @@ pub struct TouchpadSettings {
     pub accel_speed: f64,
     pub accel_profile: AccelProfile,
     pub scroll_factor: f64,
+    /// Optional separate horizontal scroll factor (if different from vertical)
+    pub scroll_factor_horizontal: Option<f64>,
     pub scroll_method: ScrollMethod,
     pub click_method: ClickMethod,
     pub tap_button_map: TapButtonMap,
@@ -115,6 +120,7 @@ impl Default for TouchpadSettings {
             accel_speed: 0.0,
             accel_profile: AccelProfile::Adaptive,
             scroll_factor: 1.0,
+            scroll_factor_horizontal: None,
             scroll_method: ScrollMethod::TwoFinger,
             click_method: ClickMethod::ButtonAreas,
             tap_button_map: TapButtonMap::LeftRightMiddle,

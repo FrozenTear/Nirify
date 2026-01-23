@@ -150,12 +150,34 @@ pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
 }
 
 /// Generate window-rules.kdl from window rules settings
-pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
+///
+/// # Arguments
+/// * `settings` - Window rules settings
+/// * `float_settings_app` - Whether to add a rule to float the settings app
+pub fn generate_window_rules_kdl(settings: &WindowRulesSettings, float_settings_app: bool) -> String {
     // Pre-allocate ~2KB for window rules (can be complex)
     let mut content = String::with_capacity(2048);
     content.push_str("// Window rules - managed by niri-settings-rust\n\n");
 
-    if settings.rules.is_empty() {
+    // Check if there's already a rule for niri-settings
+    let has_niri_settings_rule = settings.rules.iter().any(|rule| {
+        rule.matches.iter().any(|m| {
+            m.app_id
+                .as_ref()
+                .is_some_and(|id| id.contains("niri-settings"))
+        })
+    });
+
+    // Auto-generated rule to float the settings app (only if preference is enabled AND no existing rule)
+    if float_settings_app && !has_niri_settings_rule {
+        content.push_str("// Auto-generated: Float niri-settings app\n");
+        content.push_str("window-rule {\n");
+        content.push_str("    match app-id=\"^niri-settings$\"\n");
+        content.push_str("    open-floating true\n");
+        content.push_str("}\n\n");
+    }
+
+    if settings.rules.is_empty() && !float_settings_app {
         content.push_str("// No window rules configured yet.\n");
         content.push_str("// Add rules through the UI or manually here.\n");
         content.push_str("// Example:\n");
@@ -163,7 +185,7 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings) -> String {
         content.push_str("//     match app-id=\"firefox\"\n");
         content.push_str("//     open-maximized true\n");
         content.push_str("// }\n");
-    } else {
+    } else if !settings.rules.is_empty() {
         for rule in &settings.rules {
             content.push_str(&format!("// {}\n", rule.name));
             content.push_str("window-rule {\n");

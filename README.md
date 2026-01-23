@@ -1,22 +1,30 @@
 # Niri Settings
 
-A native settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor, built with Rust and [Slint](https://slint.dev/).
+A native settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor, built with Rust and [iced](https://iced.rs/).
 
 ## Features
 
-- **Native Performance**: Built in Rust with Slint UI for minimal resource usage
+- **Native Performance**: Built in Rust with iced UI for minimal resource usage
 - **Live Preview**: Changes apply immediately with auto-save (no Apply button needed)
 - **Safe Setup**: Automatically backs up your config before making changes
 - **Smart Config Management**: Preserves your custom settings while managing common options
+- **Floats by Default**: Settings app floats above your tiled windows (configurable)
+- **Theme Support**: NiriAmber and Catppuccin Mocha themes included
 - **Comprehensive Coverage**:
-  - Appearance (gaps, focus ring, borders, corner radius)
-  - Input devices (keyboard, mouse, touchpad, trackpoint, tablet)
-  - Animations and cursor settings
-  - Window and layer rules
+  - Appearance (gaps, focus ring, borders, corner radius, background color)
+  - Input devices (keyboard, mouse, touchpad, trackpoint, trackball, tablet, touch)
+  - Animations (per-animation control with spring/easing curves)
+  - Cursor settings
+  - Window and layer rules (with regex support)
   - Workspaces and outputs
-  - Keybindings (view and edit)
+  - Keybindings (view, edit, and capture new keys)
   - Startup applications and environment variables
   - Debug and advanced options
+  - Niri IPC tools (query windows, workspaces, outputs)
+
+## Screenshots
+
+*Coming soon*
 
 ## Requirements
 
@@ -27,8 +35,8 @@ A native settings application for the [niri](https://github.com/YaLTeR/niri) Way
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR-USERNAME/niri-settings
-cd niri-settings
+git clone https://github.com/FrozenTear/niri-tweaks
+cd niri-tweaks
 
 # Build in release mode
 cargo build --release
@@ -89,6 +97,7 @@ Niri Settings manages configuration files in `~/.config/niri/niri-settings/`:
 ```
 ~/.config/niri/niri-settings/
 ├── main.kdl              # Entry point (includes all other files)
+├── preferences.kdl       # App preferences (theme, float behavior)
 ├── appearance.kdl        # Gaps, focus ring, borders, corner radius
 ├── behavior.kdl          # Focus follows mouse, workspace behavior
 ├── animations.kdl        # Animation settings
@@ -114,8 +123,18 @@ Niri Settings manages configuration files in `~/.config/niri/niri-settings/`:
     ├── environment.kdl   # Environment variables
     ├── debug.kdl         # Debug options
     ├── switch-events.kdl # Lid/tablet mode events
+    ├── recent-windows.kdl # Recent windows settings
     └── misc.kdl          # Miscellaneous settings
 ```
+
+## App Preferences
+
+The settings app has its own preferences (separate from niri config):
+
+- **Theme**: Choose between NiriAmber (default) and Catppuccin Mocha
+- **Float Settings App**: When enabled (default), the app floats above tiled windows
+
+These can be changed in the **Tools** page under "App Preferences".
 
 ## Development
 
@@ -133,6 +152,16 @@ cargo clippy
 cargo fmt
 ```
 
+## Architecture
+
+The app follows the Elm Architecture pattern:
+- **State**: All application state in a single `App` struct
+- **Messages**: Events represented as enum variants
+- **Update**: Pure functions that handle state changes
+- **View**: UI constructed from current state
+
+See `CLAUDE.md` for detailed architecture documentation.
+
 ## License
 
 GPL-3.0 - See [LICENSE](LICENSE) for details.
@@ -144,5 +173,5 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 ## Acknowledgments
 
 - [niri](https://github.com/YaLTeR/niri) - The scrollable-tiling Wayland compositor
-- [Slint](https://slint.dev/) - Native GUI toolkit for Rust
+- [iced](https://iced.rs/) - Cross-platform GUI library for Rust
 - [niri-settings](https://github.com/stefonarch/niri-settings) - Original Python/Qt implementation (inspiration)

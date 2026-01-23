@@ -76,6 +76,25 @@ pub struct LayerRulesSettings {
     pub next_id: u32,
 }
 
+impl LayerRulesSettings {
+    /// Find a layer rule by ID (immutable)
+    pub fn find(&self, id: u32) -> Option<&LayerRule> {
+        self.rules.iter().find(|r| r.id == id)
+    }
+
+    /// Find a layer rule by ID (mutable)
+    pub fn find_mut(&mut self, id: u32) -> Option<&mut LayerRule> {
+        self.rules.iter_mut().find(|r| r.id == id)
+    }
+
+    /// Remove a rule by ID, returns true if removed
+    pub fn remove(&mut self, id: u32) -> bool {
+        let len_before = self.rules.len();
+        self.rules.retain(|r| r.id != id);
+        self.rules.len() < len_before
+    }
+}
+
 // ============================================================================
 // WINDOW RULES
 // ============================================================================
@@ -311,4 +330,23 @@ pub struct WindowRulesSettings {
     pub rules: Vec<WindowRule>,
     /// Counter for generating unique IDs
     pub next_id: u32,
+}
+
+impl WindowRulesSettings {
+    /// Find a window rule by ID (immutable)
+    pub fn find(&self, id: u32) -> Option<&WindowRule> {
+        self.rules.iter().find(|r| r.id == id)
+    }
+
+    /// Find a window rule by ID (mutable)
+    pub fn find_mut(&mut self, id: u32) -> Option<&mut WindowRule> {
+        self.rules.iter_mut().find(|r| r.id == id)
+    }
+
+    /// Remove a rule by ID, returns true if removed
+    pub fn remove(&mut self, id: u32) -> bool {
+        let len_before = self.rules.len();
+        self.rules.retain(|r| r.id != id);
+        self.rules.len() < len_before
+    }
 }

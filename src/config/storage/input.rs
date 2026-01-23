@@ -257,6 +257,7 @@ pub fn generate_mouse_kdl(settings: &MouseSettings) -> String {
         settings.accel_speed,
         settings.accel_profile,
         settings.scroll_factor,
+        settings.scroll_factor_horizontal,
     );
 
     // Only output scroll-method if it's not the default (no-scroll for mouse)
@@ -322,6 +323,7 @@ pub fn generate_touchpad_kdl(settings: &TouchpadSettings) -> String {
         settings.accel_speed,
         settings.accel_profile,
         settings.scroll_factor,
+        settings.scroll_factor_horizontal,
     );
 
     // Touchpad-specific enums
