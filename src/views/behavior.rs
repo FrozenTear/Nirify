@@ -12,6 +12,7 @@ use crate::types::{CenterFocusedColumn, ModKey, WarpMouseMode};
 /// Creates the behavior settings view
 pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
     let focus_follows_mouse = settings.focus_follows_mouse;
+    let focus_max_scroll = settings.focus_follows_mouse_max_scroll_amount;
     let warp_mouse_to_focus = settings.warp_mouse_to_focus;
     let workspace_auto_back_and_forth = settings.workspace_auto_back_and_forth;
     let always_center_single_column = settings.always_center_single_column;
@@ -36,6 +37,15 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
             "Automatically focus windows when hovering over them",
             focus_follows_mouse,
             |value| Message::Behavior(BehaviorMessage::ToggleFocusFollowsMouse(value)),
+        ),
+        optional_slider_row(
+            "Max scroll amount",
+            "Limit viewport scrolling when focus-follows-mouse triggers (% of window size)",
+            focus_max_scroll,
+            0.0,
+            100.0,
+            "%",
+            |value| Message::Behavior(BehaviorMessage::SetFocusFollowsMouseMaxScroll(value)),
         ),
         picker_row(
             "Warp mouse to focused window",
@@ -140,20 +150,13 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
             Some(mod_key),
             |value| Message::Behavior(BehaviorMessage::SetModKey(value)),
         ),
-        {
-            let message = if let Some(key) = mod_key_nested {
-                format!("Nested modifier key: {} (edit behavior.kdl to change)", key)
-            } else {
-                "Nested modifier key: None (uses same as above) - edit behavior.kdl to change".to_string()
-            };
-
-            container(
-                iced::widget::text(message)
-                    .size(13)
-                    .color([0.6, 0.7, 0.9])
-            )
-            .padding(12)
-        },
+        optional_picker_row(
+            "Nested modifier key",
+            "Override modifier key when niri runs nested inside another compositor",
+            ModKey::all(),
+            mod_key_nested,
+            |value| Message::Behavior(BehaviorMessage::SetModKeyNested(value)),
+        ),
         spacer(16.0),
 
         section_header("Power Button"),

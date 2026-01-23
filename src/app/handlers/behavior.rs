@@ -13,6 +13,9 @@ impl super::super::App {
             BehaviorMessage::ToggleFocusFollowsMouse(value) => {
                 self.settings.behavior.focus_follows_mouse = value;
             }
+            BehaviorMessage::SetFocusFollowsMouseMaxScroll(value) => {
+                self.settings.behavior.focus_follows_mouse_max_scroll_amount = value.map(|v| v.clamp(0.0, 100.0));
+            }
             BehaviorMessage::SetWarpMouseToFocus(mode) => {
                 self.settings.behavior.warp_mouse_to_focus = mode;
             }

@@ -106,6 +106,172 @@ pub fn validate_string_opt(s: Option<&str>) -> Option<String> {
     s.map(validate_string)
 }
 
+// Pre-save validation for settings
+// Validates settings before writing to disk to prevent invalid configs.
+
+use super::models::{LayerRule, Settings, WindowRule};
+
+/// Validation error with context
+#[derive(Debug, Clone)]
+pub struct ValidationError {
+    pub category: String,
+    pub field: String,
+    pub message: String,
+}
+
+impl std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}: {}", self.category, self.field, self.message)
+    }
+}
+
+/// Result of validation
+#[derive(Debug, Default)]
+pub struct ValidationResult {
+    pub errors: Vec<ValidationError>,
+    pub warnings: Vec<ValidationError>,
+}
+
+impl ValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.errors.is_empty()
+    }
+
+    pub fn add_error(&mut self, category: &str, field: &str, message: &str) {
+        self.errors.push(ValidationError {
+            category: category.to_string(),
+            field: field.to_string(),
+            message: message.to_string(),
+        });
+    }
+
+    pub fn add_warning(&mut self, category: &str, field: &str, message: &str) {
+        self.warnings.push(ValidationError {
+            category: category.to_string(),
+            field: field.to_string(),
+            message: message.to_string(),
+        });
+    }
+}
+
+/// Validate a regex pattern using regex_syntax for robust parsing
+fn validate_regex_strict(pattern: &str) -> Result<(), String> {
+    if pattern.is_empty() {
+        return Ok(());
+    }
+    regex_syntax::Parser::new()
+        .parse(pattern)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// Validate a window rule
+fn validate_window_rule(rule: &WindowRule, result: &mut ValidationResult) {
+    let rule_name = format!("WindowRule[{}]", rule.id);
+
+    for (idx, m) in rule.matches.iter().enumerate() {
+        let match_prefix = format!("{}.match[{}]", rule_name, idx);
+
+        // Validate regex patterns with strict parser
+        if let Some(ref pattern) = m.app_id {
+            if let Err(e) = validate_regex_strict(pattern) {
+                result.add_error("WindowRules", &format!("{}.app_id", match_prefix), &e);
+            }
+        }
+        if let Some(ref pattern) = m.title {
+            if let Err(e) = validate_regex_strict(pattern) {
+                result.add_error("WindowRules", &format!("{}.title", match_prefix), &e);
+            }
+        }
+    }
+
+    // Validate opacity range
+    if let Some(opacity) = rule.opacity {
+        if !(0.0..=1.0).contains(&opacity) {
+            result.add_warning(
+                "WindowRules",
+                &format!("{}.opacity", rule_name),
+                &format!("Opacity {} is outside valid range [0.0, 1.0]", opacity),
+            );
+        }
+    }
+}
+
+/// Validate a layer rule
+fn validate_layer_rule(rule: &LayerRule, result: &mut ValidationResult) {
+    let rule_name = format!("LayerRule[{}]", rule.id);
+
+    for (idx, m) in rule.matches.iter().enumerate() {
+        let match_prefix = format!("{}.match[{}]", rule_name, idx);
+
+        // Validate namespace regex with strict parser
+        if let Some(ref pattern) = m.namespace {
+            if let Err(e) = validate_regex_strict(pattern) {
+                result.add_error("LayerRules", &format!("{}.namespace", match_prefix), &e);
+            }
+        }
+    }
+
+    // Validate opacity range
+    if let Some(opacity) = rule.opacity {
+        if !(0.0..=1.0).contains(&opacity) {
+            result.add_warning(
+                "LayerRules",
+                &format!("{}.opacity", rule_name),
+                &format!("Opacity {} is outside valid range [0.0, 1.0]", opacity),
+            );
+        }
+    }
+}
+
+/// Validate all settings before saving
+///
+/// Returns validation result with errors (which should block save) and warnings.
+pub fn validate_settings(settings: &Settings) -> ValidationResult {
+    let mut result = ValidationResult::default();
+
+    // Validate window rules
+    for rule in &settings.window_rules.rules {
+        validate_window_rule(rule, &mut result);
+    }
+
+    // Validate layer rules
+    for rule in &settings.layer_rules.rules {
+        validate_layer_rule(rule, &mut result);
+    }
+
+    // Validate keybindings - check for empty key combos
+    for (idx, binding) in settings.keybindings.bindings.iter().enumerate() {
+        if binding.key_combo.trim().is_empty() {
+            result.add_warning(
+                "Keybindings",
+                &format!("binding[{}].key_combo", idx),
+                "Empty key combo",
+            );
+        }
+    }
+
+    // Log validation results
+    if result.errors.is_empty() && result.warnings.is_empty() {
+        log::debug!("Settings validation passed");
+    } else {
+        if !result.errors.is_empty() {
+            log::warn!("Settings validation found {} errors", result.errors.len());
+            for err in &result.errors {
+                log::warn!("  Validation error: {}", err);
+            }
+        }
+        if !result.warnings.is_empty() {
+            log::info!("Settings validation found {} warnings", result.warnings.len());
+            for warn in &result.warnings {
+                log::info!("  Validation warning: {}", warn);
+            }
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,5 +306,28 @@ mod tests {
             validate_string_opt(Some("hello")),
             Some("hello".to_string())
         );
+    }
+
+    #[test]
+    fn test_validate_regex_strict_valid() {
+        assert!(validate_regex_strict("^foo$").is_ok());
+        assert!(validate_regex_strict(".*bar.*").is_ok());
+        assert!(validate_regex_strict("").is_ok());
+        assert!(validate_regex_strict(r"\d+").is_ok());
+    }
+
+    #[test]
+    fn test_validate_regex_strict_invalid() {
+        assert!(validate_regex_strict("[unclosed").is_err());
+        assert!(validate_regex_strict("(unclosed").is_err());
+        assert!(validate_regex_strict("*invalid").is_err());
+        assert!(validate_regex_strict(r"\").is_err());
+    }
+
+    #[test]
+    fn test_validate_empty_settings() {
+        let settings = Settings::default();
+        let result = validate_settings(&settings);
+        assert!(result.is_valid());
     }
 }

@@ -370,3 +370,147 @@ pub fn info_text<'a, Message: 'a>(content: &'a str) -> Element<'a, Message> {
     .padding(12)
     .into()
 }
+
+/// Creates an optional slider row with a checkbox to enable/disable
+///
+/// Shows "Disabled" when None, or the value when Some
+///
+/// # Example
+/// ```rust,ignore
+/// optional_slider_row(
+///     "Max scroll amount",
+///     "Limit viewport scrolling (% of window)",
+///     settings.focus_follows_mouse_max_scroll_amount,
+///     0.0,
+///     100.0,
+///     "%",
+///     |value| BehaviorMessage::SetFocusFollowsMouseMaxScroll(value),
+/// )
+/// ```
+pub fn optional_slider_row<'a, Message: Clone + 'a>(
+    label: &'a str,
+    description: &'a str,
+    value: Option<f32>,
+    min: f32,
+    max: f32,
+    unit: &'a str,
+    on_change: impl Fn(Option<f32>) -> Message + Clone + 'a,
+) -> Element<'a, Message> {
+    let is_enabled = value.is_some();
+    let current_value = value.unwrap_or((min + max) / 2.0);
+
+    let on_change_clone = on_change.clone();
+
+    column![
+        // Top: Label, enable toggle, and current value
+        row![
+            text(label).size(16),
+            toggler(is_enabled).on_toggle(move |enabled| {
+                if enabled {
+                    on_change_clone(Some(current_value))
+                } else {
+                    on_change_clone(None)
+                }
+            }),
+            text(if is_enabled {
+                format!("{:.1}{}", current_value, unit)
+            } else {
+                "Disabled".to_string()
+            })
+            .size(14)
+            .color(if is_enabled { [0.8, 0.8, 0.8] } else { [0.5, 0.5, 0.5] })
+            .font(crate::theme::fonts::MONO_FONT),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Center),
+        // Middle: Description
+        text(description).size(12).color([0.7, 0.7, 0.7]),
+        // Bottom: Slider (only active when enabled)
+        {
+            let on_change_slider = on_change.clone();
+            if is_enabled {
+                slider(min..=max, current_value, move |v| on_change_slider(Some(v)))
+                    .step(1.0)
+            } else {
+                slider(min..=max, current_value, move |_v| on_change(None))
+                    .step(1.0)
+            }
+        },
+    ]
+    .spacing(6)
+    .padding(12)
+    .into()
+}
+
+/// Creates an optional picker row for enum selections
+///
+/// Shows "None" option plus all enum values
+///
+/// # Example
+/// ```rust,ignore
+/// optional_picker_row(
+///     "Nested modifier key",
+///     "Override modifier when running nested",
+///     ModKey::all(),
+///     settings.mod_key_nested,
+///     |value| BehaviorMessage::SetModKeyNested(value),
+/// )
+/// ```
+pub fn optional_picker_row<'a, T, Message: Clone + 'a>(
+    label: &'a str,
+    description: &'a str,
+    options: &'a [T],
+    selected: Option<T>,
+    on_select: impl Fn(Option<T>) -> Message + 'a,
+) -> Element<'a, Message>
+where
+    T: Clone + Eq + std::fmt::Display + 'a,
+{
+    // Create wrapper options with None option
+    #[derive(Clone, PartialEq, Eq)]
+    enum OptionWrapper<T> {
+        None,
+        Some(T),
+    }
+
+    impl<T: std::fmt::Display> std::fmt::Display for OptionWrapper<T> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                OptionWrapper::None => write!(f, "None (Use Default)"),
+                OptionWrapper::Some(v) => v.fmt(f),
+            }
+        }
+    }
+
+    let wrapped_options: Vec<OptionWrapper<T>> = std::iter::once(OptionWrapper::None)
+        .chain(options.iter().cloned().map(OptionWrapper::Some))
+        .collect();
+
+    let wrapped_selected = match selected {
+        None => OptionWrapper::None,
+        Some(v) => OptionWrapper::Some(v),
+    };
+
+    row![
+        // Left side: Label and description
+        column![
+            text(label).size(16),
+            text(description).size(12).color([0.7, 0.7, 0.7]),
+        ]
+        .spacing(4)
+        .width(Length::Fill),
+        // Right side: Picker dropdown
+        pick_list(wrapped_options, Some(wrapped_selected), move |selected| {
+            match selected {
+                OptionWrapper::None => on_select(None),
+                OptionWrapper::Some(v) => on_select(Some(v)),
+            }
+        })
+        .width(Length::Fixed(200.0))
+        .padding([8, 12]),
+    ]
+    .spacing(20)
+    .padding(12)
+    .align_y(Alignment::Center)
+    .into()
+}

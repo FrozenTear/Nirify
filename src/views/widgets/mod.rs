@@ -28,6 +28,7 @@ pub use key_capture::{format_key_combination, is_modifier_only, key_capture_row,
 pub use list_item::list_item;
 pub use optional_picker::{optional_bool_picker, OptionalBool};
 pub use setting_row::{
-    info_text, picker_row, section_header, slider_row, slider_row_int, slider_row_int_with_state,
-    slider_row_with_state, spacer, subsection_header, text_input_row, toggle_row,
+    info_text, optional_picker_row, optional_slider_row, picker_row, section_header, slider_row,
+    slider_row_int, slider_row_int_with_state, slider_row_with_state, spacer, subsection_header,
+    text_input_row, toggle_row,
 };

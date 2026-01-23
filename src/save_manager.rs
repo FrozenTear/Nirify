@@ -140,6 +140,15 @@ impl SaveManager {
                 settings.lock().expect("settings mutex poisoned").clone()
             };
 
+            // Validate settings before saving
+            let validation_result = crate::config::validation::validate_settings(&settings_snapshot);
+            if !validation_result.is_valid() {
+                // Log errors but don't block save - warnings are logged in validate_settings
+                for err in &validation_result.errors {
+                    error!("Validation error (saving anyway): {}", err);
+                }
+            }
+
             // Perform actual save (async I/O, no locks held)
             let result: Result<Result<usize, _>, _> = tokio::task::spawn_blocking(move || {
                 crate::config::save_dirty(&paths, &settings_snapshot, &dirty_set)

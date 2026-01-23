@@ -217,6 +217,7 @@ pub enum AppearanceMessage {
 pub enum BehaviorMessage {
     // Focus
     ToggleFocusFollowsMouse(bool),
+    SetFocusFollowsMouseMaxScroll(Option<f32>),
     SetWarpMouseToFocus(WarpMouseMode),
 
     // Workspace
