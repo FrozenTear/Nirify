@@ -2,6 +2,35 @@
 //!
 //! This module defines all possible events/actions in the application.
 //! Messages flow: User interaction → Message → update() → State change → view()
+//!
+//! # Architecture
+//!
+//! The message system follows the Elm Architecture pattern:
+//! 1. User interacts with UI → creates a `Message`
+//! 2. `update()` matches on the message and modifies state
+//! 3. `view()` renders the updated state
+//!
+//! # Organization
+//!
+//! Messages are organized into nested enums by settings category:
+//!
+//! - **Navigation & System**: `NavigateToPage`, `ToggleSidebar`, `SearchQueryChanged`, etc.
+//! - **Visual Settings**: `AppearanceMessage`, `AnimationsMessage`, `CursorMessage`
+//! - **Behavior Settings**: `BehaviorMessage`, `LayoutExtrasMessage`, `GesturesMessage`
+//! - **Input Devices**: `KeyboardMessage`, `MouseMessage`, `TouchpadMessage`,
+//!   `TrackpointMessage`, `TrackballMessage`, `TabletMessage`, `TouchMessage`
+//! - **Rules & Bindings**: `WindowRulesMessage`, `LayerRulesMessage`, `KeybindingsMessage`
+//! - **System Configuration**: `OutputsMessage`, `WorkspacesMessage`, `EnvironmentMessage`,
+//!   `StartupMessage`, `MiscellaneousMessage`
+//! - **Advanced**: `DebugMessage`, `SwitchEventsMessage`, `RecentWindowsMessage`
+//! - **App Management**: `ToolsMessage`, `ConfigEditorMessage`, `BackupsMessage`, `PreferencesMessage`
+//!
+//! # Why Nested Enums?
+//!
+//! - **Namespacing**: Avoids name collisions (e.g., `WindowRulesMessage::AddRule` vs `LayerRulesMessage::AddRule`)
+//! - **Handler Organization**: Each category can have its own handler function
+//! - **IDE Navigation**: Easy to find all messages for a specific feature
+//! - **Testing**: Categories can be unit tested independently
 
 use crate::types::{AccelProfile, CenterFocusedColumn, ClickMethod, ModKey, ScrollMethod, TapButtonMap, WarpMouseMode};
 use crate::config::ColumnWidthType;
@@ -10,54 +39,82 @@ use crate::views::widgets::GradientPickerMessage;
 /// Root message enum - all possible application events
 #[derive(Debug, Clone)]
 pub enum Message {
-    // Navigation
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Navigation & UI
+    // ═══════════════════════════════════════════════════════════════════════════
     NavigateToPage(Page),
     ToggleSidebar,
-
-    // Search
     SearchQueryChanged(String),
     SearchResultSelected(usize),
     ClearSearch,
-
-    // Theme
     ChangeTheme(crate::theme::AppTheme),
 
-    // Settings categories (nested enums)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Visual Settings
+    // ═══════════════════════════════════════════════════════════════════════════
     Appearance(AppearanceMessage),
+    Animations(AnimationsMessage),
+    Cursor(CursorMessage),
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Behavior & Layout
+    // ═══════════════════════════════════════════════════════════════════════════
     Behavior(BehaviorMessage),
+    LayoutExtras(LayoutExtrasMessage),
+    Gestures(GesturesMessage),
+    Workspaces(WorkspacesMessage),
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Input Devices
+    // ═══════════════════════════════════════════════════════════════════════════
     Keyboard(KeyboardMessage),
     Mouse(MouseMessage),
     Touchpad(TouchpadMessage),
-    Animations(AnimationsMessage),
-    Cursor(CursorMessage),
-    Workspaces(WorkspacesMessage),
-    WindowRules(WindowRulesMessage),
-    LayerRules(LayerRulesMessage),
-    Outputs(OutputsMessage),
-    Keybindings(KeybindingsMessage),
-    Debug(DebugMessage),
-    Miscellaneous(MiscellaneousMessage),
-    Environment(EnvironmentMessage),
-    SwitchEvents(SwitchEventsMessage),
-    RecentWindows(RecentWindowsMessage),
     Trackpoint(TrackpointMessage),
     Trackball(TrackballMessage),
     Tablet(TabletMessage),
     Touch(TouchMessage),
-    Gestures(GesturesMessage),
-    LayoutExtras(LayoutExtrasMessage),
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Rules & Bindings
+    // ═══════════════════════════════════════════════════════════════════════════
+    WindowRules(WindowRulesMessage),
+    LayerRules(LayerRulesMessage),
+    Keybindings(KeybindingsMessage),
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // System Configuration
+    // ═══════════════════════════════════════════════════════════════════════════
+    Outputs(OutputsMessage),
+    Miscellaneous(MiscellaneousMessage),
+    Environment(EnvironmentMessage),
     Startup(StartupMessage),
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Advanced Features
+    // ═══════════════════════════════════════════════════════════════════════════
+    Debug(DebugMessage),
+    SwitchEvents(SwitchEventsMessage),
+    RecentWindows(RecentWindowsMessage),
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // App Management
+    // ═══════════════════════════════════════════════════════════════════════════
     Tools(ToolsMessage),
     Preferences(PreferencesMessage),
     ConfigEditor(ConfigEditorMessage),
     Backups(BackupsMessage),
 
-    // Save subsystem
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Save & Persistence
+    // ═══════════════════════════════════════════════════════════════════════════
     Save(SaveMessage),
     SaveCompleted(crate::save_manager::SaveResult),
     ReloadCompleted(crate::save_manager::ReloadResult),
 
-    // Dialogs
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Dialogs & Modals
+    // ═══════════════════════════════════════════════════════════════════════════
     ShowDialog(DialogState),
     CloseDialog,
     DialogConfirm,
@@ -66,11 +123,14 @@ pub enum Message {
     WizardSetupConfig,
     ConsolidationApply,
 
-    // System
+    // ═══════════════════════════════════════════════════════════════════════════
+    // System Events
+    // ═══════════════════════════════════════════════════════════════════════════
     WindowCloseRequested,
     CheckNiriStatus,
     ClearToast,
-    None, // No-op message
+    /// No-op message (for optional callbacks that don't need action)
+    None,
 }
 
 /// Page navigation enum
@@ -188,7 +248,13 @@ impl PageCategory {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// VISUAL SETTINGS MESSAGES
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Appearance settings messages
+///
+/// Controls visual elements: focus ring, border, gaps, corner radius, background
 #[derive(Debug, Clone)]
 pub enum AppearanceMessage {
     // Focus ring
@@ -213,7 +279,13 @@ pub enum AppearanceMessage {
     SetBackgroundColor(Option<String>), // Optional hex color string
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// BEHAVIOR & LAYOUT MESSAGES
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Behavior settings messages
+///
+/// Controls: focus behavior, workspace navigation, column defaults, modifier keys
 #[derive(Debug, Clone)]
 pub enum BehaviorMessage {
     // Focus
@@ -244,7 +316,13 @@ pub enum BehaviorMessage {
     ToggleDisablePowerKeyHandling(bool),
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// INPUT DEVICE MESSAGES
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Keyboard settings messages
+///
+/// Controls: XKB layout, variant, options, repeat rate
 #[derive(Debug, Clone)]
 pub enum KeyboardMessage {
     SetXkbLayout(String),
@@ -257,6 +335,8 @@ pub enum KeyboardMessage {
 }
 
 /// Mouse settings messages
+///
+/// Controls: natural scroll, acceleration, scroll method, button emulation
 #[derive(Debug, Clone)]
 pub enum MouseMessage {
     ToggleOffOnTouchpad(bool),
@@ -271,6 +351,8 @@ pub enum MouseMessage {
 }
 
 /// Touchpad settings messages
+///
+/// Controls: tap-to-click, DWT, gestures, scroll, acceleration
 #[derive(Debug, Clone)]
 pub enum TouchpadMessage {
     ToggleTapToClick(bool),
@@ -290,7 +372,9 @@ pub enum TouchpadMessage {
     ToggleDisabledOnExternalMouse(bool),
 }
 
-/// Animations settings messages (model-driven, more complex)
+/// Animations settings messages
+///
+/// Controls all 11 animation types: duration, curve, spring parameters, custom shaders
 #[derive(Debug, Clone)]
 pub enum AnimationsMessage {
     ToggleSlowdown(bool),
@@ -332,7 +416,13 @@ pub enum WorkspacesMessage {
     MoveWorkspaceDown(usize),
 }
 
-/// Window rules settings messages (complex list + detail view)
+// ═══════════════════════════════════════════════════════════════════════════════
+// RULES & BINDINGS MESSAGES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Window rules settings messages
+///
+/// Manages per-application rules: matching criteria, open behavior, sizing, styling
 #[derive(Debug, Clone)]
 pub enum WindowRulesMessage {
     // List management
@@ -388,6 +478,8 @@ pub enum WindowRulesMessage {
 }
 
 /// Layer rules settings messages
+///
+/// Manages layer-shell surface rules: panels, docks, notifications, overlays
 #[derive(Debug, Clone)]
 pub enum LayerRulesMessage {
     // List management
@@ -421,7 +513,13 @@ pub enum LayerRulesMessage {
     ValidateRegex(u32, usize, String, String), // (rule_id, match_index, field_name, regex)
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM CONFIGURATION MESSAGES
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Outputs (displays) settings messages
+///
+/// Manages monitors: resolution, scale, position, VRR, hot corners
 #[derive(Debug, Clone)]
 pub enum OutputsMessage {
     // List management
@@ -485,7 +583,13 @@ pub enum KeybindingsMessage {
     ToggleSection(String),
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADVANCED SETTINGS MESSAGES
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Debug settings messages
+///
+/// Expert-only options: rendering, device config, performance, compatibility
 #[derive(Debug, Clone)]
 pub enum DebugMessage {
     // Expert mode
@@ -711,7 +815,13 @@ pub enum StartupMessage {
     SetCommand(u32, String),
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// APP MANAGEMENT MESSAGES
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Tools page messages for IPC operations
+///
+/// Niri IPC queries and actions: windows, workspaces, outputs, config reload
 #[derive(Debug, Clone)]
 pub enum ToolsMessage {
     // Query actions
@@ -787,14 +897,24 @@ pub struct BackupEntry {
     pub path: std::path::PathBuf,
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// SAVE & PERSISTENCE MESSAGES
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Save subsystem messages
+///
+/// Periodic auto-save triggers from subscription
 #[derive(Debug, Clone)]
 pub enum SaveMessage {
     /// Periodic check if save is needed (from subscription)
     CheckSave,
 }
 
-/// Dialog state
+// ═══════════════════════════════════════════════════════════════════════════════
+// DIALOG & MODAL TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Dialog state - defines the content and behavior of modal dialogs
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum DialogState {
     #[default]

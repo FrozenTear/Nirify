@@ -14,6 +14,7 @@ pub mod expandable_section;
 pub mod file_path;
 pub mod gradient_picker;
 pub mod key_capture;
+pub mod list_detail;
 pub mod list_item;
 pub mod optional_picker;
 pub mod setting_row;
@@ -31,4 +32,10 @@ pub use setting_row::{
     info_text, optional_picker_row, optional_slider_row, picker_row, section_header, slider_row,
     slider_row_int, slider_row_int_with_state, slider_row_with_state, spacer, subsection_header,
     text_input_row, toggle_row,
+};
+pub use list_detail::{
+    action_button, action_button_style, add_button, add_button_style, add_item_button,
+    badge, delete_button, delete_button_style, empty_detail_placeholder, empty_list_placeholder,
+    list_detail_layout, list_item_style, list_panel_style, match_container_style,
+    remove_button, selection_indicator, BADGE_BEHAVIOR, BADGE_VISIBILITY,
 };

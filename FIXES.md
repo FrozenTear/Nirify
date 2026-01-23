@@ -135,7 +135,18 @@
 **Problem:** Similar list-detail patterns implemented differently
 **Fix:** Create generic component
 
-**Status:** [ ] Not Started
+**Implementation:**
+- Created `src/views/widgets/list_detail.rs` with shared components:
+  - `list_detail_layout()` - standard 1:2 split layout
+  - `add_button()`, `action_button()`, `delete_button()`, `remove_button()` - consistent button styles
+  - `list_item_style()` - selection-aware list item styling
+  - `empty_list_placeholder()`, `empty_detail_placeholder()` - consistent empty states
+  - `selection_indicator()`, `badge()` - reusable UI elements
+  - `match_container_style()`, `add_item_button()` - section helpers
+- Updated window_rules.rs, layer_rules.rs, keybindings.rs to use shared components
+- Reduced code duplication by ~150 lines
+
+**Status:** [x] Completed
 
 ---
 
@@ -144,7 +155,24 @@
 **Problem:** 25 nested enums, 851 lines
 **Fix:** Consider grouping or simplifying
 
-**Status:** [ ] Not Started
+**Implementation:**
+- Added comprehensive module documentation explaining the architecture
+- Reorganized Message enum with section headers for logical grouping:
+  - Navigation & UI
+  - Visual Settings
+  - Behavior & Layout
+  - Input Devices
+  - Rules & Bindings
+  - System Configuration
+  - Advanced Features
+  - App Management
+  - Save & Persistence
+  - Dialogs & Modals
+  - System Events
+- Added section headers and docstrings to nested message enums
+- Decision: Kept nested enums for namespacing benefits; combining similar enums (e.g., TrackpointMessage/TrackballMessage) would add complexity without significant benefit
+
+**Status:** [x] Completed (documentation & organization)
 
 ---
 
@@ -179,7 +207,7 @@
 | 7 | Stubbed handlers | [x] | (basic impl) |
 | 8 | Pre-save validation | [x] | (integrated) |
 | 9 | Advanced behavior settings | [x] | (new widgets) |
-| 10 | ListDetailView | [ ] | |
-| 11 | Flatten messages | [ ] | |
+| 10 | ListDetailView | [x] | (list_detail.rs, shared components) |
+| 11 | Flatten messages | [x] | (documentation & organization) |
 | 12 | HashMap for rules | [ ] | |
 | 13 | Stream KDL | [ ] | |

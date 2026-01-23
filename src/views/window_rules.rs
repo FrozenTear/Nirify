@@ -32,24 +32,8 @@ pub fn view<'a>(
         empty_detail_view()
     };
 
-    // Horizontal split layout (responsive 1:2 ratio)
-    row![
-        container(list_panel)
-            .width(Length::FillPortion(1))
-            .height(Length::Fill)
-            .style(|_theme| {
-                container::Style {
-                    background: Some(iced::Background::Color(iced::Color::from_rgba(0.1, 0.1, 0.1, 0.5))),
-                    ..Default::default()
-                }
-            }),
-        container(detail_panel)
-            .width(Length::FillPortion(2))
-            .height(Length::Fill)
-            .padding(20),
-    ]
-    .spacing(0)
-    .into()
+    // Use shared list-detail layout
+    list_detail_layout(list_panel, detail_panel)
 }
 
 /// List panel showing all window rules
@@ -57,25 +41,7 @@ fn rule_list(settings: &WindowRulesSettings, selected_id: Option<u32>) -> Elemen
     let mut list = column![
         row![
             text("Window Rules").size(18),
-            button(text("+").size(18))
-                .on_press(Message::WindowRules(WindowRulesMessage::AddRule))
-                .padding([4, 12])
-                .style(|_theme, status| {
-                    let bg = match status {
-                        button::Status::Hovered => iced::Color::from_rgba(0.3, 0.5, 0.7, 0.5),
-                        button::Status::Pressed => iced::Color::from_rgba(0.4, 0.6, 0.8, 0.5),
-                        _ => iced::Color::from_rgba(0.2, 0.4, 0.6, 0.4),
-                    };
-                    button::Style {
-                        background: Some(iced::Background::Color(bg)),
-                        text_color: iced::Color::WHITE,
-                        border: iced::Border {
-                            radius: 4.0.into(),
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    }
-                }),
+            add_button(Message::WindowRules(WindowRulesMessage::AddRule)),
         ]
         .spacing(10)
         .padding([12, 20])
@@ -84,16 +50,7 @@ fn rule_list(settings: &WindowRulesSettings, selected_id: Option<u32>) -> Elemen
     .spacing(0);
 
     if settings.rules.is_empty() {
-        list = list.push(
-            container(
-                text("No window rules defined\nClick + to add one")
-                    .size(13)
-                    .color([0.75, 0.75, 0.75])
-                    .center()
-            )
-            .padding(20)
-            .center(Length::Fill)
-        );
+        list = list.push(empty_list_placeholder("No window rules defined\nClick + to add one"));
     } else {
         for rule in &settings.rules {
             let rule_id = rule.id;
@@ -125,34 +82,14 @@ fn rule_list(settings: &WindowRulesSettings, selected_id: Option<u32>) -> Elemen
                 button(
                     column![
                         row![
-                            text(if is_selected { "●" } else { "○" })
-                                .size(12)
-                                .width(Length::Fixed(20.0))
-                                .color(if is_selected { [0.5, 0.7, 1.0] } else { [0.5, 0.5, 0.5] }),
+                            selection_indicator(is_selected),
                             text(rule_name)
                                 .size(14)
                                 .color(if is_selected { [1.0, 1.0, 1.0] } else { [0.9, 0.9, 0.9] }),
-                            if let Some(badge) = behavior_badge {
-                                container(
-                                    text(badge)
-                                        .size(10)
-                                        .color([0.9, 0.9, 0.9])
-                                )
-                                .padding([2, 6])
-                                .style(|_theme| {
-                                    container::Style {
-                                        background: Some(iced::Background::Color(
-                                            iced::Color::from_rgba(0.4, 0.3, 0.6, 0.4)
-                                        )),
-                                        border: iced::Border {
-                                            radius: 3.0.into(),
-                                            ..Default::default()
-                                        },
-                                        ..Default::default()
-                                    }
-                                })
+                            if let Some(badge_text) = behavior_badge {
+                                badge(badge_text, BADGE_BEHAVIOR)
                             } else {
-                                container(text(""))
+                                container(text("")).into()
                             },
                         ]
                         .spacing(8)
@@ -166,23 +103,7 @@ fn rule_list(settings: &WindowRulesSettings, selected_id: Option<u32>) -> Elemen
                 .on_press(Message::WindowRules(WindowRulesMessage::SelectRule(rule_id)))
                 .padding([10, 12])
                 .width(Length::Fill)
-                .style(move |_theme, status| {
-                    let background = match (is_selected, status) {
-                        (true, button::Status::Hovered) => iced::Color::from_rgba(0.3, 0.4, 0.6, 0.5),
-                        (true, button::Status::Pressed) => iced::Color::from_rgba(0.4, 0.5, 0.7, 0.5),
-                        (true, _) => iced::Color::from_rgba(0.2, 0.3, 0.5, 0.4),
-                        (false, button::Status::Hovered) => iced::Color::from_rgba(0.25, 0.25, 0.25, 0.5),
-                        (false, button::Status::Pressed) => iced::Color::from_rgba(0.3, 0.3, 0.3, 0.5),
-                        (false, _) => iced::Color::TRANSPARENT,
-                    };
-
-                    button::Style {
-                        background: Some(iced::Background::Color(background)),
-                        border: iced::Border::default(),
-                        text_color: iced::Color::WHITE,
-                        ..Default::default()
-                    }
-                })
+                .style(list_item_style(is_selected))
             );
         }
     }
@@ -192,21 +113,10 @@ fn rule_list(settings: &WindowRulesSettings, selected_id: Option<u32>) -> Elemen
 
 /// Empty detail view shown when no rule is selected
 fn empty_detail_view() -> Element<'static, Message> {
-    container(
-        column![
-            text("Select a window rule to edit")
-                .size(16)
-                .color([0.75, 0.75, 0.75]),
-            spacer(8.0),
-            text("Window rules let you configure per-application behavior")
-                .size(13)
-                .color([0.5, 0.5, 0.5]),
-        ]
-        .spacing(4)
-        .align_x(Alignment::Center)
+    empty_detail_placeholder(
+        "Select a window rule to edit",
+        "Window rules let you configure per-application behavior",
     )
-    .center(Length::Fill)
-    .into()
 }
 
 /// Detail view for a selected window rule
@@ -237,38 +147,8 @@ fn rule_detail_view<'a>(
             .spacing(4)
             .width(Length::Fill),
             row![
-                button(text("Duplicate").size(13))
-                    .on_press(Message::WindowRules(WindowRulesMessage::DuplicateRule(id)))
-                    .padding([8, 12])
-                    .style(|_theme, status| {
-                        let bg = match status {
-                            button::Status::Hovered => iced::Color::from_rgba(0.3, 0.4, 0.5, 0.5),
-                            button::Status::Pressed => iced::Color::from_rgba(0.4, 0.5, 0.6, 0.5),
-                            _ => iced::Color::from_rgba(0.25, 0.3, 0.35, 0.4),
-                        };
-                        button::Style {
-                            background: Some(iced::Background::Color(bg)),
-                            text_color: iced::Color::WHITE,
-                            border: iced::Border { radius: 4.0.into(), ..Default::default() },
-                            ..Default::default()
-                        }
-                    }),
-                button(text("Delete").size(13))
-                    .on_press(Message::WindowRules(WindowRulesMessage::DeleteRule(id)))
-                    .padding([8, 12])
-                    .style(|_theme, status| {
-                        let bg = match status {
-                            button::Status::Hovered => iced::Color::from_rgba(0.7, 0.2, 0.2, 0.6),
-                            button::Status::Pressed => iced::Color::from_rgba(0.8, 0.3, 0.3, 0.7),
-                            _ => iced::Color::from_rgba(0.6, 0.2, 0.2, 0.5),
-                        };
-                        button::Style {
-                            background: Some(iced::Background::Color(bg)),
-                            text_color: iced::Color::WHITE,
-                            border: iced::Border { radius: 4.0.into(), ..Default::default() },
-                            ..Default::default()
-                        }
-                    }),
+                action_button("Duplicate", Message::WindowRules(WindowRulesMessage::DuplicateRule(id))),
+                delete_button(Message::WindowRules(WindowRulesMessage::DeleteRule(id))),
             ]
             .spacing(8),
         ]
@@ -298,22 +178,9 @@ fn rule_detail_view<'a>(
                             row![
                                 text(format!("Match {}", match_idx + 1)).size(13).color([0.8, 0.8, 0.8]),
                                 if rule.matches.len() > 1 {
-                                    button(text("×").size(14))
-                                        .on_press(Message::WindowRules(WindowRulesMessage::RemoveMatch(id, match_idx)))
-                                        .padding([2, 8])
-                                        .style(|_theme, status| {
-                                            let bg = match status {
-                                                button::Status::Hovered => iced::Color::from_rgba(0.6, 0.2, 0.2, 0.5),
-                                                _ => iced::Color::TRANSPARENT,
-                                            };
-                                            button::Style {
-                                                background: Some(iced::Background::Color(bg)),
-                                                text_color: iced::Color::from_rgb(0.8, 0.4, 0.4),
-                                                ..Default::default()
-                                            }
-                                        })
+                                    remove_button(Message::WindowRules(WindowRulesMessage::RemoveMatch(id, match_idx)))
                                 } else {
-                                    button(text("")).width(Length::Shrink)
+                                    button(text("")).width(Length::Shrink).into()
                                 },
                             ]
                             .spacing(8)
@@ -396,46 +263,12 @@ fn rule_detail_view<'a>(
                         .spacing(8)
                     )
                     .padding(12)
-                    .style(|_theme| {
-                        container::Style {
-                            background: Some(iced::Background::Color(iced::Color::from_rgba(0.15, 0.15, 0.15, 0.4))),
-                            border: iced::Border {
-                                color: iced::Color::from_rgba(0.3, 0.3, 0.3, 0.5),
-                                width: 1.0,
-                                radius: 6.0.into(),
-                            },
-                            ..Default::default()
-                        }
-                    })
+                    .style(match_container_style)
                 );
             }
 
             match_content = match_content.push(
-                button(
-                    row![
-                        text("+").size(14),
-                        text("Add Match Criteria").size(13),
-                    ]
-                    .spacing(6)
-                )
-                .on_press(Message::WindowRules(WindowRulesMessage::AddMatch(id)))
-                .padding([8, 16])
-                .style(|_theme, status| {
-                    let bg = match status {
-                        button::Status::Hovered => iced::Color::from_rgba(0.3, 0.4, 0.5, 0.4),
-                        _ => iced::Color::from_rgba(0.2, 0.25, 0.3, 0.3),
-                    };
-                    button::Style {
-                        background: Some(iced::Background::Color(bg)),
-                        text_color: iced::Color::from_rgb(0.7, 0.8, 0.9),
-                        border: iced::Border {
-                            color: iced::Color::from_rgba(0.4, 0.5, 0.6, 0.3),
-                            width: 1.0,
-                            radius: 4.0.into(),
-                        },
-                        ..Default::default()
-                    }
-                })
+                add_item_button("Add Match Criteria", Message::WindowRules(WindowRulesMessage::AddMatch(id)))
             );
 
             match_content

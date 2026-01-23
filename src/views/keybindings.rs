@@ -65,24 +65,8 @@ pub fn view<'a>(
         empty_detail_view()
     };
 
-    // Horizontal split layout (responsive 1:2 ratio)
-    row![
-        container(list_panel)
-            .width(Length::FillPortion(1))
-            .height(Length::Fill)
-            .style(|_theme| {
-                container::Style {
-                    background: Some(iced::Background::Color(iced::Color::from_rgba(0.1, 0.1, 0.1, 0.5))),
-                    ..Default::default()
-                }
-            }),
-        container(detail_panel)
-            .width(Length::FillPortion(2))
-            .height(Length::Fill)
-            .padding(20),
-    ]
-    .spacing(0)
-    .into()
+    // Use shared list-detail layout
+    list_detail_layout(list_panel, detail_panel)
 }
 
 /// List panel showing all keybindings
@@ -93,21 +77,7 @@ fn keybinding_list<'a>(
     let mut list = column![
         row![
             text("Keybindings").size(18),
-            button(text("+").size(18))
-                .on_press(Message::Keybindings(KeybindingsMessage::AddKeybinding))
-                .padding([4, 12])
-                .style(|_theme, status| {
-                    let bg = match status {
-                        button::Status::Hovered => iced::Color::from_rgba(0.3, 0.5, 0.7, 0.5),
-                        button::Status::Pressed => iced::Color::from_rgba(0.4, 0.6, 0.8, 0.5),
-                        _ => iced::Color::from_rgba(0.2, 0.4, 0.6, 0.4),
-                    };
-                    button::Style {
-                        background: Some(iced::Background::Color(bg)),
-                        text_color: iced::Color::WHITE,
-                        ..Default::default()
-                    }
-                }),
+            add_button(Message::Keybindings(KeybindingsMessage::AddKeybinding)),
         ]
         .spacing(10)
         .padding([12, 20])
@@ -128,16 +98,7 @@ fn keybinding_list<'a>(
     }
 
     if settings.bindings.is_empty() {
-        list = list.push(
-            container(
-                text("No keybindings configured\nClick + to add one")
-                    .size(13)
-                    .color([0.75, 0.75, 0.75])
-                    .center()
-            )
-            .padding(20)
-            .center(Length::Fill)
-        );
+        list = list.push(empty_list_placeholder("No keybindings configured\nClick + to add one"));
     } else {
         for (idx, binding) in settings.bindings.iter().enumerate() {
             let is_selected = selected_index == Some(idx);
@@ -165,9 +126,7 @@ fn keybinding_list<'a>(
                 button(
                     column![
                         row![
-                            text(if is_selected { "●" } else { "○" })
-                                .size(10)
-                                .color(if is_selected { [0.5, 0.7, 1.0] } else { [0.4, 0.4, 0.4] }),
+                            selection_indicator(is_selected),
                             text(key_display)
                                 .size(14)
                                 .color(if is_selected { [1.0, 1.0, 1.0] } else { [0.9, 0.9, 0.9] }),
@@ -183,23 +142,7 @@ fn keybinding_list<'a>(
                 .on_press(Message::Keybindings(KeybindingsMessage::SelectKeybinding(idx)))
                 .padding([8, 12])
                 .width(Length::Fill)
-                .style(move |_theme, status| {
-                    let background = match (is_selected, status) {
-                        (true, button::Status::Hovered) => iced::Color::from_rgba(0.3, 0.4, 0.6, 0.5),
-                        (true, button::Status::Pressed) => iced::Color::from_rgba(0.4, 0.5, 0.7, 0.5),
-                        (true, _) => iced::Color::from_rgba(0.2, 0.3, 0.5, 0.4),
-                        (false, button::Status::Hovered) => iced::Color::from_rgba(0.25, 0.25, 0.25, 0.5),
-                        (false, button::Status::Pressed) => iced::Color::from_rgba(0.3, 0.3, 0.3, 0.5),
-                        (false, _) => iced::Color::TRANSPARENT,
-                    };
-
-                    button::Style {
-                        background: Some(iced::Background::Color(background)),
-                        border: iced::Border::default(),
-                        text_color: iced::Color::WHITE,
-                        ..Default::default()
-                    }
-                })
+                .style(list_item_style(is_selected))
             );
         }
     }
@@ -209,21 +152,10 @@ fn keybinding_list<'a>(
 
 /// Empty detail view shown when no keybinding is selected
 fn empty_detail_view() -> Element<'static, Message> {
-    container(
-        column![
-            text("Select a keybinding to edit")
-                .size(16)
-                .color([0.75, 0.75, 0.75]),
-            spacer(12.0),
-            text("Or click + to add a new one")
-                .size(13)
-                .color([0.5, 0.5, 0.5]),
-        ]
-        .spacing(8)
-        .align_x(Alignment::Center)
+    empty_detail_placeholder(
+        "Select a keybinding to edit",
+        "Or click + to add a new one",
     )
-    .center(Length::Fill)
-    .into()
 }
 
 /// Detail view for a selected keybinding
@@ -242,21 +174,7 @@ fn keybinding_detail_view<'a>(
         // Header with delete button
         row![
             text("Edit Keybinding").size(20),
-            button(text("Delete").size(14))
-                .on_press(Message::Keybindings(KeybindingsMessage::RemoveKeybinding(idx)))
-                .padding([8, 16])
-                .style(|_theme, status| {
-                    let bg = match status {
-                        button::Status::Hovered => iced::Color::from_rgba(0.8, 0.2, 0.2, 0.6),
-                        button::Status::Pressed => iced::Color::from_rgba(0.9, 0.3, 0.3, 0.7),
-                        _ => iced::Color::from_rgba(0.7, 0.2, 0.2, 0.5),
-                    };
-                    button::Style {
-                        background: Some(iced::Background::Color(bg)),
-                        text_color: iced::Color::WHITE,
-                        ..Default::default()
-                    }
-                }),
+            delete_button(Message::Keybindings(KeybindingsMessage::RemoveKeybinding(idx))),
         ]
         .spacing(20)
         .align_y(Alignment::Center),
