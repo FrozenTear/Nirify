@@ -116,7 +116,7 @@ impl PointerDeviceSettings for TrackballSettings {
 fn generate_pointer_device_kdl(device_name: &str, settings: &impl PointerDeviceSettings) -> String {
     let mut content = String::with_capacity(512);
     content.push_str(&format!(
-        "// {} settings - managed by niri-settings-rust\n\ninput {{\n    {} {{\n",
+        "// {} settings - managed by Nirify\n\ninput {{\n    {} {{\n",
         // Capitalize first letter for comment
         {
             let mut chars = device_name.chars();
@@ -211,7 +211,7 @@ pub fn generate_keyboard_kdl(settings: &KeyboardSettings) -> String {
 
     // Note: Keyboard does not support 'off' flag in niri - keyboards cannot be disabled
     format!(
-        r#"// Keyboard settings - managed by niri-settings-rust
+        r#"// Keyboard settings - managed by Nirify
 
 input {{
     keyboard {{
@@ -241,7 +241,7 @@ input {{
 pub fn generate_mouse_kdl(settings: &MouseSettings) -> String {
     // Pre-allocate ~512 bytes for typical mouse config
     let mut content = String::with_capacity(512);
-    content.push_str("// Mouse settings - managed by niri-settings-rust\n\ninput {\n    mouse {\n");
+    content.push_str("// Mouse settings - managed by Nirify\n\ninput {\n    mouse {\n");
 
     // Check if device is disabled
     if settings.off {
@@ -287,7 +287,7 @@ pub fn generate_touchpad_kdl(settings: &TouchpadSettings) -> String {
     // Pre-allocate ~768 bytes for typical touchpad config (more options than mouse)
     let mut content = String::with_capacity(768);
     content.push_str(
-        "// Touchpad settings - managed by niri-settings-rust\n\ninput {\n    touchpad {\n",
+        "// Touchpad settings - managed by Nirify\n\ninput {\n    touchpad {\n",
     );
 
     // Check if device is disabled
@@ -431,7 +431,7 @@ fn generate_mapped_input_kdl(device: &impl MappedInputDevice) -> String {
 
     // Header
     content.push_str(&format!(
-        "// {} settings - managed by niri-settings-rust\n\ninput {{\n    {} {{\n",
+        "// {} settings - managed by Nirify\n\ninput {{\n    {} {{\n",
         title, name
     ));
 

@@ -4,7 +4,7 @@
 //! Instead of just appending an include line (which can cause conflicts), it:
 //! 1. Parses the config and classifies each top-level node
 //! 2. Generates a clean config that preserves unmanaged content
-//! 3. Replaces managed sections with a single include to niri-settings
+//! 3. Replaces managed sections with a single include to nirify
 //!
 //! **Note on preservation:** Unmanaged nodes retain their semantic structure (names,
 //! values, children) but formatting (whitespace, indentation, inline comments) may
@@ -22,13 +22,13 @@ use super::storage::atomic_write;
 /// Classification of a top-level KDL node
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeClassification {
-    /// Managed by niri-settings - will be replaced with include
+    /// Managed by Nirify - will be replaced with include
     Managed,
-    /// User's include directive for niri-settings (skip it)
-    NiriSettingsInclude,
+    /// User's include directive for Nirify (skip it)
+    NirifyInclude,
     /// Other include directives (preserve)
     OtherInclude,
-    /// Not managed by niri-settings - preserve structure (formatting may be normalized)
+    /// Not managed by Nirify - preserve structure (formatting may be normalized)
     Unmanaged,
 }
 
@@ -40,7 +40,7 @@ pub struct ConfigAnalysis {
     /// Classification for each top-level node (by index)
     pub node_classifications: Vec<(usize, NodeClassification)>,
     /// Whether our include line already exists
-    pub has_niri_settings_include: bool,
+    pub has_nirify_include: bool,
     /// Count of managed nodes that will be removed
     pub managed_count: usize,
     /// Count of unmanaged nodes that will be preserved
@@ -64,10 +64,10 @@ pub struct SmartReplaceResult {
     pub warnings: Vec<String>,
 }
 
-/// Top-level node names managed by niri-settings
+/// Top-level node names managed by Nirify
 ///
 /// These nodes will be removed from the user's config and replaced
-/// with an include to niri-settings/main.kdl
+/// with an include to nirify/main.kdl
 const MANAGED_NODES: &[&str] = &[
     // Core layout (contains gaps, focus-ring, border, struts, etc.)
     "layout",
@@ -99,20 +99,20 @@ const MANAGED_NODES: &[&str] = &[
     "binds",
 ];
 
-/// Check if a node name is managed by niri-settings
+/// Check if a node name is managed by Nirify
 fn is_managed_node(name: &str) -> bool {
     MANAGED_NODES.contains(&name)
 }
 
-/// Check if this is a niri-settings include line
-fn is_niri_settings_include(node: &KdlNode) -> bool {
+/// Check if this is a Nirify include line
+fn is_nirify_include(node: &KdlNode) -> bool {
     if node.name().value() != "include" {
         return false;
     }
     node.entries()
         .first()
         .and_then(|e| e.value().as_string())
-        .map(|s| s.contains("niri-settings"))
+        .map(|s| s.contains("nirify"))
         .unwrap_or(false)
 }
 
@@ -128,17 +128,17 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
         .with_context(|| format!("Failed to parse {:?} as KDL", config_path))?;
 
     let mut node_classifications = Vec::new();
-    let mut has_niri_settings_include = false;
+    let mut has_nirify_include = false;
     let mut managed_count = 0;
     let mut unmanaged_count = 0;
 
     for (idx, node) in document.nodes().iter().enumerate() {
         let name = node.name().value();
 
-        let classification = if is_niri_settings_include(node) {
-            has_niri_settings_include = true;
-            debug!("Found existing niri-settings include at index {}", idx);
-            NodeClassification::NiriSettingsInclude
+        let classification = if is_nirify_include(node) {
+            has_nirify_include = true;
+            debug!("Found existing Nirify include at index {}", idx);
+            NodeClassification::NirifyInclude
         } else if name == "include" {
             unmanaged_count += 1;
             debug!("Found other include at index {}: preserving", idx);
@@ -163,14 +163,14 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
     }
 
     info!(
-        "Config analysis: {} managed, {} unmanaged, niri-settings include: {}",
-        managed_count, unmanaged_count, has_niri_settings_include
+        "Config analysis: {} managed, {} unmanaged, Nirify include: {}",
+        managed_count, unmanaged_count, has_nirify_include
     );
 
     Ok(ConfigAnalysis {
         document,
         node_classifications,
-        has_niri_settings_include,
+        has_nirify_include,
         managed_count,
         unmanaged_count,
         original_content,
@@ -179,12 +179,12 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
 
 /// Generate a minimal config with just the include line
 fn generate_minimal_config() -> String {
-    r#"// Configuration managed by niri-settings
+    r#"// Configuration managed by Nirify
 //
-// All settings are in: ~/.config/niri/niri-settings/
-// Edit them using the niri-settings app or the files directly.
+// All settings are in: ~/.config/niri/nirify/
+// Edit them using the Nirify app or the files directly.
 
-include "niri-settings/main.kdl"
+include "nirify/main.kdl"
 "#
     .to_string()
 }
@@ -194,17 +194,17 @@ fn generate_replaced_config(analysis: &ConfigAnalysis) -> String {
     let mut content = String::with_capacity(4096);
 
     // Header comment
-    content.push_str("// Configuration managed by niri-settings\n");
+    content.push_str("// Configuration managed by Nirify\n");
     content.push_str("// Backup of original config saved before modification\n");
     content.push_str("//\n");
     content.push_str("// Managed settings (appearance, input, behavior, etc.) are in:\n");
-    content.push_str("//   ~/.config/niri/niri-settings/\n");
+    content.push_str("//   ~/.config/niri/nirify/\n");
     content.push_str("//\n");
     content.push_str("// Your custom settings below are preserved.\n\n");
 
     // Add our include line (relative path from config.kdl location)
-    content.push_str("// === niri-settings managed configuration ===\n");
-    content.push_str("include \"niri-settings/main.kdl\"\n");
+    content.push_str("// === Nirify managed configuration ===\n");
+    content.push_str("include \"nirify/main.kdl\"\n");
 
     // Extract and add unmanaged content
     let unmanaged = extract_unmanaged_nodes(analysis);
@@ -237,8 +237,8 @@ fn extract_unmanaged_nodes(analysis: &ConfigAnalysis) -> String {
                 // Use KDL's Display formatting - preserves structure, may normalize whitespace
                 result.push_str(&format!("{}\n", node));
             }
-            NodeClassification::Managed | NodeClassification::NiriSettingsInclude => {
-                // Skip managed nodes and existing niri-settings includes
+            NodeClassification::Managed | NodeClassification::NirifyInclude => {
+                // Skip managed nodes and existing Nirify includes
             }
         }
     }
@@ -310,8 +310,8 @@ pub fn smart_replace_config(config_path: &Path, backup_dir: &Path) -> Result<Sma
     };
 
     // Check if already set up with no managed nodes to clean
-    if analysis.has_niri_settings_include && analysis.managed_count == 0 {
-        info!("Config already set up with niri-settings include, no changes needed");
+    if analysis.has_nirify_include && analysis.managed_count == 0 {
+        info!("Config already set up with Nirify include, no changes needed");
         warnings.push("Config already set up, no changes needed".to_string());
         return Ok(SmartReplaceResult {
             backup_path: PathBuf::new(),
@@ -372,7 +372,7 @@ pub fn smart_replace_config(config_path: &Path, backup_dir: &Path) -> Result<Sma
         backup_path,
         replaced_count: analysis.managed_count,
         preserved_count: analysis.unmanaged_count,
-        include_added: !analysis.has_niri_settings_include,
+        include_added: !analysis.has_nirify_include,
         warnings,
     })
 }
@@ -399,7 +399,7 @@ mod tests {
     fn test_generate_minimal_config() {
         let config = generate_minimal_config();
         assert!(config.contains("include"));
-        assert!(config.contains("niri-settings/main.kdl"));
+        assert!(config.contains("nirify/main.kdl"));
 
         // Should be valid KDL
         config.parse::<KdlDocument>().expect("Should be valid KDL");

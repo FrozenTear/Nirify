@@ -23,7 +23,7 @@ fn test_smart_replace_creates_config_when_missing() {
     // Should create minimal config with include
     assert!(config_path.exists());
     let content = fs::read_to_string(&config_path).unwrap();
-    assert!(content.contains("niri-settings/main.kdl"));
+    assert!(content.contains("nirify/main.kdl"));
 
     // No backup needed for new file
     assert!(result.backup_path.as_os_str().is_empty());
@@ -54,7 +54,7 @@ another-custom { baz 123 }
 
     // Check the content
     let content = fs::read_to_string(&config_path).unwrap();
-    assert!(content.contains("niri-settings/main.kdl"));
+    assert!(content.contains("nirify/main.kdl"));
     assert!(content.contains("custom-node"));
     assert!(content.contains("another-custom"));
     assert!(!content.contains("layout { gaps inner=16 }")); // removed
@@ -88,7 +88,7 @@ fn test_smart_replace_idempotent() {
 
     // Create config with our include line already present, no managed nodes
     let content = r#"
-include "niri-settings/main.kdl"
+include "nirify/main.kdl"
 custom-node { foo "bar" }
 "#;
     fs::write(&config_path, content).unwrap();
@@ -99,7 +99,7 @@ custom-node { foo "bar" }
     assert!(result.backup_path.as_os_str().is_empty()); // No backup needed
     assert!(!result.include_added);
     assert_eq!(result.replaced_count, 0);
-    assert_eq!(result.preserved_count, 1); // just custom-node (niri-settings include is separate)
+    assert_eq!(result.preserved_count, 1); // just custom-node (Nirify include is separate)
 
     // Content should be unchanged
     let new_content = fs::read_to_string(&config_path).unwrap();
@@ -124,7 +124,7 @@ layout { gaps inner=10 }
     // Other include should be preserved
     let content = fs::read_to_string(&config_path).unwrap();
     assert!(content.contains("other-config.kdl"));
-    assert!(content.contains("niri-settings/main.kdl"));
+    assert!(content.contains("nirify/main.kdl"));
 
     assert_eq!(result.preserved_count, 1); // other include
     assert_eq!(result.replaced_count, 1); // layout
@@ -156,7 +156,7 @@ window-rule { match app-id="test" }
 
     // Content should have our include and no managed nodes
     let content = fs::read_to_string(&config_path).unwrap();
-    assert!(content.contains("niri-settings/main.kdl"));
+    assert!(content.contains("nirify/main.kdl"));
     assert!(!content.contains("layout {"));
     assert!(!content.contains("input {"));
     assert!(!content.contains("animations {"));
@@ -179,7 +179,7 @@ fn test_smart_replace_handles_corrupted_config() {
 
     // Should have written minimal config
     let content = fs::read_to_string(&config_path).unwrap();
-    assert!(content.contains("niri-settings/main.kdl"));
+    assert!(content.contains("nirify/main.kdl"));
 
     // Warning should be present
     assert!(!result.warnings.is_empty());
@@ -193,7 +193,7 @@ fn test_smart_replace_removes_existing_niri_settings_include() {
 
     // Config with our include AND managed nodes (shouldn't happen normally, but test it)
     let original = r#"
-include "niri-settings/main.kdl"
+include "nirify/main.kdl"
 layout { gaps inner=16 }
 "#;
     fs::write(&config_path, original).unwrap();
@@ -205,6 +205,6 @@ layout { gaps inner=16 }
 
     // Only one include line in output
     let content = fs::read_to_string(&config_path).unwrap();
-    let include_count = content.matches("niri-settings/main.kdl").count();
+    let include_count = content.matches("nirify/main.kdl").count();
     assert_eq!(include_count, 1);
 }

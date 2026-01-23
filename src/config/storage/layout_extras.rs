@@ -16,7 +16,7 @@ use std::fmt::Write;
 /// - Tab indicator settings (position, width, gap, colors)
 /// - Insert hint settings (color)
 pub fn generate_layout_extras_kdl(settings: &LayoutExtrasSettings) -> String {
-    let mut kdl = KdlBuilder::with_header("Layout extras settings - managed by niri-settings-rust");
+    let mut kdl = KdlBuilder::with_header("Layout extras settings - managed by Nirify");
 
     kdl.block("layout", |b| {
         // Shadow settings

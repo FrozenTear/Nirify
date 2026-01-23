@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Keyboard settings - managed by niri-settings-rust
+// Keyboard settings - managed by Nirify
 
 input {
     keyboard {

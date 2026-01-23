@@ -1,12 +1,12 @@
 //! Config file registry - single source of truth for config file mappings
 //!
 //! This module provides a central registry for all config files managed by
-//! niri-settings. It eliminates duplication of file paths across ConfigPaths,
+//! Nirify. It eliminates duplication of file paths across ConfigPaths,
 //! ConfigHealthReport, loader, and storage modules.
 
 use std::path::{Path, PathBuf};
 
-/// All config file types managed by niri-settings
+/// All config file types managed by Nirify
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ConfigFile {
     // Core settings
@@ -219,10 +219,10 @@ mod tests {
 
     #[test]
     fn test_full_path() {
-        let managed_dir = Path::new("/home/user/.config/niri/niri-settings");
+        let managed_dir = Path::new("/home/user/.config/niri/Nirify");
         assert_eq!(
             ConfigFile::Keyboard.full_path(managed_dir),
-            PathBuf::from("/home/user/.config/niri/niri-settings/input/keyboard.kdl")
+            PathBuf::from("/home/user/.config/niri/Nirify/input/keyboard.kdl")
         );
     }
 }

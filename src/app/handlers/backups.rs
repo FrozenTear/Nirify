@@ -115,7 +115,7 @@ impl super::super::App {
                 match result {
                     Ok(()) => {
                         self.ui.backups_state.status_message = Some("Backup restored successfully!".to_string());
-                        self.ui.toast = Some("Backup restored! Restart niri-settings to see changes.".to_string());
+                        self.ui.toast = Some("Backup restored! Restart Nirify to see changes.".to_string());
                         self.ui.toast_shown_at = Some(std::time::Instant::now());
                     }
                     Err(e) => {

@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Cursor settings - managed by niri-settings-rust
+// Cursor settings - managed by Nirify
 
 cursor {
     xcursor-theme "Adwaita"

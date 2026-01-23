@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Layer rules - managed by niri-settings-rust
+// Layer rules - managed by Nirify
 // Rules for layer-shell surfaces (panels, notifications, etc.)
 
 // No layer rules configured yet.

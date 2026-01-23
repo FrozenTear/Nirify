@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Debug settings - managed by niri-settings-rust
+// Debug settings - managed by Nirify
 
 // WARNING: These are advanced options. Use with caution.
 

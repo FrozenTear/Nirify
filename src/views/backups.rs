@@ -34,7 +34,7 @@ pub fn view(state: &BackupsState) -> Element<'_, Message> {
         page_title("Backups"),
         info_text(
             "Manage configuration backups. Backups are automatically created \
-             when you set up niri-settings or make significant changes."
+             when you set up Nirify or make significant changes."
         ),
     ]
     .spacing(4);
@@ -42,7 +42,7 @@ pub fn view(state: &BackupsState) -> Element<'_, Message> {
     // Info banner
     content = content.push(
         container(
-            text("Backups are stored in ~/.config/niri/.backup/ and persist even if niri-settings is removed.")
+            text("Backups are stored in ~/.config/niri/.backup/ and persist even if Nirify is removed.")
                 .size(12)
                 .color([0.7, 0.85, 0.7]),
         )
@@ -103,7 +103,7 @@ pub fn view(state: &BackupsState) -> Element<'_, Message> {
     if state.backups.is_empty() {
         content = content.push(
             container(
-                text("No backups found. Backups are created when you first set up niri-settings.")
+                text("No backups found. Backups are created when you first set up Nirify.")
                     .size(13)
                     .color([0.5, 0.5, 0.5]),
             )

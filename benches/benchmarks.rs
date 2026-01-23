@@ -1,4 +1,4 @@
-//! Performance benchmarks for niri-settings
+//! Performance benchmarks for Nirify
 //!
 //! Run with: cargo bench
 //!

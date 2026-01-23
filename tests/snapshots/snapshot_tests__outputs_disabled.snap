@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Output/Display settings - managed by niri-settings-rust
+// Output/Display settings - managed by Nirify
 
 output "HDMI-A-1" {
     off

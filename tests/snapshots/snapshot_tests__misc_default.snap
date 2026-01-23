@@ -2,6 +2,6 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Miscellaneous settings - managed by niri-settings-rust
+// Miscellaneous settings - managed by Nirify
 
 screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"

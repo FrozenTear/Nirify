@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Startup commands - managed by niri-settings-rust
+// Startup commands - managed by Nirify
 
 // These commands run when niri starts.
 

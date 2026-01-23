@@ -9,7 +9,7 @@ use crate::config::models::PreferencesSettings;
 pub fn generate_preferences_kdl(prefs: &PreferencesSettings) -> String {
     let mut lines = vec![
         "// Application preferences (not part of niri config)".to_string(),
-        "// This file stores settings specific to niri-settings application".to_string(),
+        "// This file stores settings specific to Nirify application".to_string(),
         "".to_string(),
         "preferences {".to_string(),
     ];

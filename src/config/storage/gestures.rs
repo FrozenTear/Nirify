@@ -12,7 +12,7 @@ use crate::config::models::{DndEdgeSettings, GestureSettings};
 /// - DND edge view scroll settings
 /// - DND workspace switch settings
 pub fn generate_gestures_kdl(settings: &GestureSettings) -> String {
-    let mut kdl = KdlBuilder::with_header("Gesture settings - managed by niri-settings-rust");
+    let mut kdl = KdlBuilder::with_header("Gesture settings - managed by Nirify");
 
     // Check if we have any gesture settings to output
     let has_hot_corners = settings.hot_corners.enabled

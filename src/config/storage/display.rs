@@ -66,7 +66,7 @@ fn generate_single_animation_kdl(
 pub fn generate_animations_kdl(settings: &AnimationSettings) -> String {
     // Pre-allocate for animation config with per-animation settings
     let mut content = String::with_capacity(2048);
-    content.push_str("// Animation settings - managed by niri-settings-rust\n\nanimations {\n");
+    content.push_str("// Animation settings - managed by Nirify\n\nanimations {\n");
 
     if !settings.enabled {
         content.push_str("    off\n");
@@ -113,7 +113,7 @@ pub fn generate_animations_kdl(settings: &AnimationSettings) -> String {
 pub fn generate_cursor_kdl(settings: &CursorSettings) -> String {
     // Pre-allocate ~256 bytes for cursor config
     let mut content = String::with_capacity(256);
-    content.push_str("// Cursor settings - managed by niri-settings-rust\n\ncursor {\n");
+    content.push_str("// Cursor settings - managed by Nirify\n\ncursor {\n");
 
     if !settings.theme.is_empty() {
         content.push_str(&format!(
@@ -139,7 +139,7 @@ pub fn generate_cursor_kdl(settings: &CursorSettings) -> String {
 pub fn generate_overview_kdl(settings: &OverviewSettings) -> String {
     // Pre-allocate ~512 bytes for overview config (with workspace-shadow)
     let mut content = String::with_capacity(512);
-    content.push_str("// Overview settings - managed by niri-settings-rust\n\noverview {\n");
+    content.push_str("// Overview settings - managed by Nirify\n\noverview {\n");
 
     content.push_str(&format!("    zoom {:.2}\n", settings.zoom));
 
@@ -225,7 +225,7 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
 pub fn generate_outputs_kdl(settings: &OutputSettings) -> String {
     // Pre-allocate ~1.5KB for outputs (multiple displays with new features)
     let mut content = String::with_capacity(1536);
-    content.push_str("// Output/Display settings - managed by niri-settings-rust\n\n");
+    content.push_str("// Output/Display settings - managed by Nirify\n\n");
 
     if settings.outputs.is_empty() {
         content.push_str("// No outputs configured yet.\n");

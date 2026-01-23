@@ -1229,12 +1229,12 @@ pub fn run() -> iced::Result {
         .subscription(App::subscription)
         .theme(|app: &App| app.ui.current_theme.to_iced_theme())
         .settings(iced::Settings {
-            id: Some("niri-settings".to_string()),
+            id: Some("nirify".to_string()),
             ..Default::default()
         })
         .window(iced::window::Settings {
             platform_specific: iced::window::settings::PlatformSpecific {
-                application_id: "niri-settings".to_string(),
+                application_id: "nirify".to_string(),
                 ..Default::default()
             },
             ..Default::default()

@@ -26,7 +26,7 @@ pub fn generate_appearance_kdl(
     settings: &AppearanceSettings,
     behavior: &BehaviorSettings,
 ) -> String {
-    let mut kdl = KdlBuilder::with_header("Appearance settings - managed by niri-settings-rust");
+    let mut kdl = KdlBuilder::with_header("Appearance settings - managed by Nirify");
 
     kdl.block("layout", |b| {
         // Gaps - single value (niri only supports one gaps value)

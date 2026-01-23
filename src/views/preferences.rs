@@ -1,6 +1,6 @@
 //! Preferences settings view
 //!
-//! Application preferences that control how niri-settings behaves.
+//! Application preferences that control how Nirify behaves.
 
 use iced::widget::{column, container, row, text, toggler};
 use iced::{Alignment, Element, Length};

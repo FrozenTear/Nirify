@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Touchpad settings - managed by niri-settings-rust
+// Touchpad settings - managed by Nirify
 
 input {
     touchpad {

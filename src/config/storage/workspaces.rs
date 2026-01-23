@@ -13,7 +13,7 @@ use crate::config::models::WorkspacesSettings;
 /// - open-on-output to pin to specific monitors
 /// - layout overrides per workspace (v25.11+)
 pub fn generate_workspaces_kdl(settings: &WorkspacesSettings) -> String {
-    let mut kdl = KdlBuilder::with_header("Named workspaces - managed by niri-settings-rust");
+    let mut kdl = KdlBuilder::with_header("Named workspaces - managed by Nirify");
     kdl.comment("Workspaces declared here will always exist.");
     kdl.newline();
 

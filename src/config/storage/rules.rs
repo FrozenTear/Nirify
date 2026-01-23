@@ -66,7 +66,7 @@ fn add_bool_criterion(parts: &mut Vec<String>, name: &str, value: Option<bool>) 
 pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
     // Pre-allocate ~2KB for layer rules
     let mut content = String::with_capacity(2048);
-    content.push_str("// Layer rules - managed by niri-settings-rust\n");
+    content.push_str("// Layer rules - managed by Nirify\n");
     content.push_str("// Rules for layer-shell surfaces (panels, notifications, etc.)\n\n");
 
     if settings.rules.is_empty() {
@@ -157,22 +157,22 @@ pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
 pub fn generate_window_rules_kdl(settings: &WindowRulesSettings, float_settings_app: bool) -> String {
     // Pre-allocate ~2KB for window rules (can be complex)
     let mut content = String::with_capacity(2048);
-    content.push_str("// Window rules - managed by niri-settings-rust\n\n");
+    content.push_str("// Window rules - managed by Nirify\n\n");
 
-    // Check if there's already a rule for niri-settings
-    let has_niri_settings_rule = settings.rules.iter().any(|rule| {
+    // Check if there's already a rule for Nirify
+    let has_nirify_rule = settings.rules.iter().any(|rule| {
         rule.matches.iter().any(|m| {
             m.app_id
                 .as_ref()
-                .is_some_and(|id| id.contains("niri-settings"))
+                .is_some_and(|id| id.contains("nirify"))
         })
     });
 
     // Auto-generated rule to float the settings app (only if preference is enabled AND no existing rule)
-    if float_settings_app && !has_niri_settings_rule {
-        content.push_str("// Auto-generated: Float niri-settings app\n");
+    if float_settings_app && !has_nirify_rule {
+        content.push_str("// Auto-generated: Float Nirify app\n");
         content.push_str("window-rule {\n");
-        content.push_str("    match app-id=\"^niri-settings$\"\n");
+        content.push_str("    match app-id=\"^nirify$\"\n");
         content.push_str("    open-floating true\n");
         content.push_str("}\n\n");
     }

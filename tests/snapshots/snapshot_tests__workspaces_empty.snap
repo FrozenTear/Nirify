@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Named workspaces - managed by niri-settings-rust
+// Named workspaces - managed by Nirify
 
 // Workspaces declared here will always exist.
 

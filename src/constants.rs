@@ -1,11 +1,11 @@
 /// Application name
-pub const APP_NAME: &str = "Niri Settings";
+pub const APP_NAME: &str = "Nirify";
 
 /// Application version from Cargo.toml
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Directory name for our managed config files
-pub const CONFIG_DIR_NAME: &str = "niri-settings";
+pub const CONFIG_DIR_NAME: &str = "nirify";
 
 /// Main include file name
 pub const MAIN_KDL_NAME: &str = "main.kdl";

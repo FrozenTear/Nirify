@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Miscellaneous settings - managed by niri-settings-rust
+// Miscellaneous settings - managed by Nirify
 
 prefer-no-csd
 screenshot-path "~/Pictures/Screenshots"

@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Output/Display settings - managed by niri-settings-rust
+// Output/Display settings - managed by Nirify
 
 // No outputs configured yet.
 // Add outputs through the UI or manually here.

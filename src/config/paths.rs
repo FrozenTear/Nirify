@@ -9,16 +9,16 @@ pub struct ConfigPaths {
     /// User's niri config: ~/.config/niri/config.kdl
     pub niri_config: PathBuf,
 
-    /// Our managed directory: ~/.config/niri/niri-settings/
+    /// Our managed directory: ~/.config/niri/nirify/
     pub managed_dir: PathBuf,
 
-    /// Input subdirectory: ~/.config/niri/niri-settings/input/
+    /// Input subdirectory: ~/.config/niri/nirify/input/
     pub input_dir: PathBuf,
 
-    /// Advanced subdirectory: ~/.config/niri/niri-settings/advanced/
+    /// Advanced subdirectory: ~/.config/niri/nirify/advanced/
     pub advanced_dir: PathBuf,
 
-    /// Backup directory: ~/.config/niri/niri-settings/.backup/
+    /// Backup directory: ~/.config/niri/nirify/.backup/
     pub backup_dir: PathBuf,
 
     // Core config files
@@ -214,7 +214,7 @@ impl ConfigPaths {
 
         let reader = BufReader::new(file);
         for line in reader.lines().map_while(Result::ok) {
-            if line.contains("niri-settings/main.kdl") {
+            if line.contains("nirify/main.kdl") {
                 return true;
             }
         }
@@ -256,7 +256,7 @@ impl ConfigPaths {
 
         // Append include line
         let include_line = format!(
-            "\n// Managed by niri-settings - do not remove this line\ninclude \"~/.config/niri/{}/main.kdl\"\n",
+            "\n// Managed by Nirify - do not remove this line\ninclude \"~/.config/niri/{}/main.kdl\"\n",
             crate::constants::CONFIG_DIR_NAME
         );
 
@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn test_config_paths_creation() {
         let paths = ConfigPaths::new().unwrap();
-        assert!(paths.managed_dir.ends_with("niri-settings"));
+        assert!(paths.managed_dir.ends_with("nirify"));
         assert!(paths.main_kdl.ends_with("main.kdl"));
         assert!(paths.keyboard_kdl.ends_with("keyboard.kdl"));
     }

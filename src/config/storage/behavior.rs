@@ -14,7 +14,7 @@ use crate::config::models::BehaviorSettings;
 /// # Returns
 /// A string containing the complete main.kdl content with include directives.
 pub fn generate_main_kdl() -> String {
-    let mut kdl = KdlBuilder::with_header("niri-settings-rust managed configuration");
+    let mut kdl = KdlBuilder::with_header("Nirify managed configuration");
     kdl.comment("Do not edit manually - changes will be overwritten");
     kdl.newline();
 
@@ -73,7 +73,7 @@ pub fn generate_main_kdl() -> String {
 /// # Returns
 /// A string containing valid KDL configuration for niri.
 pub fn generate_behavior_kdl(settings: &BehaviorSettings) -> String {
-    let mut kdl = KdlBuilder::with_header("Behavior settings - managed by niri-settings-rust");
+    let mut kdl = KdlBuilder::with_header("Behavior settings - managed by Nirify");
 
     // Check if we have any input settings to output
     let has_mod_key = settings.mod_key != crate::types::ModKey::Super;

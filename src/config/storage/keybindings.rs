@@ -1,6 +1,6 @@
 //! Keybindings KDL generation
 //!
-//! Generates KDL configuration for keybindings managed by niri-settings.
+//! Generates KDL configuration for keybindings managed by Nirify.
 
 use crate::config::models::{KeybindAction, Keybinding, KeybindingsSettings};
 
@@ -23,12 +23,12 @@ use crate::config::models::{KeybindAction, Keybinding, KeybindingsSettings};
 pub fn generate_keybindings_kdl(settings: &KeybindingsSettings) -> String {
     // Pre-allocate for typical keybindings config
     let mut content = String::with_capacity(2048);
-    content.push_str("// Keybindings - managed by niri-settings-rust\n");
-    content.push_str("// Edit these bindings in the niri-settings app\n\n");
+    content.push_str("// Keybindings - managed by Nirify-rust\n");
+    content.push_str("// Edit these bindings in the Nirify app\n\n");
 
     if settings.bindings.is_empty() {
         content.push_str("// No keybindings configured yet.\n");
-        content.push_str("// Add keybindings using the niri-settings app.\n");
+        content.push_str("// Add keybindings using the Nirify app.\n");
         return content;
     }
 

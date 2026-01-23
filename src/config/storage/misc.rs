@@ -13,7 +13,7 @@ use crate::config::models::{MiscSettings, XWaylandSatelliteConfig};
 /// - Disable primary clipboard
 /// - Hotkey overlay skip at startup
 pub fn generate_misc_kdl(settings: &MiscSettings) -> String {
-    let mut kdl = KdlBuilder::with_header("Miscellaneous settings - managed by niri-settings-rust");
+    let mut kdl = KdlBuilder::with_header("Miscellaneous settings - managed by Nirify");
 
     kdl.optional_flag("prefer-no-csd", settings.prefer_no_csd);
     kdl.field_string_if_not_empty("screenshot-path", &settings.screenshot_path);

@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Appearance settings - managed by niri-settings-rust
+// Appearance settings - managed by Nirify
 
 layout {
     gaps 16

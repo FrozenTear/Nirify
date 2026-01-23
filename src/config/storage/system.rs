@@ -37,7 +37,7 @@ fn is_valid_env_var_name(name: &str) -> bool {
 /// Creates KDL configuration for spawn-at-startup commands.
 /// Each command becomes a separate spawn-at-startup node.
 pub fn generate_startup_kdl(settings: &StartupSettings) -> String {
-    let mut kdl = KdlBuilder::with_header("Startup commands - managed by niri-settings-rust");
+    let mut kdl = KdlBuilder::with_header("Startup commands - managed by Nirify");
     kdl.comment("These commands run when niri starts.");
     kdl.newline();
 
@@ -68,7 +68,7 @@ pub fn generate_startup_kdl(settings: &StartupSettings) -> String {
 /// Creates KDL configuration for environment variables.
 /// Variables are set for all spawned processes.
 pub fn generate_environment_kdl(settings: &EnvironmentSettings) -> String {
-    let mut kdl = KdlBuilder::with_header("Environment variables - managed by niri-settings-rust");
+    let mut kdl = KdlBuilder::with_header("Environment variables - managed by Nirify");
     kdl.comment("These are set for all processes spawned by niri.");
     kdl.newline();
 
@@ -106,7 +106,7 @@ pub fn generate_environment_kdl(settings: &EnvironmentSettings) -> String {
 /// Creates KDL configuration for niri debug options.
 /// These are advanced options primarily for developers and troubleshooting.
 pub fn generate_debug_kdl(settings: &DebugSettings) -> String {
-    let mut kdl = KdlBuilder::with_header("Debug settings - managed by niri-settings-rust");
+    let mut kdl = KdlBuilder::with_header("Debug settings - managed by Nirify");
     kdl.comment("WARNING: These are advanced options. Use with caution.");
     kdl.newline();
 
@@ -216,7 +216,7 @@ pub fn generate_debug_kdl(settings: &DebugSettings) -> String {
 /// Creates KDL configuration for hardware switch events (lid, tablet mode).
 /// Each event can trigger spawn commands.
 pub fn generate_switch_events_kdl(settings: &SwitchEventsSettings) -> String {
-    let mut kdl = KdlBuilder::with_header("Switch events - managed by niri-settings-rust");
+    let mut kdl = KdlBuilder::with_header("Switch events - managed by Nirify");
     kdl.comment("Configure actions for hardware switch events.");
     kdl.newline();
 
@@ -307,7 +307,7 @@ pub fn generate_switch_events_kdl(settings: &SwitchEventsSettings) -> String {
 /// Includes highlight styling and preview settings.
 pub fn generate_recent_windows_kdl(settings: &RecentWindowsSettings) -> String {
     let mut kdl =
-        KdlBuilder::with_header("Recent windows switcher - managed by niri-settings-rust");
+        KdlBuilder::with_header("Recent windows switcher - managed by Nirify");
     kdl.comment("Configures the Alt-Tab window switcher appearance.");
     kdl.newline();
 

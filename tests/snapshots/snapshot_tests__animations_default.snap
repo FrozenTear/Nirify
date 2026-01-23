@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Animation settings - managed by niri-settings-rust
+// Animation settings - managed by Nirify
 
 animations {
 }

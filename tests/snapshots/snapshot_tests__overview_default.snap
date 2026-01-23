@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Overview settings - managed by niri-settings-rust
+// Overview settings - managed by Nirify
 
 overview {
     zoom 0.50

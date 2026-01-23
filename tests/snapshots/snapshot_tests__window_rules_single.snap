@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Window rules - managed by niri-settings-rust
+// Window rules - managed by Nirify
 
 // Firefox Floating
 window-rule {

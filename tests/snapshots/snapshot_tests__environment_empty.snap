@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Environment variables - managed by niri-settings-rust
+// Environment variables - managed by Nirify
 
 // These are set for all processes spawned by niri.
 

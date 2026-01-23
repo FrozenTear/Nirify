@@ -123,7 +123,7 @@ pub struct WindowInfo {
     /// Window title - can be null in some cases, defaults to empty string
     #[serde(default, deserialize_with = "deserialize_nullable_string")]
     pub title: String,
-    /// App ID - can be null for some windows (like niri-settings itself), defaults to empty string
+    /// App ID - can be null for some windows (like Nirify itself), defaults to empty string
     #[serde(default, deserialize_with = "deserialize_nullable_string")]
     pub app_id: String,
     #[serde(default)]
@@ -1216,10 +1216,10 @@ mod tests {
 
     #[test]
     fn test_window_info_handles_null_app_id() {
-        // Test that null app_id values are handled (e.g., for niri-settings itself)
+        // Test that null app_id values are handled (e.g., for Nirify itself)
         let json = r#"{
             "id": 27,
-            "title": "niri-settings",
+            "title": "Nirify",
             "app_id": null,
             "pid": 68767,
             "workspace_id": 3,
@@ -1228,7 +1228,7 @@ mod tests {
         }"#;
         let info: WindowInfo = serde_json::from_str(json).unwrap();
         assert_eq!(info.id, 27);
-        assert_eq!(info.title, "niri-settings");
+        assert_eq!(info.title, "Nirify");
         assert_eq!(info.app_id, ""); // null should become empty string
         assert!(info.is_focused);
     }

@@ -1,4 +1,4 @@
-//! Custom theme for niri-settings
+//! Custom theme for Nirify
 //!
 //! A refined dark theme with warm undertones and precise spacing.
 //! Inspired by professional creative tools and audio software.
@@ -196,7 +196,7 @@ impl AppTheme {
     }
 }
 
-/// Custom color palette for niri-settings
+/// Custom color palette for Nirify
 pub struct NiriColors {
     // Background layers
     pub bg_base: Color,           // #1a1d23 - Deep charcoal base

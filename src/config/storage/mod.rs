@@ -1,7 +1,7 @@
 //! Settings storage - writes KDL configuration files
 //!
 //! This module provides functions to save settings to the multi-file
-//! KDL configuration structure managed by niri-settings.
+//! KDL configuration structure managed by Nirify.
 //!
 //! # Module Structure
 //!
@@ -607,7 +607,7 @@ mod tests {
         assert!(content.contains("include \"appearance.kdl\""));
         assert!(content.contains("include \"behavior.kdl\""));
         assert!(content.contains("include \"input/keyboard.kdl\""));
-        assert!(content.contains("niri-settings-rust managed"));
+        assert!(content.contains("Nirify managed"));
     }
 
     #[test]

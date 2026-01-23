@@ -1,7 +1,7 @@
 //! Settings loader - reads KDL configuration files
 //!
 //! This module provides functions to load settings from the multi-file
-//! KDL configuration structure managed by niri-settings.
+//! KDL configuration structure managed by Nirify.
 //!
 //! # Module Structure
 //!

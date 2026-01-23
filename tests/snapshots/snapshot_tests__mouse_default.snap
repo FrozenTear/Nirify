@@ -2,7 +2,7 @@
 source: tests/snapshot_tests.rs
 expression: kdl
 ---
-// Mouse settings - managed by niri-settings-rust
+// Mouse settings - managed by Nirify
 
 input {
     mouse {
