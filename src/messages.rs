@@ -124,6 +124,12 @@ pub enum Message {
     WizardNext,
     WizardBack,
     WizardSetupConfig,
+    /// Toggle a wizard consolidation suggestion
+    WizardConsolidationToggle(usize),
+    /// Apply selected wizard consolidation suggestions
+    WizardConsolidationApply,
+    /// Skip wizard consolidation step
+    WizardConsolidationSkip,
     /// Analyze rules and show consolidation dialog if suggestions found
     AnalyzeConsolidation,
     /// Toggle selection of a consolidation suggestion
@@ -1001,6 +1007,7 @@ pub enum WizardStep {
     Welcome,
     ConfigSetup,
     ImportResults,
+    Consolidation,
     Complete,
 }
 
