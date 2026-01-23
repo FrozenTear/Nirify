@@ -31,7 +31,7 @@ pub struct BackupsState {
 /// Creates the backups view
 pub fn view(state: &BackupsState) -> Element<'_, Message> {
     let mut content = column![
-        section_header("Backups"),
+        page_title("Backups"),
         info_text(
             "Manage configuration backups. Backups are automatically created \
              when you set up niri-settings or make significant changes."
@@ -269,5 +269,7 @@ pub fn view(state: &BackupsState) -> Element<'_, Message> {
 
     content = content.push(spacer(32.0));
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

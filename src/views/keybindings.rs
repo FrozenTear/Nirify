@@ -414,7 +414,7 @@ fn action_editor<'a>(binding: &'a Keybinding, idx: usize) -> Element<'a, Message
     ]
     .spacing(4);
 
-    // Command display for spawn actions
+    // Command input for spawn actions
     if is_spawn {
         if let KeybindAction::Spawn(args) = &binding.action {
             let cmd_display = args.join(" ");
@@ -422,26 +422,18 @@ fn action_editor<'a>(binding: &'a Keybinding, idx: usize) -> Element<'a, Message
             content = content.push(
                 row![
                     text("Command:").size(14).width(Length::Fixed(80.0)),
-                    container(
-                        text(cmd_display)
-                            .size(14)
-                    )
-                    .padding(8)
-                    .style(|_theme| container::Style {
-                        background: Some(iced::Background::Color(iced::Color::from_rgba(0.15, 0.15, 0.15, 0.8))),
-                        border: iced::Border {
-                            color: iced::Color::from_rgb(0.3, 0.3, 0.3),
-                            width: 1.0,
-                            radius: 4.0.into(),
-                        },
-                        ..Default::default()
-                    }),
+                    text_input("Enter command...", &cmd_display)
+                        .on_input(move |value| {
+                            Message::Keybindings(KeybindingsMessage::SetCommand(idx, value))
+                        })
+                        .padding(8)
+                        .width(Length::Fill),
                 ]
                 .spacing(12)
                 .align_y(Alignment::Center)
             );
             content = content.push(
-                info_text("Edit command by selecting a different action or modifying keybindings.kdl directly")
+                info_text("Enter the command to run (e.g., 'alacritty' or 'firefox --new-window')")
             );
         }
     }

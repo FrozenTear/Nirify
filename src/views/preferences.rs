@@ -11,7 +11,7 @@ use crate::messages::{Message, PreferencesMessage};
 /// Creates the preferences settings view
 pub fn view(float_settings_app: bool) -> Element<'static, Message> {
     let mut content = column![
-        section_header("Preferences"),
+        page_title("Preferences"),
         info_text("Configure how this settings application behaves."),
     ]
     .spacing(4);
@@ -89,5 +89,11 @@ pub fn view(float_settings_app: bool) -> Element<'static, Message> {
         }),
     );
 
-    content.into()
+    iced::widget::scrollable(
+        iced::widget::container(content)
+            .padding(20)
+            .width(iced::Length::Fill)
+    )
+    .height(iced::Length::Fill)
+    .into()
 }

@@ -17,7 +17,7 @@ pub fn view<'a>(settings: &'a TabletSettings, calibration_cache: &'a [String; 6]
     let matrix_values = settings.calibration_matrix;
 
     let content = column![
-        section_header("Tablet Settings"),
+        page_title("Tablet Settings"),
         info_text(
             "Configure graphics tablet and pen input behavior."
         ),
@@ -27,8 +27,6 @@ pub fn view<'a>(settings: &'a TabletSettings, calibration_cache: &'a [String; 6]
             off,
             |value| Message::Tablet(TabletMessage::SetOff(value)),
         ),
-        spacer(16.0),
-
         section_header("Output Mapping"),
         info_text(
             "Map the tablet to a specific display. Leave empty to use the default (full desktop)."
@@ -42,8 +40,6 @@ pub fn view<'a>(settings: &'a TabletSettings, calibration_cache: &'a [String; 6]
         ]
         .spacing(6)
         .padding(12),
-        spacer(16.0),
-
         section_header("Configuration"),
         toggle_row(
             "Left-handed mode",
@@ -51,8 +47,7 @@ pub fn view<'a>(settings: &'a TabletSettings, calibration_cache: &'a [String; 6]
             left_handed,
             |value| Message::Tablet(TabletMessage::SetLeftHanded(value)),
         ),
-        spacer(16.0),
-
+        subsection_header("Advanced"),
         calibration_matrix(
             "Calibration Matrix",
             "Advanced: Calibration matrix for libinput (6 values). \
@@ -72,5 +67,7 @@ pub fn view<'a>(settings: &'a TabletSettings, calibration_cache: &'a [String; 6]
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

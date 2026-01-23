@@ -280,7 +280,34 @@ pub fn text_input_row<'a, Message: Clone + 'a>(
     .into()
 }
 
+/// Creates a page title - the first heading on a page
+///
+/// No top padding since it's at the start of the page content.
+/// Use this as the FIRST element in page content columns.
+///
+/// # Example
+/// ```rust,ignore
+/// page_title("Appearance Settings")
+/// ```
+pub fn page_title<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
+    container(
+        text(label)
+            .size(18)
+            .color([0.9, 0.9, 0.9])
+    )
+    .padding(iced::Padding {
+        top: 0.0,
+        right: 0.0,
+        bottom: 4.0,
+        left: 0.0,
+    })
+    .into()
+}
+
 /// Creates a section header for grouping related settings
+///
+/// Uses top padding of 16px for visual separation between sections.
+/// Use this for sections AFTER the first page_title.
 ///
 /// # Example
 /// ```rust,ignore
@@ -292,11 +319,18 @@ pub fn section_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
             .size(18)
             .color([0.9, 0.9, 0.9])
     )
-    .padding(12)
+    .padding(iced::Padding {
+        top: 16.0,
+        right: 0.0,
+        bottom: 4.0,
+        left: 0.0,
+    })
     .into()
 }
 
 /// Creates a subsection header (smaller than section header)
+///
+/// Uses top padding of 12px for visual separation within sections
 ///
 /// # Example
 /// ```rust,ignore
@@ -308,7 +342,12 @@ pub fn subsection_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message
             .size(15)
             .color([0.8, 0.8, 0.8])
     )
-    .padding(12)
+    .padding(iced::Padding {
+        top: 12.0,
+        right: 0.0,
+        bottom: 4.0,
+        left: 0.0,
+    })
     .into()
 }
 

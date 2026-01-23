@@ -25,7 +25,7 @@ pub fn view(settings: &RecentWindowsSettings) -> Element<'static, Message> {
     let binds = settings.binds.clone();
 
     let mut content = column![
-        section_header("Recent Windows Switcher"),
+        page_title("Recent Windows Switcher"),
         info_text(
             "Configure the window switcher overlay for switching between recently used windows (Alt-Tab)."
         ),
@@ -189,7 +189,9 @@ pub fn view(settings: &RecentWindowsSettings) -> Element<'static, Message> {
 
     content = content.push(spacer(16.0));
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }
 
 // Scope option for pick_list display

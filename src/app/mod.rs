@@ -195,6 +195,8 @@ impl App {
 
             Message::Outputs(msg) => self.update_outputs(msg),
 
+            Message::Overview(msg) => self.update_overview(msg),
+
             // Save subsystem (Phase 4)
             Message::Save(SaveMessage::CheckSave) => {
                 if self.should_save() {
@@ -666,31 +668,29 @@ impl App {
 
     /// Creates the content area for the current page
     fn page_content(&self) -> Element<'_, Message> {
-        use iced::widget::scrollable;
-
-        // Get the page-specific content (without the page title - nav shows it)
-        let page_view = match self.ui.current_page {
+        // Each page handles its own scrollable container
+        match self.ui.current_page {
             Page::Overview => return self.overview_page(),
             Page::Appearance => {
-                views::appearance::view(&self.settings.appearance)
+                return views::appearance::view(&self.settings.appearance);
             }
             Page::Behavior => {
-                views::behavior::view(&self.settings.behavior)
+                return views::behavior::view(&self.settings.behavior);
             }
             Page::Keyboard => {
-                views::keyboard::view(&self.settings.keyboard)
+                return views::keyboard::view(&self.settings.keyboard);
             }
             Page::Mouse => {
-                views::mouse::view(&self.settings.mouse)
+                return views::mouse::view(&self.settings.mouse);
             }
             Page::Touchpad => {
-                views::touchpad::view(&self.settings.touchpad)
+                return views::touchpad::view(&self.settings.touchpad);
             }
             Page::Trackpoint => {
-                views::trackpoint::view(&self.settings.trackpoint)
+                return views::trackpoint::view(&self.settings.trackpoint);
             }
             Page::Trackball => {
-                views::trackball::view(&self.settings.trackball)
+                return views::trackball::view(&self.settings.trackball);
             }
             Page::Tablet => {
                 return views::tablet::view(&self.settings.tablet, &self.ui.tablet_calibration_cache);
@@ -779,34 +779,139 @@ impl App {
             Page::Backups => {
                 return views::backups::view(&self.ui.backups_state);
             }
-        };
-
-        // Wrap in scrollable container with padding
-        scrollable(
-            container(page_view)
-                .padding(24)
-                .width(Length::Fill)
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+        }
     }
 
-    /// Overview page - summary dashboard with widget demo
+    /// Overview page - summary dashboard with overview settings
     fn overview_page(&self) -> Element<'_, Message> {
-        use iced::widget::{pick_list, row};
+        use iced::widget::{pick_list, row, scrollable, slider, text_input, toggler};
         use iced::Alignment;
+        use crate::messages::OverviewMessage;
+        use crate::views::widgets::{page_title, spacer};
 
         let settings = &self.settings;
+
+        // Overview settings section (workspace exposé / overview mode)
+        let overview_settings = {
+            let zoom = settings.overview.zoom;
+            let backdrop_color = settings.overview.backdrop_color.as_ref().map(|c| c.to_hex()).unwrap_or_default();
+            let shadow_enabled = settings.overview.workspace_shadow.as_ref().map(|s| s.enabled).unwrap_or(false);
+
+            let mut overview_section = column![
+                page_title("Workspace Overview Settings"),
+                text("Configure the appearance of the workspace overview (toggle-overview action)").size(12).color([0.7, 0.7, 0.7]),
+
+                // Zoom slider
+                row![
+                    text("Zoom Level:").size(14).width(Length::Fixed(140.0)),
+                    slider(0.1..=2.0, zoom as f32, |v| Message::Overview(OverviewMessage::SetZoom(v as f64)))
+                        .step(0.05)
+                        .width(Length::Fixed(200.0)),
+                    text(format!("{:.2}x", zoom)).size(14).width(Length::Fixed(60.0)),
+                ]
+                .spacing(12)
+                .align_y(Alignment::Center),
+                text("How much to scale down windows in overview (0.1 = 10%, 1.0 = 100%)").size(12).color([0.7, 0.7, 0.7]),
+                spacer(8.0),
+
+                // Backdrop color
+                row![
+                    text("Backdrop Color:").size(14).width(Length::Fixed(140.0)),
+                    text_input("#00000080", &backdrop_color)
+                        .on_input(|v| {
+                            let color = if v.is_empty() { None } else { Some(v) };
+                            Message::Overview(OverviewMessage::SetBackdropColor(color))
+                        })
+                        .padding(6)
+                        .width(Length::Fixed(150.0)),
+                ]
+                .spacing(12)
+                .align_y(Alignment::Center),
+                text("Background color behind workspaces in overview (hex with alpha, e.g., #00000080)").size(12).color([0.7, 0.7, 0.7]),
+                spacer(8.0),
+
+                // Workspace shadow toggle
+                row![
+                    text("Workspace Shadow:").size(14).width(Length::Fixed(140.0)),
+                    toggler(shadow_enabled)
+                        .on_toggle(|v| Message::Overview(OverviewMessage::ToggleWorkspaceShadow(v))),
+                ]
+                .spacing(12)
+                .align_y(Alignment::Center),
+                text("Add shadow behind workspaces in overview (v25.05+)").size(12).color([0.7, 0.7, 0.7]),
+            ]
+            .spacing(4);
+
+            // Shadow settings (if enabled)
+            if let Some(ref shadow) = settings.overview.workspace_shadow {
+                if shadow.enabled {
+                    let shadow_color = shadow.color.to_hex();
+                    overview_section = overview_section.push(spacer(8.0));
+                    overview_section = overview_section.push(
+                        row![
+                            text("  Softness:").size(14).width(Length::Fixed(140.0)),
+                            slider(0..=200, shadow.softness, |v| Message::Overview(OverviewMessage::SetWorkspaceShadowSoftness(v)))
+                                .width(Length::Fixed(150.0)),
+                            text(format!("{}", shadow.softness)).size(14).width(Length::Fixed(40.0)),
+                        ]
+                        .spacing(12)
+                        .align_y(Alignment::Center)
+                    );
+                    overview_section = overview_section.push(
+                        row![
+                            text("  Spread:").size(14).width(Length::Fixed(140.0)),
+                            slider(0..=200, shadow.spread, |v| Message::Overview(OverviewMessage::SetWorkspaceShadowSpread(v)))
+                                .width(Length::Fixed(150.0)),
+                            text(format!("{}", shadow.spread)).size(14).width(Length::Fixed(40.0)),
+                        ]
+                        .spacing(12)
+                        .align_y(Alignment::Center)
+                    );
+                    overview_section = overview_section.push(
+                        row![
+                            text("  Offset X:").size(14).width(Length::Fixed(140.0)),
+                            slider(-100..=100, shadow.offset_x, |v| Message::Overview(OverviewMessage::SetWorkspaceShadowOffsetX(v)))
+                                .width(Length::Fixed(150.0)),
+                            text(format!("{}", shadow.offset_x)).size(14).width(Length::Fixed(40.0)),
+                        ]
+                        .spacing(12)
+                        .align_y(Alignment::Center)
+                    );
+                    overview_section = overview_section.push(
+                        row![
+                            text("  Offset Y:").size(14).width(Length::Fixed(140.0)),
+                            slider(-100..=100, shadow.offset_y, |v| Message::Overview(OverviewMessage::SetWorkspaceShadowOffsetY(v)))
+                                .width(Length::Fixed(150.0)),
+                            text(format!("{}", shadow.offset_y)).size(14).width(Length::Fixed(40.0)),
+                        ]
+                        .spacing(12)
+                        .align_y(Alignment::Center)
+                    );
+                    overview_section = overview_section.push(
+                        row![
+                            text("  Shadow Color:").size(14).width(Length::Fixed(140.0)),
+                            text_input("#00000050", &shadow_color)
+                                .on_input(|v| Message::Overview(OverviewMessage::SetWorkspaceShadowColor(v)))
+                                .padding(6)
+                                .width(Length::Fixed(150.0)),
+                        ]
+                        .spacing(12)
+                        .align_y(Alignment::Center)
+                    );
+                }
+            }
+
+            overview_section
+        };
 
         let summary = column![
             text("Welcome to Niri Settings").size(24),
             text("A modern GUI for configuring the niri Wayland compositor").size(14).color([0.7, 0.7, 0.7]),
-            text("").size(16),
+            spacer(16.0),
 
             // Preferences Section
             text("Preferences").size(18),
-            text("").size(8),
+            spacer(8.0),
             row![
                 text("Theme:").size(14).width(Length::Fixed(100.0)),
                 pick_list(
@@ -819,12 +924,16 @@ impl App {
             ]
             .spacing(12)
             .align_y(Alignment::Center),
-            text("Choose your preferred color theme for the application").size(12).color([0.75, 0.75, 0.75]),
-            text("").size(16),
+            text("Choose your preferred color theme for the application").size(12).color([0.7, 0.7, 0.7]),
+            spacer(16.0),
+
+            // Overview Settings
+            overview_settings,
+            spacer(16.0),
 
             // Current Settings Summary
             text("Current Configuration").size(18),
-            text("").size(8),
+            spacer(8.0),
             text(format!("Focus Ring: {} ({}px)",
                 if settings.appearance.focus_ring_enabled { "Enabled" } else { "Disabled" },
                 settings.appearance.focus_ring_width as i32
@@ -835,7 +944,7 @@ impl App {
             )).size(14).font(fonts::MONO_FONT),
             text(format!("Window Gaps: {}px", settings.appearance.gaps as i32)).size(14).font(fonts::MONO_FONT),
             text(format!("Corner Radius: {}px", settings.appearance.corner_radius as i32)).size(14).font(fonts::MONO_FONT),
-            text("").size(12),
+            spacer(12.0),
 
             text(format!("Focus Follows Mouse: {}",
                 if settings.behavior.focus_follows_mouse { "Yes" } else { "No" }
@@ -843,13 +952,13 @@ impl App {
             text(format!("Workspace Auto Back-and-Forth: {}",
                 if settings.behavior.workspace_auto_back_and_forth { "Yes" } else { "No" }
             )).size(14),
-            text("").size(12),
+            spacer(12.0),
 
             text(format!("Keyboard Layout: {}", settings.keyboard.xkb_layout)).size(14).font(fonts::MONO_FONT),
             text(format!("Repeat Rate: {}/sec, Delay: {}ms",
                 settings.keyboard.repeat_rate, settings.keyboard.repeat_delay
             )).size(14).font(fonts::MONO_FONT),
-            text("").size(12),
+            spacer(12.0),
 
             text(format!("Mouse: Natural Scroll {}",
                 if settings.mouse.natural_scroll { "ON" } else { "OFF" }
@@ -860,29 +969,18 @@ impl App {
             text(format!("Cursor: {} ({}px)",
                 settings.cursor.theme, settings.cursor.size
             )).size(14).font(fonts::MONO_FONT),
-            text("").size(16),
-
-            // Migration Status
-            text("iced 0.14 Migration - Phase 6 Complete").size(16).color([0.6, 0.8, 0.6]),
-            text("✓ Phase 1-4: Foundation, Widgets, Appearance, SaveManager").size(13).color([0.7, 0.7, 0.7]),
-            text("✓ Phase 5-6: All 25 pages implemented").size(13).color([0.7, 0.7, 0.7]),
-            text("✓ Navigation: Modern horizontal tabs with search").size(13).color([0.7, 0.7, 0.7]),
-            text("→ Next: Complex widgets (Phase 7) & Search (Phase 9)").size(13).color([0.7, 0.7, 0.7]),
-            text("").size(12),
-            text("Scroll down to see widget demonstration →").size(13).color([0.6, 0.7, 0.9]),
-            text("").size(16),
         ]
-        .spacing(6);
+        .spacing(6)
+        .width(Length::Fill);
 
-        // Combine summary with widget demo
-        let page_view = column![summary, views::widget_demo::view(&self.ui.widget_demo_state),]
-            .spacing(20);
-
-        container(page_view)
-            .padding(20)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+        // Wrap in scrollable with full width
+        scrollable(
+            container(summary)
+                .padding(20)
+                .width(Length::Fill)
+        )
+        .height(Length::Fill)
+        .into()
     }
 
     /// Mark that settings have changed (triggers debounced save)

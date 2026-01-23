@@ -110,8 +110,10 @@ pub fn generate_debug_kdl(settings: &DebugSettings) -> String {
     kdl.comment("WARNING: These are advanced options. Use with caution.");
     kdl.newline();
 
+    use crate::config::models::PreviewRenderMode;
+
     // Check if any debug option is enabled
-    let has_any = settings.preview_render
+    let has_any = settings.preview_render != PreviewRenderMode::Off
         || settings.enable_overlay_planes
         || settings.disable_cursor_plane
         || settings.disable_direct_scanout
@@ -142,7 +144,9 @@ pub fn generate_debug_kdl(settings: &DebugSettings) -> String {
     }
 
     kdl.block("debug", |b| {
-        b.optional_flag("preview-render", settings.preview_render);
+        if let Some(mode_str) = settings.preview_render.to_kdl() {
+            b.field_string("preview-render", mode_str);
+        }
         b.optional_flag("enable-overlay-planes", settings.enable_overlay_planes);
         b.optional_flag("disable-cursor-plane", settings.disable_cursor_plane);
         b.optional_flag("disable-direct-scanout", settings.disable_direct_scanout);

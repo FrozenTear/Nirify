@@ -85,6 +85,7 @@ pub enum Message {
     // ═══════════════════════════════════════════════════════════════════════════
     // System Configuration
     // ═══════════════════════════════════════════════════════════════════════════
+    Overview(OverviewMessage),
     Outputs(OutputsMessage),
     Miscellaneous(MiscellaneousMessage),
     Environment(EnvironmentMessage),
@@ -606,7 +607,7 @@ pub enum DebugMessage {
     SetExpertMode(bool),
 
     // Rendering options
-    SetPreviewRender(bool),
+    SetPreviewRender(crate::config::models::PreviewRenderMode),
     SetEnableOverlayPlanes(bool),
     SetDisableCursorPlane(bool),
     SetDisableDirectScanout(bool),
@@ -650,6 +651,29 @@ pub enum MiscellaneousMessage {
     SetConfigNotificationDisableFailed(bool),
     SetSpawnShAtStartup(bool),
     SetXWaylandSatellite(crate::config::models::XWaylandSatelliteConfig),
+}
+
+/// Overview settings messages (workspace overview / exposé)
+///
+/// Controls the appearance of the workspace overview mode (triggered by toggle-overview)
+#[derive(Debug, Clone)]
+pub enum OverviewMessage {
+    /// Set the overview zoom level (how much to scale down windows)
+    SetZoom(f64),
+    /// Set the backdrop color (optional)
+    SetBackdropColor(Option<String>),
+    /// Toggle workspace shadow in overview
+    ToggleWorkspaceShadow(bool),
+    /// Set workspace shadow softness (blur radius)
+    SetWorkspaceShadowSoftness(i32),
+    /// Set workspace shadow spread
+    SetWorkspaceShadowSpread(i32),
+    /// Set workspace shadow X offset
+    SetWorkspaceShadowOffsetX(i32),
+    /// Set workspace shadow Y offset
+    SetWorkspaceShadowOffsetY(i32),
+    /// Set workspace shadow color
+    SetWorkspaceShadowColor(String),
 }
 
 /// Environment settings messages

@@ -26,7 +26,7 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
     let border_urgent = settings.border_urgent.clone();
 
     let content = column![
-        section_header("Focus Ring"),
+        page_title("Focus Ring"),
         info_text(
             "The focus ring is a colored outline around the currently focused window. \
              It helps you see which window will receive keyboard input."
@@ -66,7 +66,6 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
             &focus_ring_urgent,
             |msg| Message::Appearance(AppearanceMessage::FocusRingUrgent(msg)),
         ),
-        spacer(16.0),
         section_header("Window Border"),
         info_text(
             "Window borders are drawn around the edges of each window. \
@@ -107,7 +106,6 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
             &border_urgent,
             |msg| Message::Appearance(AppearanceMessage::BorderUrgent(msg)),
         ),
-        spacer(16.0),
         section_header("Layout"),
         slider_row(
             "Window gaps",
@@ -131,5 +129,7 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

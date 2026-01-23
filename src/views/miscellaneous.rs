@@ -2,7 +2,7 @@
 //!
 //! Shows various settings that don't fit into other categories.
 
-use iced::widget::{column, container, pick_list, row, scrollable, text, text_input, toggler};
+use iced::widget::{column, container, pick_list, row, scrollable, text, text_input};
 use iced::{Element, Length};
 
 use super::widgets::*;
@@ -28,94 +28,87 @@ pub fn view(settings: &MiscSettings) -> Element<'static, Message> {
     ];
 
     let content = column![
-        section_header("Miscellaneous Settings"),
+        page_title("Miscellaneous Settings"),
         info_text(
             "Additional niri settings that don't fit into other categories."
         ),
-        spacer(16.0),
 
         // Window Decorations
         subsection_header("Window Decorations"),
-        toggle_setting("Prefer No Client-Side Decorations", prefer_no_csd, MiscellaneousMessage::SetPreferNoCsd),
-        info_text("Ask applications to use server-side (compositor) decorations when possible."),
-        spacer(16.0),
+        toggle_row(
+            "Prefer No Client-Side Decorations",
+            "Ask applications to use server-side (compositor) decorations when possible",
+            prefer_no_csd,
+            |v| Message::Miscellaneous(MiscellaneousMessage::SetPreferNoCsd(v)),
+        ),
 
         // Screenshots
         subsection_header("Screenshots"),
-        string_setting("Screenshot Path", &screenshot_path, "~/Pictures/Screenshots/%Y-%m-%d_%H-%M-%S.png", MiscellaneousMessage::SetScreenshotPath),
-        info_text("Path pattern for saved screenshots. Supports strftime format codes."),
-        spacer(16.0),
+        // Custom text input row for screenshot path (owned string)
+        column![
+            text("Screenshot Path").size(16),
+            text("Path pattern for saved screenshots. Supports strftime format codes.").size(12).color([0.7, 0.7, 0.7]),
+            text_input("~/Pictures/Screenshots/%Y-%m-%d_%H-%M-%S.png", &screenshot_path)
+                .on_input(|s| Message::Miscellaneous(MiscellaneousMessage::SetScreenshotPath(s)))
+                .padding(8)
+                .font(fonts::MONO_FONT),
+        ]
+        .spacing(6)
+        .padding(12),
 
         // Clipboard
         subsection_header("Clipboard"),
-        toggle_setting("Disable Primary Clipboard", disable_clipboard, MiscellaneousMessage::SetDisablePrimaryClipboard),
-        info_text("Disable the middle-click paste (primary selection) clipboard."),
-        spacer(16.0),
+        toggle_row(
+            "Disable Primary Clipboard",
+            "Disable the middle-click paste (primary selection) clipboard",
+            disable_clipboard,
+            |v| Message::Miscellaneous(MiscellaneousMessage::SetDisablePrimaryClipboard(v)),
+        ),
 
         // Hotkey Overlay
         subsection_header("Hotkey Overlay"),
-        toggle_setting("Skip at Startup", hotkey_skip, MiscellaneousMessage::SetHotkeyOverlaySkipAtStartup),
-        toggle_setting("Hide Unbound Actions", hotkey_hide, MiscellaneousMessage::SetHotkeyOverlayHideNotBound),
-        info_text("Controls the hotkey overlay that shows available keyboard shortcuts."),
-        spacer(16.0),
+        toggle_row(
+            "Skip at Startup",
+            "Don't show the hotkey overlay when niri starts",
+            hotkey_skip,
+            |v| Message::Miscellaneous(MiscellaneousMessage::SetHotkeyOverlaySkipAtStartup(v)),
+        ),
+        toggle_row(
+            "Hide Unbound Actions",
+            "Hide actions that don't have a keybinding assigned",
+            hotkey_hide,
+            |v| Message::Miscellaneous(MiscellaneousMessage::SetHotkeyOverlayHideNotBound(v)),
+        ),
 
         // Startup Behavior
         subsection_header("Startup Behavior"),
-        toggle_setting("Spawn Through Shell at Startup", spawn_sh, MiscellaneousMessage::SetSpawnShAtStartup),
-        info_text("Execute startup commands through the shell (enables shell features like ~)."),
-        spacer(16.0),
+        toggle_row(
+            "Spawn Through Shell at Startup",
+            "Execute startup commands through the shell (enables shell features like ~)",
+            spawn_sh,
+            |v| Message::Miscellaneous(MiscellaneousMessage::SetSpawnShAtStartup(v)),
+        ),
 
         // Notifications
         subsection_header("Notifications"),
-        toggle_setting("Disable Config Parse Failed Notification", config_disable, MiscellaneousMessage::SetConfigNotificationDisableFailed),
-        spacer(16.0),
+        toggle_row(
+            "Disable Config Parse Failed Notification",
+            "Don't show notification when config parsing fails",
+            config_disable,
+            |v| Message::Miscellaneous(MiscellaneousMessage::SetConfigNotificationDisableFailed(v)),
+        ),
 
         // XWayland
         subsection_header("XWayland"),
         xwayland_setting(&xwayland, xwayland_options),
-        info_text("Configuration for xwayland-satellite (X11 compatibility layer)."),
-        spacer(16.0),
+
+        spacer(32.0),
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
-}
-
-/// Create a toggle setting row
-fn toggle_setting<F>(label: &str, value: bool, msg_fn: F) -> Element<'static, Message>
-where
-    F: Fn(bool) -> MiscellaneousMessage + 'static,
-{
-    row![
-        text(label.to_string()).size(14).width(Length::Fixed(300.0)),
-        toggler(value)
-            .on_toggle(move |v| Message::Miscellaneous(msg_fn(v)))
-            .size(20),
-    ]
-    .spacing(16)
-    .align_y(iced::Alignment::Center)
-    .into()
-}
-
-/// Create a string setting row
-fn string_setting<F>(label: &str, value: &str, placeholder: &str, msg_fn: F) -> Element<'static, Message>
-where
-    F: Fn(String) -> MiscellaneousMessage + 'static,
-{
-    let value_owned = value.to_string();
-    let placeholder_owned = placeholder.to_string();
-
-    row![
-        text(label.to_string()).size(14).width(Length::Fixed(300.0)),
-        text_input(&placeholder_owned, &value_owned)
-            .on_input(move |s| Message::Miscellaneous(msg_fn(s)))
-            .padding(8)
-            .font(fonts::MONO_FONT)
-            .width(Length::Fill),
-    ]
-    .spacing(16)
-    .align_y(iced::Alignment::Center)
-    .into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }
 
 /// Create the XWayland satellite picker
@@ -137,7 +130,12 @@ fn xwayland_setting(current: &XWaylandSatelliteConfig, options: Vec<XWaylandSate
 
     let mut content = column![
         row![
-            text("XWayland Satellite").size(14).width(Length::Fixed(300.0)),
+            column![
+                text("XWayland Satellite").size(16),
+                text("Configuration for xwayland-satellite (X11 compatibility layer)").size(12).color([0.7, 0.7, 0.7]),
+            ]
+            .spacing(4)
+            .width(Length::Fill),
             pick_list(
                 options.clone(),
                 Some(if is_custom { XWaylandSatelliteConfig::Default } else { current.clone() }),
@@ -146,10 +144,11 @@ fn xwayland_setting(current: &XWaylandSatelliteConfig, options: Vec<XWaylandSate
             .placeholder(&current_display)
             .width(Length::Fixed(200.0)),
         ]
-        .spacing(16)
+        .spacing(20)
         .align_y(iced::Alignment::Center),
     ]
-    .spacing(8);
+    .spacing(8)
+    .padding(12);
 
     // Show custom path input if currently using custom
     if is_custom {
@@ -161,7 +160,7 @@ fn xwayland_setting(current: &XWaylandSatelliteConfig, options: Vec<XWaylandSate
                         XWaylandSatelliteConfig::CustomPath(s)
                     )))
                     .padding(8)
-                    .font(fonts::MONO_FONT)
+                    .font(crate::theme::fonts::MONO_FONT)
                     .width(Length::Fill),
             ]
             .spacing(16)

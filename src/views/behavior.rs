@@ -28,7 +28,7 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
     let mod_key_nested = settings.mod_key_nested;
 
     let content = column![
-        section_header("Focus Behavior"),
+        page_title("Focus Behavior"),
         info_text(
             "Control how window focus behaves when moving your mouse."
         ),
@@ -54,8 +54,6 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
             Some(warp_mouse_to_focus),
             |value| Message::Behavior(BehaviorMessage::SetWarpMouseToFocus(value)),
         ),
-        spacer(16.0),
-
         section_header("Workspace Behavior"),
         toggle_row(
             "Auto back-and-forth",
@@ -82,8 +80,6 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
             Some(center_focused_column),
             |value| Message::Behavior(BehaviorMessage::SetCenterFocusedColumn(value)),
         ),
-        spacer(16.0),
-
         section_header("Default Column Width"),
         info_text(
             "Choose how new window columns are sized by default."
@@ -95,8 +91,6 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
             Some(default_column_width_type),
             |value| Message::Behavior(BehaviorMessage::SetDefaultColumnWidthType(value)),
         ),
-        spacer(16.0),
-
         section_header("Screen Edge Struts"),
         info_text(
             "Reserve space at screen edges (useful for panels/docks). Values in pixels."
@@ -137,8 +131,6 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
             " px",
             |value| Message::Behavior(BehaviorMessage::SetStrutBottom(value)),
         ),
-        spacer(16.0),
-
         section_header("Modifier Keys"),
         info_text(
             "Choose the primary modifier key for niri window management shortcuts."
@@ -157,8 +149,6 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
             mod_key_nested,
             |value| Message::Behavior(BehaviorMessage::SetModKeyNested(value)),
         ),
-        spacer(16.0),
-
         section_header("Power Button"),
         toggle_row(
             "Disable power key handling",
@@ -170,5 +160,7 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

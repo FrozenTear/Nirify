@@ -17,14 +17,11 @@ pub fn view(settings: &AnimationSettings) -> Element<'_, Message> {
     let slowdown_enabled = (settings.slowdown - 1.0).abs() > 0.01;
 
     let content = column![
-        section_header("Animations"),
+        page_title("Animations"),
         info_text(
             "Configure niri's window and workspace animations. Each animation can use spring physics, \
              easing curves, or custom GLSL shaders."
         ),
-        spacer(8.0),
-
-        // Global settings
         subsection_header("Global Settings"),
         toggle_row(
             "Enable slowdown",
@@ -45,9 +42,6 @@ pub fn view(settings: &AnimationSettings) -> Element<'_, Message> {
         } else {
             column![].into()
         },
-        spacer(16.0),
-
-        // Shader-compatible animations with special UI
         subsection_header("Window Animations (Shader Support)"),
         info_text(
             "These animations support custom GLSL shaders for advanced visual effects."
@@ -55,9 +49,6 @@ pub fn view(settings: &AnimationSettings) -> Element<'_, Message> {
         animation_card("window-open", AnimationId::WindowOpen, &settings.per_animation.window_open, true),
         animation_card("window-close", AnimationId::WindowClose, &settings.per_animation.window_close, true),
         animation_card("window-resize", AnimationId::WindowResize, &settings.per_animation.window_resize, true),
-        spacer(16.0),
-
-        // Other animations
         subsection_header("Other Animations"),
         animation_card("workspace-switch", AnimationId::WorkspaceSwitch, &settings.per_animation.workspace_switch, false),
         animation_card("window-movement", AnimationId::WindowMovement, &settings.per_animation.window_movement, false),
@@ -71,7 +62,9 @@ pub fn view(settings: &AnimationSettings) -> Element<'_, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }
 
 /// Creates a card for a single animation with type selector and parameters

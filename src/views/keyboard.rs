@@ -34,7 +34,7 @@ pub fn view(settings: &KeyboardSettings) -> Element<'_, Message> {
     let track_layout = settings.track_layout.clone();
 
     let content = column![
-        section_header("Keyboard Layout"),
+        page_title("Keyboard Layout"),
         info_text(
             "Configure keyboard layout using XKB settings. The layout determines key mapping and language support."
         ),
@@ -44,8 +44,6 @@ pub fn view(settings: &KeyboardSettings) -> Element<'_, Message> {
             xkb_layout,
             |value| Message::Keyboard(KeyboardMessage::SetXkbLayout(value)),
         ),
-        spacer(16.0),
-
         section_header("Key Repeat"),
         info_text(
             "Controls how quickly keys repeat when held down. Delay is how long before repeat starts, rate is how fast keys repeat."
@@ -68,8 +66,6 @@ pub fn view(settings: &KeyboardSettings) -> Element<'_, Message> {
             " /sec",
             |value| Message::Keyboard(KeyboardMessage::SetRepeatRate(value)),
         ),
-        spacer(16.0),
-
         section_header("Layout Tracking"),
         info_text(
             "Configure how keyboard layouts are tracked across windows. Options: 'global' (one layout for all windows), 'window' (per-window layout)."
@@ -84,5 +80,7 @@ pub fn view(settings: &KeyboardSettings) -> Element<'_, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

@@ -15,11 +15,10 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
     let variables = settings.variables.clone();
 
     let mut content = column![
-        section_header("Environment Variables"),
+        page_title("Environment Variables"),
         info_text(
             "Environment variables set for programs launched by niri."
         ),
-        spacer(16.0),
     ]
     .spacing(4);
 
@@ -42,7 +41,6 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
         );
     } else {
         content = content.push(subsection_header("Configured Variables"));
-        content = content.push(spacer(8.0));
 
         for var in &variables {
             let var_id = var.id;
@@ -53,10 +51,10 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
                 container(
                     column![
                         row![
-                            text(format!("Variable #{}", var_id)).size(12).color([0.5, 0.5, 0.5]),
-                            button(text("×").size(14))
+                            text(format!("Variable #{}", var_id)).size(12).color([0.5, 0.5, 0.5]).width(Length::Fill),
+                            button(text("Delete").size(12))
                                 .on_press(Message::Environment(EnvironmentMessage::RemoveVariable(var_id)))
-                                .padding([2, 8])
+                                .padding([4, 12])
                                 .style(delete_button_style),
                         ]
                         .spacing(8)
@@ -119,9 +117,7 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
         .style(add_button_style)
     );
 
-    content = content.push(spacer(16.0));
     content = content.push(subsection_header("Common Variables"));
-    content = content.push(spacer(8.0));
     content = content.push(info_text("Examples of commonly used environment variables:"));
     content = content.push(spacer(4.0));
     content = content.push(text("DISPLAY").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
@@ -132,8 +128,11 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
     content = content.push(text("  Desktop environment name (e.g., \"niri\")").size(12).color([0.75, 0.75, 0.75]));
     content = content.push(text("GTK_THEME").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
     content = content.push(text("  GTK theme name (e.g., \"Adwaita:dark\")").size(12).color([0.75, 0.75, 0.75]));
+    content = content.push(spacer(32.0));
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }
 
 /// Style for delete buttons

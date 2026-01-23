@@ -18,7 +18,7 @@ pub fn view(settings: &SwitchEventsSettings) -> Element<'static, Message> {
     let tablet_off = settings.tablet_mode_off.display();
 
     let content = column![
-        section_header("Switch Events"),
+        page_title("Switch Events"),
         info_text(
             "Configure actions for laptop lid and tablet mode switches. \
              Enter the command to run when each event occurs."
@@ -56,7 +56,9 @@ pub fn view(settings: &SwitchEventsSettings) -> Element<'static, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }
 
 /// Create a command input row

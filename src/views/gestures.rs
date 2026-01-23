@@ -29,16 +29,12 @@ pub fn view(settings: &GestureSettings) -> Element<'static, Message> {
     let dnd_workspace_speed = settings.dnd_edge_workspace_switch.max_speed;
 
     let content = column![
-        section_header("Gestures"),
+        page_title("Gestures"),
         info_text(
             "Configure hot corners and drag-and-drop edge triggers for workspace and view navigation."
         ),
-        spacer(16.0),
-
-        // Hot Corners Section
         subsection_header("Hot Corners"),
         info_text("Trigger overview mode by moving the cursor to screen corners."),
-        spacer(8.0),
         toggle_row(
             "Enable hot corners",
             "Allow triggering overview from screen corners",
@@ -69,12 +65,8 @@ pub fn view(settings: &GestureSettings) -> Element<'static, Message> {
             hot_corner_br,
             |value| Message::Gestures(GesturesMessage::SetHotCornerBottomRight(value)),
         ),
-        spacer(16.0),
-
-        // DnD Edge View Scroll Section
         subsection_header("DnD Edge View Scroll"),
         info_text("Scroll the view when dragging items to screen edges."),
-        spacer(8.0),
         toggle_row(
             "Enable edge scroll",
             "Scroll view when dragging to left/right edges",
@@ -108,12 +100,8 @@ pub fn view(settings: &GestureSettings) -> Element<'static, Message> {
             " px/s",
             |value| Message::Gestures(GesturesMessage::SetDndScrollMaxSpeed(value)),
         ),
-        spacer(16.0),
-
-        // DnD Edge Workspace Switch Section
         subsection_header("DnD Edge Workspace Switch"),
         info_text("Switch workspaces when dragging items to screen top/bottom edges."),
-        spacer(8.0),
         toggle_row(
             "Enable workspace switch",
             "Switch workspace when dragging to top/bottom edges",
@@ -151,5 +139,7 @@ pub fn view(settings: &GestureSettings) -> Element<'static, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

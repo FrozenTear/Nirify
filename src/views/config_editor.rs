@@ -52,7 +52,7 @@ pub struct ConfigEditorState {
 /// Creates the config editor view
 pub fn view(state: &ConfigEditorState) -> Element<'_, Message> {
     let mut content = column![
-        section_header("Config Editor"),
+        page_title("Config Editor"),
         info_text(
             "View the generated KDL configuration files. \
              These files are automatically generated from your settings and should not be edited manually."
@@ -198,5 +198,7 @@ pub fn view(state: &ConfigEditorState) -> Element<'_, Message> {
 
     content = content.push(spacer(32.0));
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

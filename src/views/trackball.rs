@@ -22,7 +22,7 @@ pub fn view(settings: &TrackballSettings) -> Element<'_, Message> {
     let scroll_button_lock = settings.scroll_button_lock;
 
     let content = column![
-        section_header("Trackball Settings"),
+        page_title("Trackball Settings"),
         info_text(
             "Configure trackball device behavior, acceleration, and scrolling."
         ),
@@ -32,8 +32,6 @@ pub fn view(settings: &TrackballSettings) -> Element<'_, Message> {
             off,
             |value| Message::Trackball(TrackballMessage::SetOff(value)),
         ),
-        spacer(16.0),
-
         section_header("Scrolling"),
         toggle_row(
             "Natural scroll",
@@ -54,8 +52,6 @@ pub fn view(settings: &TrackballSettings) -> Element<'_, Message> {
             scroll_button_lock,
             |value| Message::Trackball(TrackballMessage::SetScrollButtonLock(value)),
         ),
-        spacer(16.0),
-
         section_header("Pointer Acceleration"),
         info_text(
             "Control how trackball movement speed relates to physical rotation."
@@ -76,8 +72,6 @@ pub fn view(settings: &TrackballSettings) -> Element<'_, Message> {
             Some(accel_profile),
             |value| Message::Trackball(TrackballMessage::SetAccelProfile(value)),
         ),
-        spacer(16.0),
-
         section_header("Button Configuration"),
         toggle_row(
             "Left-handed mode",
@@ -95,5 +89,7 @@ pub fn view(settings: &TrackballSettings) -> Element<'_, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

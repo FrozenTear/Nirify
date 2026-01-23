@@ -41,7 +41,7 @@ pub struct ToolsState {
 /// Creates the tools view
 pub fn view(state: &ToolsState, niri_connected: bool) -> Element<'_, Message> {
     let mut content = column![
-        section_header("Niri Tools"),
+        page_title("Niri Tools"),
         info_text(
             "Query niri state and perform actions via IPC. \
              These tools help debug and inspect the compositor."
@@ -269,7 +269,9 @@ pub fn view(state: &ToolsState, niri_connected: bool) -> Element<'_, Message> {
 
     content = content.push(spacer(32.0));
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }
 
 /// Render the windows list

@@ -21,7 +21,7 @@ pub fn view(settings: &MouseSettings) -> Element<'_, Message> {
     let scroll_button_lock = settings.scroll_button_lock;
 
     let content = column![
-        section_header("Mouse Settings"),
+        page_title("Mouse Settings"),
         info_text(
             "Configure mouse behavior, acceleration, and scrolling."
         ),
@@ -31,8 +31,6 @@ pub fn view(settings: &MouseSettings) -> Element<'_, Message> {
             off,
             |value| Message::Mouse(MouseMessage::ToggleOffOnTouchpad(value)),
         ),
-        spacer(16.0),
-
         section_header("Scrolling"),
         toggle_row(
             "Natural scroll",
@@ -56,8 +54,6 @@ pub fn view(settings: &MouseSettings) -> Element<'_, Message> {
             Some(scroll_method),
             |value| Message::Mouse(MouseMessage::SetScrollMethod(value)),
         ),
-        spacer(16.0),
-
         section_header("Pointer Acceleration"),
         info_text(
             "Control how mouse movement speed relates to physical movement. Acceleration speed ranges from -1 (slower) to 1 (faster)."
@@ -78,8 +74,6 @@ pub fn view(settings: &MouseSettings) -> Element<'_, Message> {
             Some(accel_profile),
             |value| Message::Mouse(MouseMessage::SetAccelProfile(value)),
         ),
-        spacer(16.0),
-
         section_header("Button Configuration"),
         toggle_row(
             "Left-handed mode",
@@ -103,5 +97,7 @@ pub fn view(settings: &MouseSettings) -> Element<'_, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

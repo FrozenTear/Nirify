@@ -19,6 +19,7 @@ mod layout_extras;
 mod miscellaneous;
 mod mouse;
 mod outputs;
+mod overview;
 mod preferences;
 mod recent_windows;
 mod startup;

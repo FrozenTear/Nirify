@@ -47,13 +47,10 @@ pub fn view(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
     let default_display = settings.default_column_display;
 
     let content = column![
-        section_header("Layout Extras"),
+        page_title("Layout Extras"),
         info_text(
             "Configure window shadows, tab indicators, insert hints, and preset sizes."
         ),
-        spacer(16.0),
-
-        // Shadow Settings
         subsection_header("Window Shadow"),
         toggle_row(
             "Enable shadow",
@@ -105,9 +102,6 @@ pub fn view(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
         ),
         color_row("Active color", &shadow_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetShadowColor(s))),
         color_row("Inactive color", &shadow_inactive_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetShadowInactiveColor(s))),
-        spacer(16.0),
-
-        // Tab Indicator Settings
         subsection_header("Tab Indicator"),
         info_text("Visual indicator for tabbed windows."),
         toggle_row(
@@ -152,9 +146,6 @@ pub fn view(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
         color_row("Active color", &tab_active_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorActiveColor(s))),
         color_row("Inactive color", &tab_inactive_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorInactiveColor(s))),
         color_row("Urgent color", &tab_urgent_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorUrgentColor(s))),
-        spacer(16.0),
-
-        // Insert Hint Settings
         subsection_header("Insert Hint"),
         info_text("Visual feedback when inserting windows."),
         toggle_row(
@@ -164,9 +155,6 @@ pub fn view(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
             |value| Message::LayoutExtras(LayoutExtrasMessage::SetInsertHintEnabled(value)),
         ),
         color_row("Hint color", &hint_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetInsertHintColor(s))),
-        spacer(16.0),
-
-        // Default Column Display
         subsection_header("Default Column Display"),
         info_text("How new columns display windows by default."),
         row![
@@ -184,7 +172,9 @@ pub fn view(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }
 
 /// Create a color input row

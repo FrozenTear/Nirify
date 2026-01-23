@@ -155,9 +155,43 @@ pub fn parse_mouse_from_children(m_children: &KdlDocument, settings: &mut Settin
     // Parse common pointer device settings
     parse_pointer_device_from_children(m_children, &mut settings.mouse);
 
-    // Mouse-specific: scroll-factor
-    if let Some(v) = get_f64(m_children, &["scroll-factor"]) {
-        settings.mouse.scroll_factor = v;
+    // Mouse-specific: scroll-factor (can be single value or "horizontal=X vertical=Y")
+    parse_scroll_factor(
+        m_children,
+        &mut settings.mouse.scroll_factor,
+        &mut settings.mouse.scroll_factor_horizontal,
+    );
+}
+
+/// Parse scroll-factor which can be either a single f64 or a string "horizontal=X vertical=Y"
+fn parse_scroll_factor(children: &KdlDocument, vertical: &mut f64, horizontal: &mut Option<f64>) {
+    // First try to get as a string (for split format)
+    if let Some(s) = get_string(children, &["scroll-factor"]) {
+        // Parse "horizontal=X vertical=Y" format
+        let mut h_val: Option<f64> = None;
+        let mut v_val: Option<f64> = None;
+
+        for part in s.split_whitespace() {
+            if let Some(val_str) = part.strip_prefix("horizontal=") {
+                h_val = val_str.parse().ok();
+            } else if let Some(val_str) = part.strip_prefix("vertical=") {
+                v_val = val_str.parse().ok();
+            }
+        }
+
+        if let Some(v) = v_val {
+            *vertical = v;
+        }
+        if let Some(h) = h_val {
+            // Only set horizontal if it differs from vertical
+            if h_val != v_val {
+                *horizontal = Some(h);
+            }
+        }
+    } else if let Some(v) = get_f64(children, &["scroll-factor"]) {
+        // Single value: applies to both directions
+        *vertical = v;
+        *horizontal = None;
     }
 }
 
@@ -182,10 +216,12 @@ pub fn parse_touchpad_from_children(tp_children: &KdlDocument, settings: &mut Se
     settings.touchpad.disabled_on_external_mouse =
         has_flag(tp_children, &["disabled-on-external-mouse"]);
 
-    // Touchpad-specific: scroll-factor
-    if let Some(v) = get_f64(tp_children, &["scroll-factor"]) {
-        settings.touchpad.scroll_factor = v;
-    }
+    // Touchpad-specific: scroll-factor (can be single value or "horizontal=X vertical=Y")
+    parse_scroll_factor(
+        tp_children,
+        &mut settings.touchpad.scroll_factor,
+        &mut settings.touchpad.scroll_factor_horizontal,
+    );
 
     // Touchpad-specific: click-method, tap-button-map
     if let Some(v) = get_string(tp_children, &["click-method"]) {

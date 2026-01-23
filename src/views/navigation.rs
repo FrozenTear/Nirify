@@ -140,6 +140,7 @@ fn get_pages_in_category(category: PageCategory) -> Vec<Page> {
         Page::SwitchEvents,
         Page::RecentWindows,
         Page::Tools,
+        Page::Preferences,
         Page::ConfigEditor,
         Page::Backups,
     ];

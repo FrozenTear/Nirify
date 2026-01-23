@@ -78,10 +78,11 @@ pub struct RecentWindowsHighlight {
 impl Default for RecentWindowsHighlight {
     fn default() -> Self {
         Self {
-            active_color: Color::from_hex("#7fc8ff").unwrap_or_default(),
-            urgent_color: Color::from_hex("#eb6f92").unwrap_or_default(),
-            padding: 8,
-            corner_radius: 12,
+            // Niri defaults from docs
+            active_color: Color::from_hex("#999999ff").unwrap_or_default(),
+            urgent_color: Color::from_hex("#ff9999ff").unwrap_or_default(),
+            padding: 30,
+            corner_radius: 0,
         }
     }
 }
@@ -98,7 +99,8 @@ pub struct RecentWindowsPreviews {
 impl Default for RecentWindowsPreviews {
     fn default() -> Self {
         Self {
-            max_height: 200,
+            // Niri defaults from docs
+            max_height: 480,
             max_scale: 0.5,
         }
     }
@@ -127,8 +129,9 @@ impl Default for RecentWindowsSettings {
     fn default() -> Self {
         Self {
             off: false,
-            debounce_ms: 100,
-            open_delay_ms: 200,
+            // Niri defaults from docs
+            debounce_ms: 750,
+            open_delay_ms: 150,
             highlight: RecentWindowsHighlight::default(),
             previews: RecentWindowsPreviews::default(),
             binds: vec![],

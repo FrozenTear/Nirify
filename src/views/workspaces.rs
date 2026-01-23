@@ -12,14 +12,13 @@ use crate::messages::{Message, WorkspacesMessage};
 /// Creates the workspaces settings view
 pub fn view(settings: &WorkspacesSettings) -> Element<'static, Message> {
     let mut content = column![
-        section_header("Named Workspaces"),
+        page_title("Named Workspaces"),
         info_text(
             "Define named workspaces that persist across sessions. \
              Workspaces can be pinned to specific outputs."
         ),
-        spacer(8.0),
     ]
-    .spacing(8);
+    .spacing(4);
 
     // List of workspaces
     if settings.workspaces.is_empty() {
@@ -161,7 +160,7 @@ pub fn view(settings: &WorkspacesSettings) -> Element<'static, Message> {
     }
 
     // Add workspace button
-    content = content.push(spacer(8.0));
+    content = content.push(spacer(16.0));
     content = content.push(
         button(
             row![
@@ -196,5 +195,7 @@ pub fn view(settings: &WorkspacesSettings) -> Element<'static, Message> {
         "Tip: Pin workspaces to outputs to have them always appear on a specific monitor."
     ));
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

@@ -11,7 +11,7 @@ use crate::messages::{CursorMessage, Message};
 /// Takes reference to settings to allow text_input to borrow the theme string
 pub fn view(settings: &CursorSettings) -> Element<'_, Message> {
     let content = column![
-        section_header("Cursor Theme"),
+        page_title("Cursor Theme"),
         info_text(
             "Configure the cursor theme and size. The theme name should match a cursor theme installed on your system."
         ),
@@ -24,8 +24,6 @@ pub fn view(settings: &CursorSettings) -> Element<'_, Message> {
         ]
         .spacing(6)
         .padding(12),
-        spacer(16.0),
-
         section_header("Cursor Size"),
         info_text(
             "Set the cursor size in pixels. Common sizes are 24 (default) or 32 for larger displays."
@@ -43,5 +41,7 @@ pub fn view(settings: &CursorSettings) -> Element<'_, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

@@ -26,7 +26,7 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
     let drag_lock = settings.drag_lock;
 
     let content = column![
-        section_header("Tap Settings"),
+        page_title("Tap Settings"),
         info_text(
             "Configure tap-to-click behavior and multi-finger tap gestures."
         ),
@@ -36,8 +36,6 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
             tap,
             |value| Message::Touchpad(TouchpadMessage::ToggleTapToClick(value)),
         ),
-        spacer(16.0),
-
         section_header("Disable While Typing"),
         info_text(
             "Prevent accidental touchpad input while typing. DWT = disable while typing, DWTP = disable while trackpoint is active."
@@ -54,8 +52,6 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
             dwtp,
             |value| Message::Touchpad(TouchpadMessage::ToggleDwtp(value)),
         ),
-        spacer(16.0),
-
         section_header("Scrolling"),
         toggle_row(
             "Natural scroll",
@@ -79,8 +75,6 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
             Some(scroll_method),
             |value| Message::Touchpad(TouchpadMessage::SetScrollMethod(value)),
         ),
-        spacer(16.0),
-
         section_header("Pointer Acceleration"),
         info_text(
             "Control how pointer movement speed relates to finger movement. Speed ranges from -1 (slower) to 1 (faster)."
@@ -115,8 +109,6 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
             Some(tap_button_map),
             |value| Message::Touchpad(TouchpadMessage::SetTapButtonMap(value)),
         ),
-        spacer(16.0),
-
         section_header("Additional Settings"),
         toggle_row(
             "Left-handed mode",
@@ -146,5 +138,7 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

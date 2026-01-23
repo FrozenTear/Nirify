@@ -15,12 +15,11 @@ pub fn view(settings: &StartupSettings) -> Element<'static, Message> {
     let commands = settings.commands.clone();
 
     let mut content = column![
-        section_header("Startup Commands"),
+        page_title("Startup Commands"),
         info_text(
             "Commands listed here will run automatically when niri starts. \
              Useful for launching background services, setting up your environment, etc."
         ),
-        spacer(16.0),
     ]
     .spacing(4);
 
@@ -43,7 +42,6 @@ pub fn view(settings: &StartupSettings) -> Element<'static, Message> {
         );
     } else {
         content = content.push(subsection_header("Configured Commands"));
-        content = content.push(spacer(8.0));
 
         for cmd in &commands {
             let cmd_id = cmd.id;
@@ -97,18 +95,18 @@ pub fn view(settings: &StartupSettings) -> Element<'static, Message> {
         .style(add_button_style)
     );
 
-    content = content.push(spacer(16.0));
     content = content.push(subsection_header("Tips"));
-    content = content.push(spacer(8.0));
     content = content.push(info_text("Commands are split by whitespace. For complex commands, create a script and call it here."));
     content = content.push(spacer(4.0));
     content = content.push(text("Example commands:").size(13).color([0.7, 0.7, 0.7]));
     content = content.push(text("  waybar").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
     content = content.push(text("  mako").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
     content = content.push(text("  /home/user/scripts/startup.sh").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
-    content = content.push(spacer(16.0));
+    content = content.push(spacer(32.0));
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }
 
 /// Style for delete buttons

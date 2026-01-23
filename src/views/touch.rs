@@ -16,7 +16,7 @@ pub fn view<'a>(settings: &'a TouchSettings, calibration_cache: &'a [String; 6])
     let matrix_values = settings.calibration_matrix;
 
     let content = column![
-        section_header("Touch Settings"),
+        page_title("Touch Settings"),
         info_text(
             "Configure touchscreen behavior and mapping."
         ),
@@ -26,24 +26,22 @@ pub fn view<'a>(settings: &'a TouchSettings, calibration_cache: &'a [String; 6])
             off,
             |value| Message::Touch(TouchMessage::SetOff(value)),
         ),
-        spacer(16.0),
-
         section_header("Output Mapping"),
         info_text(
             "Map the touchscreen to a specific display. This is important for multi-monitor setups \
              to ensure touch input is properly aligned with the screen."
         ),
+        // Styled to match text_input_row pattern
         column![
-            text("Map to output").size(14),
-            text("Output name (e.g., eDP-1, HDMI-A-1)").size(12).color([0.75, 0.75, 0.75]),
+            text("Map to output").size(16),
+            text("Output name (e.g., eDP-1, HDMI-A-1)").size(12).color([0.7, 0.7, 0.7]),
             text_input("Leave empty for default", &map_to_output)
                 .on_input(|value| Message::Touch(TouchMessage::SetMapToOutput(value)))
                 .padding(8),
         ]
         .spacing(6)
         .padding(12),
-        spacer(16.0),
-
+        subsection_header("Advanced"),
         calibration_matrix(
             "Calibration Matrix",
             "Advanced: Calibration matrix for libinput (6 values). \
@@ -63,5 +61,7 @@ pub fn view<'a>(settings: &'a TouchSettings, calibration_cache: &'a [String; 6])
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20)).into()
+    scrollable(container(content).padding(20).width(iced::Length::Fill))
+        .height(iced::Length::Fill)
+        .into()
 }

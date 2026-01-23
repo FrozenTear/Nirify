@@ -87,6 +87,8 @@ pub fn click_method_to_kdl(method: crate::types::ClickMethod) -> &'static str {
 /// Write common input device settings (shared between mouse and touchpad).
 ///
 /// Writes boolean flags and numeric settings that are common to both input devices.
+/// If `scroll_factor_horizontal` is Some and differs from `scroll_factor` (vertical),
+/// outputs the split format "horizontal=X vertical=Y".
 pub fn write_common_input_settings(
     content: &mut String,
     natural_scroll: bool,
@@ -95,6 +97,7 @@ pub fn write_common_input_settings(
     accel_speed: f64,
     accel_profile: AccelProfile,
     scroll_factor: f64,
+    scroll_factor_horizontal: Option<f64>,
 ) {
     if natural_scroll {
         content.push_str("        natural-scroll\n");
@@ -110,7 +113,16 @@ pub fn write_common_input_settings(
         "        accel-profile \"{}\"\n",
         accel_profile_to_kdl(accel_profile)
     ));
-    content.push_str(&format!("        scroll-factor {:.2}\n", scroll_factor));
+
+    // Output scroll-factor: use split format if horizontal differs from vertical
+    if let Some(h) = scroll_factor_horizontal {
+        content.push_str(&format!(
+            "        scroll-factor \"horizontal={:.2} vertical={:.2}\"\n",
+            h, scroll_factor
+        ));
+    } else {
+        content.push_str(&format!("        scroll-factor {:.2}\n", scroll_factor));
+    }
 }
 
 #[cfg(test)]
