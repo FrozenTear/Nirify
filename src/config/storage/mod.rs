@@ -560,7 +560,8 @@ pub fn save_with_backup(path: &Path, content: &str, backup_dir: &Path) -> anyhow
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or_else(|| ConfigError::InvalidConfig("Path has no valid filename".to_string()))?;
-        let timestamp = Local::now().format("%Y-%m-%dT%H-%M-%S%.3f");
+        // Use microsecond precision (%.6f) to prevent filename collisions during rapid saves
+        let timestamp = Local::now().format("%Y-%m-%dT%H-%M-%S%.6f");
         let backup_name = format!("{}.{}.bak", filename, timestamp);
         let backup_path = backup_dir.join(&backup_name);
 
