@@ -127,7 +127,10 @@ pub enum Message {
     // System Events
     // ═══════════════════════════════════════════════════════════════════════════
     WindowCloseRequested,
+    /// Trigger async niri status check
     CheckNiriStatus,
+    /// Async niri status check completed
+    NiriStatusChecked(bool),
     ClearToast,
     /// No-op message (for optional callbacks that don't need action)
     None,

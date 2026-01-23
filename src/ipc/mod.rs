@@ -9,10 +9,24 @@
 //! - **Sync functions** (e.g., `reload_config()`) block the calling thread until complete.
 //!   Use these for initialization or when blocking is acceptable.
 //!
-//! - **Async functions** will be reimplemented with iced Task system in Phase 4.
+//! - **Async helpers** in the [`tasks`] submodule return `iced::Task` for non-blocking
+//!   operations. Use these in iced handlers to keep the UI responsive.
+//!
+//! # Example: Async IPC in handlers
+//!
+//! ```ignore
+//! use crate::ipc::tasks;
+//!
+//! fn update(&mut self, message: Message) -> Task<Message> {
+//!     match message {
+//!         Message::CheckNiri => tasks::check_niri_running(Message::NiriStatusChecked),
+//!         Message::RefreshWindows => tasks::get_windows(|r| Message::WindowsLoaded(r)),
+//!         _ => Task::none(),
+//!     }
+//! }
+//! ```
 
-// TODO: Phase 4 - Reimplement async_ops with iced Task system
-// pub mod async_ops;
+pub mod tasks;
 
 use log::{debug, info, warn};
 use serde::Deserialize;

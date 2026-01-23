@@ -449,7 +449,12 @@ impl App {
             }
 
             Message::CheckNiriStatus => {
-                self.ui.niri_status = if crate::ipc::is_niri_running() {
+                // Run niri status check asynchronously to avoid blocking UI
+                crate::ipc::tasks::check_niri_running(Message::NiriStatusChecked)
+            }
+
+            Message::NiriStatusChecked(is_connected) => {
+                self.ui.niri_status = if is_connected {
                     crate::views::status_bar::NiriStatus::Connected
                 } else {
                     crate::views::status_bar::NiriStatus::Disconnected

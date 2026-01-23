@@ -62,50 +62,6 @@ fn build_key_combo(modifiers: &[ModKey], base_key: &str) -> String {
     parts.join("+")
 }
 
-/// Parse modifiers from an existing key combo string
-pub fn parse_modifiers(key_combo: &str) -> Vec<ModKey> {
-    let mut modifiers = Vec::new();
-
-    for part in key_combo.split('+') {
-        let trimmed = part.trim();
-        match trimmed.to_lowercase().as_str() {
-            "mod" | "super" => {
-                if !modifiers.contains(&ModKey::Super) {
-                    modifiers.push(ModKey::Super);
-                }
-            }
-            "ctrl" | "control" => {
-                if !modifiers.contains(&ModKey::Ctrl) {
-                    modifiers.push(ModKey::Ctrl);
-                }
-            }
-            "shift" => {
-                if !modifiers.contains(&ModKey::Shift) {
-                    modifiers.push(ModKey::Shift);
-                }
-            }
-            "alt" => {
-                if !modifiers.contains(&ModKey::Alt) {
-                    modifiers.push(ModKey::Alt);
-                }
-            }
-            "mod3" => {
-                if !modifiers.contains(&ModKey::Mod3) {
-                    modifiers.push(ModKey::Mod3);
-                }
-            }
-            "mod5" => {
-                if !modifiers.contains(&ModKey::Mod5) {
-                    modifiers.push(ModKey::Mod5);
-                }
-            }
-            _ => {} // Not a modifier, skip
-        }
-    }
-
-    modifiers
-}
-
 impl super::super::App {
     /// Updates keybindings settings
     pub(in crate::app) fn update_keybindings(&mut self, msg: M) -> Task<Message> {
