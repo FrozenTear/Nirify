@@ -14,15 +14,15 @@ pub use ui_state::UiState;
 use std::sync::Arc;
 use std::time::Duration;
 
+use iced::time;
 use iced::widget::{column, container, text};
 use iced::{Element, Length, Subscription, Task};
-use iced::time;
 
 use crate::config::{ConfigPaths, DirtyTracker, Settings, SettingsCategory};
 use crate::messages::{DialogState, Message, Page, SaveMessage};
-use crate::save_manager::{SaveResult, ReloadResult};
-use crate::views;
+use crate::save_manager::{ReloadResult, SaveResult};
 use crate::theme::fonts;
+use crate::views;
 
 /// Main application state
 pub struct App {
@@ -65,16 +65,17 @@ impl App {
         log::info!("Settings loaded successfully");
 
         // Parse theme from settings
-        let current_theme = settings.preferences.theme.parse::<crate::theme::AppTheme>()
+        let current_theme = settings
+            .preferences
+            .theme
+            .parse::<crate::theme::AppTheme>()
             .unwrap_or_default();
 
         // Initialize calibration matrix caches from settings
-        let tablet_calibration_cache = crate::views::widgets::format_matrix_values(
-            settings.tablet.calibration_matrix
-        );
-        let touch_calibration_cache = crate::views::widgets::format_matrix_values(
-            settings.touch.calibration_matrix
-        );
+        let tablet_calibration_cache =
+            crate::views::widgets::format_matrix_values(settings.tablet.calibration_matrix);
+        let touch_calibration_cache =
+            crate::views::widgets::format_matrix_values(settings.touch.calibration_matrix);
 
         // Check initial niri connection status
         let niri_status = if crate::ipc::is_niri_running() {
@@ -84,7 +85,11 @@ impl App {
         };
 
         // Create UI state
-        let mut ui = UiState::new(current_theme, tablet_calibration_cache, touch_calibration_cache);
+        let mut ui = UiState::new(
+            current_theme,
+            tablet_calibration_cache,
+            touch_calibration_cache,
+        );
         ui.niri_status = niri_status;
 
         // Check if this is the first run and show the wizard
@@ -123,7 +128,9 @@ impl App {
                     if is_connected {
                         return Task::perform(
                             async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
-                            |result| Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(result)),
+                            |result| {
+                                Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(result))
+                            },
                         );
                     }
                 }
@@ -280,15 +287,19 @@ impl App {
                                 if self.settings.window_rules.remove(rule_id) {
                                     log::info!("Deleted window rule {}", rule_id);
                                     if self.ui.selected_window_rule_id == Some(rule_id) {
-                                        self.ui.selected_window_rule_id = self.settings.window_rules.rules.first().map(|r| r.id);
+                                        self.ui.selected_window_rule_id =
+                                            self.settings.window_rules.rules.first().map(|r| r.id);
                                     }
-                                    self.dirty_tracker.mark(crate::config::SettingsCategory::WindowRules);
+                                    self.dirty_tracker
+                                        .mark(crate::config::SettingsCategory::WindowRules);
                                 } else if self.settings.layer_rules.remove(rule_id) {
                                     log::info!("Deleted layer rule {}", rule_id);
                                     if self.ui.selected_layer_rule_id == Some(rule_id) {
-                                        self.ui.selected_layer_rule_id = self.settings.layer_rules.rules.first().map(|r| r.id);
+                                        self.ui.selected_layer_rule_id =
+                                            self.settings.layer_rules.rules.first().map(|r| r.id);
                                     }
-                                    self.dirty_tracker.mark(crate::config::SettingsCategory::LayerRules);
+                                    self.dirty_tracker
+                                        .mark(crate::config::SettingsCategory::LayerRules);
                                 }
                                 self.mark_changed();
                             }
@@ -301,7 +312,8 @@ impl App {
                             ConfirmAction::ClearAllKeybindings => {
                                 log::info!("Clearing all keybindings");
                                 self.settings.keybindings.bindings.clear();
-                                self.dirty_tracker.mark(crate::config::SettingsCategory::Keybindings);
+                                self.dirty_tracker
+                                    .mark(crate::config::SettingsCategory::Keybindings);
                                 self.mark_changed();
                             }
                         }
@@ -413,28 +425,35 @@ impl App {
                 self.ui.wizard_suggestions.clear();
                 if analysis.has_suggestions() {
                     for s in &analysis.window_suggestions {
-                        self.ui.wizard_suggestions.push(crate::messages::ConsolidationSuggestion {
-                            description: s.description.clone(),
-                            rule_ids: s.rule_ids.clone(),
-                            rule_count: s.rule_ids.len(),
-                            patterns: s.patterns.clone(),
-                            merged_pattern: s.merged_pattern.clone(),
-                            is_window_rule: true,
-                            selected: true, // Pre-select in wizard
-                        });
+                        self.ui
+                            .wizard_suggestions
+                            .push(crate::messages::ConsolidationSuggestion {
+                                description: s.description.clone(),
+                                rule_ids: s.rule_ids.clone(),
+                                rule_count: s.rule_ids.len(),
+                                patterns: s.patterns.clone(),
+                                merged_pattern: s.merged_pattern.clone(),
+                                is_window_rule: true,
+                                selected: true, // Pre-select in wizard
+                            });
                     }
                     for s in &analysis.layer_suggestions {
-                        self.ui.wizard_suggestions.push(crate::messages::ConsolidationSuggestion {
-                            description: s.description.clone(),
-                            rule_ids: s.rule_ids.clone(),
-                            rule_count: s.rule_ids.len(),
-                            patterns: s.patterns.clone(),
-                            merged_pattern: s.merged_pattern.clone(),
-                            is_window_rule: false,
-                            selected: true, // Pre-select in wizard
-                        });
+                        self.ui
+                            .wizard_suggestions
+                            .push(crate::messages::ConsolidationSuggestion {
+                                description: s.description.clone(),
+                                rule_ids: s.rule_ids.clone(),
+                                rule_count: s.rule_ids.len(),
+                                patterns: s.patterns.clone(),
+                                merged_pattern: s.merged_pattern.clone(),
+                                is_window_rule: false,
+                                selected: true, // Pre-select in wizard
+                            });
                     }
-                    log::info!("Wizard: Found {} consolidation suggestions", self.ui.wizard_suggestions.len());
+                    log::info!(
+                        "Wizard: Found {} consolidation suggestions",
+                        self.ui.wizard_suggestions.len()
+                    );
                 }
 
                 // Progress to next step
@@ -456,13 +475,19 @@ impl App {
 
             Message::WizardConsolidationApply => {
                 // Apply selected wizard consolidation suggestions
-                let selected: Vec<_> = self.ui.wizard_suggestions.iter()
+                let selected: Vec<_> = self
+                    .ui
+                    .wizard_suggestions
+                    .iter()
                     .filter(|s| s.selected)
                     .cloned()
                     .collect();
 
                 if !selected.is_empty() {
-                    log::info!("Wizard: Applying {} consolidation suggestions", selected.len());
+                    log::info!(
+                        "Wizard: Applying {} consolidation suggestions",
+                        selected.len()
+                    );
 
                     for suggestion in &selected {
                         if suggestion.is_window_rule {
@@ -557,10 +582,8 @@ impl App {
                 // Apply selected consolidation suggestions
                 if let DialogState::Consolidation { suggestions } = &self.ui.dialog_state {
                     // Clone selected suggestions to avoid borrow issues
-                    let selected: Vec<_> = suggestions.iter()
-                        .filter(|s| s.selected)
-                        .cloned()
-                        .collect();
+                    let selected: Vec<_> =
+                        suggestions.iter().filter(|s| s.selected).cloned().collect();
 
                     if selected.is_empty() {
                         log::info!("No consolidation suggestions selected");
@@ -582,10 +605,12 @@ impl App {
 
                         // Mark affected categories as dirty
                         if window_rules_changed {
-                            self.dirty_tracker.mark(crate::config::SettingsCategory::WindowRules);
+                            self.dirty_tracker
+                                .mark(crate::config::SettingsCategory::WindowRules);
                         }
                         if layer_rules_changed {
-                            self.dirty_tracker.mark(crate::config::SettingsCategory::LayerRules);
+                            self.dirty_tracker
+                                .mark(crate::config::SettingsCategory::LayerRules);
                         }
 
                         self.mark_changed();
@@ -659,23 +684,20 @@ impl App {
         }
     }
 
-
     /// Returns the subscription for periodic save checks and keyboard capture
     pub fn subscription(&self) -> Subscription<Message> {
         use iced::keyboard;
 
         // Base subscription: periodic save checks (every 200ms - sufficient with 300ms debounce)
-        let save_check = time::every(Duration::from_millis(200))
-            .map(|_| Message::Save(SaveMessage::CheckSave));
+        let save_check =
+            time::every(Duration::from_millis(200)).map(|_| Message::Save(SaveMessage::CheckSave));
 
         // Niri status check (every 5 seconds)
-        let niri_check = time::every(Duration::from_secs(5))
-            .map(|_| Message::CheckNiriStatus);
+        let niri_check = time::every(Duration::from_secs(5)).map(|_| Message::CheckNiriStatus);
 
         // Toast auto-clear check (every 500ms, only when toast is showing)
         let toast_check = if self.ui.toast.is_some() {
-            Some(time::every(Duration::from_millis(500))
-                .map(|_| Message::ClearToast))
+            Some(time::every(Duration::from_millis(500)).map(|_| Message::ClearToast))
         } else {
             None
         };
@@ -697,9 +719,9 @@ impl App {
 
                         // Only capture if we got a valid key (not just a modifier)
                         if !key_combo.is_empty() {
-                            Message::Keybindings(
-                                crate::messages::KeybindingsMessage::CapturedKey(key_combo),
-                            )
+                            Message::Keybindings(crate::messages::KeybindingsMessage::CapturedKey(
+                                key_combo,
+                            ))
                         } else {
                             Message::None
                         }
@@ -727,13 +749,15 @@ impl App {
         use iced::widget::column;
 
         // Primary navigation bar (top)
-        let primary_nav = views::navigation::primary_nav(self.ui.current_page, &self.ui.search_query);
+        let primary_nav =
+            views::navigation::primary_nav(self.ui.current_page, &self.ui.search_query);
 
         // Secondary navigation bar (sub-tabs)
         let secondary_nav = views::navigation::secondary_nav(self.ui.current_page);
 
         // Main content area (or search results if searching)
-        let content_area = if !self.ui.search_query.is_empty() && !self.ui.search_results.is_empty() {
+        let content_area = if !self.ui.search_query.is_empty() && !self.ui.search_results.is_empty()
+        {
             // Show search results in the content area
             views::search_results::view(&self.ui.search_results, &self.ui.search_query)
         } else {
@@ -743,23 +767,22 @@ impl App {
         // Status bar (bottom)
         let is_dirty = self.dirty_tracker.is_dirty();
         let save_status = self.ui.toast.clone();
-        let status_bar = views::status_bar::view(is_dirty, save_status, self.ui.current_theme, self.ui.niri_status);
+        let status_bar = views::status_bar::view(
+            is_dirty,
+            save_status,
+            self.ui.current_theme,
+            self.ui.niri_status,
+        );
 
         // Stack everything vertically
-        let layout = column![
-            primary_nav,
-            secondary_nav,
-            content_area,
-            status_bar,
-        ]
-        .spacing(0);
+        let layout = column![primary_nav, secondary_nav, content_area, status_bar,].spacing(0);
 
-        let main_view = container(layout)
-            .width(Length::Fill)
-            .height(Length::Fill);
+        let main_view = container(layout).width(Length::Fill).height(Length::Fill);
 
         // If there's an active dialog, render it on top
-        if let Some(dialog) = views::dialogs::view(&self.ui.dialog_state, &self.ui.wizard_suggestions) {
+        if let Some(dialog) =
+            views::dialogs::view(&self.ui.dialog_state, &self.ui.wizard_suggestions)
+        {
             // For now, use iced's Stack widget or similar approach
             // Since iced doesn't have perfect z-layering, dialogs handle their own backdrop
             dialog
@@ -795,7 +818,10 @@ impl App {
                 return views::trackball::view(&self.settings.trackball);
             }
             Page::Tablet => {
-                return views::tablet::view(&self.settings.tablet, &self.ui.tablet_calibration_cache);
+                return views::tablet::view(
+                    &self.settings.tablet,
+                    &self.ui.tablet_calibration_cache,
+                );
             }
             Page::Touch => {
                 return views::touch::view(&self.settings.touch, &self.ui.touch_calibration_cache);
@@ -844,7 +870,7 @@ impl App {
                     &self.settings.outputs,
                     self.ui.selected_output_index,
                     &self.ui.output_sections_expanded,
-                    &self.ui.tools_state.outputs,  // IPC data for available modes
+                    &self.ui.tools_state.outputs, // IPC data for available modes
                 );
             }
             Page::Miscellaneous => {
@@ -876,7 +902,10 @@ impl App {
                 return views::preferences::view(self.settings.preferences.float_settings_app);
             }
             Page::ConfigEditor => {
-                return views::config_editor::view(&self.ui.config_editor_state, &self.ui.config_editor_content);
+                return views::config_editor::view(
+                    &self.ui.config_editor_state,
+                    &self.ui.config_editor_content,
+                );
             }
             Page::Backups => {
                 return views::backups::view(&self.ui.backups_state);
@@ -886,18 +915,28 @@ impl App {
 
     /// Overview page - summary dashboard with overview settings
     fn overview_page(&self) -> Element<'_, Message> {
-        use iced::widget::{pick_list, row, scrollable, slider, text_input, toggler};
-        use iced::Alignment;
         use crate::messages::OverviewMessage;
         use crate::views::widgets::{page_title, spacer};
+        use iced::widget::{pick_list, row, scrollable, slider, text_input, toggler};
+        use iced::Alignment;
 
         let settings = &self.settings;
 
         // Overview settings section (workspace exposé / overview mode)
         let overview_settings = {
             let zoom = settings.overview.zoom;
-            let backdrop_color = settings.overview.backdrop_color.as_ref().map(|c| c.to_hex()).unwrap_or_default();
-            let shadow_enabled = settings.overview.workspace_shadow.as_ref().map(|s| s.enabled).unwrap_or(false);
+            let backdrop_color = settings
+                .overview
+                .backdrop_color
+                .as_ref()
+                .map(|c| c.to_hex())
+                .unwrap_or_default();
+            let shadow_enabled = settings
+                .overview
+                .workspace_shadow
+                .as_ref()
+                .map(|s| s.enabled)
+                .unwrap_or(false);
 
             let mut overview_section = column![
                 page_title("Workspace Overview Settings"),
@@ -952,53 +991,71 @@ impl App {
                     overview_section = overview_section.push(
                         row![
                             text("  Softness:").size(14).width(Length::Fixed(140.0)),
-                            slider(0..=200, shadow.softness, |v| Message::Overview(OverviewMessage::SetWorkspaceShadowSoftness(v)))
-                                .width(Length::Fixed(150.0)),
-                            text(format!("{}", shadow.softness)).size(14).width(Length::Fixed(40.0)),
+                            slider(0..=200, shadow.softness, |v| Message::Overview(
+                                OverviewMessage::SetWorkspaceShadowSoftness(v)
+                            ))
+                            .width(Length::Fixed(150.0)),
+                            text(format!("{}", shadow.softness))
+                                .size(14)
+                                .width(Length::Fixed(40.0)),
                         ]
                         .spacing(12)
-                        .align_y(Alignment::Center)
+                        .align_y(Alignment::Center),
                     );
                     overview_section = overview_section.push(
                         row![
                             text("  Spread:").size(14).width(Length::Fixed(140.0)),
-                            slider(0..=200, shadow.spread, |v| Message::Overview(OverviewMessage::SetWorkspaceShadowSpread(v)))
-                                .width(Length::Fixed(150.0)),
-                            text(format!("{}", shadow.spread)).size(14).width(Length::Fixed(40.0)),
+                            slider(0..=200, shadow.spread, |v| Message::Overview(
+                                OverviewMessage::SetWorkspaceShadowSpread(v)
+                            ))
+                            .width(Length::Fixed(150.0)),
+                            text(format!("{}", shadow.spread))
+                                .size(14)
+                                .width(Length::Fixed(40.0)),
                         ]
                         .spacing(12)
-                        .align_y(Alignment::Center)
+                        .align_y(Alignment::Center),
                     );
                     overview_section = overview_section.push(
                         row![
                             text("  Offset X:").size(14).width(Length::Fixed(140.0)),
-                            slider(-100..=100, shadow.offset_x, |v| Message::Overview(OverviewMessage::SetWorkspaceShadowOffsetX(v)))
-                                .width(Length::Fixed(150.0)),
-                            text(format!("{}", shadow.offset_x)).size(14).width(Length::Fixed(40.0)),
+                            slider(-100..=100, shadow.offset_x, |v| Message::Overview(
+                                OverviewMessage::SetWorkspaceShadowOffsetX(v)
+                            ))
+                            .width(Length::Fixed(150.0)),
+                            text(format!("{}", shadow.offset_x))
+                                .size(14)
+                                .width(Length::Fixed(40.0)),
                         ]
                         .spacing(12)
-                        .align_y(Alignment::Center)
+                        .align_y(Alignment::Center),
                     );
                     overview_section = overview_section.push(
                         row![
                             text("  Offset Y:").size(14).width(Length::Fixed(140.0)),
-                            slider(-100..=100, shadow.offset_y, |v| Message::Overview(OverviewMessage::SetWorkspaceShadowOffsetY(v)))
-                                .width(Length::Fixed(150.0)),
-                            text(format!("{}", shadow.offset_y)).size(14).width(Length::Fixed(40.0)),
+                            slider(-100..=100, shadow.offset_y, |v| Message::Overview(
+                                OverviewMessage::SetWorkspaceShadowOffsetY(v)
+                            ))
+                            .width(Length::Fixed(150.0)),
+                            text(format!("{}", shadow.offset_y))
+                                .size(14)
+                                .width(Length::Fixed(40.0)),
                         ]
                         .spacing(12)
-                        .align_y(Alignment::Center)
+                        .align_y(Alignment::Center),
                     );
                     overview_section = overview_section.push(
                         row![
                             text("  Shadow Color:").size(14).width(Length::Fixed(140.0)),
                             text_input("#00000050", &shadow_color)
-                                .on_input(|v| Message::Overview(OverviewMessage::SetWorkspaceShadowColor(v)))
+                                .on_input(|v| Message::Overview(
+                                    OverviewMessage::SetWorkspaceShadowColor(v)
+                                ))
                                 .padding(6)
                                 .width(Length::Fixed(150.0)),
                         ]
                         .spacing(12)
-                        .align_y(Alignment::Center)
+                        .align_y(Alignment::Center),
                     );
                 }
             }
@@ -1007,10 +1064,11 @@ impl App {
         };
 
         let summary = column![
-            text("Welcome to Niri Settings").size(24),
-            text("A modern GUI for configuring the niri Wayland compositor").size(14).color([0.7, 0.7, 0.7]),
+            text("Welcome to Nirify").size(24),
+            text("A modern GUI for configuring the niri Wayland compositor")
+                .size(14)
+                .color([0.7, 0.7, 0.7]),
             spacer(16.0),
-
             // Preferences Section
             text("Preferences").size(18),
             spacer(8.0),
@@ -1026,63 +1084,110 @@ impl App {
             ]
             .spacing(12)
             .align_y(Alignment::Center),
-            text("Choose your preferred color theme for the application").size(12).color([0.7, 0.7, 0.7]),
+            text("Choose your preferred color theme for the application")
+                .size(12)
+                .color([0.7, 0.7, 0.7]),
             spacer(16.0),
-
             // Overview Settings
             overview_settings,
             spacer(16.0),
-
             // Current Settings Summary
             text("Current Configuration").size(18),
             spacer(8.0),
-            text(format!("Focus Ring: {} ({}px)",
-                if settings.appearance.focus_ring_enabled { "Enabled" } else { "Disabled" },
+            text(format!(
+                "Focus Ring: {} ({}px)",
+                if settings.appearance.focus_ring_enabled {
+                    "Enabled"
+                } else {
+                    "Disabled"
+                },
                 settings.appearance.focus_ring_width as i32
-            )).size(14).font(fonts::MONO_FONT),
-            text(format!("Border: {} ({}px)",
-                if settings.appearance.border_enabled { "Enabled" } else { "Disabled" },
+            ))
+            .size(14)
+            .font(fonts::MONO_FONT),
+            text(format!(
+                "Border: {} ({}px)",
+                if settings.appearance.border_enabled {
+                    "Enabled"
+                } else {
+                    "Disabled"
+                },
                 settings.appearance.border_thickness as i32
-            )).size(14).font(fonts::MONO_FONT),
-            text(format!("Window Gaps: {}px", settings.appearance.gaps as i32)).size(14).font(fonts::MONO_FONT),
-            text(format!("Corner Radius: {}px", settings.appearance.corner_radius as i32)).size(14).font(fonts::MONO_FONT),
+            ))
+            .size(14)
+            .font(fonts::MONO_FONT),
+            text(format!(
+                "Window Gaps: {}px",
+                settings.appearance.gaps as i32
+            ))
+            .size(14)
+            .font(fonts::MONO_FONT),
+            text(format!(
+                "Corner Radius: {}px",
+                settings.appearance.corner_radius as i32
+            ))
+            .size(14)
+            .font(fonts::MONO_FONT),
             spacer(12.0),
-
-            text(format!("Focus Follows Mouse: {}",
-                if settings.behavior.focus_follows_mouse { "Yes" } else { "No" }
-            )).size(14),
-            text(format!("Workspace Auto Back-and-Forth: {}",
-                if settings.behavior.workspace_auto_back_and_forth { "Yes" } else { "No" }
-            )).size(14),
+            text(format!(
+                "Focus Follows Mouse: {}",
+                if settings.behavior.focus_follows_mouse {
+                    "Yes"
+                } else {
+                    "No"
+                }
+            ))
+            .size(14),
+            text(format!(
+                "Workspace Auto Back-and-Forth: {}",
+                if settings.behavior.workspace_auto_back_and_forth {
+                    "Yes"
+                } else {
+                    "No"
+                }
+            ))
+            .size(14),
             spacer(12.0),
-
-            text(format!("Keyboard Layout: {}", settings.keyboard.xkb_layout)).size(14).font(fonts::MONO_FONT),
-            text(format!("Repeat Rate: {}/sec, Delay: {}ms",
+            text(format!("Keyboard Layout: {}", settings.keyboard.xkb_layout))
+                .size(14)
+                .font(fonts::MONO_FONT),
+            text(format!(
+                "Repeat Rate: {}/sec, Delay: {}ms",
                 settings.keyboard.repeat_rate, settings.keyboard.repeat_delay
-            )).size(14).font(fonts::MONO_FONT),
+            ))
+            .size(14)
+            .font(fonts::MONO_FONT),
             spacer(12.0),
-
-            text(format!("Mouse: Natural Scroll {}",
-                if settings.mouse.natural_scroll { "ON" } else { "OFF" }
-            )).size(14).font(fonts::MONO_FONT),
-            text(format!("Touchpad: Tap-to-Click {}",
+            text(format!(
+                "Mouse: Natural Scroll {}",
+                if settings.mouse.natural_scroll {
+                    "ON"
+                } else {
+                    "OFF"
+                }
+            ))
+            .size(14)
+            .font(fonts::MONO_FONT),
+            text(format!(
+                "Touchpad: Tap-to-Click {}",
                 if settings.touchpad.tap { "ON" } else { "OFF" }
-            )).size(14).font(fonts::MONO_FONT),
-            text(format!("Cursor: {} ({}px)",
+            ))
+            .size(14)
+            .font(fonts::MONO_FONT),
+            text(format!(
+                "Cursor: {} ({}px)",
                 settings.cursor.theme, settings.cursor.size
-            )).size(14).font(fonts::MONO_FONT),
+            ))
+            .size(14)
+            .font(fonts::MONO_FONT),
         ]
         .spacing(6)
         .width(Length::Fill);
 
         // Wrap in scrollable with full width
-        scrollable(
-            container(summary)
-                .padding(20)
-                .width(Length::Fill)
-        )
-        .height(Length::Fill)
-        .into()
+        scrollable(container(summary).padding(20).width(Length::Fill))
+            .height(Length::Fill)
+            .into()
     }
 
     /// Mark that settings have changed (triggers debounced save)
@@ -1116,7 +1221,9 @@ impl App {
                         files_written: count,
                         categories: dirty.into_iter().collect(),
                     },
-                    Err(e) => SaveResult::Error { message: e.to_string() },
+                    Err(e) => SaveResult::Error {
+                        message: e.to_string(),
+                    },
                 }
             },
             Message::SaveCompleted,
@@ -1129,7 +1236,9 @@ impl App {
             async move {
                 match crate::ipc::reload_config() {
                     Ok(()) => ReloadResult::Success,
-                    Err(e) => ReloadResult::Error { message: e.to_string() },
+                    Err(e) => ReloadResult::Error {
+                        message: e.to_string(),
+                    },
                 }
             },
             Message::ReloadCompleted,
@@ -1137,14 +1246,20 @@ impl App {
     }
 
     /// Apply window rule consolidation - merge multiple rules into one
-    fn apply_window_rule_consolidation(&mut self, suggestion: &crate::messages::ConsolidationSuggestion) {
+    fn apply_window_rule_consolidation(
+        &mut self,
+        suggestion: &crate::messages::ConsolidationSuggestion,
+    ) {
         use crate::config::models::WindowRuleMatch;
 
         // Get the first rule ID to keep (will be modified to use merged pattern)
-        let Some(&first_id) = suggestion.rule_ids.first() else { return };
+        let Some(&first_id) = suggestion.rule_ids.first() else {
+            return;
+        };
 
         // Find the first rule and update its match pattern
-        if let Some(rule) = self.settings
+        if let Some(rule) = self
+            .settings
             .window_rules
             .rules
             .iter_mut()
@@ -1179,14 +1294,20 @@ impl App {
     }
 
     /// Apply layer rule consolidation - merge multiple rules into one
-    fn apply_layer_rule_consolidation(&mut self, suggestion: &crate::messages::ConsolidationSuggestion) {
+    fn apply_layer_rule_consolidation(
+        &mut self,
+        suggestion: &crate::messages::ConsolidationSuggestion,
+    ) {
         use crate::config::models::LayerRuleMatch;
 
         // Get the first rule ID to keep
-        let Some(&first_id) = suggestion.rule_ids.first() else { return };
+        let Some(&first_id) = suggestion.rule_ids.first() else {
+            return;
+        };
 
         // Find the first rule and update its match pattern
-        if let Some(rule) = self.settings
+        if let Some(rule) = self
+            .settings
             .layer_rules
             .rules
             .iter_mut()
@@ -1233,6 +1354,7 @@ pub fn run() -> iced::Result {
             ..Default::default()
         })
         .window(iced::window::Settings {
+            min_size: Some(iced::Size::new(650.0, 200.0)),
             platform_specific: iced::window::settings::PlatformSpecific {
                 application_id: "nirify".to_string(),
                 ..Default::default()
