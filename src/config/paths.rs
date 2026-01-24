@@ -274,9 +274,65 @@ impl ConfigPaths {
     }
 }
 
-// Note: Default trait intentionally not implemented for ConfigPaths
-// because it requires fallible operations (directory resolution).
-// Use ConfigPaths::new() instead and handle the error appropriately.
+/// Create fallback ConfigPaths for error state display.
+///
+/// This is used when normal initialization fails, allowing the app to
+/// display an error dialog instead of crashing. The paths point to a
+/// temporary directory and should not be used for actual configuration.
+impl Default for ConfigPaths {
+    fn default() -> Self {
+        let temp = std::env::temp_dir().join("nirify-error-fallback");
+        let input_dir = temp.join("input");
+        let advanced_dir = temp.join("advanced");
+
+        Self {
+            niri_config: temp.join("config.kdl"),
+            managed_dir: temp.clone(),
+            input_dir: input_dir.clone(),
+            advanced_dir: advanced_dir.clone(),
+            backup_dir: temp.join(".backup"),
+
+            // Core
+            main_kdl: temp.join("main.kdl"),
+            appearance_kdl: temp.join("appearance.kdl"),
+            behavior_kdl: temp.join("behavior.kdl"),
+
+            // Input
+            keyboard_kdl: input_dir.join("keyboard.kdl"),
+            mouse_kdl: input_dir.join("mouse.kdl"),
+            touchpad_kdl: input_dir.join("touchpad.kdl"),
+            trackpoint_kdl: input_dir.join("trackpoint.kdl"),
+            trackball_kdl: input_dir.join("trackball.kdl"),
+            tablet_kdl: input_dir.join("tablet.kdl"),
+            touch_kdl: input_dir.join("touch.kdl"),
+
+            // Display
+            outputs_kdl: temp.join("outputs.kdl"),
+            animations_kdl: temp.join("animations.kdl"),
+            cursor_kdl: temp.join("cursor.kdl"),
+            overview_kdl: temp.join("overview.kdl"),
+
+            // Workspaces
+            workspaces_kdl: temp.join("workspaces.kdl"),
+
+            // Keybindings
+            keybindings_kdl: temp.join("keybindings.kdl"),
+
+            // Advanced
+            layout_extras_kdl: advanced_dir.join("layout-extras.kdl"),
+            gestures_kdl: advanced_dir.join("gestures.kdl"),
+            layer_rules_kdl: advanced_dir.join("layer-rules.kdl"),
+            window_rules_kdl: advanced_dir.join("window-rules.kdl"),
+            misc_kdl: advanced_dir.join("misc.kdl"),
+            startup_kdl: advanced_dir.join("startup.kdl"),
+            environment_kdl: advanced_dir.join("environment.kdl"),
+            debug_kdl: advanced_dir.join("debug.kdl"),
+            switch_events_kdl: advanced_dir.join("switch-events.kdl"),
+            recent_windows_kdl: advanced_dir.join("recent-windows.kdl"),
+            preferences_kdl: advanced_dir.join("preferences.kdl"),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

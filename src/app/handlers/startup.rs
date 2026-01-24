@@ -1,5 +1,6 @@
 //! Startup commands message handler
 
+use crate::app::helpers::parse_spawn_command;
 use crate::config::SettingsCategory;
 use crate::messages::{StartupMessage, Message};
 use iced::Task;
@@ -24,10 +25,22 @@ impl super::super::App {
             }
             StartupMessage::SetCommand(id, cmd) => {
                 if let Some(command) = startup.commands.iter_mut().find(|c| c.id == id) {
-                    // Split by whitespace for the command vector
-                    command.command = cmd.split_whitespace().map(String::from).collect();
-                    if command.command.is_empty() {
-                        command.command.push(String::new());
+                    // Use proper command parsing with quote handling and validation
+                    match parse_spawn_command(&cmd) {
+                        Ok(parsed) => {
+                            if let Some(warning) = &parsed.warning {
+                                log::warn!("Startup command {}: {}", id, warning);
+                            }
+                            command.command = if parsed.args.is_empty() {
+                                vec![String::new()]
+                            } else {
+                                parsed.args
+                            };
+                        }
+                        Err(e) => {
+                            log::error!("Failed to parse startup command {}: {}", id, e);
+                            return Task::none();
+                        }
                     }
                 }
             }

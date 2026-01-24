@@ -56,7 +56,12 @@ impl App {
             Ok(paths) => Arc::new(paths),
             Err(e) => {
                 log::error!("Failed to initialize config paths: {}", e);
-                panic!("Cannot proceed without valid config paths");
+                return Self::new_with_error(
+                    "Could not determine configuration directory. \
+                     Please ensure your system has a valid XDG config directory."
+                        .to_string(),
+                    Some(e.to_string()),
+                );
             }
         };
 
@@ -100,6 +105,39 @@ impl App {
                 step: crate::messages::WizardStep::Welcome,
             };
         }
+
+        let app = Self {
+            settings,
+            paths,
+            dirty_tracker: DirtyTracker::new(),
+            search_index: crate::search::SearchIndex::new(),
+            last_change_time: None,
+            save_in_progress: false,
+            ui,
+        };
+
+        (app, Task::none())
+    }
+
+    /// Creates an App in error state for displaying initialization failures.
+    ///
+    /// This allows the app to show a user-friendly error dialog instead of
+    /// panicking when initialization fails.
+    fn new_with_error(error_message: String, details: Option<String>) -> (Self, Task<Message>) {
+        let settings = Settings::default();
+        let mut ui = UiState::new(
+            crate::theme::AppTheme::default(),
+            crate::views::widgets::format_matrix_values(None),
+            crate::views::widgets::format_matrix_values(None),
+        );
+
+        ui.dialog_state = DialogState::Error {
+            title: "Initialization Failed".to_string(),
+            message: error_message,
+            details,
+        };
+
+        let paths = Arc::new(ConfigPaths::default());
 
         let app = Self {
             settings,
@@ -301,6 +339,13 @@ impl App {
             }
 
             Message::CloseDialog => {
+                // If this was an initialization error dialog, exit the app gracefully
+                if let DialogState::Error { title, .. } = &self.ui.dialog_state {
+                    if title == "Initialization Failed" {
+                        log::info!("User acknowledged initialization failure, exiting");
+                        std::process::exit(1);
+                    }
+                }
                 self.ui.dialog_state = DialogState::None;
                 Task::none()
             }
