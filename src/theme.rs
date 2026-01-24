@@ -490,3 +490,49 @@ pub fn status_bar_style(_theme: &Theme) -> container::Style {
         snap: false,
     }
 }
+
+/// Container style for the search dropdown
+pub fn search_dropdown_style(_theme: &Theme) -> container::Style {
+    let colors = NiriColors::default();
+
+    container::Style {
+        background: Some(iced::Background::Color(colors.bg_surface)),
+        border: Border {
+            color: colors.border_strong,
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        shadow: Shadow {
+            color: Color::from_rgba(0.0, 0.0, 0.0, 0.4),
+            offset: Vector::new(0.0, 4.0),
+            blur_radius: 16.0,
+        },
+        text_color: Some(colors.text_primary),
+        snap: false,
+    }
+}
+
+/// Button style for search dropdown items
+pub fn search_dropdown_item_style() -> impl Fn(&Theme, button::Status) -> button::Style {
+    let colors = NiriColors::default();
+
+    move |_theme, status| {
+        let bg = match status {
+            button::Status::Hovered => colors.bg_surface_hover,
+            button::Status::Pressed => colors.bg_input,
+            _ => Color::TRANSPARENT,
+        };
+
+        button::Style {
+            background: Some(iced::Background::Color(bg)),
+            text_color: colors.text_primary,
+            border: Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: 6.0.into(),
+            },
+            shadow: Shadow::default(),
+            snap: false,
+        }
+    }
+}

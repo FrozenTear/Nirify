@@ -61,6 +61,8 @@ pub struct UiState {
     pub window_rule_sections_expanded: HashMap<(u32, String), bool>,
     /// Regex validation errors
     pub window_rule_regex_errors: HashMap<(u32, String), String>,
+    /// Available workspace names from niri (for dropdowns)
+    pub available_workspaces: Vec<String>,
 
     // Keybindings state
     /// Selected keybinding index for list-detail view

@@ -5,7 +5,7 @@
 
 pub mod dialogs;
 pub mod navigation;
-pub mod search_results;
+pub mod search_dropdown;
 pub mod status_bar;
 
 pub mod animations;

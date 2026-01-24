@@ -17,6 +17,7 @@ pub fn view<'a>(
     selected_rule_id: Option<u32>,
     sections_expanded: &'a HashMap<(u32, String), bool>,
     regex_errors: &'a HashMap<(u32, String), String>,
+    available_workspaces: &'a [String],
 ) -> Element<'a, Message> {
     // Left panel: List of rules
     let list_panel = rule_list(settings, selected_rule_id);
@@ -24,7 +25,7 @@ pub fn view<'a>(
     // Right panel: Detail view for selected rule
     let detail_panel = if let Some(id) = selected_rule_id {
         if let Some(rule) = settings.rules.iter().find(|r| r.id == id) {
-            rule_detail_view(rule, sections_expanded, regex_errors)
+            rule_detail_view(rule, sections_expanded, regex_errors, available_workspaces)
         } else {
             empty_detail_view()
         }
@@ -124,6 +125,7 @@ fn rule_detail_view<'a>(
     rule: &'a WindowRule,
     sections_expanded: &'a HashMap<(u32, String), bool>,
     regex_errors: &'a HashMap<(u32, String), String>,
+    available_workspaces: &'a [String],
 ) -> Element<'a, Message> {
     let id = rule.id;
 
@@ -300,10 +302,11 @@ fn rule_detail_view<'a>(
                 rule.open_on_output.as_deref().unwrap_or(""),
                 move |value| Message::WindowRules(WindowRulesMessage::SetOpenOnOutput(id, if value.is_empty() { None } else { Some(value) })),
             ),
-            text_input_row(
+            text_input_with_suggestions(
                 "Open on workspace",
-                "Workspace name",
+                "Select from available workspaces or type a custom name",
                 rule.open_on_workspace.as_deref().unwrap_or(""),
+                available_workspaces,
                 move |value| Message::WindowRules(WindowRulesMessage::SetOpenOnWorkspace(id, if value.is_empty() { None } else { Some(value) })),
             ),
             toggle_row(

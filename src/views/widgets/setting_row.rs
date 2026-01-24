@@ -280,6 +280,68 @@ pub fn text_input_row<'a, Message: Clone + 'a>(
     .into()
 }
 
+/// Creates a text input with a dropdown of suggestions
+///
+/// Used for fields like "open on workspace" where the user can either
+/// select from known options or type a custom value.
+///
+/// # Example
+/// ```rust,ignore
+/// text_input_with_suggestions(
+///     "Open on workspace",
+///     "Workspace name",
+///     rule.open_on_workspace.as_deref().unwrap_or(""),
+///     &available_workspaces,
+///     move |value| Message::SetWorkspace(id, value),
+/// )
+/// ```
+pub fn text_input_with_suggestions<'a, Message: Clone + 'a>(
+    label: &'a str,
+    description: &'a str,
+    value: &'a str,
+    suggestions: &'a [String],
+    on_change: impl Fn(String) -> Message + Clone + 'a,
+) -> Element<'a, Message> {
+    // Build options: "(None)" + suggestions
+    let mut options: Vec<String> = vec!["(None)".to_string()];
+    options.extend(suggestions.iter().cloned());
+
+    // Find selected option
+    let selected = if value.is_empty() {
+        Some("(None)".to_string())
+    } else if suggestions.contains(&value.to_string()) {
+        Some(value.to_string())
+    } else {
+        None // Custom value not in list
+    };
+
+    let on_change_clone = on_change.clone();
+
+    column![
+        text(label).size(16),
+        text(description).size(12).color([0.7, 0.7, 0.7]),
+        row![
+            pick_list(options, selected, move |s: String| {
+                if s == "(None)" {
+                    on_change_clone(String::new())
+                } else {
+                    on_change_clone(s)
+                }
+            })
+            .placeholder("Select...")
+            .width(Length::FillPortion(1)),
+            text_input("or type custom...", value)
+                .on_input(on_change)
+                .padding(8)
+                .width(Length::FillPortion(2)),
+        ]
+        .spacing(8),
+    ]
+    .spacing(6)
+    .padding(12)
+    .into()
+}
+
 /// Creates a page title - the first heading on a page
 ///
 /// No top padding since it's at the start of the page content.

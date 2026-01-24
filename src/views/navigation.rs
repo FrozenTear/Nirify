@@ -6,11 +6,16 @@
 //! - Search bar with icon
 //! - Smooth transitions and hover states
 
-use iced::widget::{button, container, row, text, text_input, Row};
+use iced::widget::{button, container, row, text, text_input, Id, Row};
 use iced::{Alignment, Element, Length};
 
 use crate::messages::{Message, Page, PageCategory};
 use crate::theme::{fonts, nav_bar_style, nav_tab_style, search_container_style, subnav_bar_style, subnav_tab_style};
+
+/// Stable ID for search input to maintain focus
+pub fn search_input_id() -> Id {
+    Id::new("search-input")
+}
 
 /// Creates the primary navigation bar with category tabs
 pub fn primary_nav<'a>(current_page: Page, search_query: &'a str) -> Element<'a, Message> {
@@ -46,11 +51,12 @@ pub fn primary_nav<'a>(current_page: Page, search_query: &'a str) -> Element<'a,
         tabs = tabs.push(tab);
     }
 
-    // Search bar
+    // Search bar with stable ID
     let search = container(
         row![
             text("🔍").size(14),
             text_input("Search settings...", search_query)
+                .id(search_input_id())
                 .on_input(Message::SearchQueryChanged)
                 .padding([6, 10])
                 .width(Length::Fixed(300.0))

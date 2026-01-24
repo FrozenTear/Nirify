@@ -15,8 +15,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use iced::time;
-use iced::widget::{column, container, text};
-use iced::{Element, Length, Subscription, Task};
+use iced::widget::{column, container, stack, text};
+use iced::{alignment::Horizontal, Element, Length, Subscription, Task};
 
 use crate::config::{ConfigPaths, DirtyTracker, Settings, SettingsCategory};
 use crate::messages::{DialogState, Message, Page, SaveMessage};
@@ -119,21 +119,32 @@ impl App {
             // Navigation
             Message::NavigateToPage(page) => {
                 self.ui.current_page = page;
+                let is_connected = matches!(
+                    self.ui.niri_status,
+                    crate::views::status_bar::NiriStatus::Connected
+                );
+
                 // Auto-refresh IPC outputs when navigating to Outputs page
-                if page == Page::Outputs {
-                    let is_connected = matches!(
-                        self.ui.niri_status,
-                        crate::views::status_bar::NiriStatus::Connected
+                if page == Page::Outputs && is_connected {
+                    return Task::perform(
+                        async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
+                        |result| {
+                            Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(result))
+                        },
                     );
-                    if is_connected {
-                        return Task::perform(
-                            async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
-                            |result| {
-                                Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(result))
-                            },
-                        );
-                    }
                 }
+
+                // Auto-refresh workspaces when navigating to Window Rules page
+                // (for the workspace dropdown)
+                if page == Page::WindowRules && is_connected {
+                    return Task::perform(
+                        async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
+                        |result| {
+                            Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(result))
+                        },
+                    );
+                }
+
                 Task::none()
             }
 
@@ -150,7 +161,8 @@ impl App {
                 // Perform search immediately
                 self.ui.search_results = self.search_index.search(&self.ui.search_query);
 
-                Task::none()
+                // Re-focus search input to maintain typing focus
+                iced::widget::operation::focus(views::navigation::search_input_id())
             }
 
             Message::SearchResultSelected(index) => {
@@ -746,8 +758,6 @@ impl App {
 
     /// Constructs the UI from current state
     pub fn view(&self) -> Element<'_, Message> {
-        use iced::widget::column;
-
         // Primary navigation bar (top)
         let primary_nav =
             views::navigation::primary_nav(self.ui.current_page, &self.ui.search_query);
@@ -755,14 +765,8 @@ impl App {
         // Secondary navigation bar (sub-tabs)
         let secondary_nav = views::navigation::secondary_nav(self.ui.current_page);
 
-        // Main content area (or search results if searching)
-        let content_area = if !self.ui.search_query.is_empty() && !self.ui.search_results.is_empty()
-        {
-            // Show search results in the content area
-            views::search_results::view(&self.ui.search_results, &self.ui.search_query)
-        } else {
-            self.page_content()
-        };
+        // Main content area (always show current page)
+        let content_area = self.page_content();
 
         // Status bar (bottom)
         let is_dirty = self.dirty_tracker.is_dirty();
@@ -777,17 +781,35 @@ impl App {
         // Stack everything vertically
         let layout = column![primary_nav, secondary_nav, content_area, status_bar,].spacing(0);
 
-        let main_view = container(layout).width(Length::Fill).height(Length::Fill);
+        let main_view: Element<'_, Message> =
+            container(layout).width(Length::Fill).height(Length::Fill).into();
 
-        // If there's an active dialog, render it on top
+        // Check for search dropdown overlay
+        let with_dropdown = if let Some(dropdown) =
+            views::search_dropdown::view(&self.ui.search_results, &self.ui.search_query)
+        {
+            use iced::widget::{column as col, Space};
+            // Position dropdown at top-right, below nav bar
+            let dropdown_overlay = col![
+                Space::new().height(Length::Fixed(50.0)),
+                container(dropdown)
+                    .width(Length::Fill)
+                    .padding(20)
+                    .align_x(Horizontal::Right),
+            ];
+
+            stack![main_view, dropdown_overlay].into()
+        } else {
+            main_view
+        };
+
+        // If there's an active dialog, render it on top of everything
         if let Some(dialog) =
             views::dialogs::view(&self.ui.dialog_state, &self.ui.wizard_suggestions)
         {
-            // For now, use iced's Stack widget or similar approach
-            // Since iced doesn't have perfect z-layering, dialogs handle their own backdrop
             dialog
         } else {
-            main_view.into()
+            with_dropdown
         }
     }
 
@@ -847,6 +869,7 @@ impl App {
                     self.ui.selected_window_rule_id,
                     &self.ui.window_rule_sections_expanded,
                     &self.ui.window_rule_regex_errors,
+                    &self.ui.available_workspaces,
                 );
             }
             Page::LayerRules => {
