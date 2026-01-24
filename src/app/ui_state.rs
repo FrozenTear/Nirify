@@ -27,6 +27,10 @@ pub struct UiState {
     pub last_search_time: Option<std::time::Instant>,
     /// Whether sidebar is expanded (for responsive design)
     pub sidebar_expanded: bool,
+    /// Whether to show the search bar in navigation
+    pub show_search_bar: bool,
+    /// Whether search is active (for Ctrl+K modal when search bar is hidden)
+    pub search_focused: bool,
     /// Widget demo state for testing
     pub widget_demo_state: views::widget_demo::DemoState,
     /// Toast notification message
@@ -105,6 +109,7 @@ impl UiState {
             tablet_calibration_cache,
             touch_calibration_cache,
             sidebar_expanded: true,
+            show_search_bar: true,
             ..Default::default()
         }
     }

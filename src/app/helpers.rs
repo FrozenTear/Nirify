@@ -252,6 +252,55 @@ mod tests {
     }
 }
 
+/// Checks if a pressed key combo matches a configured hotkey string
+/// e.g., matches "Ctrl+K" against the pressed combo "Ctrl+K"
+///
+/// This is case-insensitive and handles different modifier orderings.
+pub fn hotkey_matches(pressed: &str, configured: &str) -> bool {
+    if pressed.is_empty() || configured.is_empty() {
+        return false;
+    }
+
+    // Normalize both to lowercase for comparison
+    let pressed_lower = pressed.to_lowercase();
+    let configured_lower = configured.to_lowercase();
+
+    // Simple case: exact match after lowercasing
+    if pressed_lower == configured_lower {
+        return true;
+    }
+
+    // Parse both into sets of modifiers and the key
+    fn parse_combo(s: &str) -> (Vec<&str>, &str) {
+        let parts: Vec<&str> = s.split('+').map(|p| p.trim()).collect();
+        if parts.is_empty() {
+            return (vec![], "");
+        }
+        let key = parts.last().unwrap_or(&"");
+        let mods = parts[..parts.len().saturating_sub(1)].to_vec();
+        (mods, key)
+    }
+
+    let (pressed_mods, pressed_key) = parse_combo(&pressed_lower);
+    let (configured_mods, configured_key) = parse_combo(&configured_lower);
+
+    // Keys must match
+    if pressed_key != configured_key {
+        return false;
+    }
+
+    // All configured modifiers must be present in pressed
+    // (pressed may have additional modifiers, that's ok)
+    for modifier in &configured_mods {
+        if !pressed_mods.contains(modifier) {
+            return false;
+        }
+    }
+
+    // But we also want exact match - pressed shouldn't have extra modifiers
+    pressed_mods.len() == configured_mods.len()
+}
+
 /// Formats a key press event into a niri-compatible key combo string
 /// e.g., "Mod+Shift+Return" or "Ctrl+Alt+Delete"
 pub fn format_key_combo(key: &iced::keyboard::Key, modifiers: iced::keyboard::Modifiers) -> String {

@@ -91,6 +91,7 @@ impl App {
             touch_calibration_cache,
         );
         ui.niri_status = niri_status;
+        ui.show_search_bar = settings.preferences.show_search_bar;
 
         // Check if this is the first run and show the wizard
         if paths.is_first_run() {
@@ -172,6 +173,8 @@ impl App {
                     // Clear search after navigation
                     self.ui.search_query.clear();
                     self.ui.search_results.clear();
+                    // Close search modal if open
+                    self.ui.search_focused = false;
                 }
                 Task::none()
             }
@@ -181,6 +184,21 @@ impl App {
                 self.ui.search_results.clear();
                 self.ui.last_search_time = None;
                 Task::none()
+            }
+
+            Message::ToggleSearch => {
+                // If search bar is visible, just focus it
+                // If hidden, show it as focused (modal mode)
+                self.ui.search_focused = !self.ui.search_focused;
+                if self.ui.search_focused {
+                    // Focus the search input
+                    iced::widget::operation::focus(views::navigation::search_input_id())
+                } else {
+                    // Clear search when closing
+                    self.ui.search_query.clear();
+                    self.ui.search_results.clear();
+                    Task::none()
+                }
             }
 
             // Theme
@@ -714,7 +732,11 @@ impl App {
             None
         };
 
-        // Keyboard capture subscription (only active when capturing)
+        // Parse the search hotkey for keyboard listening
+        let search_hotkey = self.settings.preferences.search_hotkey.clone();
+        let has_search_hotkey = !search_hotkey.is_empty();
+
+        // Keyboard capture subscription (only active when capturing keybindings)
         if self.ui.key_capture_active.is_some() {
             let key_capture = keyboard::listen().map(|event| {
                 match event {
@@ -747,6 +769,31 @@ impl App {
                 subs.push(toast);
             }
             Subscription::batch(subs)
+        } else if has_search_hotkey {
+            // Listen for search hotkey when not in key capture mode
+            // Use Subscription::with to pass the hotkey to the closure (avoiding capture)
+            let search_listener = keyboard::listen()
+                .with(search_hotkey)
+                .map(|(hotkey, event): (String, keyboard::Event)| {
+                    match event {
+                        keyboard::Event::KeyPressed { key, modifiers, .. } => {
+                            // Check if the pressed key matches the configured search hotkey
+                            let key_combo = helpers::format_key_combo(&key, modifiers);
+                            if helpers::hotkey_matches(&key_combo, &hotkey) {
+                                Message::ToggleSearch
+                            } else {
+                                Message::None
+                            }
+                        }
+                        _ => Message::None,
+                    }
+                });
+
+            let mut subs = vec![save_check, niri_check, search_listener];
+            if let Some(toast) = toast_check {
+                subs.push(toast);
+            }
+            Subscription::batch(subs)
         } else {
             let mut subs = vec![save_check, niri_check];
             if let Some(toast) = toast_check {
@@ -759,8 +806,11 @@ impl App {
     /// Constructs the UI from current state
     pub fn view(&self) -> Element<'_, Message> {
         // Primary navigation bar (top)
-        let primary_nav =
-            views::navigation::primary_nav(self.ui.current_page, &self.ui.search_query);
+        let primary_nav = views::navigation::primary_nav(
+            self.ui.current_page,
+            &self.ui.search_query,
+            self.ui.show_search_bar,
+        );
 
         // Secondary navigation bar (sub-tabs)
         let secondary_nav = views::navigation::secondary_nav(self.ui.current_page);
@@ -784,23 +834,142 @@ impl App {
         let main_view: Element<'_, Message> =
             container(layout).width(Length::Fill).height(Length::Fill).into();
 
-        // Check for search dropdown overlay
-        let with_dropdown = if let Some(dropdown) =
-            views::search_dropdown::view(&self.ui.search_results, &self.ui.search_query)
-        {
-            use iced::widget::{column as col, Space};
-            // Position dropdown at top-right, below nav bar
-            let dropdown_overlay = col![
-                Space::new().height(Length::Fixed(50.0)),
-                container(dropdown)
-                    .width(Length::Fill)
-                    .padding(20)
-                    .align_x(Horizontal::Right),
+        // Check for search modal (when search bar is hidden but search is active)
+        let with_search_modal = if !self.ui.show_search_bar && self.ui.search_focused {
+            use iced::widget::{column as col, row, text_input, Space};
+            use crate::theme::{search_dropdown_style, fonts};
+
+            // Build search input
+            let search_input = text_input("Search settings...", &self.ui.search_query)
+                .id(views::navigation::search_input_id())
+                .on_input(Message::SearchQueryChanged)
+                .padding(12)
+                .size(16)
+                .width(Length::Fixed(400.0));
+
+            // Build results list if there are results
+            let results_content: Element<'_, Message> = if !self.ui.search_query.trim().is_empty() {
+                if self.ui.search_results.is_empty() {
+                    container(
+                        text("No matching settings found")
+                            .size(14)
+                            .color([0.6, 0.6, 0.6])
+                    )
+                    .padding(16)
+                    .into()
+                } else {
+                    let mut results_col = col![].spacing(4).padding(8);
+                    for (index, result) in self.ui.search_results.iter().take(8).enumerate() {
+                        let item = iced::widget::button(
+                            row![
+                                col![
+                                    text(&result.setting_name).size(14).font(fonts::UI_FONT_MEDIUM),
+                                    text(&result.description).size(11).color([0.6, 0.6, 0.6]),
+                                ]
+                                .spacing(2)
+                                .width(Length::Fill),
+                                text(result.page.name()).size(10).color([0.5, 0.5, 0.5]),
+                            ]
+                            .spacing(8)
+                            .padding([10, 12])
+                        )
+                        .on_press(Message::SearchResultSelected(index))
+                        .width(Length::Fill)
+                        .style(crate::theme::search_dropdown_item_style());
+
+                        results_col = results_col.push(item);
+                    }
+                    if self.ui.search_results.len() > 8 {
+                        results_col = results_col.push(
+                            container(
+                                text(format!("and {} more...", self.ui.search_results.len() - 8))
+                                    .size(12)
+                                    .color([0.5, 0.5, 0.5])
+                            )
+                            .padding([8, 16])
+                        );
+                    }
+                    results_col.into()
+                }
+            } else {
+                container(
+                    text("Type to search settings...")
+                        .size(13)
+                        .color([0.5, 0.5, 0.5])
+                )
+                .padding(16)
+                .into()
+            };
+
+            // Build the modal
+            let modal_content = col![
+                row![
+                    text("🔍").size(16),
+                    search_input,
+                ]
+                .spacing(12)
+                .align_y(iced::Alignment::Center),
+                results_content,
+            ]
+            .spacing(8);
+
+            let modal = container(modal_content)
+                .padding(16)
+                .style(search_dropdown_style)
+                .width(Length::Fixed(450.0));
+
+            // Center the modal with a semi-transparent backdrop
+            let backdrop = container(
+                iced::widget::mouse_area(
+                    container(Space::new())
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                )
+                .on_press(Message::ToggleSearch) // Click backdrop to close
+            )
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(|_| container::Style {
+                background: Some(iced::Background::Color(iced::Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
+                ..Default::default()
+            });
+
+            let modal_overlay = stack![
+                backdrop,
+                col![
+                    Space::new().height(Length::Fixed(100.0)),
+                    container(modal)
+                        .width(Length::Fill)
+                        .align_x(Horizontal::Center),
+                ],
             ];
 
-            stack![main_view, dropdown_overlay].into()
+            stack![main_view, modal_overlay].into()
         } else {
             main_view
+        };
+
+        // Check for search dropdown overlay (when search bar is visible)
+        let with_dropdown = if self.ui.show_search_bar {
+            if let Some(dropdown) =
+                views::search_dropdown::view(&self.ui.search_results, &self.ui.search_query)
+            {
+                use iced::widget::{column as col, Space};
+                // Position dropdown at top-right, below nav bar
+                let dropdown_overlay = col![
+                    Space::new().height(Length::Fixed(50.0)),
+                    container(dropdown)
+                        .width(Length::Fill)
+                        .padding(20)
+                        .align_x(Horizontal::Right),
+                ];
+
+                stack![with_search_modal, dropdown_overlay].into()
+            } else {
+                with_search_modal
+            }
+        } else {
+            with_search_modal
         };
 
         // If there's an active dialog, render it on top of everything
@@ -922,7 +1091,11 @@ impl App {
                 return views::tools::view(&self.ui.tools_state, niri_connected);
             }
             Page::Preferences => {
-                return views::preferences::view(self.settings.preferences.float_settings_app);
+                return views::preferences::view(
+                    self.settings.preferences.float_settings_app,
+                    self.ui.show_search_bar,
+                    &self.settings.preferences.search_hotkey,
+                );
             }
             Page::ConfigEditor => {
                 return views::config_editor::view(

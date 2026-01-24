@@ -18,7 +18,11 @@ pub fn search_input_id() -> Id {
 }
 
 /// Creates the primary navigation bar with category tabs
-pub fn primary_nav<'a>(current_page: Page, search_query: &'a str) -> Element<'a, Message> {
+pub fn primary_nav<'a>(
+    current_page: Page,
+    search_query: &'a str,
+    show_search_bar: bool,
+) -> Element<'a, Message> {
     let current_category = current_page.category();
 
     // Category tabs
@@ -51,25 +55,60 @@ pub fn primary_nav<'a>(current_page: Page, search_query: &'a str) -> Element<'a,
         tabs = tabs.push(tab);
     }
 
-    // Search bar with stable ID
-    let search = container(
-        row![
-            text("🔍").size(14),
-            text_input("Search settings...", search_query)
-                .id(search_input_id())
-                .on_input(Message::SearchQueryChanged)
-                .padding([6, 10])
-                .width(Length::Fixed(300.0))
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center)
-    )
-    .padding([6, 12])
-    .style(search_container_style);
+    let nav_content = if show_search_bar {
+        // Search bar with stable ID
+        let search = container(
+            row![
+                text("🔍").size(14),
+                text_input("Search settings...", search_query)
+                    .id(search_input_id())
+                    .on_input(Message::SearchQueryChanged)
+                    .padding([6, 10])
+                    .width(Length::Fixed(300.0))
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center)
+        )
+        .padding([6, 12])
+        .style(search_container_style);
 
-    let nav_content = row![tabs]
-        .push(container(search).width(Length::Fill).align_x(iced::alignment::Horizontal::Right))
-        .align_y(Alignment::Center);
+        row![tabs]
+            .push(container(search).width(Length::Fill).align_x(iced::alignment::Horizontal::Right))
+            .align_y(Alignment::Center)
+    } else {
+        // Search button (opens search modal on Ctrl+K or click)
+        let search_btn = button(
+            row![
+                text("🔍").size(14),
+                text("Search").size(13),
+            ]
+            .spacing(6)
+            .align_y(Alignment::Center)
+        )
+        .on_press(Message::ToggleSearch)
+        .padding([6, 12])
+        .style(|theme: &iced::Theme, status| {
+            let mut style = search_container_style(theme);
+            if matches!(status, iced::widget::button::Status::Hovered) {
+                style.background = Some(iced::Background::Color(iced::Color::from_rgba(0.25, 0.25, 0.25, 0.9)));
+            }
+            iced::widget::button::Style {
+                background: style.background,
+                border: style.border,
+                text_color: iced::Color::from_rgb(0.8, 0.8, 0.8),
+                ..Default::default()
+            }
+        });
+
+        row![tabs]
+            .push(
+                container(search_btn)
+                    .width(Length::Fill)
+                    .align_x(iced::alignment::Horizontal::Right)
+                    .padding([0, 12])
+            )
+            .align_y(Alignment::Center)
+    };
 
     container(nav_content)
         .width(Length::Fill)

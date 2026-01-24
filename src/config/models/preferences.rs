@@ -9,6 +9,10 @@ pub struct PreferencesSettings {
     pub theme: String,
     /// Whether the settings app should float (true) or tile (false)
     pub float_settings_app: bool,
+    /// Whether to show the search bar in navigation
+    pub show_search_bar: bool,
+    /// Keyboard shortcut for opening search (e.g., "Ctrl+K", "Ctrl+/", or empty to disable)
+    pub search_hotkey: String,
 }
 
 impl Default for PreferencesSettings {
@@ -16,6 +20,8 @@ impl Default for PreferencesSettings {
         Self {
             theme: "NiriAmber".to_string(),
             float_settings_app: true, // Float by default
+            show_search_bar: true,    // Show search bar by default
+            search_hotkey: "Ctrl+K".to_string(),
         }
     }
 }

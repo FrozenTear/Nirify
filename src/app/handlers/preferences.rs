@@ -20,6 +20,27 @@ impl super::super::App {
 
                 Task::none()
             }
+
+            PreferencesMessage::SetShowSearchBar(show) => {
+                self.settings.preferences.show_search_bar = show;
+                self.ui.show_search_bar = show;
+
+                // Mark preferences as dirty for auto-save
+                self.dirty_tracker.mark(SettingsCategory::Preferences);
+                self.mark_changed();
+
+                Task::none()
+            }
+
+            PreferencesMessage::SetSearchHotkey(hotkey) => {
+                self.settings.preferences.search_hotkey = hotkey;
+
+                // Mark preferences as dirty for auto-save
+                self.dirty_tracker.mark(SettingsCategory::Preferences);
+                self.mark_changed();
+
+                Task::none()
+            }
         }
     }
 }

@@ -50,6 +50,8 @@ pub enum Message {
     SearchResultSelected(usize),
     ClearSearch,
     ChangeTheme(crate::theme::AppTheme),
+    /// Toggle search bar visibility / focus (Ctrl+K)
+    ToggleSearch,
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Visual Settings
@@ -894,6 +896,10 @@ pub enum ToolsMessage {
 pub enum PreferencesMessage {
     /// Toggle whether the settings app should float or tile
     SetFloatSettingsApp(bool),
+    /// Toggle whether to show the search bar in navigation
+    SetShowSearchBar(bool),
+    /// Set the keyboard shortcut for opening search (e.g., "Ctrl+K", "Ctrl+/", or empty to disable)
+    SetSearchHotkey(String),
 }
 
 /// Config editor messages
