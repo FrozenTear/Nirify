@@ -128,7 +128,7 @@ pub fn view(float_settings_app: bool, show_search_bar: bool, search_hotkey: &str
             column![
                 row![
                     text("Niri Settings").size(16),
-                    text("v0.2.0").size(14).color([0.5, 0.5, 0.5]),
+                    text("v0.2.2").size(14).color([0.5, 0.5, 0.5]),
                 ]
                 .spacing(8)
                 .align_y(Alignment::Center),
