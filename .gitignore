@@ -19,6 +19,8 @@ coverage/
 # Review files (internal only)
 *review*.md
 *REVIEW*.md
+REVIEWER_BRIEFING.md
+REVIEWER_RESPONSE_*.md
 
 # Editor/IDE
 *.swp
