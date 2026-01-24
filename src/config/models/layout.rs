@@ -221,12 +221,15 @@ impl Default for LayoutExtrasSettings {
 }
 
 /// Layout overrides for per-output or per-workspace configuration (v25.11+)
+///
+/// All fields are optional - only set fields will be output to KDL.
+/// Niri allows overriding "all the same options as the top-level layout {}"
+/// for individual outputs and named workspaces.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct LayoutOverride {
-    /// Inner gaps override
-    pub gaps_inner: Option<f32>,
-    /// Outer gaps override
-    pub gaps_outer: Option<f32>,
+    // === Gaps and Struts ===
+    /// Gaps override (single value used for all gaps)
+    pub gaps: Option<f32>,
     /// Strut left override
     pub strut_left: Option<f32>,
     /// Strut right override
@@ -235,8 +238,88 @@ pub struct LayoutOverride {
     pub strut_top: Option<f32>,
     /// Strut bottom override
     pub strut_bottom: Option<f32>,
+
+    // === Column/Window Behavior ===
     /// Center focused column override
     pub center_focused_column: Option<CenterFocusedColumn>,
     /// Always center single column override
     pub always_center_single_column: Option<bool>,
+    /// Default column display mode override (normal/tabbed)
+    pub default_column_display: Option<DefaultColumnDisplay>,
+
+    // === Default Sizing ===
+    /// Default column width as proportion (0.0-1.0)
+    pub default_column_width_proportion: Option<f32>,
+    /// Default column width as fixed pixels
+    pub default_column_width_fixed: Option<i32>,
+    /// Preset column widths for switch-preset-column-width
+    pub preset_column_widths: Option<Vec<PresetWidth>>,
+    /// Preset window heights for switch-preset-window-height
+    pub preset_window_heights: Option<Vec<PresetHeight>>,
+
+    // === Focus Ring ===
+    /// Focus ring enabled override (false = off)
+    pub focus_ring_enabled: Option<bool>,
+    /// Focus ring width override
+    pub focus_ring_width: Option<i32>,
+    /// Focus ring active color override
+    pub focus_ring_active: Option<ColorOrGradient>,
+    /// Focus ring inactive color override
+    pub focus_ring_inactive: Option<ColorOrGradient>,
+
+    // === Border ===
+    /// Border enabled override (false = off)
+    pub border_enabled: Option<bool>,
+    /// Border width override
+    pub border_width: Option<i32>,
+    /// Border active color override
+    pub border_active: Option<ColorOrGradient>,
+    /// Border inactive color override
+    pub border_inactive: Option<ColorOrGradient>,
+
+    // === Shadow ===
+    /// Shadow enabled override (false = off)
+    pub shadow_enabled: Option<bool>,
+    /// Shadow softness (blur radius) override
+    pub shadow_softness: Option<i32>,
+    /// Shadow spread override
+    pub shadow_spread: Option<i32>,
+    /// Shadow X offset override
+    pub shadow_offset_x: Option<i32>,
+    /// Shadow Y offset override
+    pub shadow_offset_y: Option<i32>,
+    /// Shadow color override
+    pub shadow_color: Option<Color>,
+}
+
+impl LayoutOverride {
+    /// Returns true if any field is set (not all None)
+    pub fn has_any(&self) -> bool {
+        self.gaps.is_some()
+            || self.strut_left.is_some()
+            || self.strut_right.is_some()
+            || self.strut_top.is_some()
+            || self.strut_bottom.is_some()
+            || self.center_focused_column.is_some()
+            || self.always_center_single_column.is_some()
+            || self.default_column_display.is_some()
+            || self.default_column_width_proportion.is_some()
+            || self.default_column_width_fixed.is_some()
+            || self.preset_column_widths.is_some()
+            || self.preset_window_heights.is_some()
+            || self.focus_ring_enabled.is_some()
+            || self.focus_ring_width.is_some()
+            || self.focus_ring_active.is_some()
+            || self.focus_ring_inactive.is_some()
+            || self.border_enabled.is_some()
+            || self.border_width.is_some()
+            || self.border_active.is_some()
+            || self.border_inactive.is_some()
+            || self.shadow_enabled.is_some()
+            || self.shadow_softness.is_some()
+            || self.shadow_spread.is_some()
+            || self.shadow_offset_x.is_some()
+            || self.shadow_offset_y.is_some()
+            || self.shadow_color.is_some()
+    }
 }

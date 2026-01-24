@@ -170,35 +170,38 @@ pub fn generate_overview_kdl(settings: &OverviewSettings) -> String {
 
 /// Generate KDL for a layout override block
 pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> String {
-    let mut content = String::with_capacity(256);
+    use crate::config::models::{DefaultColumnDisplay, PresetHeight, PresetWidth};
+    use crate::types::ColorOrGradient;
+
+    let mut content = String::with_capacity(512);
     let inner_indent = format!("{}    ", indent);
+    let deep_indent = format!("{}        ", indent);
 
     content.push_str(&format!("{}layout {{\n", indent));
 
     // Gaps - niri uses a single value
-    if let Some(gaps) = layout.gaps_inner.or(layout.gaps_outer) {
+    if let Some(gaps) = layout.gaps {
         content.push_str(&format!("{}gaps {}\n", inner_indent, gaps as i32));
     }
 
-    // Struts - use block format like global layout
+    // Struts block
     let has_struts = layout.strut_left.is_some()
         || layout.strut_right.is_some()
         || layout.strut_top.is_some()
         || layout.strut_bottom.is_some();
     if has_struts {
         content.push_str(&format!("{}struts {{\n", inner_indent));
-        let strut_indent = format!("{}    ", inner_indent);
         if let Some(left) = layout.strut_left {
-            content.push_str(&format!("{}left {}\n", strut_indent, left as i32));
+            content.push_str(&format!("{}left {}\n", deep_indent, left as i32));
         }
         if let Some(right) = layout.strut_right {
-            content.push_str(&format!("{}right {}\n", strut_indent, right as i32));
+            content.push_str(&format!("{}right {}\n", deep_indent, right as i32));
         }
         if let Some(top) = layout.strut_top {
-            content.push_str(&format!("{}top {}\n", strut_indent, top as i32));
+            content.push_str(&format!("{}top {}\n", deep_indent, top as i32));
         }
         if let Some(bottom) = layout.strut_bottom {
-            content.push_str(&format!("{}bottom {}\n", strut_indent, bottom as i32));
+            content.push_str(&format!("{}bottom {}\n", deep_indent, bottom as i32));
         }
         content.push_str(&format!("{}}}\n", inner_indent));
     }
@@ -215,6 +218,152 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
     // always-center-single-column
     if layout.always_center_single_column == Some(true) {
         content.push_str(&format!("{}always-center-single-column\n", inner_indent));
+    }
+
+    // default-column-display
+    if let Some(ref dcd) = layout.default_column_display {
+        let mode = match dcd {
+            DefaultColumnDisplay::Normal => "normal",
+            DefaultColumnDisplay::Tabbed => "tabbed",
+        };
+        content.push_str(&format!("{}default-column-display \"{}\"\n", inner_indent, mode));
+    }
+
+    // default-column-width
+    if layout.default_column_width_proportion.is_some() || layout.default_column_width_fixed.is_some()
+    {
+        content.push_str(&format!("{}default-column-width {{\n", inner_indent));
+        if let Some(p) = layout.default_column_width_proportion {
+            content.push_str(&format!("{}proportion {:.5}\n", deep_indent, p));
+        }
+        if let Some(f) = layout.default_column_width_fixed {
+            content.push_str(&format!("{}fixed {}\n", deep_indent, f));
+        }
+        content.push_str(&format!("{}}}\n", inner_indent));
+    }
+
+    // preset-column-widths
+    if let Some(ref presets) = layout.preset_column_widths {
+        content.push_str(&format!("{}preset-column-widths {{\n", inner_indent));
+        for preset in presets {
+            match preset {
+                PresetWidth::Proportion(p) => {
+                    content.push_str(&format!("{}proportion {:.5}\n", deep_indent, p));
+                }
+                PresetWidth::Fixed(f) => {
+                    content.push_str(&format!("{}fixed {}\n", deep_indent, f));
+                }
+            }
+        }
+        content.push_str(&format!("{}}}\n", inner_indent));
+    }
+
+    // preset-window-heights
+    if let Some(ref presets) = layout.preset_window_heights {
+        content.push_str(&format!("{}preset-window-heights {{\n", inner_indent));
+        for preset in presets {
+            match preset {
+                PresetHeight::Proportion(p) => {
+                    content.push_str(&format!("{}proportion {:.5}\n", deep_indent, p));
+                }
+                PresetHeight::Fixed(f) => {
+                    content.push_str(&format!("{}fixed {}\n", deep_indent, f));
+                }
+            }
+        }
+        content.push_str(&format!("{}}}\n", inner_indent));
+    }
+
+    // focus-ring
+    let has_focus_ring = layout.focus_ring_enabled.is_some()
+        || layout.focus_ring_width.is_some()
+        || layout.focus_ring_active.is_some()
+        || layout.focus_ring_inactive.is_some();
+    if has_focus_ring {
+        content.push_str(&format!("{}focus-ring {{\n", inner_indent));
+        if layout.focus_ring_enabled == Some(false) {
+            content.push_str(&format!("{}off\n", deep_indent));
+        } else {
+            if let Some(w) = layout.focus_ring_width {
+                content.push_str(&format!("{}width {}\n", deep_indent, w));
+            }
+            if let Some(ref c) = layout.focus_ring_active {
+                if let ColorOrGradient::Color(color) = c {
+                    content.push_str(&format!("{}active-color \"{}\"\n", deep_indent, color.to_hex()));
+                }
+            }
+            if let Some(ref c) = layout.focus_ring_inactive {
+                if let ColorOrGradient::Color(color) = c {
+                    content.push_str(&format!(
+                        "{}inactive-color \"{}\"\n",
+                        deep_indent,
+                        color.to_hex()
+                    ));
+                }
+            }
+        }
+        content.push_str(&format!("{}}}\n", inner_indent));
+    }
+
+    // border
+    let has_border = layout.border_enabled.is_some()
+        || layout.border_width.is_some()
+        || layout.border_active.is_some()
+        || layout.border_inactive.is_some();
+    if has_border {
+        content.push_str(&format!("{}border {{\n", inner_indent));
+        if layout.border_enabled == Some(false) {
+            content.push_str(&format!("{}off\n", deep_indent));
+        } else {
+            if let Some(w) = layout.border_width {
+                content.push_str(&format!("{}width {}\n", deep_indent, w));
+            }
+            if let Some(ref c) = layout.border_active {
+                if let ColorOrGradient::Color(color) = c {
+                    content.push_str(&format!("{}active-color \"{}\"\n", deep_indent, color.to_hex()));
+                }
+            }
+            if let Some(ref c) = layout.border_inactive {
+                if let ColorOrGradient::Color(color) = c {
+                    content.push_str(&format!(
+                        "{}inactive-color \"{}\"\n",
+                        deep_indent,
+                        color.to_hex()
+                    ));
+                }
+            }
+        }
+        content.push_str(&format!("{}}}\n", inner_indent));
+    }
+
+    // shadow
+    let has_shadow = layout.shadow_enabled.is_some()
+        || layout.shadow_softness.is_some()
+        || layout.shadow_spread.is_some()
+        || layout.shadow_offset_x.is_some()
+        || layout.shadow_offset_y.is_some()
+        || layout.shadow_color.is_some();
+    if has_shadow {
+        content.push_str(&format!("{}shadow {{\n", inner_indent));
+        if layout.shadow_enabled == Some(false) {
+            content.push_str(&format!("{}off\n", deep_indent));
+        } else {
+            if let Some(s) = layout.shadow_softness {
+                content.push_str(&format!("{}softness {}\n", deep_indent, s));
+            }
+            if let Some(s) = layout.shadow_spread {
+                content.push_str(&format!("{}spread {}\n", deep_indent, s));
+            }
+            if layout.shadow_offset_x.is_some() || layout.shadow_offset_y.is_some() {
+                let x = layout.shadow_offset_x.unwrap_or(0);
+                let y = layout.shadow_offset_y.unwrap_or(0);
+                content.push_str(&format!("{}offset x={} y={}\n", deep_indent, x, y));
+            }
+            if let Some(ref c) = layout.shadow_color {
+                content.push_str(&format!("{}color \"{}\"\n", deep_indent, c.to_hex()));
+            }
+        }
+        content.push_str(&format!("{}}}\n", inner_indent));
     }
 
     content.push_str(&format!("{}}}\n", indent));

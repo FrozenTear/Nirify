@@ -130,70 +130,39 @@ pub fn parse_single_animation(children: &KdlDocument) -> SingleAnimationConfig {
 
 /// Parse a layout override block from KDL children
 pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOverride> {
+    use crate::config::models::{DefaultColumnDisplay, PresetHeight, PresetWidth};
+    use crate::types::{Color, ColorOrGradient};
+
     let mut layout = LayoutOverride::default();
 
-    // Parse gaps
+    // Parse gaps (single value in niri)
     if let Some(gaps_node) = layout_children.get("gaps") {
-        for entry in gaps_node.entries() {
-            if let Some(name) = entry.name() {
-                let val = entry.value();
-                match name.value() {
-                    "inner" => {
-                        if let Some(v) = val.as_float() {
-                            layout.gaps_inner = Some(v as f32);
-                        } else if let Some(v) = val.as_integer() {
-                            layout.gaps_inner = Some(v as f32);
-                        }
-                    }
-                    "outer" => {
-                        if let Some(v) = val.as_float() {
-                            layout.gaps_outer = Some(v as f32);
-                        } else if let Some(v) = val.as_integer() {
-                            layout.gaps_outer = Some(v as f32);
-                        }
-                    }
-                    _ => {}
+        if let Some(entry) = gaps_node.entries().first() {
+            if entry.name().is_none() {
+                // Positional argument: gaps 16
+                if let Some(v) = entry.value().as_float() {
+                    layout.gaps = Some(v as f32);
+                } else if let Some(v) = entry.value().as_integer() {
+                    layout.gaps = Some(v as f32);
                 }
             }
         }
     }
 
-    // Parse struts
+    // Parse struts block
     if let Some(struts_node) = layout_children.get("struts") {
-        for entry in struts_node.entries() {
-            if let Some(name) = entry.name() {
-                let val = entry.value();
-                match name.value() {
-                    "left" => {
-                        if let Some(v) = val.as_float() {
-                            layout.strut_left = Some(v as f32);
-                        } else if let Some(v) = val.as_integer() {
-                            layout.strut_left = Some(v as f32);
-                        }
-                    }
-                    "right" => {
-                        if let Some(v) = val.as_float() {
-                            layout.strut_right = Some(v as f32);
-                        } else if let Some(v) = val.as_integer() {
-                            layout.strut_right = Some(v as f32);
-                        }
-                    }
-                    "top" => {
-                        if let Some(v) = val.as_float() {
-                            layout.strut_top = Some(v as f32);
-                        } else if let Some(v) = val.as_integer() {
-                            layout.strut_top = Some(v as f32);
-                        }
-                    }
-                    "bottom" => {
-                        if let Some(v) = val.as_float() {
-                            layout.strut_bottom = Some(v as f32);
-                        } else if let Some(v) = val.as_integer() {
-                            layout.strut_bottom = Some(v as f32);
-                        }
-                    }
-                    _ => {}
-                }
+        if let Some(struts_children) = struts_node.children() {
+            if let Some(v) = get_i64(struts_children, &["left"]) {
+                layout.strut_left = Some(v as f32);
+            }
+            if let Some(v) = get_i64(struts_children, &["right"]) {
+                layout.strut_right = Some(v as f32);
+            }
+            if let Some(v) = get_i64(struts_children, &["top"]) {
+                layout.strut_top = Some(v as f32);
+            }
+            if let Some(v) = get_i64(struts_children, &["bottom"]) {
+                layout.strut_bottom = Some(v as f32);
             }
         }
     }
@@ -208,16 +177,171 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
         layout.always_center_single_column = Some(true);
     }
 
-    // Only return Some if at least one value was specified
-    if layout.gaps_inner.is_some()
-        || layout.gaps_outer.is_some()
-        || layout.strut_left.is_some()
-        || layout.strut_right.is_some()
-        || layout.strut_top.is_some()
-        || layout.strut_bottom.is_some()
-        || layout.center_focused_column.is_some()
-        || layout.always_center_single_column.is_some()
-    {
+    // default-column-display
+    if let Some(v) = get_string(layout_children, &["default-column-display"]) {
+        layout.default_column_display = match v.as_str() {
+            "tabbed" => Some(DefaultColumnDisplay::Tabbed),
+            "normal" => Some(DefaultColumnDisplay::Normal),
+            _ => None,
+        };
+    }
+
+    // default-column-width
+    if let Some(dcw_node) = layout_children.get("default-column-width") {
+        if let Some(dcw_children) = dcw_node.children() {
+            if let Some(v) = get_f64(dcw_children, &["proportion"]) {
+                layout.default_column_width_proportion = Some(v as f32);
+            }
+            if let Some(v) = get_i64(dcw_children, &["fixed"]) {
+                layout.default_column_width_fixed = Some(v as i32);
+            }
+        }
+    }
+
+    // preset-column-widths
+    if let Some(pcw_node) = layout_children.get("preset-column-widths") {
+        if let Some(pcw_children) = pcw_node.children() {
+            let mut presets = Vec::new();
+            for node in pcw_children.nodes() {
+                match node.name().value() {
+                    "proportion" => {
+                        if let Some(v) = node.entries().first().and_then(|e| e.value().as_float()) {
+                            presets.push(PresetWidth::Proportion(v as f32));
+                        }
+                    }
+                    "fixed" => {
+                        if let Some(v) = node.entries().first().and_then(|e| e.value().as_integer())
+                        {
+                            presets.push(PresetWidth::Fixed(v as i32));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if !presets.is_empty() {
+                layout.preset_column_widths = Some(presets);
+            }
+        }
+    }
+
+    // preset-window-heights
+    if let Some(pwh_node) = layout_children.get("preset-window-heights") {
+        if let Some(pwh_children) = pwh_node.children() {
+            let mut presets = Vec::new();
+            for node in pwh_children.nodes() {
+                match node.name().value() {
+                    "proportion" => {
+                        if let Some(v) = node.entries().first().and_then(|e| e.value().as_float()) {
+                            presets.push(PresetHeight::Proportion(v as f32));
+                        }
+                    }
+                    "fixed" => {
+                        if let Some(v) = node.entries().first().and_then(|e| e.value().as_integer())
+                        {
+                            presets.push(PresetHeight::Fixed(v as i32));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if !presets.is_empty() {
+                layout.preset_window_heights = Some(presets);
+            }
+        }
+    }
+
+    // focus-ring
+    if let Some(fr_node) = layout_children.get("focus-ring") {
+        if let Some(fr_children) = fr_node.children() {
+            if has_flag(fr_children, &["off"]) {
+                layout.focus_ring_enabled = Some(false);
+            } else {
+                layout.focus_ring_enabled = Some(true);
+            }
+            if let Some(v) = get_i64(fr_children, &["width"]) {
+                layout.focus_ring_width = Some(v as i32);
+            }
+            if let Some(s) = get_string(fr_children, &["active-color"]) {
+                if let Some(c) = Color::from_hex(&s) {
+                    layout.focus_ring_active = Some(ColorOrGradient::Color(c));
+                }
+            }
+            if let Some(s) = get_string(fr_children, &["inactive-color"]) {
+                if let Some(c) = Color::from_hex(&s) {
+                    layout.focus_ring_inactive = Some(ColorOrGradient::Color(c));
+                }
+            }
+        }
+    }
+
+    // border
+    if let Some(b_node) = layout_children.get("border") {
+        if let Some(b_children) = b_node.children() {
+            if has_flag(b_children, &["off"]) {
+                layout.border_enabled = Some(false);
+            } else {
+                layout.border_enabled = Some(true);
+            }
+            if let Some(v) = get_i64(b_children, &["width"]) {
+                layout.border_width = Some(v as i32);
+            }
+            if let Some(s) = get_string(b_children, &["active-color"]) {
+                if let Some(c) = Color::from_hex(&s) {
+                    layout.border_active = Some(ColorOrGradient::Color(c));
+                }
+            }
+            if let Some(s) = get_string(b_children, &["inactive-color"]) {
+                if let Some(c) = Color::from_hex(&s) {
+                    layout.border_inactive = Some(ColorOrGradient::Color(c));
+                }
+            }
+        }
+    }
+
+    // shadow
+    if let Some(s_node) = layout_children.get("shadow") {
+        if let Some(s_children) = s_node.children() {
+            if has_flag(s_children, &["off"]) {
+                layout.shadow_enabled = Some(false);
+            } else {
+                layout.shadow_enabled = Some(true);
+            }
+            if let Some(v) = get_i64(s_children, &["softness"]) {
+                layout.shadow_softness = Some(v as i32);
+            }
+            if let Some(v) = get_i64(s_children, &["spread"]) {
+                layout.shadow_spread = Some(v as i32);
+            }
+            // offset can be: offset x=0 y=5
+            if let Some(offset_node) = s_children.get("offset") {
+                for entry in offset_node.entries() {
+                    if let Some(name) = entry.name() {
+                        match name.value() {
+                            "x" => {
+                                if let Some(v) = entry.value().as_integer() {
+                                    layout.shadow_offset_x = Some(v as i32);
+                                }
+                            }
+                            "y" => {
+                                if let Some(v) = entry.value().as_integer() {
+                                    layout.shadow_offset_y = Some(v as i32);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            if let Some(s) = get_string(s_children, &["color"]) {
+                if let Some(c) = Color::from_hex(&s) {
+                    layout.shadow_color = Some(c);
+                }
+            }
+        }
+    }
+
+    // Return Some only if any field was set
+    if layout.has_any() {
         Some(layout)
     } else {
         None
