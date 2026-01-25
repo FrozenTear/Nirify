@@ -1,15 +1,16 @@
 //! Keyboard settings view
 
 use iced::widget::{column, container, scrollable, text, text_input};
-use iced::Element;
+use iced::{Element, Length};
 
-use super::widgets::*;
+use super::widgets::{page_title, info_text, section_header, slider_row_int, spacer, card};
 use crate::config::models::KeyboardSettings;
 use crate::messages::{KeyboardMessage, Message};
+use crate::theme::muted_text_container;
 
-/// Helper to create a text input row with string value
-/// Takes the string by value and returns it as part of the Element
-fn text_input_row<'a, Message: Clone + 'a>(
+/// Helper to create a text input row with string value (owned)
+/// Takes the string by value for keyboard settings
+fn keyboard_text_input<'a>(
     label: &'static str,
     description: &'static str,
     value: String,
@@ -17,8 +18,7 @@ fn text_input_row<'a, Message: Clone + 'a>(
 ) -> Element<'a, Message> {
     column![
         text(label).size(16),
-        text(description).size(12).color([0.7, 0.7, 0.7]),
-        // text_input internally stores what it needs
+        container(text(description).size(12)).style(muted_text_container),
         text_input("", &value).on_input(on_change).padding(8),
     ]
     .spacing(6)
@@ -38,49 +38,55 @@ pub fn view(settings: &KeyboardSettings) -> Element<'_, Message> {
         info_text(
             "Configure keyboard layout using XKB settings. The layout determines key mapping and language support."
         ),
-        text_input_row(
-            "XKB layout",
-            "Keyboard layout (e.g., us, de, fr)",
-            xkb_layout,
-            |value| Message::Keyboard(KeyboardMessage::SetXkbLayout(value)),
-        ),
+        card(column![
+            keyboard_text_input(
+                "XKB layout",
+                "Keyboard layout (e.g., us, de, fr)",
+                xkb_layout,
+                |value| Message::Keyboard(KeyboardMessage::SetXkbLayout(value)),
+            ),
+        ].spacing(0).width(Length::Fill)),
         section_header("Key Repeat"),
         info_text(
             "Controls how quickly keys repeat when held down. Delay is how long before repeat starts, rate is how fast keys repeat."
         ),
-        slider_row_int(
-            "Repeat delay",
-            "Delay before key repeat starts in milliseconds",
-            repeat_delay,
-            100,
-            2000,
-            " ms",
-            |value| Message::Keyboard(KeyboardMessage::SetRepeatDelay(value)),
-        ),
-        slider_row_int(
-            "Repeat rate",
-            "Number of key repeats per second",
-            repeat_rate,
-            1,
-            100,
-            " /sec",
-            |value| Message::Keyboard(KeyboardMessage::SetRepeatRate(value)),
-        ),
+        card(column![
+            slider_row_int(
+                "Repeat delay",
+                "Delay before key repeat starts in milliseconds",
+                repeat_delay,
+                100,
+                2000,
+                " ms",
+                |value| Message::Keyboard(KeyboardMessage::SetRepeatDelay(value)),
+            ),
+            slider_row_int(
+                "Repeat rate",
+                "Number of key repeats per second",
+                repeat_rate,
+                1,
+                100,
+                " /sec",
+                |value| Message::Keyboard(KeyboardMessage::SetRepeatRate(value)),
+            ),
+        ].spacing(0).width(Length::Fill)),
         section_header("Layout Tracking"),
         info_text(
             "Configure how keyboard layouts are tracked across windows. Options: 'global' (one layout for all windows), 'window' (per-window layout)."
         ),
-        text_input_row(
-            "Track layout",
-            "Layout tracking mode (global or window)",
-            track_layout,
-            |value| Message::Keyboard(KeyboardMessage::SetTrackLayout(value)),
-        ),
+        card(column![
+            keyboard_text_input(
+                "Track layout",
+                "Layout tracking mode (global or window)",
+                track_layout,
+                |value| Message::Keyboard(KeyboardMessage::SetTrackLayout(value)),
+            ),
+        ].spacing(0).width(Length::Fill)),
         spacer(32.0),
     ]
     .spacing(4);
 
-    scrollable(container(content).padding(20).width(iced::Length::Fill))
-        .height(iced::Length::Fill)
+    scrollable(container(content).padding(20).width(Length::Fill))
+        .height(Length::Fill)
         .into()
 }

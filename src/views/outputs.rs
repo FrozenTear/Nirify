@@ -8,6 +8,7 @@ use super::widgets::*;
 use crate::config::models::{OutputConfig, OutputSettings};
 use crate::ipc::FullOutputInfo;
 use crate::messages::{Message, OutputsMessage};
+use crate::theme::muted_text_container;
 use crate::types::{Transform, VrrMode};
 
 /// Represents an available display mode for dropdown selection
@@ -56,9 +57,10 @@ pub fn view<'a>(
         container(list_panel)
             .width(Length::FillPortion(1))
             .height(Length::Fill)
-            .style(|_theme| {
+            .style(|theme: &iced::Theme| {
+                let bg = theme.palette().background;
                 container::Style {
-                    background: Some(iced::Background::Color(iced::Color::from_rgba(0.1, 0.1, 0.1, 0.5))),
+                    background: Some(iced::Background::Color(iced::Color { a: 0.5, ..bg })),
                     ..Default::default()
                 }
             }),
@@ -79,18 +81,7 @@ fn output_list<'a>(settings: &'a OutputSettings, selected_index: Option<usize>) 
             button(text("+").size(18))
                 .on_press(Message::Outputs(OutputsMessage::AddOutput))
                 .padding([4, 12])
-                .style(|_theme, status| {
-                    let bg = match status {
-                        button::Status::Hovered => iced::Color::from_rgba(0.3, 0.5, 0.7, 0.5),
-                        button::Status::Pressed => iced::Color::from_rgba(0.4, 0.6, 0.8, 0.5),
-                        _ => iced::Color::from_rgba(0.2, 0.4, 0.6, 0.4),
-                    };
-                    button::Style {
-                        background: Some(iced::Background::Color(bg)),
-                        text_color: iced::Color::WHITE,
-                        ..Default::default()
-                    }
-                }),
+                .style(add_button_style),
         ]
         .spacing(10)
         .padding([12, 20])
@@ -101,10 +92,8 @@ fn output_list<'a>(settings: &'a OutputSettings, selected_index: Option<usize>) 
     if settings.outputs.is_empty() {
         list = list.push(
             container(
-                text("No outputs configured\nClick + to add one")
-                    .size(13)
-                    .color([0.75, 0.75, 0.75])
-                    .center()
+                container(text("No outputs configured\nClick + to add one").size(13).center())
+                    .style(muted_text_container)
             )
             .padding(20)
             .center(Length::Fill)
@@ -128,22 +117,21 @@ fn output_list<'a>(settings: &'a OutputSettings, selected_index: Option<usize>) 
                     row![
                         text(if selected_index == Some(idx) { "●" } else { "○" })
                             .size(12)
-                            .width(Length::Fixed(20.0))
-                            .color(if selected_index == Some(idx) { [0.5, 0.7, 1.0] } else { [0.5, 0.5, 0.5] }),
+                            .width(Length::Fixed(20.0)),
                         text(display_name)
-                            .size(14)
-                            .color(if selected_index == Some(idx) { [1.0, 1.0, 1.0] } else { [0.8, 0.8, 0.8] }),
+                            .size(14),
                         if let Some(badge_text) = badge {
                             container(
                                 text(badge_text)
                                     .size(11)
-                                    .color([0.9, 0.9, 0.9])
                             )
                             .padding([2, 6])
-                            .style(|_theme| {
+                            .style(|theme: &iced::Theme| {
+                                let primary = theme.palette().primary;
                                 container::Style {
+                                    text_color: Some(theme.palette().text),
                                     background: Some(iced::Background::Color(
-                                        iced::Color::from_rgba(0.3, 0.5, 0.7, 0.3)
+                                        iced::Color { a: 0.3, ..primary }
                                     )),
                                     border: iced::Border {
                                         radius: 3.0.into(),
@@ -162,21 +150,23 @@ fn output_list<'a>(settings: &'a OutputSettings, selected_index: Option<usize>) 
                 .on_press(Message::Outputs(OutputsMessage::SelectOutput(idx)))
                 .padding([8, 12])
                 .width(Length::Fill)
-                .style(move |_theme, status| {
+                .style(move |theme: &iced::Theme, status| {
                     let is_selected = selected_index == Some(idx);
+                    let primary = theme.palette().primary;
+                    let text_color = theme.palette().text;
                     let background = match (is_selected, status) {
-                        (true, button::Status::Hovered) => iced::Color::from_rgba(0.3, 0.4, 0.6, 0.5),
-                        (true, button::Status::Pressed) => iced::Color::from_rgba(0.4, 0.5, 0.7, 0.5),
-                        (true, _) => iced::Color::from_rgba(0.2, 0.3, 0.5, 0.4),
-                        (false, button::Status::Hovered) => iced::Color::from_rgba(0.25, 0.25, 0.25, 0.5),
-                        (false, button::Status::Pressed) => iced::Color::from_rgba(0.3, 0.3, 0.3, 0.5),
+                        (true, button::Status::Hovered) => iced::Color { a: 0.5, ..primary },
+                        (true, button::Status::Pressed) => iced::Color { a: 0.6, ..primary },
+                        (true, _) => iced::Color { a: 0.4, ..primary },
+                        (false, button::Status::Hovered) => iced::Color { a: 0.15, ..text_color },
+                        (false, button::Status::Pressed) => iced::Color { a: 0.2, ..text_color },
                         (false, _) => iced::Color::TRANSPARENT,
                     };
 
                     button::Style {
                         background: Some(iced::Background::Color(background)),
                         border: iced::Border::default(),
-                        text_color: iced::Color::WHITE,
+                        text_color,
                         ..Default::default()
                     }
                 })
@@ -190,9 +180,8 @@ fn output_list<'a>(settings: &'a OutputSettings, selected_index: Option<usize>) 
 /// Empty detail view shown when no output is selected
 fn empty_detail_view() -> Element<'static, Message> {
     container(
-        text("Select an output to configure")
-            .size(16)
-            .color([0.75, 0.75, 0.75])
+        container(text("Select an output to configure").size(16))
+            .style(muted_text_container)
     )
     .center(Length::Fill)
     .into()
@@ -252,7 +241,7 @@ fn mode_row<'a>(idx: usize, current_mode: &'a str, available_modes: &[ModeOption
             ]
             .spacing(12)
             .align_y(Alignment::Center),
-            text("Resolution and refresh rate").size(12).color([0.75, 0.75, 0.75]),
+            container(text("Resolution and refresh rate").size(12)).style(muted_text_container),
         ]
         .spacing(4)
         .into()
@@ -283,7 +272,7 @@ fn output_detail_view<'a>(
         row![
             column![
                 text("Output name").size(16),
-                text("Display identifier (e.g., HDMI-1, eDP-1)").size(12).color([0.7, 0.7, 0.7]),
+                container(text("Display identifier (e.g., HDMI-1, eDP-1)").size(12)).style(muted_text_container),
                 text_input("", &output.name)
                     .on_input(move |name| Message::Outputs(OutputsMessage::SetOutputName(idx, name)))
                     .padding(8),
@@ -293,18 +282,7 @@ fn output_detail_view<'a>(
             button(text("Delete").size(14))
                 .on_press(Message::Outputs(OutputsMessage::RemoveOutput(idx)))
                 .padding([8, 16])
-                .style(|_theme, status| {
-                    let bg = match status {
-                        button::Status::Hovered => iced::Color::from_rgba(0.8, 0.2, 0.2, 0.6),
-                        button::Status::Pressed => iced::Color::from_rgba(0.9, 0.3, 0.3, 0.7),
-                        _ => iced::Color::from_rgba(0.7, 0.2, 0.2, 0.5),
-                    };
-                    button::Style {
-                        background: Some(iced::Background::Color(bg)),
-                        text_color: iced::Color::WHITE,
-                        ..Default::default()
-                    }
-                }),
+                .style(delete_button_style),
         ]
         .spacing(20)
         .align_y(Alignment::Center),
@@ -412,9 +390,7 @@ fn output_detail_view<'a>(
         } else {
             column![
                 info_text("Configure which corners trigger overview mode on this output"),
-                text("Hot corners not configured for this output")
-                    .size(13)
-                    .color([0.75, 0.75, 0.75]),
+                container(text("Hot corners not configured for this output").size(13)).style(muted_text_container),
                 button(text("Enable Hot Corners").size(14))
                     .on_press(Message::Outputs(OutputsMessage::SetHotCornersEnabled(idx, Some(true))))
                     .padding([8, 16]),
@@ -459,4 +435,34 @@ fn output_detail_view<'a>(
     ));
 
     scrollable(content).height(Length::Fill).into()
+}
+
+/// Style for delete buttons - uses theme danger color
+fn delete_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {
+    let danger = theme.palette().danger;
+    let bg = match status {
+        button::Status::Hovered => iced::Color { a: 0.6, ..danger },
+        button::Status::Pressed => iced::Color { a: 0.7, ..danger },
+        _ => iced::Color { a: 0.5, ..danger },
+    };
+    button::Style {
+        background: Some(iced::Background::Color(bg)),
+        text_color: iced::Color::WHITE,
+        ..Default::default()
+    }
+}
+
+/// Style for add buttons - uses theme primary color
+fn add_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {
+    let primary = theme.palette().primary;
+    let bg = match status {
+        button::Status::Hovered => iced::Color { a: 0.5, ..primary },
+        button::Status::Pressed => iced::Color { a: 0.6, ..primary },
+        _ => iced::Color { a: 0.4, ..primary },
+    };
+    button::Style {
+        background: Some(iced::Background::Color(bg)),
+        text_color: iced::Color::WHITE,
+        ..Default::default()
+    }
 }

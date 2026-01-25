@@ -6,7 +6,7 @@ use iced::widget::{button, column, container, row, text, text_input};
 use iced::{Alignment, Border, Color as IcedColor, Element, Length};
 
 use crate::types::Color;
-use crate::theme::fonts;
+use crate::theme::{fonts, muted_text_container};
 
 /// Creates a color picker row with hex input and color preview
 ///
@@ -55,7 +55,7 @@ pub fn color_picker_row<'a, Message: Clone + 'a>(
         // Left side: Label and description
         column![
             text(label).size(16),
-            text(description).size(12).color([0.7, 0.7, 0.7]),
+            container(text(description).size(12)).style(muted_text_container),
         ]
         .spacing(4)
         .width(Length::Fill),
@@ -145,7 +145,7 @@ pub fn color_picker_with_swatches<'a, Message: Clone + 'a>(
             // Left side: Label and description
             column![
                 text(label).size(16),
-                text(description).size(12).color([0.7, 0.7, 0.7]),
+                container(text(description).size(12)).style(muted_text_container),
             ]
             .spacing(4)
             .width(Length::Fill),

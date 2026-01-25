@@ -35,26 +35,27 @@ pub fn expandable_section<'a, Message: Clone + 'a>(
             text(arrow)
                 .size(14)
                 .width(Length::Fixed(20.0)),
+            // Title uses theme's default text color (no .color() call)
             text(title)
-                .size(16)
-                .color([0.9, 0.9, 0.9]),
+                .size(16),
         ]
         .spacing(8)
         .align_y(Alignment::Center)
     )
     .on_press(on_toggle)
     .padding(12)
-    .style(|_theme, status| {
+    .style(|theme: &iced::Theme, status| {
+        let bg_base = theme.palette().background;
         let base_color = match status {
-            button::Status::Hovered => iced::Color::from_rgba(0.3, 0.3, 0.3, 0.5),
-            button::Status::Pressed => iced::Color::from_rgba(0.4, 0.4, 0.4, 0.5),
+            button::Status::Hovered => iced::Color { r: bg_base.r + 0.15, g: bg_base.g + 0.15, b: bg_base.b + 0.15, a: 0.5 },
+            button::Status::Pressed => iced::Color { r: bg_base.r + 0.20, g: bg_base.g + 0.20, b: bg_base.b + 0.20, a: 0.5 },
             _ => iced::Color::TRANSPARENT,
         };
 
         button::Style {
             background: Some(iced::Background::Color(base_color)),
             border: iced::Border::default(),
-            text_color: iced::Color::WHITE,
+            text_color: theme.palette().text,
             ..Default::default()
         }
     });

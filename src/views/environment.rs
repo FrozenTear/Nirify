@@ -8,7 +8,7 @@ use iced::{Alignment, Element, Length};
 use super::widgets::*;
 use crate::config::models::EnvironmentSettings;
 use crate::messages::{EnvironmentMessage, Message};
-use crate::theme::fonts;
+use crate::theme::{fonts, muted_text_container, code_text_container};
 
 /// Creates the environment settings view
 pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
@@ -24,20 +24,18 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
 
     if variables.is_empty() {
         content = content.push(
-            container(
-                column![
-                    text("No environment variables configured")
-                        .size(14)
-                        .color([0.75, 0.75, 0.75]),
-                    spacer(8.0),
-                    text("Click the button below to add your first variable")
-                        .size(13)
-                        .color([0.5, 0.5, 0.5]),
-                ]
-                .align_x(Alignment::Center)
-            )
-            .padding(24)
-            .center(Length::Fill)
+            card(column![
+                container(
+                    column![
+                        container(text("No environment variables configured").size(14)).style(muted_text_container),
+                        spacer(8.0),
+                        container(text("Click the button below to add your first variable").size(13)).style(muted_text_container),
+                    ]
+                    .align_x(Alignment::Center)
+                )
+                .padding(24)
+                .center(Length::Fill)
+            ].width(Length::Fill))
         );
     } else {
         content = content.push(subsection_header("Configured Variables"));
@@ -48,54 +46,39 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
             let var_value = var.value.clone();
 
             content = content.push(
-                container(
-                    column![
-                        row![
-                            text(format!("Variable #{}", var_id)).size(12).color([0.5, 0.5, 0.5]).width(Length::Fill),
-                            button(text("Delete").size(12))
-                                .on_press(Message::Environment(EnvironmentMessage::RemoveVariable(var_id)))
-                                .padding([4, 12])
-                                .style(delete_button_style),
-                        ]
-                        .spacing(8)
-                        .align_y(Alignment::Center),
-                        row![
-                            column![
-                                text("Name").size(12).color([0.75, 0.75, 0.75]),
-                                text_input("VARIABLE_NAME", &var_name)
-                                    .on_input(move |s| Message::Environment(EnvironmentMessage::SetVariableName(var_id, s)))
-                                    .padding(8)
-                                    .font(fonts::MONO_FONT)
-                                    .width(Length::Fixed(200.0)),
-                            ]
-                            .spacing(4),
-                            column![
-                                text("Value").size(12).color([0.75, 0.75, 0.75]),
-                                text_input("value", &var_value)
-                                    .on_input(move |s| Message::Environment(EnvironmentMessage::SetVariableValue(var_id, s)))
-                                    .padding(8)
-                                    .font(fonts::MONO_FONT)
-                                    .width(Length::Fill),
-                            ]
-                            .spacing(4)
-                            .width(Length::Fill),
-                        ]
-                        .spacing(16),
+                card(column![
+                    row![
+                        container(text(format!("Variable #{}", var_id)).size(12)).style(muted_text_container).width(Length::Fill),
+                        button(text("Delete").size(12))
+                            .on_press(Message::Environment(EnvironmentMessage::RemoveVariable(var_id)))
+                            .padding([4, 12])
+                            .style(delete_button_style),
                     ]
                     .spacing(8)
-                )
-                .padding(12)
-                .style(|_theme| {
-                    container::Style {
-                        background: Some(iced::Background::Color(iced::Color::from_rgba(0.15, 0.15, 0.15, 0.4))),
-                        border: iced::Border {
-                            color: iced::Color::from_rgba(0.3, 0.3, 0.3, 0.5),
-                            width: 1.0,
-                            radius: 6.0.into(),
-                        },
-                        ..Default::default()
-                    }
-                })
+                    .align_y(Alignment::Center),
+                    row![
+                        column![
+                            container(text("Name").size(12)).style(muted_text_container),
+                            text_input("VARIABLE_NAME", &var_name)
+                                .on_input(move |s| Message::Environment(EnvironmentMessage::SetVariableName(var_id, s)))
+                                .padding(8)
+                                .font(fonts::MONO_FONT)
+                                .width(Length::Fixed(200.0)),
+                        ]
+                        .spacing(4),
+                        column![
+                            container(text("Value").size(12)).style(muted_text_container),
+                            text_input("value", &var_value)
+                                .on_input(move |s| Message::Environment(EnvironmentMessage::SetVariableValue(var_id, s)))
+                                .padding(8)
+                                .font(fonts::MONO_FONT)
+                                .width(Length::Fill),
+                        ]
+                        .spacing(4)
+                        .width(Length::Fill),
+                    ]
+                    .spacing(16),
+                ].spacing(8).padding(12).width(Length::Fill))
             );
             content = content.push(spacer(4.0));
         }
@@ -118,16 +101,18 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
     );
 
     content = content.push(subsection_header("Common Variables"));
-    content = content.push(info_text("Examples of commonly used environment variables:"));
-    content = content.push(spacer(4.0));
-    content = content.push(text("DISPLAY").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
-    content = content.push(text("  X11 display (e.g., \":0\")").size(12).color([0.75, 0.75, 0.75]));
-    content = content.push(text("WAYLAND_DISPLAY").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
-    content = content.push(text("  Wayland display socket (e.g., \"wayland-1\")").size(12).color([0.75, 0.75, 0.75]));
-    content = content.push(text("XDG_CURRENT_DESKTOP").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
-    content = content.push(text("  Desktop environment name (e.g., \"niri\")").size(12).color([0.75, 0.75, 0.75]));
-    content = content.push(text("GTK_THEME").size(13).font(fonts::MONO_FONT).color([0.7, 0.85, 0.7]));
-    content = content.push(text("  GTK theme name (e.g., \"Adwaita:dark\")").size(12).color([0.75, 0.75, 0.75]));
+    content = content.push(card(column![
+        info_text("Examples of commonly used environment variables:"),
+        spacer(4.0),
+        container(text("DISPLAY").size(13).font(fonts::MONO_FONT)).style(code_text_container),
+        container(text("  X11 display (e.g., \":0\")").size(12)).style(muted_text_container),
+        container(text("WAYLAND_DISPLAY").size(13).font(fonts::MONO_FONT)).style(code_text_container),
+        container(text("  Wayland display socket (e.g., \"wayland-1\")").size(12)).style(muted_text_container),
+        container(text("XDG_CURRENT_DESKTOP").size(13).font(fonts::MONO_FONT)).style(code_text_container),
+        container(text("  Desktop environment name (e.g., \"niri\")").size(12)).style(muted_text_container),
+        container(text("GTK_THEME").size(13).font(fonts::MONO_FONT)).style(code_text_container),
+        container(text("  GTK theme name (e.g., \"Adwaita:dark\")").size(12)).style(muted_text_container),
+    ].spacing(4).padding(12).width(Length::Fill)));
     content = content.push(spacer(32.0));
 
     scrollable(container(content).padding(20).width(iced::Length::Fill))
@@ -135,25 +120,27 @@ pub fn view(settings: &EnvironmentSettings) -> Element<'static, Message> {
         .into()
 }
 
-/// Style for delete buttons
-fn delete_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+/// Style for delete buttons - uses theme danger color
+fn delete_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {
+    let danger = theme.palette().danger;
     let bg = match status {
-        button::Status::Hovered => iced::Color::from_rgba(0.6, 0.2, 0.2, 0.5),
+        button::Status::Hovered => iced::Color { a: 0.3, ..danger },
         _ => iced::Color::TRANSPARENT,
     };
     button::Style {
         background: Some(iced::Background::Color(bg)),
-        text_color: iced::Color::from_rgb(0.8, 0.4, 0.4),
+        text_color: danger,
         ..Default::default()
     }
 }
 
-/// Style for add buttons
-fn add_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+/// Style for add buttons - uses theme primary color
+fn add_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {
+    let primary = theme.palette().primary;
     let bg = match status {
-        button::Status::Hovered => iced::Color::from_rgba(0.3, 0.5, 0.7, 0.5),
-        button::Status::Pressed => iced::Color::from_rgba(0.4, 0.6, 0.8, 0.5),
-        _ => iced::Color::from_rgba(0.2, 0.4, 0.6, 0.4),
+        button::Status::Hovered => iced::Color { a: 0.5, ..primary },
+        button::Status::Pressed => iced::Color { a: 0.6, ..primary },
+        _ => iced::Color { a: 0.4, ..primary },
     };
     button::Style {
         background: Some(iced::Background::Color(bg)),

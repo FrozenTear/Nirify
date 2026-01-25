@@ -52,122 +52,132 @@ pub fn view(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
             "Configure window shadows, tab indicators, insert hints, and preset sizes."
         ),
         subsection_header("Window Shadow"),
-        toggle_row(
-            "Enable shadow",
-            "Show shadow behind windows",
-            shadow_enabled,
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowEnabled(value)),
-        ),
-        toggle_row(
-            "Draw behind window",
-            "Draw shadow underneath the window (for transparency)",
-            shadow_draw_behind,
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowDrawBehindWindow(value)),
-        ),
-        slider_row_int(
-            "Softness",
-            "Shadow blur/softness amount",
-            shadow_softness,
-            0,
-            100,
-            " px",
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowSoftness(value)),
-        ),
-        slider_row_int(
-            "Spread",
-            "Shadow expansion amount",
-            shadow_spread,
-            0,
-            100,
-            " px",
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowSpread(value)),
-        ),
-        slider_row_int(
-            "Offset X",
-            "Horizontal shadow offset",
-            shadow_offset_x,
-            -100,
-            100,
-            " px",
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowOffsetX(value)),
-        ),
-        slider_row_int(
-            "Offset Y",
-            "Vertical shadow offset",
-            shadow_offset_y,
-            -100,
-            100,
-            " px",
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowOffsetY(value)),
-        ),
-        color_row("Active color", &shadow_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetShadowColor(s))),
-        color_row("Inactive color", &shadow_inactive_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetShadowInactiveColor(s))),
+        card(column![
+            toggle_row(
+                "Enable shadow",
+                "Show shadow behind windows",
+                shadow_enabled,
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowEnabled(value)),
+            ),
+            toggle_row(
+                "Draw behind window",
+                "Draw shadow underneath the window (for transparency)",
+                shadow_draw_behind,
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowDrawBehindWindow(value)),
+            ),
+            slider_row_int(
+                "Softness",
+                "Shadow blur/softness amount",
+                shadow_softness,
+                0,
+                100,
+                " px",
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowSoftness(value)),
+            ),
+            slider_row_int(
+                "Spread",
+                "Shadow expansion amount",
+                shadow_spread,
+                0,
+                100,
+                " px",
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowSpread(value)),
+            ),
+            slider_row_int(
+                "Offset X",
+                "Horizontal shadow offset",
+                shadow_offset_x,
+                -100,
+                100,
+                " px",
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowOffsetX(value)),
+            ),
+            slider_row_int(
+                "Offset Y",
+                "Vertical shadow offset",
+                shadow_offset_y,
+                -100,
+                100,
+                " px",
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetShadowOffsetY(value)),
+            ),
+            color_row("Active color", &shadow_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetShadowColor(s))),
+            color_row("Inactive color", &shadow_inactive_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetShadowInactiveColor(s))),
+        ].spacing(0).width(Length::Fill)),
         subsection_header("Tab Indicator"),
         info_text("Visual indicator for tabbed windows."),
-        toggle_row(
-            "Enable tab indicator",
-            "Show indicator for tabbed windows",
-            tab_enabled,
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorEnabled(value)),
-        ),
-        toggle_row(
-            "Hide when single tab",
-            "Don't show indicator when only one tab",
-            tab_hide_single,
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorHideWhenSingleTab(value)),
-        ),
-        toggle_row(
-            "Place within column",
-            "Position indicator inside the column",
-            tab_within_column,
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorPlaceWithinColumn(value)),
-        ),
-        slider_row_int("Gap", "Distance from window", tab_gap, 0, 50, " px",
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorGap(value))),
-        slider_row_int("Width", "Indicator thickness", tab_width, 1, 50, " px",
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorWidth(value))),
-        slider_row_int("Length", "Indicator length (% of window)", tab_length, 10, 100, "%",
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorLengthProportion(value as f32 / 100.0))),
-        slider_row_int("Corner radius", "Rounded corners", tab_corner_radius, 0, 50, " px",
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorCornerRadius(value))),
-        slider_row_int("Gaps between tabs", "Space between tab indicators", tab_gaps_between, 0, 50, " px",
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorGapsBetweenTabs(value))),
-        row![
-            text("Position").size(14).width(Length::Fixed(200.0)),
-            pick_list(
-                vec![TabIndicatorPosition::Left, TabIndicatorPosition::Right, TabIndicatorPosition::Top, TabIndicatorPosition::Bottom],
-                Some(tab_position),
-                |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorPosition(value)),
-            )
-            .width(Length::Fixed(150.0)),
-        ]
-        .spacing(16)
-        .align_y(Alignment::Center),
-        color_row("Active color", &tab_active_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorActiveColor(s))),
-        color_row("Inactive color", &tab_inactive_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorInactiveColor(s))),
-        color_row("Urgent color", &tab_urgent_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorUrgentColor(s))),
+        card(column![
+            toggle_row(
+                "Enable tab indicator",
+                "Show indicator for tabbed windows",
+                tab_enabled,
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorEnabled(value)),
+            ),
+            toggle_row(
+                "Hide when single tab",
+                "Don't show indicator when only one tab",
+                tab_hide_single,
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorHideWhenSingleTab(value)),
+            ),
+            toggle_row(
+                "Place within column",
+                "Position indicator inside the column",
+                tab_within_column,
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorPlaceWithinColumn(value)),
+            ),
+            slider_row_int("Gap", "Distance from window", tab_gap, 0, 50, " px",
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorGap(value))),
+            slider_row_int("Width", "Indicator thickness", tab_width, 1, 50, " px",
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorWidth(value))),
+            slider_row_int("Length", "Indicator length (% of window)", tab_length, 10, 100, "%",
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorLengthProportion(value as f32 / 100.0))),
+            slider_row_int("Corner radius", "Rounded corners", tab_corner_radius, 0, 50, " px",
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorCornerRadius(value))),
+            slider_row_int("Gaps between tabs", "Space between tab indicators", tab_gaps_between, 0, 50, " px",
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorGapsBetweenTabs(value))),
+            row![
+                text("Position").size(14).width(Length::Fixed(200.0)),
+                pick_list(
+                    vec![TabIndicatorPosition::Left, TabIndicatorPosition::Right, TabIndicatorPosition::Top, TabIndicatorPosition::Bottom],
+                    Some(tab_position),
+                    |value| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorPosition(value)),
+                )
+                .width(Length::Fixed(150.0)),
+            ]
+            .spacing(16)
+            .align_y(Alignment::Center)
+            .padding(12),
+            color_row("Active color", &tab_active_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorActiveColor(s))),
+            color_row("Inactive color", &tab_inactive_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorInactiveColor(s))),
+            color_row("Urgent color", &tab_urgent_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorUrgentColor(s))),
+        ].spacing(0).width(Length::Fill)),
         subsection_header("Insert Hint"),
         info_text("Visual feedback when inserting windows."),
-        toggle_row(
-            "Enable insert hint",
-            "Show visual hint when inserting windows",
-            hint_enabled,
-            |value| Message::LayoutExtras(LayoutExtrasMessage::SetInsertHintEnabled(value)),
-        ),
-        color_row("Hint color", &hint_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetInsertHintColor(s))),
+        card(column![
+            toggle_row(
+                "Enable insert hint",
+                "Show visual hint when inserting windows",
+                hint_enabled,
+                |value| Message::LayoutExtras(LayoutExtrasMessage::SetInsertHintEnabled(value)),
+            ),
+            color_row("Hint color", &hint_color, |s| Message::LayoutExtras(LayoutExtrasMessage::SetInsertHintColor(s))),
+        ].spacing(0).width(Length::Fill)),
         subsection_header("Default Column Display"),
         info_text("How new columns display windows by default."),
-        row![
-            text("Display mode").size(14).width(Length::Fixed(200.0)),
-            pick_list(
-                vec![DefaultColumnDisplay::Normal, DefaultColumnDisplay::Tabbed],
-                Some(default_display),
-                |value| Message::LayoutExtras(LayoutExtrasMessage::SetDefaultColumnDisplay(value)),
-            )
-            .width(Length::Fixed(150.0)),
-        ]
-        .spacing(16)
-        .align_y(Alignment::Center),
+        card(column![
+            row![
+                text("Display mode").size(14).width(Length::Fixed(200.0)),
+                pick_list(
+                    vec![DefaultColumnDisplay::Normal, DefaultColumnDisplay::Tabbed],
+                    Some(default_display),
+                    |value| Message::LayoutExtras(LayoutExtrasMessage::SetDefaultColumnDisplay(value)),
+                )
+                .width(Length::Fixed(150.0)),
+            ]
+            .spacing(16)
+            .align_y(Alignment::Center)
+            .padding(12),
+        ].spacing(0).width(Length::Fill)),
         spacer(32.0),
     ]
     .spacing(4);
@@ -199,11 +209,15 @@ where
         container(text("").size(14))
             .width(24)
             .height(24)
-            .style(move |_theme| {
+            .style(move |theme: &iced::Theme| {
+                let border_color = {
+                    let text = theme.palette().text;
+                    iced::Color { a: 0.3, ..text }
+                };
                 container::Style {
                     background: Some(iced::Background::Color(parsed_color)),
                     border: iced::Border {
-                        color: iced::Color::from_rgba(0.5, 0.5, 0.5, 0.5),
+                        color: border_color,
                         width: 1.0,
                         radius: 4.0.into(),
                     },
@@ -218,5 +232,6 @@ where
     ]
     .spacing(12)
     .align_y(Alignment::Center)
+    .padding(12)
     .into()
 }

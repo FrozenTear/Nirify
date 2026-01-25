@@ -7,6 +7,7 @@ use iced::widget::{button, column, container, row, text};
 use iced::{Alignment, Border, Color as IcedColor, Element, Length};
 
 use crate::types::{Color, ColorOrGradient, ColorSpace, Gradient, GradientRelativeTo, HueInterpolation};
+use crate::theme::muted_text_container;
 use super::color_picker::color_picker_row;
 use super::setting_row::{info_text, picker_row, section_header, slider_row_int, spacer};
 
@@ -78,13 +79,22 @@ pub fn gradient_picker<'a, Message: Clone + 'a>(
 
     container(content)
         .padding(12)
-        .style(|_theme| container::Style {
-            border: Border {
-                color: IcedColor::from_rgb(0.3, 0.3, 0.3),
-                width: 1.0,
-                radius: 8.0.into(),
-            },
-            ..Default::default()
+        .style(|theme: &iced::Theme| {
+            let bg = theme.palette().background;
+            let border_color = IcedColor {
+                r: bg.r + 0.15,
+                g: bg.g + 0.15,
+                b: bg.b + 0.15,
+                a: 1.0,
+            };
+            container::Style {
+                border: Border {
+                    color: border_color,
+                    width: 1.0,
+                    radius: 8.0.into(),
+                },
+                ..Default::default()
+            }
         })
         .into()
 }
@@ -182,31 +192,39 @@ fn gradient_preview<'a, Message: 'a>(from: &Color, to: &Color) -> Element<'a, Me
     let from_box = container(text(""))
         .width(Length::Fill)
         .height(Length::Fixed(40.0))
-        .style(move |_theme| container::Style {
-            background: Some(iced::Background::Color(from_iced)),
-            border: Border {
-                color: IcedColor::from_rgb(0.3, 0.3, 0.3),
-                width: 1.0,
-                radius: 4.0.into(),
-            },
-            ..Default::default()
+        .style(move |theme: &iced::Theme| {
+            let bg = theme.palette().background;
+            let border_color = IcedColor { r: bg.r + 0.15, g: bg.g + 0.15, b: bg.b + 0.15, a: 1.0 };
+            container::Style {
+                background: Some(iced::Background::Color(from_iced)),
+                border: Border {
+                    color: border_color,
+                    width: 1.0,
+                    radius: 4.0.into(),
+                },
+                ..Default::default()
+            }
         });
 
     let to_box = container(text(""))
         .width(Length::Fill)
         .height(Length::Fixed(40.0))
-        .style(move |_theme| container::Style {
-            background: Some(iced::Background::Color(to_iced)),
-            border: Border {
-                color: IcedColor::from_rgb(0.3, 0.3, 0.3),
-                width: 1.0,
-                radius: 4.0.into(),
-            },
-            ..Default::default()
+        .style(move |theme: &iced::Theme| {
+            let bg = theme.palette().background;
+            let border_color = IcedColor { r: bg.r + 0.15, g: bg.g + 0.15, b: bg.b + 0.15, a: 1.0 };
+            container::Style {
+                background: Some(iced::Background::Color(to_iced)),
+                border: Border {
+                    color: border_color,
+                    width: 1.0,
+                    radius: 4.0.into(),
+                },
+                ..Default::default()
+            }
         });
 
     column![
-        text("Gradient Preview (From → To)").size(13).color([0.7, 0.7, 0.7]),
+        container(text("Gradient Preview (From → To)").size(13)).style(muted_text_container),
         row![from_box, to_box].spacing(0),
     ]
     .spacing(4)

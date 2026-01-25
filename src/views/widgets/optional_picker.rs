@@ -5,8 +5,10 @@
 //! - Some(true): "True" / "Enabled" / "Yes"
 //! - Some(false): "False" / "Disabled" / "No"
 
-use iced::widget::{column, pick_list, row, text};
+use iced::widget::{column, container, pick_list, row, text};
 use iced::{Alignment, Element, Length};
+
+use crate::theme::muted_text_container;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OptionalBool {
@@ -73,7 +75,7 @@ pub fn optional_bool_picker<'a, Message: Clone + 'a>(
         // Left side: Label and description
         column![
             text(label).size(16),
-            text(description).size(12).color([0.7, 0.7, 0.7]),
+            container(text(description).size(12)).style(muted_text_container),
         ]
         .spacing(4)
         .width(Length::Fill),

@@ -8,7 +8,7 @@ use iced::{Element, Length};
 use super::widgets::*;
 use crate::config::models::{MiscSettings, XWaylandSatelliteConfig};
 use crate::messages::{Message, MiscellaneousMessage};
-use crate::theme::fonts;
+use crate::theme::{fonts, muted_text_container};
 
 /// Creates the miscellaneous settings view
 pub fn view(settings: &MiscSettings) -> Element<'static, Message> {
@@ -35,72 +35,85 @@ pub fn view(settings: &MiscSettings) -> Element<'static, Message> {
 
         // Window Decorations
         subsection_header("Window Decorations"),
-        toggle_row(
-            "Prefer No Client-Side Decorations",
-            "Ask applications to use server-side (compositor) decorations when possible",
-            prefer_no_csd,
-            |v| Message::Miscellaneous(MiscellaneousMessage::SetPreferNoCsd(v)),
-        ),
+        card(column![
+            toggle_row(
+                "Prefer No Client-Side Decorations",
+                "Ask applications to use server-side (compositor) decorations when possible",
+                prefer_no_csd,
+                |v| Message::Miscellaneous(MiscellaneousMessage::SetPreferNoCsd(v)),
+            ),
+        ].spacing(0).width(Length::Fill)),
 
         // Screenshots
         subsection_header("Screenshots"),
-        // Custom text input row for screenshot path (owned string)
-        column![
-            text("Screenshot Path").size(16),
-            text("Path pattern for saved screenshots. Supports strftime format codes.").size(12).color([0.7, 0.7, 0.7]),
-            text_input("~/Pictures/Screenshots/%Y-%m-%d_%H-%M-%S.png", &screenshot_path)
-                .on_input(|s| Message::Miscellaneous(MiscellaneousMessage::SetScreenshotPath(s)))
-                .padding(8)
-                .font(fonts::MONO_FONT),
-        ]
-        .spacing(6)
-        .padding(12),
+        card(column![
+            column![
+                text("Screenshot Path").size(16),
+                container(text("Path pattern for saved screenshots. Supports strftime format codes.").size(12)).style(muted_text_container),
+                text_input("~/Pictures/Screenshots/%Y-%m-%d_%H-%M-%S.png", &screenshot_path)
+                    .on_input(|s| Message::Miscellaneous(MiscellaneousMessage::SetScreenshotPath(s)))
+                    .padding(8)
+                    .font(fonts::MONO_FONT),
+            ]
+            .spacing(6)
+            .padding(12),
+        ].spacing(0).width(Length::Fill)),
 
         // Clipboard
         subsection_header("Clipboard"),
-        toggle_row(
-            "Disable Primary Clipboard",
-            "Disable the middle-click paste (primary selection) clipboard",
-            disable_clipboard,
-            |v| Message::Miscellaneous(MiscellaneousMessage::SetDisablePrimaryClipboard(v)),
-        ),
+        card(column![
+            toggle_row(
+                "Disable Primary Clipboard",
+                "Disable the middle-click paste (primary selection) clipboard",
+                disable_clipboard,
+                |v| Message::Miscellaneous(MiscellaneousMessage::SetDisablePrimaryClipboard(v)),
+            ),
+        ].spacing(0).width(Length::Fill)),
 
         // Hotkey Overlay
         subsection_header("Hotkey Overlay"),
-        toggle_row(
-            "Skip at Startup",
-            "Don't show the hotkey overlay when niri starts",
-            hotkey_skip,
-            |v| Message::Miscellaneous(MiscellaneousMessage::SetHotkeyOverlaySkipAtStartup(v)),
-        ),
-        toggle_row(
-            "Hide Unbound Actions",
-            "Hide actions that don't have a keybinding assigned",
-            hotkey_hide,
-            |v| Message::Miscellaneous(MiscellaneousMessage::SetHotkeyOverlayHideNotBound(v)),
-        ),
+        card(column![
+            toggle_row(
+                "Skip at Startup",
+                "Don't show the hotkey overlay when niri starts",
+                hotkey_skip,
+                |v| Message::Miscellaneous(MiscellaneousMessage::SetHotkeyOverlaySkipAtStartup(v)),
+            ),
+            toggle_row(
+                "Hide Unbound Actions",
+                "Hide actions that don't have a keybinding assigned",
+                hotkey_hide,
+                |v| Message::Miscellaneous(MiscellaneousMessage::SetHotkeyOverlayHideNotBound(v)),
+            ),
+        ].spacing(0).width(Length::Fill)),
 
         // Startup Behavior
         subsection_header("Startup Behavior"),
-        toggle_row(
-            "Spawn Through Shell at Startup",
-            "Execute startup commands through the shell (enables shell features like ~)",
-            spawn_sh,
-            |v| Message::Miscellaneous(MiscellaneousMessage::SetSpawnShAtStartup(v)),
-        ),
+        card(column![
+            toggle_row(
+                "Spawn Through Shell at Startup",
+                "Execute startup commands through the shell (enables shell features like ~)",
+                spawn_sh,
+                |v| Message::Miscellaneous(MiscellaneousMessage::SetSpawnShAtStartup(v)),
+            ),
+        ].spacing(0).width(Length::Fill)),
 
         // Notifications
         subsection_header("Notifications"),
-        toggle_row(
-            "Disable Config Parse Failed Notification",
-            "Don't show notification when config parsing fails",
-            config_disable,
-            |v| Message::Miscellaneous(MiscellaneousMessage::SetConfigNotificationDisableFailed(v)),
-        ),
+        card(column![
+            toggle_row(
+                "Disable Config Parse Failed Notification",
+                "Don't show notification when config parsing fails",
+                config_disable,
+                |v| Message::Miscellaneous(MiscellaneousMessage::SetConfigNotificationDisableFailed(v)),
+            ),
+        ].spacing(0).width(Length::Fill)),
 
         // XWayland
         subsection_header("XWayland"),
-        xwayland_setting(&xwayland, xwayland_options),
+        card(column![
+            xwayland_setting(&xwayland, xwayland_options),
+        ].spacing(0).width(Length::Fill)),
 
         spacer(32.0),
     ]
@@ -132,7 +145,7 @@ fn xwayland_setting(current: &XWaylandSatelliteConfig, options: Vec<XWaylandSate
         row![
             column![
                 text("XWayland Satellite").size(16),
-                text("Configuration for xwayland-satellite (X11 compatibility layer)").size(12).color([0.7, 0.7, 0.7]),
+                container(text("Configuration for xwayland-satellite (X11 compatibility layer)").size(12)).style(muted_text_container),
             ]
             .spacing(4)
             .width(Length::Fill),

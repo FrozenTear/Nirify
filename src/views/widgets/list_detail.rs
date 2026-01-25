@@ -6,6 +6,8 @@
 use iced::widget::{button, column, container, row, text};
 use iced::{Alignment, Element, Length};
 
+use crate::theme::muted_text_container;
+
 /// Creates the standard list-detail two-panel layout.
 ///
 /// Layout: 1:2 ratio (list panel : detail panel)
@@ -28,11 +30,18 @@ pub fn list_detail_layout<'a, M: 'a>(
 }
 
 /// Standard style for the list panel container (dark background).
-pub fn list_panel_style(_theme: &iced::Theme) -> container::Style {
+/// Uses theme background with slight darkening for depth.
+pub fn list_panel_style(theme: &iced::Theme) -> container::Style {
+    let bg = theme.palette().background;
+    // Darken the background slightly for the list panel
+    let darkened = iced::Color {
+        r: bg.r * 0.85,
+        g: bg.g * 0.85,
+        b: bg.b * 0.85,
+        a: 0.5,
+    };
     container::Style {
-        background: Some(iced::Background::Color(iced::Color::from_rgba(
-            0.1, 0.1, 0.1, 0.5,
-        ))),
+        background: Some(iced::Background::Color(darkened)),
         ..Default::default()
     }
 }
@@ -62,15 +71,17 @@ pub fn add_button<'a, M: Clone + 'a>(on_press: M) -> Element<'a, M> {
 }
 
 /// Style function for the add button.
-pub fn add_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+/// Uses theme's primary color for a consistent accent.
+pub fn add_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {
+    let primary = theme.palette().primary;
     let bg = match status {
-        button::Status::Hovered => iced::Color::from_rgba(0.3, 0.5, 0.7, 0.5),
-        button::Status::Pressed => iced::Color::from_rgba(0.4, 0.6, 0.8, 0.5),
-        _ => iced::Color::from_rgba(0.2, 0.4, 0.6, 0.4),
+        button::Status::Hovered => iced::Color { a: 0.6, ..primary },
+        button::Status::Pressed => iced::Color { a: 0.7, ..primary },
+        _ => iced::Color { a: 0.5, ..primary },
     };
     button::Style {
         background: Some(iced::Background::Color(bg)),
-        text_color: iced::Color::WHITE,
+        text_color: theme.palette().text,
         border: iced::Border {
             radius: 4.0.into(),
             ..Default::default()
@@ -92,15 +103,17 @@ pub fn action_button<'a, M: Clone + 'a>(
 }
 
 /// Style function for neutral action buttons.
-pub fn action_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+/// Uses theme background colors for subtle appearance.
+pub fn action_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg_base = theme.palette().background;
     let bg = match status {
-        button::Status::Hovered => iced::Color::from_rgba(0.3, 0.4, 0.5, 0.5),
-        button::Status::Pressed => iced::Color::from_rgba(0.4, 0.5, 0.6, 0.5),
-        _ => iced::Color::from_rgba(0.25, 0.3, 0.35, 0.4),
+        button::Status::Hovered => iced::Color { r: bg_base.r + 0.15, g: bg_base.g + 0.15, b: bg_base.b + 0.15, a: 0.5 },
+        button::Status::Pressed => iced::Color { r: bg_base.r + 0.20, g: bg_base.g + 0.20, b: bg_base.b + 0.20, a: 0.5 },
+        _ => iced::Color { r: bg_base.r + 0.10, g: bg_base.g + 0.10, b: bg_base.b + 0.10, a: 0.4 },
     };
     button::Style {
         background: Some(iced::Background::Color(bg)),
-        text_color: iced::Color::WHITE,
+        text_color: theme.palette().text,
         border: iced::Border {
             radius: 4.0.into(),
             ..Default::default()
@@ -119,15 +132,17 @@ pub fn delete_button<'a, M: Clone + 'a>(on_press: M) -> Element<'a, M> {
 }
 
 /// Style function for delete buttons.
-pub fn delete_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+/// Uses theme's danger color for warning appearance.
+pub fn delete_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {
+    let danger = theme.palette().danger;
     let bg = match status {
-        button::Status::Hovered => iced::Color::from_rgba(0.7, 0.2, 0.2, 0.6),
-        button::Status::Pressed => iced::Color::from_rgba(0.8, 0.3, 0.3, 0.7),
-        _ => iced::Color::from_rgba(0.6, 0.2, 0.2, 0.5),
+        button::Status::Hovered => iced::Color { a: 0.6, ..danger },
+        button::Status::Pressed => iced::Color { a: 0.7, ..danger },
+        _ => iced::Color { a: 0.5, ..danger },
     };
     button::Style {
         background: Some(iced::Background::Color(bg)),
-        text_color: iced::Color::WHITE,
+        text_color: theme.palette().text,
         border: iced::Border {
             radius: 4.0.into(),
             ..Default::default()
@@ -146,48 +161,52 @@ pub fn remove_button<'a, M: Clone + 'a>(on_press: M) -> Element<'a, M> {
 }
 
 /// Style function for remove buttons.
-pub fn remove_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+/// Uses theme's danger color for text.
+pub fn remove_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {
+    let danger = theme.palette().danger;
     let bg = match status {
-        button::Status::Hovered => iced::Color::from_rgba(0.6, 0.2, 0.2, 0.5),
+        button::Status::Hovered => iced::Color { a: 0.5, ..danger },
         _ => iced::Color::TRANSPARENT,
     };
     button::Style {
         background: Some(iced::Background::Color(bg)),
-        text_color: iced::Color::from_rgb(0.8, 0.4, 0.4),
+        text_color: iced::Color { a: 0.8, ..danger },
         ..Default::default()
     }
 }
 
 /// Style function for list item buttons (selection-aware).
+/// Uses theme's primary color for selected state.
 pub fn list_item_style(is_selected: bool) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
-    move |_theme, status| {
+    move |theme, status| {
+        let primary = theme.palette().primary;
+        let bg_base = theme.palette().background;
+
         let background = match (is_selected, status) {
-            (true, button::Status::Hovered) => iced::Color::from_rgba(0.3, 0.4, 0.6, 0.5),
-            (true, button::Status::Pressed) => iced::Color::from_rgba(0.4, 0.5, 0.7, 0.5),
-            (true, _) => iced::Color::from_rgba(0.2, 0.3, 0.5, 0.4),
-            (false, button::Status::Hovered) => iced::Color::from_rgba(0.25, 0.25, 0.25, 0.5),
-            (false, button::Status::Pressed) => iced::Color::from_rgba(0.3, 0.3, 0.3, 0.5),
+            (true, button::Status::Hovered) => iced::Color { a: 0.5, ..primary },
+            (true, button::Status::Pressed) => iced::Color { a: 0.6, ..primary },
+            (true, _) => iced::Color { a: 0.4, ..primary },
+            (false, button::Status::Hovered) => iced::Color { r: bg_base.r + 0.1, g: bg_base.g + 0.1, b: bg_base.b + 0.1, a: 0.5 },
+            (false, button::Status::Pressed) => iced::Color { r: bg_base.r + 0.15, g: bg_base.g + 0.15, b: bg_base.b + 0.15, a: 0.5 },
             (false, _) => iced::Color::TRANSPARENT,
         };
 
         button::Style {
             background: Some(iced::Background::Color(background)),
             border: iced::Border::default(),
-            text_color: iced::Color::WHITE,
+            text_color: theme.palette().text,
             ..Default::default()
         }
     }
 }
 
 /// Creates an empty list placeholder message.
+/// Uses muted text via container style for theme awareness.
 pub fn empty_list_placeholder<'a, M: 'a>(
     message: &'a str,
 ) -> Element<'a, M> {
     container(
-        text(message)
-            .size(13)
-            .color([0.75, 0.75, 0.75])
-            .center(),
+        container(text(message).size(13).center()).style(muted_text_container)
     )
     .padding(20)
     .center(Length::Fill)
@@ -195,19 +214,22 @@ pub fn empty_list_placeholder<'a, M: 'a>(
 }
 
 /// Creates an empty detail view placeholder.
+/// Uses muted text via container style for theme awareness.
 pub fn empty_detail_placeholder<'a, M: 'a>(
     title: &'a str,
     subtitle: &'a str,
 ) -> Element<'a, M> {
     container(
         column![
-            text(title)
-                .size(16)
-                .color([0.75, 0.75, 0.75]),
+            container(text(title).size(16)).style(muted_text_container),
             super::spacer(8.0),
-            text(subtitle)
-                .size(13)
-                .color([0.5, 0.5, 0.5]),
+            container(text(subtitle).size(13)).style(|theme: &iced::Theme| {
+                let txt = theme.palette().text;
+                container::Style {
+                    text_color: Some(iced::Color { a: 0.35, ..txt }),
+                    ..Default::default()
+                }
+            }),
         ]
         .spacing(4)
         .align_x(Alignment::Center),
@@ -217,27 +239,39 @@ pub fn empty_detail_placeholder<'a, M: 'a>(
 }
 
 /// Creates a selection indicator (● or ○).
+/// Uses theme-aware colors via container styling.
 pub fn selection_indicator<'a, M: 'a>(is_selected: bool) -> Element<'a, M> {
-    text(if is_selected { "●" } else { "○" })
-        .size(12)
-        .width(Length::Fixed(20.0))
-        .color(if is_selected {
-            [0.5, 0.7, 1.0]
+    container(
+        text(if is_selected { "●" } else { "○" })
+            .size(12)
+            .width(Length::Fixed(20.0))
+    )
+    .style(move |theme: &iced::Theme| {
+        let color = if is_selected {
+            theme.palette().primary
         } else {
-            [0.5, 0.5, 0.5]
-        })
-        .into()
+            let txt = theme.palette().text;
+            iced::Color { a: 0.5, ..txt }
+        };
+        container::Style {
+            text_color: Some(color),
+            ..Default::default()
+        }
+    })
+    .into()
 }
 
 /// Creates a small badge container (for status indicators like "max", "float", etc.).
+/// Uses theme text color for badge text.
 pub fn badge<'a, M: 'a>(
     label: &'a str,
     color: iced::Color,
 ) -> Element<'a, M> {
-    container(text(label).size(10).color([0.9, 0.9, 0.9]))
+    container(text(label).size(10))
         .padding([2, 6])
-        .style(move |_theme| container::Style {
+        .style(move |theme: &iced::Theme| container::Style {
             background: Some(iced::Background::Color(color)),
+            text_color: Some(theme.palette().text),
             border: iced::Border {
                 radius: 3.0.into(),
                 ..Default::default()
@@ -264,13 +298,25 @@ pub const BADGE_VISIBILITY: iced::Color = iced::Color {
 };
 
 /// Container style for match criteria blocks.
-pub fn match_container_style(_theme: &iced::Theme) -> container::Style {
+/// Uses theme background colors for subtle appearance.
+pub fn match_container_style(theme: &iced::Theme) -> container::Style {
+    let bg = theme.palette().background;
+    let bg_lighter = iced::Color {
+        r: bg.r + 0.05,
+        g: bg.g + 0.05,
+        b: bg.b + 0.05,
+        a: 0.4,
+    };
+    let border_color = iced::Color {
+        r: bg.r + 0.15,
+        g: bg.g + 0.15,
+        b: bg.b + 0.15,
+        a: 0.5,
+    };
     container::Style {
-        background: Some(iced::Background::Color(iced::Color::from_rgba(
-            0.15, 0.15, 0.15, 0.4,
-        ))),
+        background: Some(iced::Background::Color(bg_lighter)),
         border: iced::Border {
-            color: iced::Color::from_rgba(0.3, 0.3, 0.3, 0.5),
+            color: border_color,
             width: 1.0,
             radius: 6.0.into(),
         },
@@ -293,16 +339,19 @@ pub fn add_item_button<'a, M: Clone + 'a>(
 }
 
 /// Style for "Add X" buttons within sections.
-pub fn add_item_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+/// Uses theme colors for consistent appearance.
+pub fn add_item_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {
+    let primary = theme.palette().primary;
+    let bg_base = theme.palette().background;
     let bg = match status {
-        button::Status::Hovered => iced::Color::from_rgba(0.3, 0.4, 0.5, 0.4),
-        _ => iced::Color::from_rgba(0.2, 0.25, 0.3, 0.3),
+        button::Status::Hovered => iced::Color { r: bg_base.r + 0.15, g: bg_base.g + 0.15, b: bg_base.b + 0.15, a: 0.4 },
+        _ => iced::Color { r: bg_base.r + 0.10, g: bg_base.g + 0.10, b: bg_base.b + 0.10, a: 0.3 },
     };
     button::Style {
         background: Some(iced::Background::Color(bg)),
-        text_color: iced::Color::from_rgb(0.7, 0.8, 0.9),
+        text_color: iced::Color { a: 0.9, ..primary },
         border: iced::Border {
-            color: iced::Color::from_rgba(0.4, 0.5, 0.6, 0.3),
+            color: iced::Color { a: 0.3, ..primary },
             width: 1.0,
             radius: 4.0.into(),
         },

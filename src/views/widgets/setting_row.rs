@@ -5,7 +5,7 @@
 
 use iced::widget::{column, container, pick_list, row, slider, text, text_input, toggler};
 use iced::{Alignment, Element, Length};
-use crate::theme::{fonts, card_style, info_block_style, accent_color, NiriColors};
+use crate::theme::{fonts, card_style, info_block_style, accent_color, muted_text_container, disabled_text_container, secondary_text_container};
 
 /// Creates a toggle row with label and description
 ///
@@ -24,12 +24,11 @@ pub fn toggle_row<'a, Message: 'a>(
     value: bool,
     on_toggle: impl Fn(bool) -> Message + 'a,
 ) -> Element<'a, Message> {
-    let colors = NiriColors::default();
     row![
         // Left side: Label and description
         column![
             text(label).size(15).font(fonts::UI_FONT_MEDIUM),
-            text(description).size(11).color(colors.text_tertiary),
+            container(text(description).size(11)).style(muted_text_container),
         ]
         .spacing(2)
         .width(Length::Fill),
@@ -67,19 +66,19 @@ pub fn slider_row<'a, Message: Clone + 'a>(
     unit: &'a str,
     on_change: impl Fn(f32) -> Message + 'a,
 ) -> Element<'a, Message> {
-    let colors = NiriColors::default();
     column![
         // Top: Label and current value
         row![
             text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill),
-            text(format!("{:.1}{}", value, unit))
-                .size(13)
-                .color(colors.text_secondary)
-                .font(fonts::MONO_FONT),
+            container(
+                text(format!("{:.1}{}", value, unit))
+                    .size(13)
+                    .font(fonts::MONO_FONT)
+            ).style(secondary_text_container),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
-        text(description).size(11).color(colors.text_tertiary),
+        container(text(description).size(11)).style(muted_text_container),
         // Bottom: Slider
         slider(min..=max, value, on_change).step(0.1),
     ]
@@ -116,23 +115,19 @@ pub fn slider_row_with_state<'a, Message: Clone + 'a>(
     enabled: bool,
     on_change: impl Fn(f32) -> Message + 'a,
 ) -> Element<'a, Message> {
-    let colors = NiriColors::default();
-    let label_color = if enabled { colors.text_primary } else { colors.text_tertiary };
-    let desc_color = if enabled { colors.text_tertiary } else { iced::Color::from_rgb(0.35, 0.35, 0.35) };
-    let value_color = if enabled { colors.text_secondary } else { colors.text_tertiary };
-
     let content = column![
         // Top: Label and current value
         row![
-            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill).color(label_color),
-            text(format!("{:.1}{}", value, unit))
-                .size(13)
-                .color(value_color)
-                .font(fonts::MONO_FONT),
+            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill),
+            container(
+                text(format!("{:.1}{}", value, unit))
+                    .size(13)
+                    .font(fonts::MONO_FONT)
+            ).style(secondary_text_container),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
-        text(description).size(11).color(desc_color),
+        container(text(description).size(11)).style(muted_text_container),
         // Bottom: Slider
         slider(min..=max, value, on_change).step(0.1),
     ]
@@ -142,12 +137,7 @@ pub fn slider_row_with_state<'a, Message: Clone + 'a>(
     if enabled {
         content.into()
     } else {
-        container(content).style(|_theme| {
-            container::Style {
-                text_color: Some(iced::Color::from_rgb(0.5, 0.5, 0.5)),
-                ..Default::default()
-            }
-        }).into()
+        container(content).style(disabled_text_container).into()
     }
 }
 
@@ -174,19 +164,19 @@ pub fn slider_row_int<'a, Message: Clone + 'a>(
     unit: &'a str,
     on_change: impl Fn(i32) -> Message + 'a,
 ) -> Element<'a, Message> {
-    let colors = NiriColors::default();
     column![
         // Top: Label and current value
         row![
             text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill),
-            text(format!("{}{}", value, unit))
-                .size(13)
-                .color(colors.text_secondary)
-                .font(fonts::MONO_FONT),
+            container(
+                text(format!("{}{}", value, unit))
+                    .size(13)
+                    .font(fonts::MONO_FONT)
+            ).style(secondary_text_container),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
-        text(description).size(11).color(colors.text_tertiary),
+        container(text(description).size(11)).style(muted_text_container),
         // Bottom: Slider
         slider(min..=max, value, on_change).step(1),
     ]
@@ -223,23 +213,19 @@ pub fn slider_row_int_with_state<'a, Message: Clone + 'a>(
     enabled: bool,
     on_change: impl Fn(i32) -> Message + 'a,
 ) -> Element<'a, Message> {
-    let colors = NiriColors::default();
-    let label_color = if enabled { colors.text_primary } else { colors.text_tertiary };
-    let desc_color = if enabled { colors.text_tertiary } else { iced::Color::from_rgb(0.35, 0.35, 0.35) };
-    let value_color = if enabled { colors.text_secondary } else { colors.text_tertiary };
-
     let content = column![
         // Top: Label and current value
         row![
-            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill).color(label_color),
-            text(format!("{}{}", value, unit))
-                .size(13)
-                .color(value_color)
-                .font(fonts::MONO_FONT),
+            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill),
+            container(
+                text(format!("{}{}", value, unit))
+                    .size(13)
+                    .font(fonts::MONO_FONT)
+            ).style(secondary_text_container),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
-        text(description).size(11).color(desc_color),
+        container(text(description).size(11)).style(muted_text_container),
         // Bottom: Slider
         slider(min..=max, value, on_change).step(1),
     ]
@@ -249,12 +235,7 @@ pub fn slider_row_int_with_state<'a, Message: Clone + 'a>(
     if enabled {
         content.into()
     } else {
-        container(content).style(|_theme| {
-            container::Style {
-                text_color: Some(iced::Color::from_rgb(0.5, 0.5, 0.5)),
-                ..Default::default()
-            }
-        }).into()
+        container(content).style(disabled_text_container).into()
     }
 }
 
@@ -275,10 +256,9 @@ pub fn text_input_row<'a, Message: Clone + 'a>(
     value: &'a str,
     on_change: impl Fn(String) -> Message + 'a,
 ) -> Element<'a, Message> {
-    let colors = NiriColors::default();
     column![
         text(label).size(15).font(fonts::UI_FONT_MEDIUM),
-        text(description).size(11).color(colors.text_tertiary),
+        container(text(description).size(11)).style(muted_text_container),
         text_input("", value).on_input(on_change).padding(8),
     ]
     .spacing(6)
@@ -308,7 +288,6 @@ pub fn text_input_with_suggestions<'a, Message: Clone + 'a>(
     suggestions: &'a [String],
     on_change: impl Fn(String) -> Message + Clone + 'a,
 ) -> Element<'a, Message> {
-    let colors = NiriColors::default();
     // Build options: "(None)" + suggestions
     let mut options: Vec<String> = vec!["(None)".to_string()];
     options.extend(suggestions.iter().cloned());
@@ -326,7 +305,7 @@ pub fn text_input_with_suggestions<'a, Message: Clone + 'a>(
 
     column![
         text(label).size(15).font(fonts::UI_FONT_MEDIUM),
-        text(description).size(11).color(colors.text_tertiary),
+        container(text(description).size(11)).style(muted_text_container),
         row![
             pick_list(options, selected, move |s: String| {
                 if s == "(None)" {
@@ -359,12 +338,11 @@ pub fn text_input_with_suggestions<'a, Message: Clone + 'a>(
 /// page_title("Appearance Settings")
 /// ```
 pub fn page_title<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
-    let colors = NiriColors::default();
+    // Uses theme's default text color (no .color() call)
     container(
         text(label)
             .size(22)
             .font(fonts::UI_FONT_SEMIBOLD)
-            .color(colors.text_primary)
     )
     .padding(iced::Padding {
         top: 0.0,
@@ -422,12 +400,13 @@ pub fn section_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
 /// subsection_header("Advanced Options")
 /// ```
 pub fn subsection_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
-    let colors = NiriColors::default();
+    // Uses secondary_text_container for muted appearance
     container(
-        text(label)
-            .size(16)
-            .font(fonts::UI_FONT_MEDIUM)
-            .color(colors.text_secondary)
+        container(
+            text(label)
+                .size(16)
+                .font(fonts::UI_FONT_MEDIUM)
+        ).style(secondary_text_container)
     )
     .padding(iced::Padding {
         top: 16.0,
@@ -467,12 +446,11 @@ pub fn picker_row<'a, T, Message: Clone + 'a>(
 where
     T: Clone + Eq + std::fmt::Display + 'a,
 {
-    let colors = NiriColors::default();
     row![
         // Left side: Label and description
         column![
             text(label).size(15).font(fonts::UI_FONT_MEDIUM),
-            text(description).size(11).color(colors.text_tertiary),
+            container(text(description).size(11)).style(muted_text_container),
         ]
         .spacing(2)
         .width(Length::Fill),
@@ -540,11 +518,25 @@ pub fn optional_slider_row<'a, Message: Clone + 'a>(
     unit: &'a str,
     on_change: impl Fn(Option<f32>) -> Message + Clone + 'a,
 ) -> Element<'a, Message> {
-    let colors = NiriColors::default();
     let is_enabled = value.is_some();
     let current_value = value.unwrap_or((min + max) / 2.0);
 
     let on_change_clone = on_change.clone();
+
+    // Value display uses different container styles based on enabled state
+    let value_text = text(if is_enabled {
+        format!("{:.1}{}", current_value, unit)
+    } else {
+        "Disabled".to_string()
+    })
+    .size(13)
+    .font(fonts::MONO_FONT);
+
+    let value_container = if is_enabled {
+        container(value_text).style(secondary_text_container)
+    } else {
+        container(value_text).style(muted_text_container)
+    };
 
     column![
         // Top: Label, enable toggle, and current value
@@ -557,19 +549,12 @@ pub fn optional_slider_row<'a, Message: Clone + 'a>(
                     on_change_clone(None)
                 }
             }),
-            text(if is_enabled {
-                format!("{:.1}{}", current_value, unit)
-            } else {
-                "Disabled".to_string()
-            })
-            .size(13)
-            .color(if is_enabled { colors.text_secondary } else { colors.text_tertiary })
-            .font(fonts::MONO_FONT),
+            value_container,
         ]
         .spacing(12)
         .align_y(Alignment::Center),
         // Middle: Description
-        text(description).size(11).color(colors.text_tertiary),
+        container(text(description).size(11)).style(muted_text_container),
         // Bottom: Slider (only active when enabled)
         {
             let on_change_slider = on_change.clone();
@@ -611,7 +596,6 @@ pub fn optional_picker_row<'a, T, Message: Clone + 'a>(
 where
     T: Clone + Eq + std::fmt::Display + 'a,
 {
-    let colors = NiriColors::default();
     // Create wrapper options with None option
     #[derive(Clone, PartialEq, Eq)]
     enum OptionWrapper<T> {
@@ -641,7 +625,7 @@ where
         // Left side: Label and description
         column![
             text(label).size(15).font(fonts::UI_FONT_MEDIUM),
-            text(description).size(11).color(colors.text_tertiary),
+            container(text(description).size(11)).style(muted_text_container),
         ]
         .spacing(2)
         .width(Length::Fill),

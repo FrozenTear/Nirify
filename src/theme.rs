@@ -609,3 +609,37 @@ pub fn secondary_text_color(theme: &Theme) -> Color {
     let text = theme.palette().text;
     Color { a: 0.7, ..text }
 }
+
+/// Container style for muted/description text - uses theme's text color with reduced opacity
+pub fn muted_text_container(theme: &Theme) -> container::Style {
+    container::Style {
+        text_color: Some(muted_text_color(theme)),
+        ..Default::default()
+    }
+}
+
+/// Container style for disabled text - uses theme's text color with very low opacity
+pub fn disabled_text_container(theme: &Theme) -> container::Style {
+    let text = theme.palette().text;
+    container::Style {
+        text_color: Some(Color { a: 0.35, ..text }),
+        ..Default::default()
+    }
+}
+
+/// Container style for secondary text (value displays, etc.)
+pub fn secondary_text_container(theme: &Theme) -> container::Style {
+    container::Style {
+        text_color: Some(secondary_text_color(theme)),
+        ..Default::default()
+    }
+}
+
+/// Container style for code/example text - uses theme's success color for a subtle green tint
+pub fn code_text_container(theme: &Theme) -> container::Style {
+    let success = theme.palette().success;
+    container::Style {
+        text_color: Some(Color { a: 0.85, ..success }),
+        ..Default::default()
+    }
+}
