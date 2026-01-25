@@ -1,6 +1,6 @@
 # Maintainer: Your Name <your.email@example.com>
 pkgname=nirify-git
-pkgver=0.2.3.r0.g0000000
+pkgver=0.2.4.r0.g0000000
 pkgrel=1
 pkgdesc="A native settings application for the niri Wayland compositor"
 arch=('x86_64' 'aarch64')
@@ -16,7 +16,7 @@ sha256sums=('SKIP')
 pkgver() {
     cd nirify
     git describe --long --tags --abbrev=7 2>/dev/null | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' ||
-    printf "0.2.3.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+    printf "0.2.4.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
 }
 
 prepare() {
