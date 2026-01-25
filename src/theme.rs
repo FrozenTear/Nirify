@@ -536,3 +536,61 @@ pub fn search_dropdown_item_style() -> impl Fn(&Theme, button::Status) -> button
         }
     }
 }
+
+/// Container style for setting cards - elevated surface with subtle border
+pub fn card_style(_theme: &Theme) -> container::Style {
+    let colors = NiriColors::default();
+
+    container::Style {
+        background: Some(iced::Background::Color(colors.bg_surface)),
+        border: Border {
+            color: colors.border_subtle,
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        shadow: Shadow {
+            color: colors.shadow_color,
+            offset: Vector::new(0.0, 2.0),
+            blur_radius: 6.0,
+        },
+        text_color: Some(colors.text_primary),
+        snap: false,
+    }
+}
+
+/// Container style for section headers with accent line
+pub fn section_header_style(_theme: &Theme) -> container::Style {
+    let colors = NiriColors::default();
+
+    container::Style {
+        background: None,
+        border: Border {
+            color: colors.accent_primary,
+            width: 2.0,
+            radius: 0.0.into(),
+        },
+        shadow: Shadow::default(),
+        text_color: Some(colors.text_primary),
+        snap: false,
+    }
+}
+
+/// Container style for info/hint blocks
+pub fn info_block_style(_theme: &Theme) -> container::Style {
+    let colors = NiriColors::default();
+
+    container::Style {
+        background: Some(iced::Background::Color(Color {
+            a: 0.3,
+            ..colors.accent_secondary
+        })),
+        border: Border {
+            color: colors.accent_secondary,
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        shadow: Shadow::default(),
+        text_color: Some(colors.text_primary),
+        snap: false,
+    }
+}

@@ -5,7 +5,7 @@
 
 use iced::widget::{column, container, pick_list, row, slider, text, text_input, toggler};
 use iced::{Alignment, Element, Length};
-use crate::theme::fonts;
+use crate::theme::{fonts, card_style, info_block_style, NiriColors};
 
 /// Creates a toggle row with label and description
 ///
@@ -24,13 +24,14 @@ pub fn toggle_row<'a, Message: 'a>(
     value: bool,
     on_toggle: impl Fn(bool) -> Message + 'a,
 ) -> Element<'a, Message> {
+    let colors = NiriColors::default();
     row![
         // Left side: Label and description
         column![
-            text(label).size(16),
-            text(description).size(12).color([0.7, 0.7, 0.7]),
+            text(label).size(15).font(fonts::UI_FONT_MEDIUM),
+            text(description).size(11).color(colors.text_tertiary),
         ]
-        .spacing(4)
+        .spacing(2)
         .width(Length::Fill),
         // Right side: Toggle switch
         toggler(value).on_toggle(on_toggle).width(Length::Shrink),
@@ -66,18 +67,19 @@ pub fn slider_row<'a, Message: Clone + 'a>(
     unit: &'a str,
     on_change: impl Fn(f32) -> Message + 'a,
 ) -> Element<'a, Message> {
+    let colors = NiriColors::default();
     column![
         // Top: Label and current value
         row![
-            text(label).size(16).width(Length::Fill),
+            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill),
             text(format!("{:.1}{}", value, unit))
-                .size(14)
-                .color([0.8, 0.8, 0.8])
+                .size(13)
+                .color(colors.text_secondary)
                 .font(fonts::MONO_FONT),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
-        text(description).size(12).color([0.7, 0.7, 0.7]),
+        text(description).size(11).color(colors.text_tertiary),
         // Bottom: Slider
         slider(min..=max, value, on_change).step(0.1),
     ]
@@ -114,22 +116,23 @@ pub fn slider_row_with_state<'a, Message: Clone + 'a>(
     enabled: bool,
     on_change: impl Fn(f32) -> Message + 'a,
 ) -> Element<'a, Message> {
-    let label_color = if enabled { [1.0, 1.0, 1.0] } else { [0.5, 0.5, 0.5] };
-    let desc_color = if enabled { [0.7, 0.7, 0.7] } else { [0.4, 0.4, 0.4] };
-    let value_color = if enabled { [0.8, 0.8, 0.8] } else { [0.5, 0.5, 0.5] };
+    let colors = NiriColors::default();
+    let label_color = if enabled { colors.text_primary } else { colors.text_tertiary };
+    let desc_color = if enabled { colors.text_tertiary } else { iced::Color::from_rgb(0.35, 0.35, 0.35) };
+    let value_color = if enabled { colors.text_secondary } else { colors.text_tertiary };
 
     let content = column![
         // Top: Label and current value
         row![
-            text(label).size(16).width(Length::Fill).color(label_color),
+            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill).color(label_color),
             text(format!("{:.1}{}", value, unit))
-                .size(14)
+                .size(13)
                 .color(value_color)
                 .font(fonts::MONO_FONT),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
-        text(description).size(12).color(desc_color),
+        text(description).size(11).color(desc_color),
         // Bottom: Slider
         slider(min..=max, value, on_change).step(0.1),
     ]
@@ -171,18 +174,19 @@ pub fn slider_row_int<'a, Message: Clone + 'a>(
     unit: &'a str,
     on_change: impl Fn(i32) -> Message + 'a,
 ) -> Element<'a, Message> {
+    let colors = NiriColors::default();
     column![
         // Top: Label and current value
         row![
-            text(label).size(16).width(Length::Fill),
+            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill),
             text(format!("{}{}", value, unit))
-                .size(14)
-                .color([0.8, 0.8, 0.8])
+                .size(13)
+                .color(colors.text_secondary)
                 .font(fonts::MONO_FONT),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
-        text(description).size(12).color([0.7, 0.7, 0.7]),
+        text(description).size(11).color(colors.text_tertiary),
         // Bottom: Slider
         slider(min..=max, value, on_change).step(1),
     ]
@@ -219,22 +223,23 @@ pub fn slider_row_int_with_state<'a, Message: Clone + 'a>(
     enabled: bool,
     on_change: impl Fn(i32) -> Message + 'a,
 ) -> Element<'a, Message> {
-    let label_color = if enabled { [1.0, 1.0, 1.0] } else { [0.5, 0.5, 0.5] };
-    let desc_color = if enabled { [0.7, 0.7, 0.7] } else { [0.4, 0.4, 0.4] };
-    let value_color = if enabled { [0.8, 0.8, 0.8] } else { [0.5, 0.5, 0.5] };
+    let colors = NiriColors::default();
+    let label_color = if enabled { colors.text_primary } else { colors.text_tertiary };
+    let desc_color = if enabled { colors.text_tertiary } else { iced::Color::from_rgb(0.35, 0.35, 0.35) };
+    let value_color = if enabled { colors.text_secondary } else { colors.text_tertiary };
 
     let content = column![
         // Top: Label and current value
         row![
-            text(label).size(16).width(Length::Fill).color(label_color),
+            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill).color(label_color),
             text(format!("{}{}", value, unit))
-                .size(14)
+                .size(13)
                 .color(value_color)
                 .font(fonts::MONO_FONT),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
-        text(description).size(12).color(desc_color),
+        text(description).size(11).color(desc_color),
         // Bottom: Slider
         slider(min..=max, value, on_change).step(1),
     ]
@@ -270,9 +275,10 @@ pub fn text_input_row<'a, Message: Clone + 'a>(
     value: &'a str,
     on_change: impl Fn(String) -> Message + 'a,
 ) -> Element<'a, Message> {
+    let colors = NiriColors::default();
     column![
-        text(label).size(16),
-        text(description).size(12).color([0.7, 0.7, 0.7]),
+        text(label).size(15).font(fonts::UI_FONT_MEDIUM),
+        text(description).size(11).color(colors.text_tertiary),
         text_input("", value).on_input(on_change).padding(8),
     ]
     .spacing(6)
@@ -302,6 +308,7 @@ pub fn text_input_with_suggestions<'a, Message: Clone + 'a>(
     suggestions: &'a [String],
     on_change: impl Fn(String) -> Message + Clone + 'a,
 ) -> Element<'a, Message> {
+    let colors = NiriColors::default();
     // Build options: "(None)" + suggestions
     let mut options: Vec<String> = vec!["(None)".to_string()];
     options.extend(suggestions.iter().cloned());
@@ -318,8 +325,8 @@ pub fn text_input_with_suggestions<'a, Message: Clone + 'a>(
     let on_change_clone = on_change.clone();
 
     column![
-        text(label).size(16),
-        text(description).size(12).color([0.7, 0.7, 0.7]),
+        text(label).size(15).font(fonts::UI_FONT_MEDIUM),
+        text(description).size(11).color(colors.text_tertiary),
         row![
             pick_list(options, selected, move |s: String| {
                 if s == "(None)" {
@@ -352,15 +359,17 @@ pub fn text_input_with_suggestions<'a, Message: Clone + 'a>(
 /// page_title("Appearance Settings")
 /// ```
 pub fn page_title<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
+    let colors = NiriColors::default();
     container(
         text(label)
-            .size(18)
-            .color([0.9, 0.9, 0.9])
+            .size(22)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(colors.text_primary)
     )
     .padding(iced::Padding {
         top: 0.0,
         right: 0.0,
-        bottom: 4.0,
+        bottom: 8.0,
         left: 0.0,
     })
     .into()
@@ -368,7 +377,8 @@ pub fn page_title<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
 
 /// Creates a section header for grouping related settings
 ///
-/// Uses top padding of 16px for visual separation between sections.
+/// Features a 2px amber accent line above the text for visual hierarchy.
+/// Uses top padding of 24px for visual separation between sections.
 /// Use this for sections AFTER the first page_title.
 ///
 /// # Example
@@ -376,15 +386,31 @@ pub fn page_title<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
 /// section_header("Focus Ring")
 /// ```
 pub fn section_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
-    container(
+    let colors = NiriColors::default();
+
+    // Section header with accent line
+    column![
+        // Thin amber accent line
+        container(text(""))
+            .width(Length::Fixed(40.0))
+            .height(Length::Fixed(2.0))
+            .style(move |_theme| {
+                container::Style {
+                    background: Some(iced::Background::Color(colors.accent_primary)),
+                    ..Default::default()
+                }
+            }),
+        // Section title
         text(label)
-            .size(18)
-            .color([0.9, 0.9, 0.9])
-    )
+            .size(20)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(colors.text_primary)
+    ]
+    .spacing(6)
     .padding(iced::Padding {
-        top: 16.0,
+        top: 24.0,
         right: 0.0,
-        bottom: 4.0,
+        bottom: 8.0,
         left: 0.0,
     })
     .into()
@@ -392,20 +418,22 @@ pub fn section_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
 
 /// Creates a subsection header (smaller than section header)
 ///
-/// Uses top padding of 12px for visual separation within sections
+/// Uses top padding of 16px for visual separation within sections
 ///
 /// # Example
 /// ```rust,ignore
 /// subsection_header("Advanced Options")
 /// ```
 pub fn subsection_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
+    let colors = NiriColors::default();
     container(
         text(label)
-            .size(15)
-            .color([0.8, 0.8, 0.8])
+            .size(16)
+            .font(fonts::UI_FONT_MEDIUM)
+            .color(colors.text_secondary)
     )
     .padding(iced::Padding {
-        top: 12.0,
+        top: 16.0,
         right: 0.0,
         bottom: 4.0,
         left: 0.0,
@@ -442,13 +470,14 @@ pub fn picker_row<'a, T, Message: Clone + 'a>(
 where
     T: Clone + Eq + std::fmt::Display + 'a,
 {
+    let colors = NiriColors::default();
     row![
         // Left side: Label and description
         column![
-            text(label).size(16),
-            text(description).size(12).color([0.7, 0.7, 0.7]),
+            text(label).size(15).font(fonts::UI_FONT_MEDIUM),
+            text(description).size(11).color(colors.text_tertiary),
         ]
-        .spacing(4)
+        .spacing(2)
         .width(Length::Fill),
         // Right side: Picker dropdown
         pick_list(options, selected, on_select)
@@ -462,14 +491,29 @@ where
 }
 
 /// Creates an info text block (for hints, warnings, etc.)
+/// Styled as a subtle teal-tinted box for visual distinction.
 pub fn info_text<'a, Message: 'a>(content: &'a str) -> Element<'a, Message> {
+    let colors = NiriColors::default();
     container(
-        text(content)
-            .size(13)
-            .color([0.6, 0.7, 0.9])
+        row![
+            text("ℹ").size(13).color(colors.accent_secondary),
+            text(content).size(12).color(colors.text_secondary),
+        ]
+        .spacing(8)
+        .align_y(Alignment::Start)
     )
     .padding(12)
+    .style(info_block_style)
     .into()
+}
+
+/// Wraps content in a card container with elevated surface styling.
+/// Use this to group related settings visually.
+pub fn card<'a, Message: 'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+    container(content)
+        .padding(4)
+        .style(card_style)
+        .into()
 }
 
 /// Creates an optional slider row with a checkbox to enable/disable
@@ -497,6 +541,7 @@ pub fn optional_slider_row<'a, Message: Clone + 'a>(
     unit: &'a str,
     on_change: impl Fn(Option<f32>) -> Message + Clone + 'a,
 ) -> Element<'a, Message> {
+    let colors = NiriColors::default();
     let is_enabled = value.is_some();
     let current_value = value.unwrap_or((min + max) / 2.0);
 
@@ -505,7 +550,7 @@ pub fn optional_slider_row<'a, Message: Clone + 'a>(
     column![
         // Top: Label, enable toggle, and current value
         row![
-            text(label).size(16),
+            text(label).size(15).font(fonts::UI_FONT_MEDIUM),
             toggler(is_enabled).on_toggle(move |enabled| {
                 if enabled {
                     on_change_clone(Some(current_value))
@@ -518,14 +563,14 @@ pub fn optional_slider_row<'a, Message: Clone + 'a>(
             } else {
                 "Disabled".to_string()
             })
-            .size(14)
-            .color(if is_enabled { [0.8, 0.8, 0.8] } else { [0.5, 0.5, 0.5] })
-            .font(crate::theme::fonts::MONO_FONT),
+            .size(13)
+            .color(if is_enabled { colors.text_secondary } else { colors.text_tertiary })
+            .font(fonts::MONO_FONT),
         ]
         .spacing(12)
         .align_y(Alignment::Center),
         // Middle: Description
-        text(description).size(12).color([0.7, 0.7, 0.7]),
+        text(description).size(11).color(colors.text_tertiary),
         // Bottom: Slider (only active when enabled)
         {
             let on_change_slider = on_change.clone();
@@ -567,6 +612,7 @@ pub fn optional_picker_row<'a, T, Message: Clone + 'a>(
 where
     T: Clone + Eq + std::fmt::Display + 'a,
 {
+    let colors = NiriColors::default();
     // Create wrapper options with None option
     #[derive(Clone, PartialEq, Eq)]
     enum OptionWrapper<T> {
@@ -595,10 +641,10 @@ where
     row![
         // Left side: Label and description
         column![
-            text(label).size(16),
-            text(description).size(12).color([0.7, 0.7, 0.7]),
+            text(label).size(15).font(fonts::UI_FONT_MEDIUM),
+            text(description).size(11).color(colors.text_tertiary),
         ]
-        .spacing(4)
+        .spacing(2)
         .width(Length::Fill),
         // Right side: Picker dropdown
         pick_list(wrapped_options, Some(wrapped_selected), move |selected| {

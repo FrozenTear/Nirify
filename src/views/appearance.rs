@@ -1,7 +1,7 @@
 //! Appearance settings view
 
 use iced::widget::{column, container, scrollable};
-use iced::Element;
+use iced::{Element, Length};
 
 use super::widgets::*;
 use crate::config::models::AppearanceSettings;
@@ -31,105 +31,120 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
             "The focus ring is a colored outline around the currently focused window. \
              It helps you see which window will receive keyboard input."
         ),
-        toggle_row(
-            "Enable focus ring",
-            "Show a colored ring around the focused window",
-            focus_ring_enabled,
-            |value| Message::Appearance(AppearanceMessage::ToggleFocusRing(value)),
-        ),
-        // Width setting - greyed out when focus ring is disabled
-        slider_row_with_state(
-            "Ring width",
-            "Thickness of the focus ring in pixels",
-            focus_ring_width,
-            1.0,
-            20.0,
-            " px",
-            focus_ring_enabled,
-            |value| Message::Appearance(AppearanceMessage::SetFocusRingWidth(value)),
-        ),
-        gradient_picker(
-            "Active window color",
-            "Color or gradient for the focus ring around the active window",
-            &focus_ring_active,
-            |msg| Message::Appearance(AppearanceMessage::FocusRingActive(msg)),
-        ),
-        gradient_picker(
-            "Inactive window color",
-            "Color or gradient for the focus ring around inactive windows",
-            &focus_ring_inactive,
-            |msg| Message::Appearance(AppearanceMessage::FocusRingInactive(msg)),
-        ),
-        gradient_picker(
-            "Urgent window color",
-            "Color or gradient for the focus ring around urgent windows (notifications)",
-            &focus_ring_urgent,
-            |msg| Message::Appearance(AppearanceMessage::FocusRingUrgent(msg)),
-        ),
+        // Focus ring settings card
+        card(column![
+            toggle_row(
+                "Enable focus ring",
+                "Show a colored ring around the focused window",
+                focus_ring_enabled,
+                |value| Message::Appearance(AppearanceMessage::ToggleFocusRing(value)),
+            ),
+            slider_row_with_state(
+                "Ring width",
+                "Thickness of the focus ring in pixels",
+                focus_ring_width,
+                1.0,
+                20.0,
+                " px",
+                focus_ring_enabled,
+                |value| Message::Appearance(AppearanceMessage::SetFocusRingWidth(value)),
+            ),
+        ].spacing(0).width(Length::Fill)),
+        // Focus ring colors card
+        card(column![
+            gradient_picker(
+                "Active window color",
+                "Color or gradient for the focus ring around the active window",
+                &focus_ring_active,
+                |msg| Message::Appearance(AppearanceMessage::FocusRingActive(msg)),
+            ),
+            gradient_picker(
+                "Inactive window color",
+                "Color or gradient for the focus ring around inactive windows",
+                &focus_ring_inactive,
+                |msg| Message::Appearance(AppearanceMessage::FocusRingInactive(msg)),
+            ),
+            gradient_picker(
+                "Urgent window color",
+                "Color or gradient for the focus ring around urgent windows (notifications)",
+                &focus_ring_urgent,
+                |msg| Message::Appearance(AppearanceMessage::FocusRingUrgent(msg)),
+            ),
+        ].spacing(0).width(Length::Fill)),
+
         section_header("Window Border"),
         info_text(
             "Window borders are drawn around the edges of each window. \
              Unlike focus rings, borders are inside the window geometry."
         ),
-        toggle_row(
-            "Enable border",
-            "Show a colored border around windows",
-            border_enabled,
-            |value| Message::Appearance(AppearanceMessage::ToggleBorder(value)),
-        ),
-        // Thickness setting - greyed out when border is disabled
-        slider_row_with_state(
-            "Border thickness",
-            "Width of the border in pixels",
-            border_thickness,
-            1.0,
-            20.0,
-            " px",
-            border_enabled,
-            |value| Message::Appearance(AppearanceMessage::SetBorderThickness(value)),
-        ),
-        gradient_picker(
-            "Active window border",
-            "Color or gradient for the border around the active window",
-            &border_active,
-            |msg| Message::Appearance(AppearanceMessage::BorderActive(msg)),
-        ),
-        gradient_picker(
-            "Inactive window border",
-            "Color or gradient for the border around inactive windows",
-            &border_inactive,
-            |msg| Message::Appearance(AppearanceMessage::BorderInactive(msg)),
-        ),
-        gradient_picker(
-            "Urgent window border",
-            "Color or gradient for the border around urgent windows (notifications)",
-            &border_urgent,
-            |msg| Message::Appearance(AppearanceMessage::BorderUrgent(msg)),
-        ),
+        // Border settings card
+        card(column![
+            toggle_row(
+                "Enable border",
+                "Show a colored border around windows",
+                border_enabled,
+                |value| Message::Appearance(AppearanceMessage::ToggleBorder(value)),
+            ),
+            slider_row_with_state(
+                "Border thickness",
+                "Width of the border in pixels",
+                border_thickness,
+                1.0,
+                20.0,
+                " px",
+                border_enabled,
+                |value| Message::Appearance(AppearanceMessage::SetBorderThickness(value)),
+            ),
+        ].spacing(0).width(Length::Fill)),
+        // Border colors card
+        card(column![
+            gradient_picker(
+                "Active window border",
+                "Color or gradient for the border around the active window",
+                &border_active,
+                |msg| Message::Appearance(AppearanceMessage::BorderActive(msg)),
+            ),
+            gradient_picker(
+                "Inactive window border",
+                "Color or gradient for the border around inactive windows",
+                &border_inactive,
+                |msg| Message::Appearance(AppearanceMessage::BorderInactive(msg)),
+            ),
+            gradient_picker(
+                "Urgent window border",
+                "Color or gradient for the border around urgent windows (notifications)",
+                &border_urgent,
+                |msg| Message::Appearance(AppearanceMessage::BorderUrgent(msg)),
+            ),
+        ].spacing(0).width(Length::Fill)),
+
         section_header("Layout"),
-        slider_row(
-            "Window gaps",
-            "Spacing between windows in pixels",
-            gaps,
-            0.0,
-            64.0,
-            " px",
-            |value| Message::Appearance(AppearanceMessage::SetGaps(value)),
-        ),
-        slider_row(
-            "Corner radius",
-            "Rounded corners for windows in pixels (0 = square corners)",
-            corner_radius,
-            0.0,
-            32.0,
-            " px",
-            |value| Message::Appearance(AppearanceMessage::SetCornerRadius(value)),
-        ),
+        // Layout card
+        card(column![
+            slider_row(
+                "Window gaps",
+                "Spacing between windows in pixels",
+                gaps,
+                0.0,
+                64.0,
+                " px",
+                |value| Message::Appearance(AppearanceMessage::SetGaps(value)),
+            ),
+            slider_row(
+                "Corner radius",
+                "Rounded corners for windows in pixels (0 = square corners)",
+                corner_radius,
+                0.0,
+                32.0,
+                " px",
+                |value| Message::Appearance(AppearanceMessage::SetCornerRadius(value)),
+            ),
+        ].spacing(0).width(Length::Fill)),
         spacer(32.0),
     ]
-    .spacing(4);
+    .spacing(12);
 
-    scrollable(container(content).padding(20).width(iced::Length::Fill))
-        .height(iced::Length::Fill)
+    scrollable(container(content).padding(20).width(Length::Fill))
+        .height(Length::Fill)
         .into()
 }
