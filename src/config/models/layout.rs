@@ -2,7 +2,7 @@
 
 use crate::constants::DEFAULT_OVERVIEW_ZOOM;
 use crate::types::{CenterFocusedColumn, Color, ColorOrGradient};
-use nirify_macros::SlintIndex;
+use nirify_macros::{HasAny, SlintIndex};
 
 /// Workspace shadow settings for overview (v25.05+)
 #[derive(Debug, Clone, PartialEq)]
@@ -225,7 +225,7 @@ impl Default for LayoutExtrasSettings {
 /// All fields are optional - only set fields will be output to KDL.
 /// Niri allows overriding "all the same options as the top-level layout {}"
 /// for individual outputs and named workspaces.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, HasAny)]
 pub struct LayoutOverride {
     // === Gaps and Struts ===
     /// Gaps override (single value used for all gaps)
@@ -292,34 +292,4 @@ pub struct LayoutOverride {
     pub shadow_color: Option<Color>,
 }
 
-impl LayoutOverride {
-    /// Returns true if any field is set (not all None)
-    pub fn has_any(&self) -> bool {
-        self.gaps.is_some()
-            || self.strut_left.is_some()
-            || self.strut_right.is_some()
-            || self.strut_top.is_some()
-            || self.strut_bottom.is_some()
-            || self.center_focused_column.is_some()
-            || self.always_center_single_column.is_some()
-            || self.default_column_display.is_some()
-            || self.default_column_width_proportion.is_some()
-            || self.default_column_width_fixed.is_some()
-            || self.preset_column_widths.is_some()
-            || self.preset_window_heights.is_some()
-            || self.focus_ring_enabled.is_some()
-            || self.focus_ring_width.is_some()
-            || self.focus_ring_active.is_some()
-            || self.focus_ring_inactive.is_some()
-            || self.border_enabled.is_some()
-            || self.border_width.is_some()
-            || self.border_active.is_some()
-            || self.border_inactive.is_some()
-            || self.shadow_enabled.is_some()
-            || self.shadow_softness.is_some()
-            || self.shadow_spread.is_some()
-            || self.shadow_offset_x.is_some()
-            || self.shadow_offset_y.is_some()
-            || self.shadow_color.is_some()
-    }
-}
+// has_any() is now derived via #[derive(HasAny)]

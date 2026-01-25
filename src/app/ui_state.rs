@@ -31,6 +31,8 @@ pub struct UiState {
     pub show_search_bar: bool,
     /// Whether search is active (for Ctrl+K modal when search bar is hidden)
     pub search_focused: bool,
+    /// Setting name to highlight after search navigation (cleared on view)
+    pub highlight_setting: Option<String>,
     /// Widget demo state for testing
     pub widget_demo_state: views::widget_demo::DemoState,
     /// Toast notification message

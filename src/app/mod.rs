@@ -24,6 +24,26 @@ use crate::save_manager::{ReloadResult, SaveResult};
 use crate::theme::fonts;
 use crate::views;
 
+/// Groups save-related state for cleaner App organization
+pub struct SaveState {
+    /// Tracks which settings categories have unsaved changes
+    pub dirty_tracker: DirtyTracker,
+    /// Last time a change was made (for debounced save)
+    pub last_change_time: Option<std::time::Instant>,
+    /// Whether a save is currently in progress
+    pub in_progress: bool,
+}
+
+impl SaveState {
+    fn new() -> Self {
+        Self {
+            dirty_tracker: DirtyTracker::new(),
+            last_change_time: None,
+            in_progress: false,
+        }
+    }
+}
+
 /// Main application state
 pub struct App {
     /// Settings - direct ownership (no mutex needed, iced is single-threaded)
@@ -32,17 +52,11 @@ pub struct App {
     /// Config paths for loading/saving
     paths: Arc<ConfigPaths>,
 
-    /// Tracks which settings categories have unsaved changes
-    dirty_tracker: DirtyTracker,
+    /// Save subsystem state (dirty tracking, debounce timing)
+    save: SaveState,
 
     /// Search index (domain data, not UI state)
     search_index: crate::search::SearchIndex,
-
-    /// Last time a change was made (for debounced save)
-    last_change_time: Option<std::time::Instant>,
-
-    /// Whether a save is currently in progress
-    save_in_progress: bool,
 
     /// UI-only state (selections, expansions, dialogs, etc.)
     ui: UiState,
@@ -109,10 +123,8 @@ impl App {
         let app = Self {
             settings,
             paths,
-            dirty_tracker: DirtyTracker::new(),
+            save: SaveState::new(),
             search_index: crate::search::SearchIndex::new(),
-            last_change_time: None,
-            save_in_progress: false,
             ui,
         };
 
@@ -142,10 +154,8 @@ impl App {
         let app = Self {
             settings,
             paths,
-            dirty_tracker: DirtyTracker::new(),
+            save: SaveState::new(),
             search_index: crate::search::SearchIndex::new(),
-            last_change_time: None,
-            save_in_progress: false,
             ui,
         };
 
@@ -158,6 +168,8 @@ impl App {
             // Navigation
             Message::NavigateToPage(page) => {
                 self.ui.current_page = page;
+                // Clear any search highlight when navigating manually
+                self.ui.highlight_setting = None;
                 let is_connected = matches!(
                     self.ui.niri_status,
                     crate::views::status_bar::NiriStatus::Connected
@@ -208,6 +220,8 @@ impl App {
                 // Navigate to the selected page
                 if let Some(result) = self.ui.search_results.get(index) {
                     self.ui.current_page = result.page;
+                    // Store setting name for highlighting on the target page
+                    self.ui.highlight_setting = Some(result.setting_name.clone());
                     // Clear search after navigation
                     self.ui.search_query.clear();
                     self.ui.search_results.clear();
@@ -247,7 +261,7 @@ impl App {
                 self.settings.preferences.theme = theme.to_str().to_string();
 
                 // Mark preferences as dirty for auto-save
-                self.dirty_tracker.mark(SettingsCategory::Preferences);
+                self.save.dirty_tracker.mark(SettingsCategory::Preferences);
                 self.mark_changed();
 
                 Task::none()
@@ -291,7 +305,7 @@ impl App {
             }
 
             Message::SaveCompleted(result) => {
-                self.save_in_progress = false;
+                self.save.in_progress = false;
                 match result {
                     SaveResult::Success { files_written, .. } => {
                         self.ui.toast = Some(format!("Saved {} file(s)", files_written));
@@ -343,7 +357,18 @@ impl App {
                 if let DialogState::Error { title, .. } = &self.ui.dialog_state {
                     if title == "Initialization Failed" {
                         log::info!("User acknowledged initialization failure, exiting");
-                        std::process::exit(1);
+
+                        // Clean up temp fallback directory if it exists
+                        let temp_fallback = std::env::temp_dir().join("nirify-error-fallback");
+                        if temp_fallback.exists() {
+                            if let Err(e) = std::fs::remove_dir_all(&temp_fallback) {
+                                log::warn!("Failed to clean up temp fallback directory: {}", e);
+                            } else {
+                                log::debug!("Cleaned up temp fallback directory");
+                            }
+                        }
+
+                        return iced::exit();
                     }
                 }
                 self.ui.dialog_state = DialogState::None;
@@ -365,7 +390,7 @@ impl App {
                                         self.ui.selected_window_rule_id =
                                             self.settings.window_rules.rules.first().map(|r| r.id);
                                     }
-                                    self.dirty_tracker
+                                    self.save.dirty_tracker
                                         .mark(crate::config::SettingsCategory::WindowRules);
                                 } else if self.settings.layer_rules.remove(rule_id) {
                                     log::info!("Deleted layer rule {}", rule_id);
@@ -373,7 +398,7 @@ impl App {
                                         self.ui.selected_layer_rule_id =
                                             self.settings.layer_rules.rules.first().map(|r| r.id);
                                     }
-                                    self.dirty_tracker
+                                    self.save.dirty_tracker
                                         .mark(crate::config::SettingsCategory::LayerRules);
                                 }
                                 self.mark_changed();
@@ -381,13 +406,13 @@ impl App {
                             ConfirmAction::ResetSettings => {
                                 log::info!("Resetting all settings to defaults");
                                 self.settings = crate::config::models::Settings::default();
-                                self.dirty_tracker.mark_all();
+                                self.save.dirty_tracker.mark_all();
                                 self.mark_changed();
                             }
                             ConfirmAction::ClearAllKeybindings => {
                                 log::info!("Clearing all keybindings");
                                 self.settings.keybindings.bindings.clear();
-                                self.dirty_tracker
+                                self.save.dirty_tracker
                                     .mark(crate::config::SettingsCategory::Keybindings);
                                 self.mark_changed();
                             }
@@ -485,7 +510,7 @@ impl App {
                 }
 
                 // Trigger initial save to create all config files
-                self.dirty_tracker.mark_all();
+                self.save.dirty_tracker.mark_all();
                 self.mark_changed();
 
                 log::info!("Wizard: Config setup complete");
@@ -680,11 +705,11 @@ impl App {
 
                         // Mark affected categories as dirty
                         if window_rules_changed {
-                            self.dirty_tracker
+                            self.save.dirty_tracker
                                 .mark(crate::config::SettingsCategory::WindowRules);
                         }
                         if layer_rules_changed {
-                            self.dirty_tracker
+                            self.save.dirty_tracker
                                 .mark(crate::config::SettingsCategory::LayerRules);
                         }
 
@@ -700,11 +725,11 @@ impl App {
             // System
             Message::WindowCloseRequested => {
                 // Perform final save before exiting (blocking to prevent data loss)
-                if self.dirty_tracker.is_dirty() {
+                if self.save.dirty_tracker.is_dirty() {
                     log::info!("Window closing with unsaved changes, performing blocking save...");
 
                     // Take dirty categories for blocking save
-                    let dirty = self.dirty_tracker.take();
+                    let dirty = self.save.dirty_tracker.take();
 
                     // Perform blocking save (acceptable since typically <100ms)
                     match crate::config::save_dirty(&self.paths, &self.settings, &dirty) {
@@ -719,9 +744,7 @@ impl App {
                 }
 
                 log::info!("Exiting application");
-                std::process::exit(0);
-                #[allow(unreachable_code)]
-                Task::none()
+                iced::exit()
             }
 
             Message::CheckNiriStatus => {
@@ -761,91 +784,84 @@ impl App {
 
     /// Returns the subscription for periodic save checks and keyboard capture
     pub fn subscription(&self) -> Subscription<Message> {
-        use iced::keyboard;
+        let mut subs = self.base_subscriptions();
 
-        // Base subscription: periodic save checks (every 200ms - sufficient with 300ms debounce)
-        let save_check =
-            time::every(Duration::from_millis(200)).map(|_| Message::Save(SaveMessage::CheckSave));
+        // Add keyboard subscription based on current mode
+        if self.ui.key_capture_active.is_some() {
+            subs.push(self.key_capture_subscription());
+        } else if !self.settings.preferences.search_hotkey.is_empty() {
+            subs.push(self.search_hotkey_subscription());
+        }
 
-        // Niri status check (every 5 seconds)
-        let niri_check = time::every(Duration::from_secs(5)).map(|_| Message::CheckNiriStatus);
+        Subscription::batch(subs)
+    }
+
+    /// Base subscriptions always active: save checks, niri status, toast clearing
+    fn base_subscriptions(&self) -> Vec<Subscription<Message>> {
+        let mut subs = vec![
+            // Periodic save checks (every 200ms - sufficient with 300ms debounce)
+            time::every(Duration::from_millis(200))
+                .map(|_| Message::Save(SaveMessage::CheckSave)),
+            // Niri status check (every 5 seconds)
+            time::every(Duration::from_secs(5)).map(|_| Message::CheckNiriStatus),
+        ];
 
         // Toast auto-clear check (every 500ms, only when toast is showing)
-        let toast_check = if self.ui.toast.is_some() {
-            Some(time::every(Duration::from_millis(500)).map(|_| Message::ClearToast))
-        } else {
-            None
-        };
-
-        // Parse the search hotkey for keyboard listening
-        let search_hotkey = self.settings.preferences.search_hotkey.clone();
-        let has_search_hotkey = !search_hotkey.is_empty();
-
-        // Keyboard capture subscription (only active when capturing keybindings)
-        if self.ui.key_capture_active.is_some() {
-            let key_capture = keyboard::listen().map(|event| {
-                match event {
-                    keyboard::Event::KeyPressed { key, modifiers, .. } => {
-                        // ESC cancels capture
-                        if matches!(key, keyboard::Key::Named(keyboard::key::Named::Escape)) {
-                            return Message::Keybindings(
-                                crate::messages::KeybindingsMessage::CancelKeyCapture,
-                            );
-                        }
-
-                        // Convert key and modifiers to a key combo string
-                        let key_combo = helpers::format_key_combo(&key, modifiers);
-
-                        // Only capture if we got a valid key (not just a modifier)
-                        if !key_combo.is_empty() {
-                            Message::Keybindings(crate::messages::KeybindingsMessage::CapturedKey(
-                                key_combo,
-                            ))
-                        } else {
-                            Message::None
-                        }
-                    }
-                    _ => Message::None,
-                }
-            });
-
-            let mut subs = vec![save_check, niri_check, key_capture];
-            if let Some(toast) = toast_check {
-                subs.push(toast);
-            }
-            Subscription::batch(subs)
-        } else if has_search_hotkey {
-            // Listen for search hotkey when not in key capture mode
-            // Use Subscription::with to pass the hotkey to the closure (avoiding capture)
-            let search_listener = keyboard::listen()
-                .with(search_hotkey)
-                .map(|(hotkey, event): (String, keyboard::Event)| {
-                    match event {
-                        keyboard::Event::KeyPressed { key, modifiers, .. } => {
-                            // Check if the pressed key matches the configured search hotkey
-                            let key_combo = helpers::format_key_combo(&key, modifiers);
-                            if helpers::hotkey_matches(&key_combo, &hotkey) {
-                                Message::ToggleSearch
-                            } else {
-                                Message::None
-                            }
-                        }
-                        _ => Message::None,
-                    }
-                });
-
-            let mut subs = vec![save_check, niri_check, search_listener];
-            if let Some(toast) = toast_check {
-                subs.push(toast);
-            }
-            Subscription::batch(subs)
-        } else {
-            let mut subs = vec![save_check, niri_check];
-            if let Some(toast) = toast_check {
-                subs.push(toast);
-            }
-            Subscription::batch(subs)
+        if self.ui.toast.is_some() {
+            subs.push(time::every(Duration::from_millis(500)).map(|_| Message::ClearToast));
         }
+
+        subs
+    }
+
+    /// Subscription for key capture mode (when recording keybindings)
+    fn key_capture_subscription(&self) -> Subscription<Message> {
+        use iced::keyboard;
+
+        keyboard::listen().map(|event| match event {
+            keyboard::Event::KeyPressed { key, modifiers, .. } => {
+                // ESC cancels capture
+                if matches!(key, keyboard::Key::Named(keyboard::key::Named::Escape)) {
+                    return Message::Keybindings(
+                        crate::messages::KeybindingsMessage::CancelKeyCapture,
+                    );
+                }
+
+                // Convert key and modifiers to a key combo string
+                let key_combo = helpers::format_key_combo(&key, modifiers);
+
+                // Only capture if we got a valid key (not just a modifier)
+                if !key_combo.is_empty() {
+                    Message::Keybindings(crate::messages::KeybindingsMessage::CapturedKey(
+                        key_combo,
+                    ))
+                } else {
+                    Message::None
+                }
+            }
+            _ => Message::None,
+        })
+    }
+
+    /// Subscription for search hotkey (when not in key capture mode)
+    fn search_hotkey_subscription(&self) -> Subscription<Message> {
+        use iced::keyboard;
+
+        let search_hotkey = self.settings.preferences.search_hotkey.clone();
+
+        keyboard::listen()
+            .with(search_hotkey)
+            .map(|(hotkey, event): (String, keyboard::Event)| match event {
+                keyboard::Event::KeyPressed { key, modifiers, .. } => {
+                    let key_combo = helpers::format_key_combo(&key, modifiers);
+                    if helpers::hotkey_matches(&key_combo, &hotkey) {
+                        Message::ToggleSearch
+                    } else {
+                        Message::None
+                    }
+                }
+                _ => Message::None,
+            })
     }
 
     /// Constructs the UI from current state
@@ -864,7 +880,7 @@ impl App {
         let content_area = self.page_content();
 
         // Status bar (bottom)
-        let is_dirty = self.dirty_tracker.is_dirty();
+        let is_dirty = self.save.dirty_tracker.is_dirty();
         let save_status = self.ui.toast.clone();
         let status_bar = views::status_bar::view(
             is_dirty,
@@ -1433,16 +1449,16 @@ impl App {
 
     /// Mark that settings have changed (triggers debounced save)
     pub(crate) fn mark_changed(&mut self) {
-        self.last_change_time = Some(std::time::Instant::now());
+        self.save.last_change_time = Some(std::time::Instant::now());
     }
 
     /// Check if we should save now (debounce: 300ms since last change)
     fn should_save(&self) -> bool {
-        if self.save_in_progress || !self.dirty_tracker.is_dirty() {
+        if self.save.in_progress || !self.save.dirty_tracker.is_dirty() {
             return false;
         }
 
-        match self.last_change_time {
+        match self.save.last_change_time {
             Some(t) => t.elapsed() >= Duration::from_millis(300),
             None => false,
         }
@@ -1450,9 +1466,9 @@ impl App {
 
     /// Create an async save task
     fn save_task(&mut self) -> Task<Message> {
-        self.save_in_progress = true;
+        self.save.in_progress = true;
         let settings = self.settings.clone();
-        let dirty = self.dirty_tracker.take();
+        let dirty = self.save.dirty_tracker.take();
         let paths = self.paths.clone();
 
         Task::perform(

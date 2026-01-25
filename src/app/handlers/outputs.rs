@@ -200,7 +200,7 @@ impl super::super::App {
 
         // Update the cache for view borrowing
 
-        self.dirty_tracker.mark(SettingsCategory::Outputs);
+        self.save.dirty_tracker.mark(SettingsCategory::Outputs);
         self.mark_changed();
         Task::none()
     }

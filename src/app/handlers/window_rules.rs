@@ -264,7 +264,7 @@ impl super::super::App {
         }
 
         if should_mark_dirty {
-            self.dirty_tracker.mark(SettingsCategory::WindowRules);
+            self.save.dirty_tracker.mark(SettingsCategory::WindowRules);
             self.mark_changed();
         }
 

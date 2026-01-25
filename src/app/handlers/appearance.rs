@@ -59,7 +59,7 @@ impl super::super::App {
         }
 
         // Mark as dirty for auto-save
-        self.dirty_tracker.mark(SettingsCategory::Appearance);
+        self.save.dirty_tracker.mark(SettingsCategory::Appearance);
         self.mark_changed();
 
         Task::none()

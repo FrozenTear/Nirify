@@ -58,7 +58,7 @@ impl super::super::App {
         }
 
 
-        self.dirty_tracker.mark(SettingsCategory::Touchpad);
+        self.save.dirty_tracker.mark(SettingsCategory::Touchpad);
         self.mark_changed();
 
         Task::none()

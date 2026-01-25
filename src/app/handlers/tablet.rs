@@ -45,7 +45,7 @@ impl super::super::App {
             }
         }
 
-        self.dirty_tracker.mark(SettingsCategory::Tablet);
+        self.save.dirty_tracker.mark(SettingsCategory::Tablet);
         self.mark_changed();
         Task::none()
     }

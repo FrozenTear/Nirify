@@ -22,7 +22,7 @@ impl super::super::App {
             TrackballMessage::SetScrollButton(v) => trackball.scroll_button = v,
         }
 
-        self.dirty_tracker.mark(SettingsCategory::Trackball);
+        self.save.dirty_tracker.mark(SettingsCategory::Trackball);
         self.mark_changed();
         Task::none()
     }

@@ -113,7 +113,7 @@ impl super::super::App {
         }
 
 
-        self.dirty_tracker.mark(SettingsCategory::Animations);
+        self.save.dirty_tracker.mark(SettingsCategory::Animations);
         self.mark_changed();
 
         Task::none()

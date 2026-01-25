@@ -96,7 +96,7 @@ impl super::super::App {
             LayoutExtrasMessage::SetDefaultColumnDisplay(v) => layout.default_column_display = v,
         }
 
-        self.dirty_tracker.mark(SettingsCategory::LayoutExtras);
+        self.save.dirty_tracker.mark(SettingsCategory::LayoutExtras);
         self.mark_changed();
         Task::none()
     }

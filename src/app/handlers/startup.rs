@@ -46,7 +46,7 @@ impl super::super::App {
             }
         }
 
-        self.dirty_tracker.mark(SettingsCategory::Startup);
+        self.save.dirty_tracker.mark(SettingsCategory::Startup);
         self.mark_changed();
         Task::none()
     }

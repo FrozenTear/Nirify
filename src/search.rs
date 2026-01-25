@@ -121,8 +121,8 @@ impl SearchIndex {
         // Sort by relevance (highest first)
         results.sort_by(|a, b| b.relevance_score.cmp(&a.relevance_score));
 
-        // Limit results
-        results.truncate(12);
+        // Limit results (matches UI display limit in search modal)
+        results.truncate(8);
 
         results
     }

@@ -123,7 +123,7 @@ pub fn secondary_nav(current_page: Page) -> Element<'static, Message> {
 
     let mut tabs = Row::new().spacing(6).padding([10, 20]);
 
-    for page in pages_in_category {
+    for &page in pages_in_category {
         let is_active = page == current_page;
 
         let tab = button(
@@ -156,42 +156,62 @@ fn get_first_page_in_category(category: PageCategory) -> Page {
     }
 }
 
-/// Helper: Get all pages in a category
-fn get_pages_in_category(category: PageCategory) -> Vec<Page> {
-    let all_pages = vec![
-        Page::Overview,
-        Page::Appearance,
-        Page::Behavior,
-        Page::Keyboard,
-        Page::Mouse,
-        Page::Touchpad,
-        Page::Trackpoint,
-        Page::Trackball,
-        Page::Tablet,
-        Page::Touch,
-        Page::Animations,
-        Page::Cursor,
-        Page::LayoutExtras,
-        Page::Gestures,
-        Page::Workspaces,
-        Page::WindowRules,
-        Page::LayerRules,
-        Page::Keybindings,
-        Page::Outputs,
-        Page::Miscellaneous,
-        Page::Startup,
-        Page::Environment,
-        Page::Debug,
-        Page::SwitchEvents,
-        Page::RecentWindows,
-        Page::Tools,
-        Page::Preferences,
-        Page::ConfigEditor,
-        Page::Backups,
-    ];
+/// Const arrays of pages per category (avoids runtime allocation)
+const SYSTEM_PAGES: &[Page] = &[
+    Page::Overview,
+    Page::Startup,
+    Page::Environment,
+    Page::Tools,
+    Page::Preferences,
+    Page::ConfigEditor,
+    Page::Backups,
+];
 
-    all_pages
-        .into_iter()
-        .filter(|page| page.category() == category)
-        .collect()
+const VISUAL_PAGES: &[Page] = &[
+    Page::Appearance,
+    Page::Animations,
+    Page::Cursor,
+];
+
+const INPUT_PAGES: &[Page] = &[
+    Page::Keyboard,
+    Page::Mouse,
+    Page::Touchpad,
+    Page::Trackpoint,
+    Page::Trackball,
+    Page::Tablet,
+    Page::Touch,
+    Page::Gestures,
+];
+
+const LAYOUT_PAGES: &[Page] = &[
+    Page::LayoutExtras,
+    Page::Workspaces,
+    Page::Outputs,
+];
+
+const RULES_PAGES: &[Page] = &[
+    Page::WindowRules,
+    Page::LayerRules,
+    Page::Keybindings,
+];
+
+const ADVANCED_PAGES: &[Page] = &[
+    Page::Debug,
+    Page::Behavior,
+    Page::Miscellaneous,
+    Page::SwitchEvents,
+    Page::RecentWindows,
+];
+
+/// Helper: Get all pages in a category (uses const arrays, no allocation)
+fn get_pages_in_category(category: PageCategory) -> &'static [Page] {
+    match category {
+        PageCategory::System => SYSTEM_PAGES,
+        PageCategory::Visual => VISUAL_PAGES,
+        PageCategory::Input => INPUT_PAGES,
+        PageCategory::Layout => LAYOUT_PAGES,
+        PageCategory::Rules => RULES_PAGES,
+        PageCategory::Advanced => ADVANCED_PAGES,
+    }
 }

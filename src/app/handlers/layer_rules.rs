@@ -159,7 +159,7 @@ impl super::super::App {
             }
         }
 
-        self.dirty_tracker.mark(SettingsCategory::LayerRules);
+        self.save.dirty_tracker.mark(SettingsCategory::LayerRules);
         self.mark_changed();
         Task::none()
     }

@@ -34,7 +34,7 @@ impl super::super::App {
         }
 
 
-        self.dirty_tracker.mark(SettingsCategory::Keyboard);
+        self.save.dirty_tracker.mark(SettingsCategory::Keyboard);
         self.mark_changed();
 
         Task::none()

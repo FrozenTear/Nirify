@@ -43,7 +43,7 @@ impl super::super::App {
             DebugMessage::SetForcePipewireInvalidModifier(v) => debug.force_pipewire_invalid_modifier = v,
         }
 
-        self.dirty_tracker.mark(SettingsCategory::Debug);
+        self.save.dirty_tracker.mark(SettingsCategory::Debug);
         self.mark_changed();
         Task::none()
     }

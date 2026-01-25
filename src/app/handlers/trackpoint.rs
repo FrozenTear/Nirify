@@ -22,7 +22,7 @@ impl super::super::App {
             TrackpointMessage::SetScrollButton(v) => trackpoint.scroll_button = v,
         }
 
-        self.dirty_tracker.mark(SettingsCategory::Trackpoint);
+        self.save.dirty_tracker.mark(SettingsCategory::Trackpoint);
         self.mark_changed();
         Task::none()
     }

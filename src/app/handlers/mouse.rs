@@ -40,7 +40,7 @@ impl super::super::App {
         }
 
 
-        self.dirty_tracker.mark(SettingsCategory::Mouse);
+        self.save.dirty_tracker.mark(SettingsCategory::Mouse);
         self.mark_changed();
 
         Task::none()

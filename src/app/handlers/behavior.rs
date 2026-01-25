@@ -58,7 +58,7 @@ impl super::super::App {
         }
 
 
-        self.dirty_tracker.mark(SettingsCategory::Behavior);
+        self.save.dirty_tracker.mark(SettingsCategory::Behavior);
         self.mark_changed();
 
         Task::none()

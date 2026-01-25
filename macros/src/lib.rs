@@ -4,7 +4,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
 
 /// Derive macro for generating Slint UI index conversion methods.
 ///
@@ -162,4 +162,105 @@ pub fn derive_slint_index(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
+}
+
+/// Derive macro for generating `has_any()` method on structs with Option fields.
+///
+/// This macro generates a `has_any(&self) -> bool` method that returns true
+/// if any of the struct's Option fields are Some.
+///
+/// # Requirements
+///
+/// - The struct must have named fields
+/// - All fields should be `Option<T>` (non-Option fields are ignored)
+///
+/// # Example
+///
+/// ```ignore
+/// use nirify_macros::HasAny;
+///
+/// #[derive(HasAny, Default)]
+/// pub struct LayoutOverride {
+///     pub gaps: Option<f32>,
+///     pub strut_left: Option<f32>,
+///     pub center_focused: Option<bool>,
+/// }
+///
+/// // Generates:
+/// // impl LayoutOverride {
+/// //     pub fn has_any(&self) -> bool {
+/// //         self.gaps.is_some()
+/// //             || self.strut_left.is_some()
+/// //             || self.center_focused.is_some()
+/// //     }
+/// // }
+/// ```
+#[proc_macro_derive(HasAny)]
+pub fn derive_has_any(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    // Only works on structs with named fields
+    let fields = match &input.data {
+        Data::Struct(data) => match &data.fields {
+            Fields::Named(fields) => &fields.named,
+            _ => {
+                return syn::Error::new_spanned(
+                    &input,
+                    "HasAny can only be derived for structs with named fields",
+                )
+                .to_compile_error()
+                .into();
+            }
+        },
+        _ => {
+            return syn::Error::new_spanned(&input, "HasAny can only be derived for structs")
+                .to_compile_error()
+                .into();
+        }
+    };
+
+    // Collect Option fields
+    let option_checks: Vec<_> = fields
+        .iter()
+        .filter_map(|field| {
+            let field_name = field.ident.as_ref()?;
+
+            // Check if the field type is Option<T>
+            if is_option_type(&field.ty) {
+                Some(quote! { self.#field_name.is_some() })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if option_checks.is_empty() {
+        return syn::Error::new_spanned(&input, "HasAny requires at least one Option field")
+            .to_compile_error()
+            .into();
+    }
+
+    // Build the has_any method
+    let expanded = quote! {
+        impl #name {
+            /// Returns true if any optional field is set (not None).
+            #[inline]
+            pub fn has_any(&self) -> bool {
+                #(#option_checks)||*
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+/// Check if a type is Option<T>
+fn is_option_type(ty: &Type) -> bool {
+    if let Type::Path(type_path) = ty {
+        if let Some(segment) = type_path.path.segments.last() {
+            return segment.ident == "Option";
+        }
+    }
+    false
 }

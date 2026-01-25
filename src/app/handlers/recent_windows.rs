@@ -70,7 +70,7 @@ impl super::super::App {
             }
         }
 
-        self.dirty_tracker.mark(SettingsCategory::RecentWindows);
+        self.save.dirty_tracker.mark(SettingsCategory::RecentWindows);
         self.mark_changed();
         Task::none()
     }

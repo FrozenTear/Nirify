@@ -35,7 +35,7 @@ impl super::super::App {
             }
         }
 
-        self.dirty_tracker.mark(SettingsCategory::Environment);
+        self.save.dirty_tracker.mark(SettingsCategory::Environment);
         self.mark_changed();
         Task::none()
     }

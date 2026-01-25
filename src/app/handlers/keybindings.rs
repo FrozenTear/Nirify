@@ -221,7 +221,7 @@ impl super::super::App {
 
         // Update the cache for view borrowing
 
-        self.dirty_tracker.mark(SettingsCategory::Keybindings);
+        self.save.dirty_tracker.mark(SettingsCategory::Keybindings);
         self.mark_changed();
 
         Task::none()

@@ -44,7 +44,7 @@ impl super::super::App {
             }
         }
 
-        self.dirty_tracker.mark(SettingsCategory::Touch);
+        self.save.dirty_tracker.mark(SettingsCategory::Touch);
         self.mark_changed();
         Task::none()
     }

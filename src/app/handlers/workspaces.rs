@@ -52,7 +52,7 @@ impl super::super::App {
         }
 
 
-        self.dirty_tracker.mark(SettingsCategory::Workspaces);
+        self.save.dirty_tracker.mark(SettingsCategory::Workspaces);
         self.mark_changed();
 
         Task::none()

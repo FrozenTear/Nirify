@@ -21,7 +21,7 @@ impl super::super::App {
             MiscellaneousMessage::SetXWaylandSatellite(v) => misc.xwayland_satellite = v,
         }
 
-        self.dirty_tracker.mark(SettingsCategory::Miscellaneous);
+        self.save.dirty_tracker.mark(SettingsCategory::Miscellaneous);
         self.mark_changed();
         Task::none()
     }

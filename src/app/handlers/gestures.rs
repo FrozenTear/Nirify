@@ -31,7 +31,7 @@ impl super::super::App {
             GesturesMessage::SetDndWorkspaceMaxSpeed(v) => gestures.dnd_edge_workspace_switch.max_speed = v.clamp(100, 5000),
         }
 
-        self.dirty_tracker.mark(SettingsCategory::Gestures);
+        self.save.dirty_tracker.mark(SettingsCategory::Gestures);
         self.mark_changed();
         Task::none()
     }
