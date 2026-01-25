@@ -538,59 +538,74 @@ pub fn search_dropdown_item_style() -> impl Fn(&Theme, button::Status) -> button
 }
 
 /// Container style for setting cards - elevated surface with subtle border
-pub fn card_style(_theme: &Theme) -> container::Style {
-    let colors = NiriColors::default();
+/// Respects the current theme's color palette.
+pub fn card_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    // Derive surface color: slightly lighter than background
+    let surface = lighten(palette.background, 0.05);
+    let border = lighten(palette.background, 0.12);
 
     container::Style {
-        background: Some(iced::Background::Color(colors.bg_surface)),
+        background: Some(iced::Background::Color(surface)),
         border: Border {
-            color: colors.border_subtle,
+            color: border,
             width: 1.0,
             radius: 8.0.into(),
         },
         shadow: Shadow {
-            color: colors.shadow_color,
+            color: Color::from_rgba(0.0, 0.0, 0.0, 0.2),
             offset: Vector::new(0.0, 2.0),
             blur_radius: 6.0,
         },
-        text_color: Some(colors.text_primary),
-        snap: false,
-    }
-}
-
-/// Container style for section headers with accent line
-pub fn section_header_style(_theme: &Theme) -> container::Style {
-    let colors = NiriColors::default();
-
-    container::Style {
-        background: None,
-        border: Border {
-            color: colors.accent_primary,
-            width: 2.0,
-            radius: 0.0.into(),
-        },
-        shadow: Shadow::default(),
-        text_color: Some(colors.text_primary),
+        text_color: Some(palette.text),
         snap: false,
     }
 }
 
 /// Container style for info/hint blocks
-pub fn info_block_style(_theme: &Theme) -> container::Style {
-    let colors = NiriColors::default();
+/// Uses the theme's success color for a subtle tint.
+pub fn info_block_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    // Use success color with low opacity for info blocks
+    let tint = Color { a: 0.15, ..palette.success };
+    let border = Color { a: 0.4, ..palette.success };
 
     container::Style {
-        background: Some(iced::Background::Color(Color {
-            a: 0.3,
-            ..colors.accent_secondary
-        })),
+        background: Some(iced::Background::Color(tint)),
         border: Border {
-            color: colors.accent_secondary,
+            color: border,
             width: 1.0,
             radius: 6.0.into(),
         },
         shadow: Shadow::default(),
-        text_color: Some(colors.text_primary),
+        text_color: Some(palette.text),
         snap: false,
     }
+}
+
+/// Helper: Lighten a color by a factor (0.0 = no change, 1.0 = white)
+fn lighten(color: Color, factor: f32) -> Color {
+    Color {
+        r: color.r + (1.0 - color.r) * factor,
+        g: color.g + (1.0 - color.g) * factor,
+        b: color.b + (1.0 - color.b) * factor,
+        a: color.a,
+    }
+}
+
+/// Helper: Get the primary accent color from theme
+pub fn accent_color(theme: &Theme) -> Color {
+    theme.palette().primary
+}
+
+/// Helper: Get muted text color from theme
+pub fn muted_text_color(theme: &Theme) -> Color {
+    let text = theme.palette().text;
+    Color { a: 0.5, ..text }
+}
+
+/// Helper: Get secondary text color from theme
+pub fn secondary_text_color(theme: &Theme) -> Color {
+    let text = theme.palette().text;
+    Color { a: 0.7, ..text }
 }

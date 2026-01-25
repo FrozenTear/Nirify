@@ -5,7 +5,7 @@
 
 use iced::widget::{column, container, pick_list, row, slider, text, text_input, toggler};
 use iced::{Alignment, Element, Length};
-use crate::theme::{fonts, card_style, info_block_style, NiriColors};
+use crate::theme::{fonts, card_style, info_block_style, accent_color, NiriColors};
 
 /// Creates a toggle row with label and description
 ///
@@ -377,7 +377,7 @@ pub fn page_title<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
 
 /// Creates a section header for grouping related settings
 ///
-/// Features a 2px amber accent line above the text for visual hierarchy.
+/// Features a 2px accent line (using theme primary color) above the text.
 /// Uses top padding of 24px for visual separation between sections.
 /// Use this for sections AFTER the first page_title.
 ///
@@ -386,25 +386,22 @@ pub fn page_title<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
 /// section_header("Focus Ring")
 /// ```
 pub fn section_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
-    let colors = NiriColors::default();
-
-    // Section header with accent line
+    // Section header with accent line (theme-aware)
     column![
-        // Thin amber accent line
+        // Thin accent line using theme's primary color
         container(text(""))
             .width(Length::Fixed(40.0))
             .height(Length::Fixed(2.0))
-            .style(move |_theme| {
+            .style(|theme| {
                 container::Style {
-                    background: Some(iced::Background::Color(colors.accent_primary)),
+                    background: Some(iced::Background::Color(accent_color(theme))),
                     ..Default::default()
                 }
             }),
-        // Section title
+        // Section title (uses theme's default text color)
         text(label)
             .size(20)
             .font(fonts::UI_FONT_SEMIBOLD)
-            .color(colors.text_primary)
     ]
     .spacing(6)
     .padding(iced::Padding {
@@ -492,12 +489,14 @@ where
 
 /// Creates an info text block (for hints, warnings, etc.)
 /// Styled as a subtle teal-tinted box for visual distinction.
+/// Creates an info text block (for hints, warnings, etc.)
+/// Styled with the theme's success color for a subtle tint.
 pub fn info_text<'a, Message: 'a>(content: &'a str) -> Element<'a, Message> {
-    let colors = NiriColors::default();
+    // Uses info_block_style which derives colors from theme
     container(
         row![
-            text("ℹ").size(13).color(colors.accent_secondary),
-            text(content).size(12).color(colors.text_secondary),
+            text("ℹ").size(13),
+            text(content).size(12),
         ]
         .spacing(8)
         .align_y(Alignment::Start)
