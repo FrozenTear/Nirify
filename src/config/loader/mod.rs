@@ -479,6 +479,7 @@ pub fn load_settings_with_result(paths: &ConfigPaths) -> LoadResult {
                     result.settings.workspaces.workspaces.push(ws);
                 }
             }
+            result.settings.workspaces.next_id = next_id;
         }
         result.track("workspaces.kdl", &status);
     }
@@ -504,6 +505,7 @@ pub fn load_settings_with_result(paths: &ConfigPaths) -> LoadResult {
                     result.settings.layer_rules.rules.push(rule);
                 }
             }
+            result.settings.layer_rules.next_id = next_id;
         }
         result.track("advanced/layer-rules.kdl", &status);
     }
@@ -529,6 +531,7 @@ pub fn load_settings_with_result(paths: &ConfigPaths) -> LoadResult {
                     result.settings.window_rules.rules.push(rule);
                 }
             }
+            result.settings.window_rules.next_id = next_id;
         }
         result.track("advanced/window-rules.kdl", &status);
     }

@@ -1,6 +1,6 @@
 # Maintainer: Your Name <your.email@example.com>
 pkgname=nirify-bin
-pkgver=0.2.6
+pkgver=0.2.7
 pkgrel=1
 pkgdesc="A native settings application for the niri Wayland compositor (pre-built binary)"
 arch=('x86_64')
