@@ -8,6 +8,7 @@ pub mod constants;
 pub mod messages;
 pub mod save_manager;
 pub mod search;
+pub mod system_theme;
 pub mod theme;
 pub mod types;
 pub mod views;

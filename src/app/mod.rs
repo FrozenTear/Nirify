@@ -267,6 +267,12 @@ impl App {
                 Task::none()
             }
 
+            // System theme events from portal or file watcher
+            Message::SystemThemeEvent(event) => {
+                self.ui.system_theme_state.handle_event(event);
+                Task::none()
+            }
+
             // Settings category messages
             Message::Appearance(msg) => self.update_appearance(msg),
 
@@ -796,7 +802,7 @@ impl App {
         Subscription::batch(subs)
     }
 
-    /// Base subscriptions always active: save checks, niri status, toast clearing
+    /// Base subscriptions always active: save checks, niri status, toast clearing, system theme
     fn base_subscriptions(&self) -> Vec<Subscription<Message>> {
         let mut subs = vec![
             // Periodic save checks (every 200ms - sufficient with 300ms debounce)
@@ -804,6 +810,8 @@ impl App {
                 .map(|_| Message::Save(SaveMessage::CheckSave)),
             // Niri status check (every 5 seconds)
             time::every(Duration::from_secs(5)).map(|_| Message::CheckNiriStatus),
+            // System theme detection (portal or file watcher)
+            crate::system_theme::subscription().map(Message::SystemThemeEvent),
         ];
 
         // Toast auto-clear check (every 500ms, only when toast is showing)
@@ -1605,7 +1613,13 @@ impl App {
 pub fn run() -> iced::Result {
     iced::application(App::new, App::update, App::view)
         .subscription(App::subscription)
-        .theme(|app: &App| app.ui.current_theme.to_iced_theme())
+        .theme(|app: &App| {
+            use crate::theme::AppTheme;
+            match app.ui.current_theme {
+                AppTheme::System => app.ui.system_theme_state.build_theme(),
+                other => other.to_iced_theme(),
+            }
+        })
         .settings(iced::Settings {
             id: Some("nirify".to_string()),
             ..Default::default()

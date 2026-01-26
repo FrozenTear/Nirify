@@ -1,6 +1,6 @@
 [package]
 name = "nirify"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2021"
 rust-version = "1.82"
 description = "A native settings application for the niri Wayland compositor"
@@ -30,6 +30,11 @@ env_logger = "0.11"
 rfd = "0.15"
 paste = "1.0"
 regex-syntax = "0.8"
+
+# System theme detection
+ashpd = "0.12"
+notify = "7"
+futures-util = "0.3"
 
 [dev-dependencies]
 tempfile = "3.23"

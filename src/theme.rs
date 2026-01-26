@@ -52,6 +52,8 @@ pub mod fonts {
 /// Application theme variants
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AppTheme {
+    /// Follow system theme (portal or pywal/wallust)
+    System,
     /// Default niri theme with warm amber/teal palette
     #[default]
     NiriAmber,
@@ -82,8 +84,12 @@ pub enum AppTheme {
 
 impl AppTheme {
     /// Returns the iced Theme for this app theme
+    ///
+    /// Note: For `AppTheme::System`, this returns the NiriAmber fallback.
+    /// The actual system theme should be resolved by the App using `SystemThemeState`.
     pub fn to_iced_theme(self) -> Theme {
         match self {
+            AppTheme::System => build_niri_amber_theme(), // Fallback; App handles actual system theme
             AppTheme::NiriAmber => build_niri_amber_theme(),
             AppTheme::CatppuccinLatte => Theme::CatppuccinLatte,
             AppTheme::CatppuccinFrappe => Theme::CatppuccinFrappe,
@@ -102,7 +108,9 @@ impl AppTheme {
     /// Returns all available themes for theme selector
     pub fn all() -> &'static [AppTheme] {
         &[
-            // Custom theme first
+            // System theme first (follows desktop/wallpaper)
+            AppTheme::System,
+            // Custom theme
             AppTheme::NiriAmber,
             // Catppuccin family (most popular)
             AppTheme::CatppuccinMocha,
@@ -124,6 +132,7 @@ impl AppTheme {
     /// Human-readable name with light/dark indicator
     pub fn name(self) -> &'static str {
         match self {
+            AppTheme::System => "System (Auto)",
             AppTheme::NiriAmber => "Niri Amber (Dark)",
             AppTheme::CatppuccinLatte => "Catppuccin Latte (Light)",
             AppTheme::CatppuccinFrappe => "Catppuccin Frappé (Dark)",
@@ -140,6 +149,9 @@ impl AppTheme {
     }
 
     /// Returns whether this is a light theme
+    ///
+    /// Note: `System` returns false (dark) as a default; actual light/dark
+    /// detection should be done via `SystemThemeState`.
     pub fn is_light(self) -> bool {
         matches!(
             self,
@@ -159,6 +171,7 @@ impl std::str::FromStr for AppTheme {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "System" => Ok(Self::System),
             "NiriAmber" => Ok(Self::NiriAmber),
             "CatppuccinLatte" => Ok(Self::CatppuccinLatte),
             "CatppuccinFrappe" => Ok(Self::CatppuccinFrappe),
@@ -180,6 +193,7 @@ impl AppTheme {
     /// Converts theme to a string (for persistence)
     pub fn to_str(self) -> &'static str {
         match self {
+            Self::System => "System",
             Self::NiriAmber => "NiriAmber",
             Self::CatppuccinLatte => "CatppuccinLatte",
             Self::CatppuccinFrappe => "CatppuccinFrappe",
@@ -280,30 +294,31 @@ pub fn niri_theme() -> Theme {
     AppTheme::default().to_iced_theme()
 }
 
-/// Custom button style for navigation tabs
+/// Custom button style for navigation tabs - uses theme palette
 pub fn nav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
-    let colors = NiriColors::default();
+    move |theme, status| {
+        let palette = theme.palette();
+        let primary = palette.primary;
+        let bg = palette.background;
+        let text = palette.text;
 
-    move |_theme, status| {
-        let base_bg = if active {
-            colors.accent_primary
-        } else {
-            Color::TRANSPARENT
-        };
+        // Derive surface colors from background
+        let surface_hover = lighten(bg, 0.12);
+        let surface = lighten(bg, 0.08);
+        let border_subtle = lighten(bg, 0.15);
+        let text_secondary = Color { a: 0.7, ..text };
+        let glow = Color { a: 0.15, ..primary };
 
-        let text_color = if active {
-            colors.bg_base
-        } else {
-            colors.text_secondary
-        };
+        let base_bg = if active { primary } else { Color::TRANSPARENT };
+        let text_color = if active { bg } else { text_secondary };
 
         match status {
             button::Status::Hovered => button::Style {
                 background: Some(iced::Background::Color(
                     if active {
-                        Color { a: 0.9, ..colors.accent_primary }
+                        Color { a: 0.9, ..primary }
                     } else {
-                        colors.bg_surface_hover
+                        surface_hover
                     }
                 )),
                 text_color,
@@ -313,7 +328,7 @@ pub fn nav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> button:
                     radius: 8.0.into(),
                 },
                 shadow: Shadow {
-                    color: if active { colors.glow_accent } else { Color::TRANSPARENT },
+                    color: if active { glow } else { Color::TRANSPARENT },
                     offset: Vector::new(0.0, 2.0),
                     blur_radius: 8.0,
                 },
@@ -322,9 +337,9 @@ pub fn nav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> button:
             button::Status::Pressed => button::Style {
                 background: Some(iced::Background::Color(
                     if active {
-                        Color { a: 0.8, ..colors.accent_primary }
+                        Color { a: 0.8, ..primary }
                     } else {
-                        colors.bg_surface
+                        surface
                     }
                 )),
                 text_color,
@@ -340,13 +355,12 @@ pub fn nav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> button:
                 background: Some(iced::Background::Color(base_bg)),
                 text_color,
                 border: Border {
-                    // Subtle border on inactive buttons to indicate focusability
-                    color: if active { Color::TRANSPARENT } else { colors.border_subtle },
+                    color: if active { Color::TRANSPARENT } else { border_subtle },
                     width: if active { 0.0 } else { 1.0 },
                     radius: 8.0.into(),
                 },
                 shadow: Shadow {
-                    color: if active { colors.glow_accent } else { Color::TRANSPARENT },
+                    color: if active { glow } else { Color::TRANSPARENT },
                     offset: Vector::new(0.0, 2.0),
                     blur_radius: 8.0,
                 },
@@ -356,27 +370,26 @@ pub fn nav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> button:
     }
 }
 
-/// Custom button style for sub-navigation tabs
+/// Custom button style for sub-navigation tabs - uses theme palette
 pub fn subnav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
-    let colors = NiriColors::default();
+    move |theme, status| {
+        let palette = theme.palette();
+        let primary = palette.primary;
+        let bg = palette.background;
+        let text = palette.text;
 
-    move |_theme, status| {
-        let text_color = if active {
-            colors.accent_secondary
-        } else {
-            colors.text_secondary
-        };
+        // Derive colors from theme
+        let surface_hover = lighten(bg, 0.12);
+        let surface = lighten(bg, 0.08);
+        let text_secondary = Color { a: 0.7, ..text };
 
-        let border_color = if active {
-            colors.accent_secondary
-        } else {
-            Color::TRANSPARENT
-        };
+        let text_color = if active { primary } else { text_secondary };
+        let border_color = if active { primary } else { Color::TRANSPARENT };
 
         match status {
             button::Status::Hovered => button::Style {
-                background: Some(iced::Background::Color(colors.bg_surface_hover)),
-                text_color: if active { colors.accent_secondary } else { colors.text_primary },
+                background: Some(iced::Background::Color(surface_hover)),
+                text_color: if active { primary } else { text },
                 border: Border {
                     color: border_color,
                     width: if active { 2.0 } else { 0.0 },
@@ -386,7 +399,7 @@ pub fn subnav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> butt
                 snap: false,
             },
             button::Status::Pressed => button::Style {
-                background: Some(iced::Background::Color(colors.bg_surface)),
+                background: Some(iced::Background::Color(surface)),
                 text_color,
                 border: Border {
                     color: border_color,
@@ -411,94 +424,117 @@ pub fn subnav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> butt
     }
 }
 
-/// Container style for search bar
-pub fn search_container_style(_theme: &Theme) -> container::Style {
-    let colors = NiriColors::default();
+/// Container style for search bar - uses theme palette
+pub fn search_container_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    let bg = palette.background;
+    let text = palette.text;
+
+    let input_bg = lighten(bg, 0.10);
+    let border = lighten(bg, 0.15);
 
     container::Style {
-        background: Some(iced::Background::Color(colors.bg_input)),
+        background: Some(iced::Background::Color(input_bg)),
         border: Border {
-            color: colors.border_subtle,
+            color: border,
             width: 1.0,
             radius: 12.0.into(),
         },
         shadow: Shadow {
-            color: colors.shadow_color,
+            color: Color::from_rgba(0.0, 0.0, 0.0, 0.25),
             offset: Vector::new(0.0, 2.0),
             blur_radius: 8.0,
         },
-        text_color: Some(colors.text_primary),
+        text_color: Some(text),
         snap: false,
     }
 }
 
-/// Container style for the main navigation bar
-pub fn nav_bar_style(_theme: &Theme) -> container::Style {
-    let colors = NiriColors::default();
+/// Container style for the main navigation bar - uses theme palette
+pub fn nav_bar_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    let bg = palette.background;
+    let text = palette.text;
+
+    let surface = lighten(bg, 0.05);
 
     container::Style {
-        background: Some(iced::Background::Color(colors.bg_surface)),
+        background: Some(iced::Background::Color(surface)),
         border: Border {
-            color: colors.border_subtle,
+            color: lighten(bg, 0.12),
             width: 0.0,
             radius: 0.0.into(),
         },
         shadow: Shadow {
-            color: colors.shadow_color,
+            color: Color::from_rgba(0.0, 0.0, 0.0, 0.25),
             offset: Vector::new(0.0, 2.0),
             blur_radius: 12.0,
         },
-        text_color: Some(colors.text_primary),
+        text_color: Some(text),
         snap: false,
     }
 }
 
-/// Container style for the sub-navigation bar
-pub fn subnav_bar_style(_theme: &Theme) -> container::Style {
-    let colors = NiriColors::default();
+/// Container style for the sub-navigation bar - uses theme palette
+pub fn subnav_bar_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    let bg = palette.background;
+    let text = palette.text;
+    let text_secondary = Color { a: 0.7, ..text };
 
     container::Style {
-        background: Some(iced::Background::Color(colors.bg_base)),
+        background: Some(iced::Background::Color(bg)),
         border: Border {
-            color: colors.border_subtle,
+            color: lighten(bg, 0.12),
             width: 0.0,
             radius: 0.0.into(),
         },
         shadow: Shadow {
-            color: colors.shadow_color,
+            color: Color::from_rgba(0.0, 0.0, 0.0, 0.25),
             offset: Vector::new(0.0, 1.0),
             blur_radius: 4.0,
         },
-        text_color: Some(colors.text_secondary),
+        text_color: Some(text_secondary),
         snap: false,
     }
 }
 
-/// Container style for the status bar at bottom
-pub fn status_bar_style(_theme: &Theme) -> container::Style {
-    let colors = NiriColors::default();
+/// Container style for the status bar at bottom - uses theme palette
+pub fn status_bar_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    let bg = palette.background;
+    let text = palette.text;
+
+    let surface = lighten(bg, 0.05);
+    let border = lighten(bg, 0.12);
+    let text_secondary = Color { a: 0.7, ..text };
 
     container::Style {
-        background: Some(iced::Background::Color(colors.bg_surface)),
+        background: Some(iced::Background::Color(surface)),
         border: Border {
-            color: colors.border_subtle,
+            color: border,
             width: 1.0,
             radius: 0.0.into(),
         },
         shadow: Shadow::default(),
-        text_color: Some(colors.text_secondary),
+        text_color: Some(text_secondary),
         snap: false,
     }
 }
 
-/// Container style for the search dropdown
-pub fn search_dropdown_style(_theme: &Theme) -> container::Style {
-    let colors = NiriColors::default();
+/// Container style for the search dropdown - uses theme palette
+pub fn search_dropdown_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    let bg = palette.background;
+    let text = palette.text;
+
+    let surface = lighten(bg, 0.05);
+    let border = lighten(bg, 0.18);
 
     container::Style {
-        background: Some(iced::Background::Color(colors.bg_surface)),
+        background: Some(iced::Background::Color(surface)),
         border: Border {
-            color: colors.border_strong,
+            color: border,
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -507,25 +543,30 @@ pub fn search_dropdown_style(_theme: &Theme) -> container::Style {
             offset: Vector::new(0.0, 4.0),
             blur_radius: 16.0,
         },
-        text_color: Some(colors.text_primary),
+        text_color: Some(text),
         snap: false,
     }
 }
 
-/// Button style for search dropdown items
+/// Button style for search dropdown items - uses theme palette
 pub fn search_dropdown_item_style() -> impl Fn(&Theme, button::Status) -> button::Style {
-    let colors = NiriColors::default();
+    move |theme, status| {
+        let palette = theme.palette();
+        let bg = palette.background;
+        let text = palette.text;
 
-    move |_theme, status| {
-        let bg = match status {
-            button::Status::Hovered => colors.bg_surface_hover,
-            button::Status::Pressed => colors.bg_input,
+        let surface_hover = lighten(bg, 0.12);
+        let input_bg = lighten(bg, 0.10);
+
+        let item_bg = match status {
+            button::Status::Hovered => surface_hover,
+            button::Status::Pressed => input_bg,
             _ => Color::TRANSPARENT,
         };
 
         button::Style {
-            background: Some(iced::Background::Color(bg)),
-            text_color: colors.text_primary,
+            background: Some(iced::Background::Color(item_bg)),
+            text_color: text,
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,

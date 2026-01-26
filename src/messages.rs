@@ -50,6 +50,8 @@ pub enum Message {
     SearchResultSelected(usize),
     ClearSearch,
     ChangeTheme(crate::theme::AppTheme),
+    /// System theme event from portal or file watcher
+    SystemThemeEvent(crate::system_theme::SystemThemeEvent),
     /// Toggle search bar visibility / focus (Ctrl+K)
     ToggleSearch,
 

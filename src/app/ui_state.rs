@@ -43,6 +43,8 @@ pub struct UiState {
     pub dialog_state: DialogState,
     /// Current theme
     pub current_theme: crate::theme::AppTheme,
+    /// System theme state (for AppTheme::System)
+    pub system_theme_state: crate::system_theme::SystemThemeState,
     /// Niri compositor connection status
     pub niri_status: crate::views::status_bar::NiriStatus,
 
