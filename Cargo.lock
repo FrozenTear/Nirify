@@ -2360,7 +2360,7 @@ dependencies = [
 
 [[package]]
 name = "nirify"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "anyhow",
  "ashpd 0.12.1",
