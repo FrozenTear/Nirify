@@ -343,6 +343,13 @@ pub fn save_dirty(
     let mut files_written = 0;
     let strategy = WriteStrategy::Atomic;
 
+    // Ensure main.kdl exists (it includes all other config files)
+    // This is essential for niri to load our managed configuration
+    if !paths.main_kdl.exists() {
+        write_config(&paths.main_kdl, &generate_main_kdl(), strategy)?;
+        files_written += 1;
+    }
+
     for category in dirty {
         match category {
             SettingsCategory::Appearance => {
