@@ -504,6 +504,23 @@ impl App {
                     return Task::none();
                 }
 
+                // Create main.kdl immediately (before adding include line)
+                // This ensures niri can load the config even if the app crashes
+                // before the debounced save completes
+                if !self.paths.main_kdl.exists() {
+                    let main_kdl_content = crate::config::storage::generate_main_kdl();
+                    if let Err(e) = crate::config::storage::atomic_write(&self.paths.main_kdl, &main_kdl_content) {
+                        log::error!("Failed to create main.kdl: {}", e);
+                        self.ui.dialog_state = DialogState::Error {
+                            title: "Setup Error".to_string(),
+                            message: "Failed to create main.kdl configuration file.".to_string(),
+                            details: Some(e.to_string()),
+                        };
+                        return Task::none();
+                    }
+                    log::info!("Created main.kdl");
+                }
+
                 // Add include line to user's config.kdl
                 if let Err(e) = self.paths.add_include_line() {
                     log::error!("Failed to add include line: {}", e);
