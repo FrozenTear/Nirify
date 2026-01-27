@@ -20,7 +20,9 @@ fn is_valid_hotkey(hotkey: &str) -> bool {
     }
 
     // Must have at least one part (the key)
-    let key = parts.last().unwrap();
+    let Some(key) = parts.last() else {
+        return false;
+    };
     if key.is_empty() {
         return false;
     }

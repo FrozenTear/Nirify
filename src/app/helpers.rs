@@ -80,7 +80,9 @@ pub fn parse_spawn_command(command: &str) -> Result<ParsedCommand, String> {
                 if let Some(&next) = chars.peek() {
                     match next {
                         '"' | '\\' | '$' | '`' => {
-                            current_arg.push(chars.next().unwrap());
+                            if let Some(escaped) = chars.next() {
+                                current_arg.push(escaped);
+                            }
                         }
                         _ => {
                             current_arg.push(c);
