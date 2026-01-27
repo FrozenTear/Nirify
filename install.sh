@@ -4,7 +4,7 @@
 # A native settings application for the niri Wayland compositor
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash
 #
 # Options (via environment variables):
 #   NIRIFY_PREFIX=/usr/local    Install prefix (default: /usr/local)
@@ -174,8 +174,8 @@ get_latest_version() {
     fi
 
     if [[ -z "$version" ]]; then
-        warn "Could not fetch latest version from GitHub. Using v0.2.7"
-        version="v0.2.7"
+        warn "Could not fetch latest version from GitHub. Using v0.2.7-1"
+        version="v0.2.7-1"
     fi
 
     echo "$version"
@@ -386,10 +386,10 @@ parse_args() {
                 echo ""
                 echo "Examples:"
                 echo "  # Install latest binary to /usr/local"
-                echo "  curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/main/install.sh | bash"
+                echo "  curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash"
                 echo ""
                 echo "  # Install specific version from source to /usr"
-                echo "  curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/main/install.sh | bash -s -- --source --prefix=/usr --version=0.2.7"
+                echo "  curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --source --prefix=/usr --version=0.2.7-1"
                 echo ""
                 exit 0
                 ;;

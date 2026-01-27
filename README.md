@@ -50,19 +50,19 @@ cargo build --release
 ### Quick Install (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash
 ```
 
 Options:
 ```bash
 # Install from source instead of binary
-curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/main/install.sh | bash -s -- --source
+curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --source
 
 # Install to a custom prefix
-curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/main/install.sh | bash -s -- --prefix=/usr
+curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --prefix=/usr
 
 # Install a specific version
-curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/main/install.sh | bash -s -- --version=0.2.7
+curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --version=0.2.7
 ```
 
 ### Using Make
