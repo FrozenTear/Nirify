@@ -181,7 +181,7 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
 fn generate_minimal_config() -> String {
     r#"// Configuration managed by Nirify
 //
-// All settings are in: ~/.config/niri/nirify/
+// All settings are in the nirify/ subdirectory.
 // Edit them using the Nirify app or the files directly.
 
 include "nirify/main.kdl"
@@ -198,7 +198,7 @@ fn generate_replaced_config(analysis: &ConfigAnalysis) -> String {
     content.push_str("// Backup of original config saved before modification\n");
     content.push_str("//\n");
     content.push_str("// Managed settings (appearance, input, behavior, etc.) are in:\n");
-    content.push_str("//   ~/.config/niri/nirify/\n");
+    content.push_str("//   nirify/\n");
     content.push_str("//\n");
     content.push_str("// Your custom settings below are preserved.\n\n");
 

@@ -204,12 +204,12 @@ fn wizard_config_setup<'a>() -> Column<'a, Message> {
         container(
             column![
                 text("How it works:").size(13).color([0.7, 0.8, 0.9]),
-                text("1. We create separate .kdl files in ~/.config/niri/nirify/")
+                text("1. We create separate .kdl files in a nirify/ subdirectory")
                     .size(12).color([0.7, 0.7, 0.7]),
                 text("2. One include line is added to your config.kdl:")
                     .size(12).color([0.7, 0.7, 0.7]),
                 container(
-                    text("include \"~/.config/niri/nirify/main.kdl\"")
+                    text("include \"nirify/main.kdl\"")
                         .size(11)
                         .color([0.5, 0.8, 0.5])
                 )
@@ -421,7 +421,7 @@ fn wizard_complete<'a>() -> Column<'a, Message> {
                 text("  - Changes apply instantly - no need to save manually").size(12).color([0.7, 0.7, 0.7]),
                 text("  - Use Window Rules to customize per-app behavior").size(12).color([0.7, 0.7, 0.7]),
                 text("  - Check Tools > Analyze Rules to consolidate similar rules").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Backups are created automatically in ~/.config/niri/nirify/backups/").size(12).color([0.7, 0.7, 0.7]),
+                text("  - Backups are created automatically in nirify/.backup/").size(12).color([0.7, 0.7, 0.7]),
             ]
             .spacing(4)
         )

@@ -254,9 +254,9 @@ impl ConfigPaths {
             String::new()
         };
 
-        // Append include line
+        // Append include line (relative path works regardless of XDG_CONFIG_HOME)
         let include_line = format!(
-            "\n// Managed by Nirify - do not remove this line\ninclude \"~/.config/niri/{}/main.kdl\"\n",
+            "\n// Managed by Nirify - do not remove this line\ninclude \"{}/main.kdl\"\n",
             crate::constants::CONFIG_DIR_NAME
         );
 

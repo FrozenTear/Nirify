@@ -42,7 +42,7 @@ pub fn view(state: &BackupsState) -> Element<'_, Message> {
     // Info banner
     content = content.push(
         container(
-            text("Backups are stored in ~/.config/niri/.backup/ and persist even if Nirify is removed.")
+            text("Backups are stored in your niri config directory under nirify/.backup/ and persist even if Nirify is removed.")
                 .size(12)
                 .color([0.7, 0.85, 0.7]),
         )
