@@ -12,9 +12,14 @@ use iced::widget::{button, checkbox, column, container, row, scrollable, text, C
 use iced::{Alignment, Border, Color as IcedColor, Element, Length};
 
 use crate::messages::{ConfirmAction, ConsolidationSuggestion, DialogState, Message, WizardStep};
+use crate::version::{get_unsupported_features, NiriVersion};
 
 /// Creates the modal overlay with dialog content
-pub fn view<'a>(dialog: &'a DialogState, wizard_suggestions: &'a [ConsolidationSuggestion]) -> Option<Element<'a, Message>> {
+pub fn view<'a>(
+    dialog: &'a DialogState,
+    wizard_suggestions: &'a [ConsolidationSuggestion],
+    niri_version: Option<NiriVersion>,
+) -> Option<Element<'a, Message>> {
     match dialog {
         DialogState::None => None,
         DialogState::Error { title, message, details } => {
@@ -26,7 +31,7 @@ pub fn view<'a>(dialog: &'a DialogState, wizard_suggestions: &'a [ConsolidationS
             confirm_label,
             on_confirm,
         } => Some(confirm_dialog(title, message, confirm_label, on_confirm)),
-        DialogState::FirstRunWizard { step } => Some(wizard_dialog(step, wizard_suggestions)),
+        DialogState::FirstRunWizard { step } => Some(wizard_dialog(step, wizard_suggestions, niri_version)),
         DialogState::ImportSummary {
             imported_count,
             defaulted_count,
@@ -131,9 +136,13 @@ fn confirm_dialog<'a>(
 }
 
 /// First-run wizard dialog
-fn wizard_dialog<'a>(step: &WizardStep, wizard_suggestions: &'a [ConsolidationSuggestion]) -> Element<'a, Message> {
+fn wizard_dialog<'a>(
+    step: &WizardStep,
+    wizard_suggestions: &'a [ConsolidationSuggestion],
+    niri_version: Option<NiriVersion>,
+) -> Element<'a, Message> {
     let content: Column<'a, Message> = match step {
-        WizardStep::Welcome => wizard_welcome(),
+        WizardStep::Welcome => wizard_welcome(niri_version),
         WizardStep::ConfigSetup => wizard_config_setup(),
         WizardStep::ImportResults => wizard_import_results(),
         WizardStep::Consolidation => wizard_consolidation(wizard_suggestions),
@@ -143,8 +152,8 @@ fn wizard_dialog<'a>(step: &WizardStep, wizard_suggestions: &'a [ConsolidationSu
     dialog_container(content)
 }
 
-fn wizard_welcome<'a>() -> Column<'a, Message> {
-    column![
+fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> {
+    let mut content = column![
         text("Welcome to Niri Settings").size(28),
         text("A graphical settings manager for the niri Wayland compositor")
             .size(14)
@@ -170,9 +179,55 @@ fn wizard_welcome<'a>() -> Column<'a, Message> {
             },
             ..Default::default()
         }),
+    ]
+    .spacing(16);
+
+    // Show version warning if some features are not supported
+    if let Some(version) = niri_version {
+        let unsupported = get_unsupported_features(version);
+        if !unsupported.is_empty() {
+            let feature_list: String = unsupported
+                .iter()
+                .map(|f| format!("  - {} (requires {}+)", f.display_name(), f.min_version()))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            content = content.push(
+                container(
+                    column![
+                        text(format!("Note: niri {} detected", version))
+                            .size(12)
+                            .color([0.9, 0.7, 0.3]),
+                        text("Some features are not available in your version:")
+                            .size(11)
+                            .color([0.8, 0.6, 0.3]),
+                        text(feature_list)
+                            .size(11)
+                            .color([0.7, 0.6, 0.4]),
+                    ]
+                    .spacing(4)
+                )
+                .padding([10, 14])
+                .style(|_theme| container::Style {
+                    background: Some(iced::Background::Color(IcedColor::from_rgb(0.2, 0.15, 0.1))),
+                    border: Border {
+                        color: IcedColor::from_rgb(0.4, 0.3, 0.15),
+                        width: 1.0,
+                        radius: 6.0.into(),
+                    },
+                    ..Default::default()
+                })
+            );
+        }
+    }
+
+    content = content.push(
         text("This wizard will help you set up the application.")
             .size(13)
-            .color([0.6, 0.6, 0.6]),
+            .color([0.6, 0.6, 0.6])
+    );
+
+    content = content.push(
         row![
             button(text("Skip"))
                 .on_press(Message::CloseDialog)
@@ -191,8 +246,9 @@ fn wizard_welcome<'a>() -> Column<'a, Message> {
                 }),
         ]
         .spacing(12)
-    ]
-    .spacing(16)
+    );
+
+    content
 }
 
 fn wizard_config_setup<'a>() -> Column<'a, Message> {

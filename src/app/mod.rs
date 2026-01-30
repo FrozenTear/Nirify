@@ -129,12 +129,27 @@ impl App {
         let touch_calibration_cache =
             crate::views::widgets::format_matrix_values(settings.touch.calibration_matrix);
 
-        // Check initial niri connection status
-        let niri_status = if crate::ipc::is_niri_running() {
-            crate::views::status_bar::NiriStatus::Connected
+        // Check initial niri connection status and version
+        let (niri_status, niri_version) = if crate::ipc::is_niri_running() {
+            let version = crate::ipc::get_version()
+                .ok()
+                .and_then(|v| crate::version::NiriVersion::parse(&v));
+            if let Some(v) = version {
+                log::info!("Detected niri version: {}", v);
+            }
+            (crate::views::status_bar::NiriStatus::Connected, version)
         } else {
-            crate::views::status_bar::NiriStatus::Disconnected
+            (crate::views::status_bar::NiriStatus::Disconnected, None)
         };
+
+        // Determine feature compatibility based on niri version
+        let feature_compat = crate::version::FeatureCompat::from_version(niri_version);
+        if !feature_compat.recent_windows {
+            log::info!(
+                "Recent windows feature disabled (requires niri 25.11+, detected: {})",
+                niri_version.map(|v| v.to_string()).unwrap_or_else(|| "unknown".to_string())
+            );
+        }
 
         // Create UI state
         let mut ui = UiState::new(
@@ -143,6 +158,8 @@ impl App {
             touch_calibration_cache,
         );
         ui.niri_status = niri_status;
+        ui.niri_version = niri_version;
+        ui.feature_compat = feature_compat;
         ui.show_search_bar = settings.preferences.show_search_bar;
 
         // Check if this is the first run and show the wizard
@@ -541,7 +558,7 @@ impl App {
                 // This ensures niri can load the config even if the app crashes
                 // before the debounced save completes
                 if !self.paths.main_kdl.exists() {
-                    let main_kdl_content = crate::config::storage::generate_main_kdl();
+                    let main_kdl_content = crate::config::storage::generate_main_kdl(self.ui.feature_compat);
                     if let Err(e) = crate::config::storage::atomic_write(&self.paths.main_kdl, &main_kdl_content) {
                         log::error!("Failed to create main.kdl: {}", e);
                         self.ui.dialog_state = DialogState::Error {
@@ -806,7 +823,7 @@ impl App {
                     let dirty = self.save.dirty_tracker.take();
 
                     // Perform blocking save (acceptable since typically <100ms)
-                    match crate::config::save_dirty(&self.paths, &self.settings, &dirty) {
+                    match crate::config::save_dirty(&self.paths, &self.settings, &dirty, self.ui.feature_compat) {
                         Ok(count) => {
                             log::info!("Successfully saved {} file(s) before exit", count);
                         }
@@ -1111,7 +1128,7 @@ impl App {
 
         // If there's an active dialog, render it on top of everything
         if let Some(dialog) =
-            views::dialogs::view(&self.ui.dialog_state, &self.ui.wizard_suggestions)
+            views::dialogs::view(&self.ui.dialog_state, &self.ui.wizard_suggestions, self.ui.niri_version)
         {
             dialog
         } else {
@@ -1546,10 +1563,11 @@ impl App {
         let settings = self.settings.clone();
         let dirty = self.save.dirty_tracker.take();
         let paths = self.paths.clone();
+        let feature_compat = self.ui.feature_compat;
 
         Task::perform(
             async move {
-                match crate::config::save_dirty(&paths, &settings, &dirty) {
+                match crate::config::save_dirty(&paths, &settings, &dirty, feature_compat) {
                     Ok(count) => SaveResult::Success {
                         files_written: count,
                         categories: dirty.into_iter().collect(),

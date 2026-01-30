@@ -652,6 +652,7 @@ animations {
     fn test_settings_roundtrip() {
         use super::super::paths::ConfigPaths;
         use super::super::storage::save_settings;
+        use crate::version::FeatureCompat;
 
         let dir = tempdir().unwrap();
 
@@ -712,8 +713,8 @@ animations {
         original.cursor.size = 32;
         original.overview.zoom = 0.75;
 
-        // Save settings
-        save_settings(&paths, &original).expect("Failed to save settings");
+        // Save settings (use all_enabled for tests)
+        save_settings(&paths, &original, FeatureCompat::all_enabled()).expect("Failed to save settings");
 
         // Load settings back
         let loaded = load_settings(&paths);

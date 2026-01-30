@@ -10,6 +10,7 @@ use iced::Task;
 use log::{debug, error, info};
 
 use crate::config::{ConfigPaths, DirtyTracker, Settings, SettingsCategory};
+use crate::version::FeatureCompat;
 
 /// RAII guard that automatically clears the save_in_progress flag on drop.
 /// This prevents the flag from being stuck if the save task panics or returns early.
@@ -55,6 +56,9 @@ pub struct SaveManager {
 
     /// Whether a save operation is currently in progress
     save_in_progress: Arc<Mutex<bool>>,
+
+    /// Feature compatibility flags based on niri version
+    feature_compat: FeatureCompat,
 }
 
 impl SaveManager {
@@ -63,6 +67,7 @@ impl SaveManager {
         settings: Arc<Mutex<Settings>>,
         paths: Arc<ConfigPaths>,
         dirty_tracker: Arc<DirtyTracker>,
+        feature_compat: FeatureCompat,
     ) -> Self {
         Self {
             settings,
@@ -70,6 +75,7 @@ impl SaveManager {
             dirty_tracker,
             last_change: Arc::new(Mutex::new(None)),
             save_in_progress: Arc::new(Mutex::new(false)),
+            feature_compat,
         }
     }
 
@@ -109,6 +115,7 @@ impl SaveManager {
         let paths = self.paths.clone();
         let dirty_tracker = self.dirty_tracker.clone();
         let save_in_progress = self.save_in_progress.clone();
+        let feature_compat = self.feature_compat;
 
         // Try to acquire save guard (returns None if already saving)
         let guard = match SaveGuard::new(save_in_progress) {
@@ -151,7 +158,7 @@ impl SaveManager {
 
             // Perform actual save (async I/O, no locks held)
             let result: Result<Result<usize, _>, _> = tokio::task::spawn_blocking(move || {
-                crate::config::save_dirty(&paths, &settings_snapshot, &dirty_set)
+                crate::config::save_dirty(&paths, &settings_snapshot, &dirty_set, feature_compat)
             })
             .await;
 

@@ -4,6 +4,7 @@
 
 use super::builder::KdlBuilder;
 use crate::config::models::BehaviorSettings;
+use crate::version::FeatureCompat;
 
 /// Generate the main.kdl content that includes all other configuration files.
 ///
@@ -11,9 +12,12 @@ use crate::config::models::BehaviorSettings;
 /// pull in all the individual settings files. The generated file should not
 /// be edited manually as changes will be overwritten.
 ///
+/// # Arguments
+/// * `compat` - Feature compatibility flags based on detected niri version
+///
 /// # Returns
 /// A string containing the complete main.kdl content with include directives.
-pub fn generate_main_kdl() -> String {
+pub fn generate_main_kdl(compat: FeatureCompat) -> String {
     let mut kdl = KdlBuilder::with_header("Nirify managed configuration");
     kdl.comment("Do not edit manually - changes will be overwritten");
     kdl.newline();
@@ -55,7 +59,13 @@ pub fn generate_main_kdl() -> String {
     kdl.field_string("include", "advanced/environment.kdl");
     kdl.field_string("include", "advanced/debug.kdl");
     kdl.field_string("include", "advanced/switch-events.kdl");
-    kdl.field_string("include", "advanced/recent-windows.kdl");
+
+    // Recent windows requires niri 25.11+
+    if compat.recent_windows {
+        kdl.field_string("include", "advanced/recent-windows.kdl");
+    } else {
+        kdl.comment("recent-windows.kdl requires niri 25.11+ (skipped)");
+    }
 
     kdl.build()
 }

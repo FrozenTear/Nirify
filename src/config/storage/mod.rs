@@ -61,6 +61,7 @@ pub use workspaces::generate_workspaces_kdl;
 use super::error::ConfigError;
 use super::models::Settings;
 use super::paths::ConfigPaths;
+use crate::version::FeatureCompat;
 use anyhow::Context;
 use chrono::Local;
 use std::fs::{self, OpenOptions};
@@ -149,16 +150,18 @@ fn write_config(path: &Path, content: &str, strategy: WriteStrategy) -> anyhow::
 
 /// Write all settings files using the specified strategy.
 ///
-/// This is the unified function that writes all 19 config files.
+/// This is the unified function that writes all config files.
+/// The `compat` parameter controls which version-dependent features are written.
 fn write_all_settings(
     paths: &ConfigPaths,
     settings: &Settings,
     strategy: WriteStrategy,
+    compat: FeatureCompat,
 ) -> anyhow::Result<()> {
     paths.ensure_directories()?;
 
-    // Main entry point
-    write_config(&paths.main_kdl, &generate_main_kdl(), strategy)?;
+    // Main entry point (includes version-aware file list)
+    write_config(&paths.main_kdl, &generate_main_kdl(compat), strategy)?;
 
     // Core settings
     write_config(
@@ -291,11 +294,16 @@ fn write_all_settings(
         &generate_switch_events_kdl(&settings.switch_events),
         strategy,
     )?;
-    write_config(
-        &paths.recent_windows_kdl,
-        &generate_recent_windows_kdl(&settings.recent_windows),
-        strategy,
-    )?;
+
+    // Recent windows requires niri 25.11+
+    if compat.recent_windows {
+        write_config(
+            &paths.recent_windows_kdl,
+            &generate_recent_windows_kdl(&settings.recent_windows),
+            strategy,
+        )?;
+    }
+
     write_config(
         &paths.preferences_kdl,
         &generate_preferences_kdl(&settings.preferences),
@@ -310,8 +318,17 @@ fn write_all_settings(
 /// This function writes all settings to their respective KDL files.
 /// Should be called after any settings change. Uses atomic writes to
 /// prevent file corruption if the process crashes during writing.
-pub fn save_settings(paths: &ConfigPaths, settings: &Settings) -> anyhow::Result<()> {
-    write_all_settings(paths, settings, WriteStrategy::Atomic)
+///
+/// # Arguments
+/// * `paths` - The configuration paths structure
+/// * `settings` - The settings to write
+/// * `compat` - Feature compatibility flags based on detected niri version
+pub fn save_settings(
+    paths: &ConfigPaths,
+    settings: &Settings,
+    compat: FeatureCompat,
+) -> anyhow::Result<()> {
+    write_all_settings(paths, settings, WriteStrategy::Atomic, compat)
 }
 
 /// Save only the specified categories to KDL files
@@ -324,6 +341,7 @@ pub fn save_settings(paths: &ConfigPaths, settings: &Settings) -> anyhow::Result
 /// * `paths` - The configuration paths structure
 /// * `settings` - The settings to write
 /// * `dirty` - Set of categories that need saving
+/// * `compat` - Feature compatibility flags based on detected niri version
 ///
 /// # Returns
 /// The number of files that were written.
@@ -331,6 +349,7 @@ pub fn save_dirty(
     paths: &ConfigPaths,
     settings: &Settings,
     dirty: &std::collections::HashSet<super::dirty::SettingsCategory>,
+    compat: FeatureCompat,
 ) -> anyhow::Result<usize> {
     use super::dirty::SettingsCategory;
 
@@ -346,7 +365,7 @@ pub fn save_dirty(
     // Ensure main.kdl exists (it includes all other config files)
     // This is essential for niri to load our managed configuration
     if !paths.main_kdl.exists() {
-        write_config(&paths.main_kdl, &generate_main_kdl(), strategy)?;
+        write_config(&paths.main_kdl, &generate_main_kdl(compat), strategy)?;
         files_written += 1;
     }
 
@@ -522,11 +541,17 @@ pub fn save_dirty(
                 )?;
             }
             SettingsCategory::RecentWindows => {
-                write_config(
-                    &paths.recent_windows_kdl,
-                    &generate_recent_windows_kdl(&settings.recent_windows),
-                    strategy,
-                )?;
+                // Recent windows requires niri 25.11+
+                if compat.recent_windows {
+                    write_config(
+                        &paths.recent_windows_kdl,
+                        &generate_recent_windows_kdl(&settings.recent_windows),
+                        strategy,
+                    )?;
+                } else {
+                    // Skip writing this file, don't count as written
+                    continue;
+                }
             }
             SettingsCategory::Preferences => {
                 write_config(
@@ -590,6 +615,7 @@ pub fn save_with_backup(path: &Path, content: &str, backup_dir: &Path) -> anyhow
 /// # Arguments
 /// * `paths` - The configuration paths structure
 /// * `settings` - The settings to write to files
+/// * `compat` - Feature compatibility flags based on detected niri version
 ///
 /// # Returns
 /// `Ok(())` on success, or an error if any file write fails.
@@ -598,8 +624,12 @@ pub fn save_with_backup(path: &Path, content: &str, backup_dir: &Path) -> anyhow
 /// Returns an error if:
 /// - Directory creation fails
 /// - Any configuration file cannot be written
-pub fn initialize_config_files(paths: &ConfigPaths, settings: &Settings) -> anyhow::Result<()> {
-    write_all_settings(paths, settings, WriteStrategy::Direct)
+pub fn initialize_config_files(
+    paths: &ConfigPaths,
+    settings: &Settings,
+    compat: FeatureCompat,
+) -> anyhow::Result<()> {
+    write_all_settings(paths, settings, WriteStrategy::Direct, compat)
 }
 
 #[cfg(test)]
@@ -610,11 +640,20 @@ mod tests {
 
     #[test]
     fn test_generate_main_kdl_contains_includes() {
-        let content = generate_main_kdl();
+        let content = generate_main_kdl(FeatureCompat::all_enabled());
         assert!(content.contains("include \"appearance.kdl\""));
         assert!(content.contains("include \"behavior.kdl\""));
         assert!(content.contains("include \"input/keyboard.kdl\""));
         assert!(content.contains("Nirify managed"));
+        assert!(content.contains("include \"advanced/recent-windows.kdl\""));
+    }
+
+    #[test]
+    fn test_generate_main_kdl_skips_recent_windows_when_disabled() {
+        let compat = FeatureCompat { recent_windows: false };
+        let content = generate_main_kdl(compat);
+        assert!(!content.contains("include \"advanced/recent-windows.kdl\""));
+        assert!(content.contains("recent-windows.kdl requires niri 25.11+"));
     }
 
     #[test]

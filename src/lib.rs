@@ -11,6 +11,7 @@ pub mod search;
 pub mod system_theme;
 pub mod theme;
 pub mod types;
+pub mod version;
 pub mod views;
 pub mod ipc;
 

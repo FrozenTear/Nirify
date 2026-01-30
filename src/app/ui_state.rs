@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use iced::widget::text_editor;
 
 use crate::messages::{DialogState, Page};
+use crate::version::{FeatureCompat, NiriVersion};
 use crate::views;
 
 /// UI-only state that doesn't affect saved settings
@@ -47,6 +48,10 @@ pub struct UiState {
     pub system_theme_state: crate::system_theme::SystemThemeState,
     /// Niri compositor connection status
     pub niri_status: crate::views::status_bar::NiriStatus,
+    /// Detected niri version (if available)
+    pub niri_version: Option<NiriVersion>,
+    /// Feature compatibility based on niri version
+    pub feature_compat: FeatureCompat,
 
     // Outputs state
     /// Selected output index for list-detail view

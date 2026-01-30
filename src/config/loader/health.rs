@@ -8,6 +8,7 @@ use super::super::paths::ConfigPaths;
 use super::super::registry::ConfigFile;
 use super::super::storage::{atomic_write, save_settings};
 use crate::config::models::Settings;
+use crate::version::FeatureCompat;
 use chrono::Local;
 use log::{debug, info, warn};
 use std::collections::HashMap;
@@ -202,13 +203,15 @@ pub fn check_config_health(paths: &ConfigPaths) -> ConfigHealthReport {
 /// # Arguments
 /// * `paths` - Configuration paths
 /// * `current_settings` - Current settings to preserve for non-corrupted sections
+/// * `compat` - Feature compatibility flags based on niri version
 ///
 /// # Example
 ///
 /// ```ignore
 /// let paths = ConfigPaths::new()?;
 /// let settings = load_settings(&paths); // Falls back to defaults for corrupted
-/// let repaired = repair_corrupted_configs(&paths, &settings)?;
+/// let compat = FeatureCompat::all_enabled();
+/// let repaired = repair_corrupted_configs(&paths, &settings, compat)?;
 /// for file in &repaired {
 ///     println!("Repaired: {}", file);
 /// }
@@ -216,6 +219,7 @@ pub fn check_config_health(paths: &ConfigPaths) -> ConfigHealthReport {
 pub fn repair_corrupted_configs(
     paths: &ConfigPaths,
     current_settings: &Settings,
+    compat: FeatureCompat,
 ) -> anyhow::Result<Vec<String>> {
     let health = check_config_health(paths);
     let corrupted = health.corrupted_files();
@@ -267,7 +271,7 @@ pub fn repair_corrupted_configs(
     // Regenerate all files with current settings
     // (corrupted sections will have fallen back to defaults during load)
     if !repaired.is_empty() {
-        save_settings(paths, current_settings)?;
+        save_settings(paths, current_settings, compat)?;
         info!("Regenerated {} corrupted config file(s)", repaired.len());
     }
 
