@@ -99,7 +99,7 @@ sudo install -Dm644 resources/icons/nirify.svg /usr/local/share/icons/hicolor/sc
 On first launch, a setup wizard will guide you through connecting the app to your niri config:
 
 1. **Automatic setup** (recommended): Click "Add Automatically" and the app will:
-   - Create a timestamped backup of your `config.kdl` in `~/.config/niri/nirify/.backup/`
+   - Create a timestamped backup of your `config.kdl` in `~/.config/niri/.nirify-backups/`
    - Reorganize your config to use Nirify for managed options
    - Preserve any custom settings you've added
 

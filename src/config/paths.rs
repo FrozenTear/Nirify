@@ -18,7 +18,7 @@ pub struct ConfigPaths {
     /// Advanced subdirectory: ~/.config/niri/nirify/advanced/
     pub advanced_dir: PathBuf,
 
-    /// Backup directory: ~/.config/niri/nirify/.backup/
+    /// Backup directory: ~/.config/niri/.nirify-backups/
     pub backup_dir: PathBuf,
 
     // Core config files
@@ -70,7 +70,7 @@ impl ConfigPaths {
         let managed_dir = niri_dir.join(CONFIG_DIR_NAME);
         let input_dir = managed_dir.join("input");
         let advanced_dir = managed_dir.join("advanced");
-        let backup_dir = managed_dir.join(".backup");
+        let backup_dir = niri_dir.join(".nirify-backups");
 
         // Build paths - using references to avoid clones
         let main_kdl = managed_dir.join("main.kdl");
@@ -290,7 +290,7 @@ impl Default for ConfigPaths {
             managed_dir: temp.clone(),
             input_dir: input_dir.clone(),
             advanced_dir: advanced_dir.clone(),
-            backup_dir: temp.join(".backup"),
+            backup_dir: temp.join(".nirify-backups"),
 
             // Core
             main_kdl: temp.join("main.kdl"),
