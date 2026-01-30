@@ -376,6 +376,56 @@ impl ConfigPaths {
         log::info!("Added include line to {:?}", self.niri_config);
         Ok(())
     }
+
+    /// Clean up old backups, keeping only the most recent N backups
+    ///
+    /// This prevents backup directory from growing indefinitely.
+    /// Defaults to keeping the 10 most recent backups.
+    pub fn cleanup_old_backups(&self, keep_count: usize) -> Result<usize, ConfigError> {
+        use std::fs;
+
+        if !self.backup_dir.exists() {
+            return Ok(0);
+        }
+
+        // Collect all backup files with their modification times
+        let mut backups: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
+
+        let entries = fs::read_dir(&self.backup_dir)?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                // Only consider backup files
+                if filename.starts_with("config.kdl.backup") {
+                    if let Ok(metadata) = fs::metadata(&path) {
+                        if let Ok(modified) = metadata.modified() {
+                            backups.push((path, modified));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sort by modification time (newest first)
+        backups.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Delete backups beyond the keep count
+        let mut deleted = 0;
+        for (path, _) in backups.into_iter().skip(keep_count) {
+            if let Err(e) = fs::remove_file(&path) {
+                log::warn!("Failed to delete old backup {:?}: {}", path, e);
+            } else {
+                log::debug!("Deleted old backup: {:?}", path);
+                deleted += 1;
+            }
+        }
+
+        if deleted > 0 {
+            log::info!("Cleaned up {} old backup(s)", deleted);
+        }
+
+        Ok(deleted)
+    }
 }
 
 /// Create fallback ConfigPaths for error state display.

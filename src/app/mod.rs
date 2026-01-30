@@ -106,6 +106,12 @@ impl App {
             }
         }
 
+        // Clean up old backups to prevent directory from growing indefinitely
+        // Keep the 10 most recent backups
+        if let Err(e) = paths.cleanup_old_backups(10) {
+            log::warn!("Failed to clean up old backups: {}", e);
+        }
+
         // Load settings from disk (load_settings returns Settings, not Result)
         let settings = crate::config::load_settings(&paths);
         log::info!("Settings loaded successfully");
@@ -574,6 +580,10 @@ impl App {
                 }
 
                 // Trigger initial save to create all config files
+                // Note: This is safe from race conditions because:
+                // 1. iced is single-threaded - this handler completes atomically
+                // 2. SaveManager uses 300ms debounce before actually saving
+                // 3. We've already created main.kdl and config.kdl above
                 self.save.dirty_tracker.mark_all();
                 self.mark_changed();
 
