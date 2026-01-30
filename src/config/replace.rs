@@ -129,6 +129,7 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
 
     let mut node_classifications = Vec::new();
     let mut has_nirify_include = false;
+    let mut nirify_include_count = 0;
     let mut managed_count = 0;
     let mut unmanaged_count = 0;
 
@@ -137,6 +138,7 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
 
         let classification = if is_nirify_include(node) {
             has_nirify_include = true;
+            nirify_include_count += 1;
             debug!("Found existing Nirify include at index {}", idx);
             NodeClassification::NirifyInclude
         } else if name == "include" {
@@ -166,6 +168,14 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
         "Config analysis: {} managed, {} unmanaged, Nirify include: {}",
         managed_count, unmanaged_count, has_nirify_include
     );
+
+    // Warn about duplicate includes (they will all be removed and replaced with one)
+    if nirify_include_count > 1 {
+        warn!(
+            "Found {} duplicate Nirify include lines - will consolidate to single include",
+            nirify_include_count
+        );
+    }
 
     Ok(ConfigAnalysis {
         document,
