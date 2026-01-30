@@ -527,15 +527,29 @@ impl App {
                     log::info!("Created main.kdl");
                 }
 
-                // Add include line to user's config.kdl
-                if let Err(e) = self.paths.add_include_line() {
-                    log::error!("Failed to add include line: {}", e);
-                    self.ui.dialog_state = DialogState::Error {
-                        title: "Setup Error".to_string(),
-                        message: "Failed to add include line to config.kdl.".to_string(),
-                        details: Some(e.to_string()),
-                    };
-                    return Task::none();
+                // Replace user's config.kdl with our managed version
+                // This removes managed nodes and adds the include directive
+                match crate::config::smart_replace_config(&self.paths.niri_config, &self.paths.backup_dir) {
+                    Ok(result) => {
+                        log::info!(
+                            "Smart replace complete: {} nodes replaced, {} preserved, backup at {:?}",
+                            result.replaced_count,
+                            result.preserved_count,
+                            result.backup_path
+                        );
+                        for warning in &result.warnings {
+                            log::warn!("Smart replace warning: {}", warning);
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to replace config: {}", e);
+                        self.ui.dialog_state = DialogState::Error {
+                            title: "Setup Error".to_string(),
+                            message: "Failed to set up config.kdl.".to_string(),
+                            details: Some(e.to_string()),
+                        };
+                        return Task::none();
+                    }
                 }
 
                 // Trigger initial save to create all config files
