@@ -79,6 +79,12 @@ impl App {
             }
         };
 
+        // Migrate old tilde-based include paths to relative paths
+        // This fixes configs created before the XDG_CONFIG_HOME fix
+        if let Err(e) = paths.migrate_include_line() {
+            log::warn!("Failed to migrate include line: {}", e);
+        }
+
         // Load settings from disk (load_settings returns Settings, not Result)
         let settings = crate::config::load_settings(&paths);
         log::info!("Settings loaded successfully");
