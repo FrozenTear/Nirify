@@ -21,12 +21,15 @@ pub fn load_keybindings(niri_config_path: &Path, settings: &mut KeybindingsSetti
 
     debug!("Loading keybindings from {:?}", niri_config_path);
 
-    // Try to read the main config
+    // Try to read the config file
     let config_content = match fs::read_to_string(niri_config_path) {
         Ok(content) => content,
         Err(e) => {
-            debug!("Could not read niri config: {}", e);
-            settings.error = Some(format!("Could not read niri config: {}", e));
+            debug!("Could not read keybindings config: {}", e);
+            // File not existing is normal for first run, don't treat as error
+            if e.kind() != std::io::ErrorKind::NotFound {
+                settings.error = Some(format!("Could not read keybindings config: {}", e));
+            }
             return;
         }
     };
@@ -34,8 +37,12 @@ pub fn load_keybindings(niri_config_path: &Path, settings: &mut KeybindingsSetti
     let doc = match parse_document(&config_content) {
         Ok(doc) => doc,
         Err(e) => {
-            debug!("Could not parse niri config: {}", e);
-            settings.error = Some(format!("Could not parse niri config: {}", e));
+            debug!("Could not parse keybindings config: {}", e);
+            settings.error = Some(format!(
+                "Could not parse keybindings config ({}): {}",
+                niri_config_path.display(),
+                e
+            ));
             return;
         }
     };

@@ -25,23 +25,41 @@ const COMMON_ACTIONS: &[&str] = &[
     "screenshot-window",
     "focus-column-left",
     "focus-column-right",
+    "focus-column-first",
+    "focus-column-last",
     "focus-window-up",
     "focus-window-down",
+    "focus-window-or-workspace-up",
+    "focus-window-or-workspace-down",
     "move-column-left",
     "move-column-right",
+    "move-column-to-first",
+    "move-column-to-last",
     "move-window-up",
     "move-window-down",
+    "move-window-to-workspace-up",
+    "move-window-to-workspace-down",
     "focus-workspace-down",
     "focus-workspace-up",
+    "focus-workspace-previous",
+    "move-workspace-down",
+    "move-workspace-up",
     "move-column-to-workspace-down",
     "move-column-to-workspace-up",
     "consume-window-into-column",
     "expel-window-from-column",
+    "center-column",
     "maximize-column",
     "fullscreen-window",
     "switch-preset-column-width",
+    "switch-preset-window-height",
     "reset-window-height",
+    "set-column-width",
+    "set-window-height",
     "power-off-monitors",
+    "suspend",
+    "toggle-window-floating",
+    "switch-focus-between-floating-and-tiling",
     "spawn",
 ];
 
@@ -373,25 +391,23 @@ fn key_capture_display<'a>(
 
 /// Action type editor
 fn action_editor<'a>(binding: &'a Keybinding, idx: usize) -> Element<'a, Message> {
-    let action_options: Vec<&str> = COMMON_ACTIONS.to_vec();
-
-    // Determine current action for pick_list selection
-    let current_action: &str = match &binding.action {
+    // Get the actual action name
+    let actual_action: &str = match &binding.action {
         KeybindAction::Spawn(_) => "spawn",
-        KeybindAction::NiriAction(action) => {
-            // Find if action is in our list
-            COMMON_ACTIONS.iter()
-                .find(|&&a| a == action.as_str())
-                .copied()
-                .unwrap_or("close-window")
-        }
-        KeybindAction::NiriActionWithArgs(action, _) => {
-            COMMON_ACTIONS.iter()
-                .find(|&&a| a == action.as_str())
-                .copied()
-                .unwrap_or("close-window")
-        }
+        KeybindAction::NiriAction(action) => action.as_str(),
+        KeybindAction::NiriActionWithArgs(action, _) => action.as_str(),
     };
+
+    // Build action options, including the actual action if not in common list
+    let mut action_options: Vec<&str> = COMMON_ACTIONS.to_vec();
+    let is_custom_action = !action_options.contains(&actual_action);
+    if is_custom_action {
+        // Insert the custom action at the beginning so it's visible
+        action_options.insert(0, actual_action);
+    }
+
+    // Current action is always the actual action (never default to close-window)
+    let current_action: &str = actual_action;
 
     let is_spawn = matches!(&binding.action, KeybindAction::Spawn(_));
 
