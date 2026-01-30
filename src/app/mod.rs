@@ -85,6 +85,27 @@ impl App {
             log::warn!("Failed to migrate include line: {}", e);
         }
 
+        // Ensure config.kdl is properly set up with include directive
+        // This replaces managed nodes with the include, preserving custom content
+        // Safe to call every time - it early-returns if no changes needed
+        if paths.niri_config.exists() && paths.managed_dir.exists() {
+            match crate::config::smart_replace_config(&paths.niri_config, &paths.backup_dir) {
+                Ok(result) => {
+                    if result.replaced_count > 0 || result.include_added {
+                        log::info!(
+                            "Config updated: {} managed nodes replaced, {} preserved, include added: {}",
+                            result.replaced_count,
+                            result.preserved_count,
+                            result.include_added
+                        );
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to update config.kdl: {}", e);
+                }
+            }
+        }
+
         // Load settings from disk (load_settings returns Settings, not Result)
         let settings = crate::config::load_settings(&paths);
         log::info!("Settings loaded successfully");
