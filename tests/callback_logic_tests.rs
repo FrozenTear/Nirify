@@ -14,6 +14,7 @@ use common::create_test_paths;
 use nirify::config::{
     load_settings, save_dirty, save_settings, DirtyTracker, Settings, SettingsCategory,
 };
+use nirify::version::FeatureCompat;
 use nirify::constants::*;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -89,7 +90,7 @@ fn test_save_dirty_single_category() {
     settings.appearance.gaps = 24.0;
 
     // Save all first to create files
-    save_settings(&paths, &settings).expect("Initial save failed");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Initial save failed");
 
     // Modify appearance
     settings.appearance.gaps = 32.0;
@@ -98,7 +99,7 @@ fn test_save_dirty_single_category() {
     let mut dirty = HashSet::new();
     dirty.insert(SettingsCategory::Appearance);
 
-    let files_written = save_dirty(&paths, &settings, &dirty).expect("save_dirty failed");
+    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("save_dirty failed");
     assert_eq!(files_written, 1, "Should write exactly 1 file");
 
     // Verify the change persisted
@@ -113,7 +114,7 @@ fn test_save_dirty_multiple_categories() {
     let paths = create_test_paths(dir.path());
 
     let mut settings = Settings::default();
-    save_settings(&paths, &settings).expect("Initial save failed");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Initial save failed");
 
     // Modify multiple categories
     settings.appearance.focus_ring_width = 6.0;
@@ -126,7 +127,7 @@ fn test_save_dirty_multiple_categories() {
     dirty.insert(SettingsCategory::Cursor);
     dirty.insert(SettingsCategory::Keyboard);
 
-    let files_written = save_dirty(&paths, &settings, &dirty).expect("save_dirty failed");
+    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("save_dirty failed");
     assert_eq!(files_written, 3, "Should write exactly 3 files");
 
     // Verify all changes persisted
@@ -143,11 +144,11 @@ fn test_save_dirty_empty() {
     let paths = create_test_paths(dir.path());
 
     let settings = Settings::default();
-    save_settings(&paths, &settings).expect("Initial save failed");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Initial save failed");
 
     // Empty dirty set
     let dirty = HashSet::new();
-    let files_written = save_dirty(&paths, &settings, &dirty).expect("save_dirty failed");
+    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("save_dirty failed");
     assert_eq!(files_written, 0, "Should write 0 files for empty dirty set");
 }
 
@@ -158,7 +159,7 @@ fn test_dirty_tracker_save_integration() {
     let paths = create_test_paths(dir.path());
 
     let mut settings = Settings::default();
-    save_settings(&paths, &settings).expect("Initial save failed");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Initial save failed");
 
     // Simulate callback behavior: modify, mark dirty
     let tracker = Arc::new(DirtyTracker::new());
@@ -174,7 +175,7 @@ fn test_dirty_tracker_save_integration() {
     assert_eq!(dirty.len(), 2);
 
     // Save dirty categories
-    let files_written = save_dirty(&paths, &settings, &dirty).expect("save_dirty failed");
+    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("save_dirty failed");
     assert_eq!(files_written, 2);
 
     // Tracker should be empty now
@@ -238,7 +239,7 @@ fn test_full_callback_save_cycle() {
 
     // Initial state
     let mut settings = Settings::default();
-    save_settings(&paths, &settings).expect("Initial save failed");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Initial save failed");
 
     let tracker = Arc::new(DirtyTracker::new());
 
@@ -256,7 +257,7 @@ fn test_full_callback_save_cycle() {
 
     // Save
     let dirty = tracker.take();
-    save_dirty(&paths, &settings, &dirty).expect("save_dirty failed");
+    save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("save_dirty failed");
 
     // Verify final value persisted
     let loaded = load_settings(&paths);

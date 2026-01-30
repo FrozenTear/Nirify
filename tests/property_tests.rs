@@ -12,6 +12,7 @@ use nirify::config::storage::{
     generate_mouse_kdl,
 };
 use nirify::config::{load_settings, save_settings};
+use nirify::version::FeatureCompat;
 use nirify::constants::*;
 use nirify::types::Color;
 use proptest::prelude::*;
@@ -314,7 +315,7 @@ proptest! {
         settings.animations.enabled = animations_enabled;
 
         // Save
-        save_settings(&paths, &settings).expect("Failed to save");
+        save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save");
 
         // Load
         let loaded = load_settings(&paths);

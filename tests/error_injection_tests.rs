@@ -11,6 +11,7 @@ use common::create_test_paths;
 use nirify::config::{
     check_config_health, load_settings, save_settings, ConfigFileStatus, Settings,
 };
+use nirify::version::FeatureCompat;
 use std::fs;
 use tempfile::tempdir;
 
@@ -31,7 +32,7 @@ fn test_save_to_readonly_directory() {
     fs::set_permissions(&paths.managed_dir, fs::Permissions::from_mode(0o444)).unwrap();
 
     let settings = Settings::default();
-    let result = save_settings(&paths, &settings);
+    let result = save_settings(&paths, &settings, FeatureCompat::all_enabled());
 
     // Should fail gracefully
     assert!(result.is_err());
@@ -52,7 +53,7 @@ fn test_load_from_unreadable_file() {
     let mut settings = Settings::default();
     settings.appearance.gaps = 24.0;
     settings.keyboard.repeat_delay = 400;
-    save_settings(&paths, &settings).unwrap();
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).unwrap();
 
     // Make appearance.kdl unreadable
     fs::set_permissions(&paths.appearance_kdl, fs::Permissions::from_mode(0o000)).unwrap();
@@ -81,7 +82,7 @@ fn test_load_with_various_corruption_types() {
     // Save valid settings
     let mut settings = Settings::default();
     settings.keyboard.repeat_delay = 400;
-    save_settings(&paths, &settings).unwrap();
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).unwrap();
 
     // Test various types of corruption
     let long_line = "x".repeat(100_000);
@@ -125,7 +126,7 @@ fn test_partial_file_corruption() {
     settings.keyboard.repeat_delay = 400;
     settings.mouse.accel_speed = 0.5;
     settings.cursor.size = 32;
-    save_settings(&paths, &settings).unwrap();
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).unwrap();
 
     // Corrupt only appearance.kdl
     fs::write(&paths.appearance_kdl, "{{{{invalid").unwrap();
@@ -148,7 +149,7 @@ fn test_all_files_corrupted() {
     let paths = create_test_paths(dir.path());
 
     // Save valid settings
-    save_settings(&paths, &Settings::default()).unwrap();
+    save_settings(&paths, &Settings::default(), FeatureCompat::all_enabled()).unwrap();
 
     // Corrupt all files
     let files = [
@@ -182,7 +183,7 @@ fn test_health_check_identifies_corrupted_files() {
     let dir = tempdir().unwrap();
     let paths = create_test_paths(dir.path());
 
-    save_settings(&paths, &Settings::default()).unwrap();
+    save_settings(&paths, &Settings::default(), FeatureCompat::all_enabled()).unwrap();
 
     // Corrupt specific files
     fs::write(&paths.appearance_kdl, "corrupted {{").unwrap();
@@ -455,7 +456,7 @@ fn test_backup_dir_created_on_demand() {
     assert!(!paths.backup_dir.exists());
 
     // Save settings
-    save_settings(&paths, &Settings::default()).unwrap();
+    save_settings(&paths, &Settings::default(), FeatureCompat::all_enabled()).unwrap();
 
     // Normal save doesn't create backup dir
     // (backup only happens during replace operations)

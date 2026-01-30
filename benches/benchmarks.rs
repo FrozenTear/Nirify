@@ -10,6 +10,7 @@ use nirify::config::storage::*;
 use nirify::config::{
     load_settings, save_dirty, save_settings, DirtyTracker, Settings, SettingsCategory,
 };
+use nirify::version::FeatureCompat;
 use std::collections::HashSet;
 use tempfile::tempdir;
 
@@ -161,7 +162,7 @@ fn bench_save_load(c: &mut Criterion) {
         let paths = create_test_paths(dir.path());
         let settings = Settings::default();
 
-        b.iter(|| save_settings(black_box(&paths), black_box(&settings)).unwrap())
+        b.iter(|| save_settings(black_box(&paths), black_box(&settings), FeatureCompat::all_enabled()).unwrap())
     });
 
     // Load all settings
@@ -169,7 +170,7 @@ fn bench_save_load(c: &mut Criterion) {
         let dir = tempdir().unwrap();
         let paths = create_test_paths(dir.path());
         let settings = Settings::default();
-        save_settings(&paths, &settings).unwrap();
+        save_settings(&paths, &settings, FeatureCompat::all_enabled()).unwrap();
 
         b.iter(|| load_settings(black_box(&paths)))
     });
@@ -179,12 +180,12 @@ fn bench_save_load(c: &mut Criterion) {
         let dir = tempdir().unwrap();
         let paths = create_test_paths(dir.path());
         let settings = Settings::default();
-        save_settings(&paths, &settings).unwrap();
+        save_settings(&paths, &settings, FeatureCompat::all_enabled()).unwrap();
 
         let mut dirty = HashSet::new();
         dirty.insert(SettingsCategory::Appearance);
 
-        b.iter(|| save_dirty(black_box(&paths), black_box(&settings), black_box(&dirty)).unwrap())
+        b.iter(|| save_dirty(black_box(&paths), black_box(&settings), black_box(&dirty), FeatureCompat::all_enabled()).unwrap())
     });
 
     // Save multiple dirty categories
@@ -192,14 +193,14 @@ fn bench_save_load(c: &mut Criterion) {
         let dir = tempdir().unwrap();
         let paths = create_test_paths(dir.path());
         let settings = Settings::default();
-        save_settings(&paths, &settings).unwrap();
+        save_settings(&paths, &settings, FeatureCompat::all_enabled()).unwrap();
 
         let mut dirty = HashSet::new();
         dirty.insert(SettingsCategory::Appearance);
         dirty.insert(SettingsCategory::Mouse);
         dirty.insert(SettingsCategory::Keyboard);
 
-        b.iter(|| save_dirty(black_box(&paths), black_box(&settings), black_box(&dirty)).unwrap())
+        b.iter(|| save_dirty(black_box(&paths), black_box(&settings), black_box(&dirty), FeatureCompat::all_enabled()).unwrap())
     });
 
     group.finish();
@@ -297,7 +298,7 @@ fn create_test_paths(base: &std::path::Path) -> nirify::config::ConfigPaths {
         managed_dir: managed_dir.clone(),
         input_dir: input_dir.clone(),
         advanced_dir: advanced_dir.clone(),
-        backup_dir: managed_dir.join(".backup"),
+        backup_dir: base.join(".nirify-backups"),
         main_kdl: managed_dir.join("main.kdl"),
         appearance_kdl: managed_dir.join("appearance.kdl"),
         behavior_kdl: managed_dir.join("behavior.kdl"),

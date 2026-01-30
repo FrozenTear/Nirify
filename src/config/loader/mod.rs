@@ -669,7 +669,7 @@ animations {
             managed_dir: managed_dir.clone(),
             input_dir: input_dir.clone(),
             advanced_dir: advanced_dir.clone(),
-            backup_dir: managed_dir.join(".backup"),
+            backup_dir: managed_dir.join(".nirify-backups"),
             main_kdl: managed_dir.join("main.kdl"),
             appearance_kdl: managed_dir.join("appearance.kdl"),
             behavior_kdl: managed_dir.join("behavior.kdl"),

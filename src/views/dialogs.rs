@@ -477,7 +477,7 @@ fn wizard_complete<'a>() -> Column<'a, Message> {
                 text("  - Changes apply instantly - no need to save manually").size(12).color([0.7, 0.7, 0.7]),
                 text("  - Use Window Rules to customize per-app behavior").size(12).color([0.7, 0.7, 0.7]),
                 text("  - Check Tools > Analyze Rules to consolidate similar rules").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Backups are created automatically in nirify/.backup/").size(12).color([0.7, 0.7, 0.7]),
+                text("  - Backups are saved to ~/.config/niri/.nirify-backups/").size(12).color([0.7, 0.7, 0.7]),
             ]
             .spacing(4)
         )

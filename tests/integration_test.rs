@@ -14,6 +14,7 @@ use nirify::config::{
     check_config_health, load_settings, repair_corrupted_configs, save_settings, ConfigFileStatus,
     Settings,
 };
+use nirify::version::FeatureCompat;
 use std::fs;
 use tempfile::tempdir;
 
@@ -51,7 +52,7 @@ fn test_full_lifecycle_save_load_modify() {
     settings.miscellaneous.prefer_no_csd = true;
 
     // Step 2: Save settings
-    save_settings(&paths, &settings).expect("Failed to save settings");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save settings");
 
     // Verify files were created
     assert!(paths.main_kdl.exists(), "main.kdl should exist");
@@ -82,7 +83,7 @@ fn test_full_lifecycle_save_load_modify() {
     modified.touchpad.natural_scroll = false;
 
     // Step 6: Save modified settings
-    save_settings(&paths, &modified).expect("Failed to save modified settings");
+    save_settings(&paths, &modified, FeatureCompat::all_enabled()).expect("Failed to save modified settings");
 
     // Step 7: Load again and verify modifications persisted
     let reloaded = load_settings(&paths);
@@ -139,7 +140,7 @@ fn test_corrupted_file_recovery() {
     let mut settings = Settings::default();
     settings.appearance.gaps = 24.0;
     settings.keyboard.repeat_delay = 400;
-    save_settings(&paths, &settings).expect("Failed to save settings");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save settings");
 
     // Now corrupt one file with invalid KDL
     fs::write(&paths.appearance_kdl, "this is { not valid kdl {{{{").unwrap();
@@ -209,7 +210,7 @@ fn test_window_rules_lifecycle() {
     settings.window_rules.next_id = 2;
 
     // Save and reload
-    save_settings(&paths, &settings).expect("Failed to save");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save");
     let loaded = load_settings(&paths);
 
     // Verify window rule was preserved
@@ -251,7 +252,7 @@ fn test_output_settings_lifecycle() {
     });
 
     // Save and reload
-    save_settings(&paths, &settings).expect("Failed to save");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save");
     let loaded = load_settings(&paths);
 
     // Verify outputs were preserved
@@ -285,7 +286,7 @@ fn test_check_config_health_all_valid() {
 
     // Save valid settings
     let settings = Settings::default();
-    save_settings(&paths, &settings).expect("Failed to save");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save");
 
     // Check health - all should be Ok
     let health = check_config_health(&paths);
@@ -346,7 +347,7 @@ fn test_repair_corrupted_configs() {
     let mut settings = Settings::default();
     settings.keyboard.repeat_delay = 400;
     settings.mouse.accel_speed = 0.5;
-    save_settings(&paths, &settings).expect("Failed to save");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save");
 
     // Corrupt one file
     fs::write(&paths.appearance_kdl, "corrupted {{ data").unwrap();
@@ -365,7 +366,7 @@ fn test_repair_corrupted_configs() {
     assert!((loaded.mouse.accel_speed - 0.5).abs() < 0.01); // Our value preserved
 
     // Repair corrupted configs
-    let repaired = repair_corrupted_configs(&paths, &loaded).expect("Repair failed");
+    let repaired = repair_corrupted_configs(&paths, &loaded, FeatureCompat::all_enabled()).expect("Repair failed");
     assert_eq!(repaired.len(), 1);
     assert!(repaired.contains(&"appearance.kdl".to_string()));
 
@@ -393,10 +394,10 @@ fn test_repair_no_corrupted_files() {
 
     // Save valid settings
     let settings = Settings::default();
-    save_settings(&paths, &settings).expect("Failed to save");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save");
 
     // Try to repair - should do nothing
-    let repaired = repair_corrupted_configs(&paths, &settings).expect("Repair failed");
+    let repaired = repair_corrupted_configs(&paths, &settings, FeatureCompat::all_enabled()).expect("Repair failed");
     assert!(repaired.is_empty());
 
     // Backup directory should be empty (or not exist)

@@ -11,6 +11,7 @@ use common::create_test_paths;
 use nirify::config::{
     load_settings, save_dirty, save_settings, DirtyTracker, Settings, SettingsCategory,
 };
+use nirify::version::FeatureCompat;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -228,7 +229,7 @@ fn test_concurrent_save_same_file() {
 
     // Initial save
     let settings = Settings::default();
-    save_settings(&paths, &settings).expect("Initial save failed");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Initial save failed");
 
     let paths = Arc::new(paths);
 
@@ -245,7 +246,7 @@ fn test_concurrent_save_same_file() {
                 dirty.insert(SettingsCategory::Appearance);
 
                 // This should not corrupt files due to atomic writes
-                save_dirty(&paths, &settings, &dirty).expect("Save failed");
+                save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("Save failed");
             })
         })
         .collect();
