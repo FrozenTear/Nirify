@@ -202,6 +202,8 @@ impl ConfigPaths {
 
     /// Check if the user's config.kdl contains our include line
     ///
+    /// Detects both the current relative path format (`nirify/main.kdl`) and
+    /// the legacy tilde path format (`~/.config/niri/nirify/main.kdl`).
     /// Uses streaming search to avoid reading entire file for large configs.
     pub fn has_include_line(&self) -> bool {
         use std::fs::File;
@@ -219,6 +221,88 @@ impl ConfigPaths {
             }
         }
         false
+    }
+
+    /// Check if config has the old tilde-based include path that needs migration
+    ///
+    /// Returns true if the config contains `~/.config/niri/nirify/main.kdl` which
+    /// doesn't work because niri doesn't expand tilde in include paths.
+    pub fn has_old_include_format(&self) -> bool {
+        use std::fs::File;
+        use std::io::{BufRead, BufReader};
+
+        let file = match File::open(&self.niri_config) {
+            Ok(f) => f,
+            Err(_) => return false,
+        };
+
+        let reader = BufReader::new(file);
+        for line in reader.lines().map_while(Result::ok) {
+            // Old format: include "~/.config/niri/nirify/main.kdl"
+            // Also catch variations like ~/.config/nirify/main.kdl
+            if line.contains("~/.config") && line.contains("nirify/main.kdl") {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Migrate old tilde-based include paths to the correct relative format
+    ///
+    /// Replaces `include "~/.config/niri/nirify/main.kdl"` (which doesn't work)
+    /// with `include "nirify/main.kdl"` (correct relative path).
+    pub fn migrate_include_line(&self) -> Result<bool, ConfigError> {
+        use std::fs;
+
+        if !self.has_old_include_format() {
+            return Ok(false);
+        }
+
+        log::info!("Migrating old tilde-based include path to relative path");
+
+        // Create backup before modifying
+        let backup_name = format!(
+            "config.kdl.backup.migration.{}",
+            chrono::Local::now().format("%Y%m%d_%H%M%S")
+        );
+        let backup_path = self.backup_dir.join(backup_name);
+        fs::create_dir_all(&self.backup_dir)?;
+        fs::copy(&self.niri_config, &backup_path)?;
+        log::info!("Created migration backup at {:?}", backup_path);
+
+        // Read and replace
+        let content = fs::read_to_string(&self.niri_config)?;
+
+        // Replace old tilde paths with relative path
+        // Match patterns like: include "~/.config/niri/nirify/main.kdl"
+        // or: include "~/.config/nirify/main.kdl"
+        let new_content = content
+            .lines()
+            .map(|line| {
+                if line.contains("include")
+                    && line.contains("~/.config")
+                    && line.contains("nirify/main.kdl")
+                {
+                    // Replace the entire include line with correct format
+                    "include \"nirify/main.kdl\"".to_string()
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        // Preserve trailing newline if original had one
+        let final_content = if content.ends_with('\n') && !new_content.ends_with('\n') {
+            format!("{}\n", new_content)
+        } else {
+            new_content
+        };
+
+        fs::write(&self.niri_config, final_content)?;
+        log::info!("Migrated include path to relative format");
+
+        Ok(true)
     }
 
     /// Add the include line to the user's config.kdl
@@ -344,5 +428,114 @@ mod tests {
         assert!(paths.managed_dir.ends_with("nirify"));
         assert!(paths.main_kdl.ends_with("main.kdl"));
         assert!(paths.keyboard_kdl.ends_with("keyboard.kdl"));
+    }
+
+    #[test]
+    fn test_has_old_include_format_detects_old_path() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let niri_dir = temp_dir.path().join("niri");
+        std::fs::create_dir_all(&niri_dir).unwrap();
+
+        let config_path = niri_dir.join("config.kdl");
+
+        // Create a config with old tilde-based path
+        let old_content = r#"
+// Managed by Nirify - do not remove this line
+include "~/.config/niri/nirify/main.kdl"
+"#;
+        std::fs::write(&config_path, old_content).unwrap();
+
+        // Create paths pointing to our temp dir
+        let mut paths = ConfigPaths::default();
+        paths.niri_config = config_path;
+        paths.backup_dir = temp_dir.path().join(".nirify-backups");
+
+        assert!(paths.has_old_include_format());
+        assert!(paths.has_include_line()); // Should also detect as having include
+    }
+
+    #[test]
+    fn test_has_old_include_format_ignores_new_path() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let niri_dir = temp_dir.path().join("niri");
+        std::fs::create_dir_all(&niri_dir).unwrap();
+
+        let config_path = niri_dir.join("config.kdl");
+
+        // Create a config with new relative path
+        let new_content = r#"
+// Managed by Nirify - do not remove this line
+include "nirify/main.kdl"
+"#;
+        std::fs::write(&config_path, new_content).unwrap();
+
+        let mut paths = ConfigPaths::default();
+        paths.niri_config = config_path;
+
+        assert!(!paths.has_old_include_format());
+        assert!(paths.has_include_line());
+    }
+
+    #[test]
+    fn test_migrate_include_line_replaces_old_path() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let niri_dir = temp_dir.path().join("niri");
+        std::fs::create_dir_all(&niri_dir).unwrap();
+
+        let config_path = niri_dir.join("config.kdl");
+
+        // Create a config with old tilde-based path
+        let old_content = r#"custom-node { foo "bar" }
+
+// Managed by Nirify - do not remove this line
+include "~/.config/niri/nirify/main.kdl"
+
+another-node { baz 42 }
+"#;
+        std::fs::write(&config_path, old_content).unwrap();
+
+        let mut paths = ConfigPaths::default();
+        paths.niri_config = config_path.clone();
+        paths.backup_dir = temp_dir.path().join(".nirify-backups");
+
+        // Run migration
+        let migrated = paths.migrate_include_line().unwrap();
+        assert!(migrated);
+
+        // Verify the content was updated
+        let new_content = std::fs::read_to_string(&config_path).unwrap();
+        assert!(new_content.contains("include \"nirify/main.kdl\""));
+        assert!(!new_content.contains("~/.config"));
+        // Other content should be preserved
+        assert!(new_content.contains("custom-node"));
+        assert!(new_content.contains("another-node"));
+
+        // Verify backup was created
+        assert!(paths.backup_dir.exists());
+    }
+
+    #[test]
+    fn test_migrate_does_nothing_for_new_format() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let niri_dir = temp_dir.path().join("niri");
+        std::fs::create_dir_all(&niri_dir).unwrap();
+
+        let config_path = niri_dir.join("config.kdl");
+
+        // Create a config with new relative path
+        let new_content = r#"include "nirify/main.kdl"
+"#;
+        std::fs::write(&config_path, new_content).unwrap();
+
+        let mut paths = ConfigPaths::default();
+        paths.niri_config = config_path;
+        paths.backup_dir = temp_dir.path().join(".nirify-backups");
+
+        // Migration should return false (nothing to migrate)
+        let migrated = paths.migrate_include_line().unwrap();
+        assert!(!migrated);
+
+        // No backup should be created
+        assert!(!paths.backup_dir.exists());
     }
 }
