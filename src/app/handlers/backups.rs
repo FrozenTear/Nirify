@@ -242,9 +242,24 @@ fn restore_backup(
     config_path: &std::path::Path,
     backup_dir: &std::path::Path,
 ) -> Result<(), String> {
-    // First, create a backup of the current config
+    use chrono::Local;
+
+    // Read backup content first (validates it exists and is readable)
+    let backup_content = std::fs::read_to_string(backup_path)
+        .map_err(|e| format!("Failed to read backup file: {}", e))?;
+
+    // Validate backup contains valid KDL before restoring
+    if let Err(e) = backup_content.parse::<kdl::KdlDocument>() {
+        return Err(format!("Backup contains invalid KDL: {}", e));
+    }
+
+    // Create a backup of the current config (read first to avoid TOCTOU)
     if config_path.exists() {
-        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        let current_content = std::fs::read_to_string(config_path)
+            .map_err(|e| format!("Failed to read current config: {}", e))?;
+
+        // Use microsecond precision to avoid timestamp collisions
+        let timestamp = Local::now().format("%Y%m%dT%H%M%S%.6f");
         let current_backup_name = format!("config.kdl.backup-{}", timestamp);
         let current_backup_path = backup_dir.join(current_backup_name);
 
@@ -254,18 +269,15 @@ fn restore_backup(
                 .map_err(|e| format!("Failed to create backup directory: {}", e))?;
         }
 
-        std::fs::copy(config_path, &current_backup_path)
+        // Use atomic write for backup
+        crate::config::atomic_write(&current_backup_path, &current_content)
             .map_err(|e| format!("Failed to backup current config: {}", e))?;
 
         log::info!("Created backup of current config: {}", current_backup_path.display());
     }
 
-    // Read the backup content
-    let backup_content = std::fs::read_to_string(backup_path)
-        .map_err(|e| format!("Failed to read backup file: {}", e))?;
-
-    // Write to config file
-    std::fs::write(config_path, backup_content)
+    // Write to config file using atomic write (safe against crashes)
+    crate::config::atomic_write(config_path, &backup_content)
         .map_err(|e| format!("Failed to write config file: {}", e))?;
 
     log::info!("Restored backup from: {}", backup_path.display());

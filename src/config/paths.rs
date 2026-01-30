@@ -1,6 +1,8 @@
 use super::error::ConfigError;
 use super::registry::ConfigFile;
+use super::storage::atomic_write;
 use crate::constants::CONFIG_DIR_NAME;
+use chrono::Local;
 use std::path::PathBuf;
 
 /// Holds all paths for config files
@@ -204,20 +206,30 @@ impl ConfigPaths {
     ///
     /// Detects both the current relative path format (`nirify/main.kdl`) and
     /// the legacy tilde path format (`~/.config/niri/nirify/main.kdl`).
-    /// Uses streaming search to avoid reading entire file for large configs.
+    /// Uses proper KDL parsing to avoid false positives from comments.
     pub fn has_include_line(&self) -> bool {
-        use std::fs::File;
-        use std::io::{BufRead, BufReader};
+        use kdl::KdlDocument;
+        use std::fs;
 
-        let file = match File::open(&self.niri_config) {
-            Ok(f) => f,
+        let content = match fs::read_to_string(&self.niri_config) {
+            Ok(c) => c,
             Err(_) => return false,
         };
 
-        let reader = BufReader::new(file);
-        for line in reader.lines().map_while(Result::ok) {
-            if line.contains("nirify/main.kdl") {
-                return true;
+        let doc: KdlDocument = match content.parse() {
+            Ok(d) => d,
+            Err(_) => return false,
+        };
+
+        for node in doc.nodes() {
+            if node.name().value() == "include" {
+                if let Some(entry) = node.entries().first() {
+                    if let Some(path) = entry.value().as_string() {
+                        if path.contains("nirify/main.kdl") {
+                            return true;
+                        }
+                    }
+                }
             }
         }
         false
@@ -227,21 +239,32 @@ impl ConfigPaths {
     ///
     /// Returns true if the config contains `~/.config/niri/nirify/main.kdl` which
     /// doesn't work because niri doesn't expand tilde in include paths.
+    /// Uses proper KDL parsing to avoid false positives from comments.
     pub fn has_old_include_format(&self) -> bool {
-        use std::fs::File;
-        use std::io::{BufRead, BufReader};
+        use kdl::KdlDocument;
+        use std::fs;
 
-        let file = match File::open(&self.niri_config) {
-            Ok(f) => f,
+        let content = match fs::read_to_string(&self.niri_config) {
+            Ok(c) => c,
             Err(_) => return false,
         };
 
-        let reader = BufReader::new(file);
-        for line in reader.lines().map_while(Result::ok) {
-            // Old format: include "~/.config/niri/nirify/main.kdl"
-            // Also catch variations like ~/.config/nirify/main.kdl
-            if line.contains("~/.config") && line.contains("nirify/main.kdl") {
-                return true;
+        let doc: KdlDocument = match content.parse() {
+            Ok(d) => d,
+            Err(_) => return false,
+        };
+
+        for node in doc.nodes() {
+            if node.name().value() == "include" {
+                if let Some(entry) = node.entries().first() {
+                    if let Some(path) = entry.value().as_string() {
+                        // Old format: include "~/.config/niri/nirify/main.kdl"
+                        // Also catch variations like ~/.config/nirify/main.kdl
+                        if path.contains("~/.config") && path.contains("nirify/main.kdl") {
+                            return true;
+                        }
+                    }
+                }
             }
         }
         false
@@ -260,18 +283,19 @@ impl ConfigPaths {
 
         log::info!("Migrating old tilde-based include path to relative path");
 
-        // Create backup before modifying
+        // Read content first (before creating backup to avoid TOCTOU)
+        let content = fs::read_to_string(&self.niri_config)?;
+
+        // Create backup using atomic write (microsecond precision to avoid collisions)
         let backup_name = format!(
             "config.kdl.backup.migration.{}",
-            chrono::Local::now().format("%Y%m%d_%H%M%S")
+            Local::now().format("%Y%m%dT%H%M%S%.6f")
         );
         let backup_path = self.backup_dir.join(backup_name);
         fs::create_dir_all(&self.backup_dir)?;
-        fs::copy(&self.niri_config, &backup_path)?;
+        atomic_write(&backup_path, &content)
+            .map_err(|e| ConfigError::backup_error(&backup_path, e.to_string()))?;
         log::info!("Created migration backup at {:?}", backup_path);
-
-        // Read and replace
-        let content = fs::read_to_string(&self.niri_config)?;
 
         // Replace old tilde paths with relative path
         // Match patterns like: include "~/.config/niri/nirify/main.kdl"
@@ -299,7 +323,8 @@ impl ConfigPaths {
             new_content
         };
 
-        fs::write(&self.niri_config, final_content)?;
+        atomic_write(&self.niri_config, &final_content)
+            .map_err(|e| ConfigError::InvalidConfig(format!("Failed to write config: {}", e)))?;
         log::info!("Migrated include path to relative format");
 
         Ok(true)
@@ -311,7 +336,6 @@ impl ConfigPaths {
     /// Returns Ok(()) if successful or if the include line already exists.
     pub fn add_include_line(&self) -> Result<(), ConfigError> {
         use std::fs;
-        use std::io::Write;
 
         // Check if include already exists
         if self.has_include_line() {
@@ -319,24 +343,25 @@ impl ConfigPaths {
             return Ok(());
         }
 
-        // Create backup
-        if self.niri_config.exists() {
-            let backup_name = format!(
-                "config.kdl.backup.{}",
-                chrono::Local::now().format("%Y%m%d_%H%M%S")
-            );
-            let backup_path = self.backup_dir.join(backup_name);
-            fs::create_dir_all(&self.backup_dir)?;
-            fs::copy(&self.niri_config, &backup_path)?;
-            log::info!("Created backup at {:?}", backup_path);
-        }
-
-        // Read existing content
+        // Read existing content first (before creating backup to avoid TOCTOU)
         let existing_content = if self.niri_config.exists() {
             fs::read_to_string(&self.niri_config)?
         } else {
             String::new()
         };
+
+        // Create backup using atomic write (microsecond precision to avoid collisions)
+        if !existing_content.is_empty() {
+            let backup_name = format!(
+                "config.kdl.backup.{}",
+                Local::now().format("%Y%m%dT%H%M%S%.6f")
+            );
+            let backup_path = self.backup_dir.join(backup_name);
+            fs::create_dir_all(&self.backup_dir)?;
+            atomic_write(&backup_path, &existing_content)
+                .map_err(|e| ConfigError::backup_error(&backup_path, e.to_string()))?;
+            log::info!("Created backup at {:?}", backup_path);
+        }
 
         // Append include line (relative path works regardless of XDG_CONFIG_HOME)
         let include_line = format!(
@@ -344,14 +369,9 @@ impl ConfigPaths {
             crate::constants::CONFIG_DIR_NAME
         );
 
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&self.niri_config)?;
-
-        file.write_all(existing_content.as_bytes())?;
-        file.write_all(include_line.as_bytes())?;
+        let new_content = format!("{}{}", existing_content, include_line);
+        atomic_write(&self.niri_config, &new_content)
+            .map_err(|e| ConfigError::InvalidConfig(format!("Failed to write config: {}", e)))?;
 
         log::info!("Added include line to {:?}", self.niri_config);
         Ok(())
