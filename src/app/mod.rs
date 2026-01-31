@@ -151,6 +151,24 @@ impl App {
             );
         }
 
+        // Ensure all required config files exist (handles upgrades from older versions)
+        // This creates any missing .kdl files that main.kdl includes
+        if paths.managed_dir.exists() {
+            match crate::config::ensure_required_files_exist(&paths, &settings, feature_compat) {
+                Ok(created) if !created.is_empty() => {
+                    log::info!(
+                        "Created {} missing config file(s): {:?}",
+                        created.len(),
+                        created
+                    );
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    log::warn!("Failed to create missing config files: {}", e);
+                }
+            }
+        }
+
         // Create UI state
         let mut ui = UiState::new(
             current_theme,

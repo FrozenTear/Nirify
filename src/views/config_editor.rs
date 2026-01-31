@@ -10,33 +10,36 @@ use super::widgets::*;
 use crate::messages::{ConfigEditorMessage, Message};
 use crate::theme::fonts;
 
-/// List of config files that can be viewed
+/// List of config files that can be viewed (relative paths from managed_dir)
 pub const CONFIG_FILES: &[&str] = &[
     "main.kdl",
     "appearance.kdl",
     "behavior.kdl",
     "animations.kdl",
     "cursor.kdl",
-    "keyboard.kdl",
-    "mouse.kdl",
-    "touchpad.kdl",
-    "trackpoint.kdl",
-    "trackball.kdl",
-    "tablet.kdl",
-    "touch.kdl",
+    "overview.kdl",
     "outputs.kdl",
     "workspaces.kdl",
     "keybindings.kdl",
-    "layout-extras.kdl",
-    "gestures.kdl",
-    "misc.kdl",
-    "startup.kdl",
-    "environment.kdl",
-    "debug.kdl",
-    "switch-events.kdl",
-    "window-rules.kdl",
-    "layer-rules.kdl",
-    "recent-windows.kdl",
+    // Input subdirectory
+    "input/keyboard.kdl",
+    "input/mouse.kdl",
+    "input/touchpad.kdl",
+    "input/trackpoint.kdl",
+    "input/trackball.kdl",
+    "input/tablet.kdl",
+    "input/touch.kdl",
+    // Advanced subdirectory
+    "advanced/layout-extras.kdl",
+    "advanced/gestures.kdl",
+    "advanced/misc.kdl",
+    "advanced/startup.kdl",
+    "advanced/environment.kdl",
+    "advanced/debug.kdl",
+    "advanced/switch-events.kdl",
+    "advanced/window-rules.kdl",
+    "advanced/layer-rules.kdl",
+    "advanced/recent-windows.kdl",
 ];
 
 /// State for the config editor page

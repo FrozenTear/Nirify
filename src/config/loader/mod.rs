@@ -85,7 +85,8 @@ pub use workspaces::{load_workspaces, parse_workspace_node_children};
 
 // Re-export health module items
 pub use health::{
-    check_config_health, repair_corrupted_configs, ConfigFileStatus, ConfigHealthReport,
+    check_config_health, ensure_required_files_exist, repair_corrupted_configs, ConfigFileStatus,
+    ConfigHealthReport,
 };
 
 // Re-export import module items

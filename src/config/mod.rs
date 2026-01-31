@@ -17,9 +17,10 @@ pub use consolidation::{analyze_rules, ConsolidationAnalysis, ConsolidationSugge
 pub use dirty::{DirtyTracker, SettingsCategory};
 pub use error::ConfigError;
 pub use loader::{
-    check_config_health, import_from_niri_config, import_from_niri_config_with_result,
-    load_settings, load_settings_with_result, repair_corrupted_configs, ConfigFileStatus,
-    ConfigHealthReport, FileLoadStatus, ImportResult, LoadResult,
+    check_config_health, ensure_required_files_exist, import_from_niri_config,
+    import_from_niri_config_with_result, load_settings, load_settings_with_result,
+    repair_corrupted_configs, ConfigFileStatus, ConfigHealthReport, FileLoadStatus, ImportResult,
+    LoadResult,
 };
 pub use models::{
     ColumnWidthType, LayoutOverride, OutputConfig, OutputHotCorners, OutputSettings, Settings,

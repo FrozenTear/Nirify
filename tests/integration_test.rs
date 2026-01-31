@@ -11,8 +11,8 @@ mod common;
 
 use common::create_test_paths;
 use nirify::config::{
-    check_config_health, load_settings, repair_corrupted_configs, save_settings, ConfigFileStatus,
-    Settings,
+    check_config_health, ensure_required_files_exist, load_settings, repair_corrupted_configs,
+    save_settings, ConfigFileStatus, Settings,
 };
 use nirify::version::FeatureCompat;
 use std::fs;
@@ -405,4 +405,58 @@ fn test_repair_no_corrupted_files() {
         let count = fs::read_dir(&paths.backup_dir).unwrap().count();
         assert_eq!(count, 0);
     }
+}
+
+#[test]
+fn test_ensure_required_files_creates_missing() {
+    let dir = tempdir().unwrap();
+    let paths = create_test_paths(dir.path());
+
+    // Create directories but only some files (simulating upgrade from older version)
+    fs::create_dir_all(&paths.managed_dir).unwrap();
+    fs::create_dir_all(&paths.input_dir).unwrap();
+    fs::create_dir_all(&paths.advanced_dir).unwrap();
+
+    // Save only a subset of files (simulating older version)
+    let settings = Settings::default();
+    fs::write(&paths.appearance_kdl, "layout { gaps 16 }").unwrap();
+    fs::write(&paths.behavior_kdl, "// behavior").unwrap();
+    // Deliberately leave startup.kdl, environment.kdl, etc. missing
+
+    // Verify startup.kdl doesn't exist
+    assert!(!paths.startup_kdl.exists());
+    assert!(!paths.environment_kdl.exists());
+
+    // Call ensure_required_files_exist
+    let created = ensure_required_files_exist(&paths, &settings, FeatureCompat::all_enabled())
+        .expect("Should create missing files");
+
+    // Should have created the missing files
+    assert!(!created.is_empty());
+    assert!(created.iter().any(|f| f.contains("startup.kdl")));
+
+    // Now verify the files exist
+    assert!(paths.startup_kdl.exists());
+    assert!(paths.environment_kdl.exists());
+
+    // Files that already existed should not be in the created list
+    assert!(!created.iter().any(|f| f == "appearance.kdl"));
+    assert!(!created.iter().any(|f| f == "behavior.kdl"));
+}
+
+#[test]
+fn test_ensure_required_files_does_nothing_when_all_exist() {
+    let dir = tempdir().unwrap();
+    let paths = create_test_paths(dir.path());
+
+    // Create all files by doing a full save
+    let settings = Settings::default();
+    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save");
+
+    // Call ensure_required_files_exist
+    let created = ensure_required_files_exist(&paths, &settings, FeatureCompat::all_enabled())
+        .expect("Should succeed");
+
+    // Should not have created anything since all files exist
+    assert!(created.is_empty());
 }
