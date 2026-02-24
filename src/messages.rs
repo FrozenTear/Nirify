@@ -355,6 +355,7 @@ pub enum KeyboardMessage {
     SetRepeatDelay(i32),
     SetRepeatRate(i32),
     SetTrackLayout(String),
+    SetNumlock(bool),
 }
 
 /// Mouse settings messages

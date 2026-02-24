@@ -305,8 +305,15 @@ pub fn hotkey_matches(pressed: &str, configured: &str) -> bool {
 
 /// Formats a key press event into a niri-compatible key combo string
 /// e.g., "Mod+Shift+Return" or "Ctrl+Alt+Delete"
-pub fn format_key_combo(key: &iced::keyboard::Key, modifiers: iced::keyboard::Modifiers) -> String {
-    use iced::keyboard::{Key, key::Named};
+///
+/// The `location` parameter distinguishes numpad keys from regular keys.
+/// When `location == Location::Numpad`, keys are mapped to their `KP_*` equivalents.
+pub fn format_key_combo(
+    key: &iced::keyboard::Key,
+    modifiers: iced::keyboard::Modifiers,
+    location: iced::keyboard::Location,
+) -> String {
+    use iced::keyboard::{Key, Location, key::Named};
 
     // Skip if this is just a modifier key by itself
     let is_modifier_key = matches!(
@@ -334,63 +341,131 @@ pub fn format_key_combo(key: &iced::keyboard::Key, modifiers: iced::keyboard::Mo
         parts.push("Shift");
     }
 
+    let is_numpad = location == Location::Numpad;
+
     // Add the key name
     let key_name = match key {
-        Key::Named(named) => match named {
-            Named::Enter => "Return",
-            Named::Tab => "Tab",
-            Named::Space => "space",
-            Named::Backspace => "BackSpace",
-            Named::Delete => "Delete",
-            Named::Escape => "Escape",
-            Named::Home => "Home",
-            Named::End => "End",
-            Named::PageUp => "Page_Up",
-            Named::PageDown => "Page_Down",
-            Named::ArrowUp => "Up",
-            Named::ArrowDown => "Down",
-            Named::ArrowLeft => "Left",
-            Named::ArrowRight => "Right",
-            Named::F1 => "F1",
-            Named::F2 => "F2",
-            Named::F3 => "F3",
-            Named::F4 => "F4",
-            Named::F5 => "F5",
-            Named::F6 => "F6",
-            Named::F7 => "F7",
-            Named::F8 => "F8",
-            Named::F9 => "F9",
-            Named::F10 => "F10",
-            Named::F11 => "F11",
-            Named::F12 => "F12",
-            Named::Insert => "Insert",
-            Named::PrintScreen => "Print",
-            Named::ScrollLock => "Scroll_Lock",
-            Named::Pause => "Pause",
-            Named::AudioVolumeUp => "XF86AudioRaiseVolume",
-            Named::AudioVolumeDown => "XF86AudioLowerVolume",
-            Named::AudioVolumeMute => "XF86AudioMute",
-            Named::MediaPlayPause => "XF86AudioPlay",
-            Named::MediaStop => "XF86AudioStop",
-            Named::MediaTrackNext => "XF86AudioNext",
-            Named::MediaTrackPrevious => "XF86AudioPrev",
-            Named::BrightnessUp => "XF86MonBrightnessUp",
-            Named::BrightnessDown => "XF86MonBrightnessDown",
-            _ => return String::new(), // Unknown named key
-        },
-        Key::Character(c) => {
-            // For character keys, uppercase for consistent display
-            let s = c.as_str();
-            if s.len() == 1 {
-                // Single character - uppercase it for display
-                let upper = s.to_uppercase();
-                if parts.is_empty() {
-                    return upper;
-                } else {
-                    return format!("{}+{}", parts.join("+"), upper);
+        Key::Named(named) => {
+            if is_numpad {
+                // Numpad named keys (NumLock OFF mappings)
+                match named {
+                    Named::Enter => "KP_Enter",
+                    Named::End => "KP_End",
+                    Named::Home => "KP_Home",
+                    Named::ArrowUp => "KP_Up",
+                    Named::ArrowDown => "KP_Down",
+                    Named::ArrowLeft => "KP_Left",
+                    Named::ArrowRight => "KP_Right",
+                    Named::PageUp => "KP_Page_Up",
+                    Named::PageDown => "KP_Page_Down",
+                    Named::Insert => "KP_Insert",
+                    Named::Delete => "KP_Delete",
+                    // Fall through to regular handling for non-numpad named keys
+                    _ => match named {
+                        Named::Tab => "Tab",
+                        Named::Space => "space",
+                        Named::Backspace => "BackSpace",
+                        Named::Escape => "Escape",
+                        _ => return String::new(),
+                    },
                 }
             } else {
-                return String::new();
+                match named {
+                    Named::Enter => "Return",
+                    Named::Tab => "Tab",
+                    Named::Space => "space",
+                    Named::Backspace => "BackSpace",
+                    Named::Delete => "Delete",
+                    Named::Escape => "Escape",
+                    Named::Home => "Home",
+                    Named::End => "End",
+                    Named::PageUp => "Page_Up",
+                    Named::PageDown => "Page_Down",
+                    Named::ArrowUp => "Up",
+                    Named::ArrowDown => "Down",
+                    Named::ArrowLeft => "Left",
+                    Named::ArrowRight => "Right",
+                    Named::F1 => "F1",
+                    Named::F2 => "F2",
+                    Named::F3 => "F3",
+                    Named::F4 => "F4",
+                    Named::F5 => "F5",
+                    Named::F6 => "F6",
+                    Named::F7 => "F7",
+                    Named::F8 => "F8",
+                    Named::F9 => "F9",
+                    Named::F10 => "F10",
+                    Named::F11 => "F11",
+                    Named::F12 => "F12",
+                    Named::Insert => "Insert",
+                    Named::PrintScreen => "Print",
+                    Named::ScrollLock => "Scroll_Lock",
+                    Named::Pause => "Pause",
+                    Named::AudioVolumeUp => "XF86AudioRaiseVolume",
+                    Named::AudioVolumeDown => "XF86AudioLowerVolume",
+                    Named::AudioVolumeMute => "XF86AudioMute",
+                    Named::MediaPlayPause => "XF86AudioPlay",
+                    Named::MediaStop => "XF86AudioStop",
+                    Named::MediaTrackNext => "XF86AudioNext",
+                    Named::MediaTrackPrevious => "XF86AudioPrev",
+                    Named::BrightnessUp => "XF86MonBrightnessUp",
+                    Named::BrightnessDown => "XF86MonBrightnessDown",
+                    _ => return String::new(), // Unknown named key
+                }
+            }
+        },
+        Key::Character(c) => {
+            let s = c.as_str();
+            if is_numpad {
+                // Numpad character keys (NumLock ON mappings)
+                let kp_name = match s {
+                    "0" => "KP_0",
+                    "1" => "KP_1",
+                    "2" => "KP_2",
+                    "3" => "KP_3",
+                    "4" => "KP_4",
+                    "5" => "KP_5",
+                    "6" => "KP_6",
+                    "7" => "KP_7",
+                    "8" => "KP_8",
+                    "9" => "KP_9",
+                    "." => "KP_Decimal",
+                    "+" => "KP_Add",
+                    "-" => "KP_Subtract",
+                    "*" => "KP_Multiply",
+                    "/" => "KP_Divide",
+                    _ => {
+                        // Unknown numpad character, fall through to regular handling
+                        if s.len() == 1 {
+                            let upper = s.to_uppercase();
+                            if parts.is_empty() {
+                                return upper;
+                            } else {
+                                return format!("{}+{}", parts.join("+"), upper);
+                            }
+                        } else {
+                            return String::new();
+                        }
+                    }
+                };
+                if parts.is_empty() {
+                    return kp_name.to_string();
+                } else {
+                    return format!("{}+{}", parts.join("+"), kp_name);
+                }
+            } else {
+                // For character keys, uppercase for consistent display
+                if s.len() == 1 {
+                    // Single character - uppercase it for display
+                    let upper = s.to_uppercase();
+                    if parts.is_empty() {
+                        return upper;
+                    } else {
+                        return format!("{}+{}", parts.join("+"), upper);
+                    }
+                } else {
+                    return String::new();
+                }
             }
         }
         Key::Unidentified => return String::new(),

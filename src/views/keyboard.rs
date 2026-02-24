@@ -3,7 +3,7 @@
 use iced::widget::{column, container, scrollable, text, text_input};
 use iced::{Element, Length};
 
-use super::widgets::{page_title, info_text, section_header, slider_row_int, spacer, card};
+use super::widgets::{page_title, info_text, section_header, slider_row_int, spacer, card, toggle_row};
 use crate::config::models::KeyboardSettings;
 use crate::messages::{KeyboardMessage, Message};
 use crate::theme::muted_text_container;
@@ -80,6 +80,18 @@ pub fn view(settings: &KeyboardSettings) -> Element<'_, Message> {
                 "Layout tracking mode (global or window)",
                 track_layout,
                 |value| Message::Keyboard(KeyboardMessage::SetTrackLayout(value)),
+            ),
+        ].spacing(0).width(Length::Fill)),
+        section_header("NumLock"),
+        info_text(
+            "Controls whether NumLock is enabled when niri starts."
+        ),
+        card(column![
+            toggle_row(
+                "Enable NumLock on startup",
+                "Start with NumLock active (numpad keys produce numbers)",
+                settings.numlock,
+                |value| Message::Keyboard(KeyboardMessage::SetNumlock(value)),
             ),
         ].spacing(0).width(Length::Fill)),
         spacer(32.0),

@@ -31,6 +31,9 @@ impl super::super::App {
             KeyboardMessage::SetTrackLayout(value) => {
                 self.settings.keyboard.track_layout = value;
             }
+            KeyboardMessage::SetNumlock(value) => {
+                self.settings.keyboard.numlock = value;
+            }
         }
 
 

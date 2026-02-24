@@ -930,7 +930,7 @@ impl App {
         use iced::keyboard;
 
         keyboard::listen().map(|event| match event {
-            keyboard::Event::KeyPressed { key, modifiers, .. } => {
+            keyboard::Event::KeyPressed { key, modifiers, location, .. } => {
                 // ESC cancels capture
                 if matches!(key, keyboard::Key::Named(keyboard::key::Named::Escape)) {
                     return Message::Keybindings(
@@ -939,7 +939,7 @@ impl App {
                 }
 
                 // Convert key and modifiers to a key combo string
-                let key_combo = helpers::format_key_combo(&key, modifiers);
+                let key_combo = helpers::format_key_combo(&key, modifiers, location);
 
                 // Only capture if we got a valid key (not just a modifier)
                 if !key_combo.is_empty() {
@@ -963,8 +963,8 @@ impl App {
         keyboard::listen()
             .with(search_hotkey)
             .map(|(hotkey, event): (String, keyboard::Event)| match event {
-                keyboard::Event::KeyPressed { key, modifiers, .. } => {
-                    let key_combo = helpers::format_key_combo(&key, modifiers);
+                keyboard::Event::KeyPressed { key, modifiers, location, .. } => {
+                    let key_combo = helpers::format_key_combo(&key, modifiers, location);
                     if helpers::hotkey_matches(&key_combo, &hotkey) {
                         Message::ToggleSearch
                     } else {
