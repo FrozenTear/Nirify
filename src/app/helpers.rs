@@ -347,19 +347,20 @@ pub fn format_key_combo(
     let key_name = match key {
         Key::Named(named) => {
             if is_numpad {
-                // Numpad named keys (NumLock OFF mappings)
+                // Numpad keys: iced on Wayland reports Named keys even with
+                // NumLock ON, so map to KP number equivalents for niri bindings
                 match named {
                     Named::Enter => "KP_Enter",
-                    Named::End => "KP_End",
-                    Named::Home => "KP_Home",
-                    Named::ArrowUp => "KP_Up",
-                    Named::ArrowDown => "KP_Down",
-                    Named::ArrowLeft => "KP_Left",
-                    Named::ArrowRight => "KP_Right",
-                    Named::PageUp => "KP_Page_Up",
-                    Named::PageDown => "KP_Page_Down",
-                    Named::Insert => "KP_Insert",
-                    Named::Delete => "KP_Delete",
+                    Named::Insert => "KP_0",
+                    Named::End => "KP_1",
+                    Named::ArrowDown => "KP_2",
+                    Named::PageDown => "KP_3",
+                    Named::ArrowLeft => "KP_4",
+                    Named::ArrowRight => "KP_6",
+                    Named::Home => "KP_7",
+                    Named::ArrowUp => "KP_8",
+                    Named::PageUp => "KP_9",
+                    Named::Delete => "KP_Decimal",
                     // Fall through to regular handling for non-numpad named keys
                     _ => match named {
                         Named::Tab => "Tab",
