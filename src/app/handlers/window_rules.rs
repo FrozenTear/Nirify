@@ -147,6 +147,99 @@ impl super::super::App {
                 }
             }
 
+            // Exclude criteria
+            M::AddExclude(id) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.excludes.push(WindowRuleMatch::default());
+                }
+            }
+
+            M::RemoveExclude(id, exclude_idx) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    if exclude_idx < rule.excludes.len() {
+                        rule.excludes.remove(exclude_idx);
+                    }
+                }
+            }
+
+            M::SetExcludeAppId(id, exclude_idx, value) => {
+                let error_key = (id, format!("exclude_app_id_{}", exclude_idx));
+                self.validate_regex(&error_key, value.as_deref());
+
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    if let Some(m) = rule.excludes.get_mut(exclude_idx) {
+                        m.app_id = value;
+                    }
+                }
+            }
+
+            M::SetExcludeTitle(id, exclude_idx, value) => {
+                let error_key = (id, format!("exclude_title_{}", exclude_idx));
+                self.validate_regex(&error_key, value.as_deref());
+
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    if let Some(m) = rule.excludes.get_mut(exclude_idx) {
+                        m.title = value;
+                    }
+                }
+            }
+
+            M::SetExcludeIsFloating(id, exclude_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    if let Some(m) = rule.excludes.get_mut(exclude_idx) {
+                        m.is_floating = value;
+                    }
+                }
+            }
+
+            M::SetExcludeIsFocused(id, exclude_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    if let Some(m) = rule.excludes.get_mut(exclude_idx) {
+                        m.is_focused = value;
+                    }
+                }
+            }
+
+            M::SetExcludeIsActive(id, exclude_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    if let Some(m) = rule.excludes.get_mut(exclude_idx) {
+                        m.is_active = value;
+                    }
+                }
+            }
+
+            M::SetExcludeIsActiveInColumn(id, exclude_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    if let Some(m) = rule.excludes.get_mut(exclude_idx) {
+                        m.is_active_in_column = value;
+                    }
+                }
+            }
+
+            M::SetExcludeIsWindowCastTarget(id, exclude_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    if let Some(m) = rule.excludes.get_mut(exclude_idx) {
+                        m.is_window_cast_target = value;
+                    }
+                }
+            }
+
+            M::SetExcludeIsUrgent(id, exclude_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    if let Some(m) = rule.excludes.get_mut(exclude_idx) {
+                        m.is_urgent = value;
+                    }
+                }
+            }
+
+            M::SetExcludeAtStartup(id, exclude_idx, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    if let Some(m) = rule.excludes.get_mut(exclude_idx) {
+                        m.at_startup = value;
+                    }
+                }
+            }
+
             M::SetOpenBehavior(id, behavior) => {
                 if let Some(rule) = self.settings.window_rules.find_mut(id) {
                     rule.open_behavior = behavior;
@@ -210,6 +303,18 @@ impl super::super::App {
             M::SetMaxHeight(id, value) => {
                 if let Some(rule) = self.settings.window_rules.find_mut(id) {
                     rule.max_height = value;
+                }
+            }
+
+            M::SetFocusRingEnabled(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.focus_ring_enabled = value;
+                }
+            }
+
+            M::SetBorderEnabled(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.border_enabled = value;
                 }
             }
 

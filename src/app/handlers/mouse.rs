@@ -25,8 +25,14 @@ impl super::super::App {
             MouseMessage::SetScrollFactor(value) => {
                 self.settings.mouse.scroll_factor = value.clamp(0.1, 10.0) as f64;
             }
+            MouseMessage::SetScrollFactorHorizontal(value) => {
+                self.settings.mouse.scroll_factor_horizontal = value.map(|v| v.clamp(0.1, 10.0) as f64);
+            }
             MouseMessage::SetScrollMethod(method) => {
                 self.settings.mouse.scroll_method = method;
+            }
+            MouseMessage::SetScrollButton(value) => {
+                self.settings.mouse.scroll_button = value;
             }
             MouseMessage::ToggleLeftHanded(value) => {
                 self.settings.mouse.left_handed = value;

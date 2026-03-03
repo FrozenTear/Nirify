@@ -352,6 +352,8 @@ pub enum KeyboardMessage {
     SetXkbVariant(String),
     SetXkbOptions(String),
     SetXkbModel(String),
+    SetXkbRules(String),
+    SetXkbFile(String),
     SetRepeatDelay(i32),
     SetRepeatRate(i32),
     SetTrackLayout(String),
@@ -368,7 +370,9 @@ pub enum MouseMessage {
     SetAccelSpeed(f32),
     SetAccelProfile(AccelProfile),
     SetScrollFactor(f32),
+    SetScrollFactorHorizontal(Option<f32>),
     SetScrollMethod(ScrollMethod),
+    SetScrollButton(Option<i32>),
     ToggleLeftHanded(bool),
     ToggleMiddleEmulation(bool),
     ToggleScrollButtonLock(bool),
@@ -386,7 +390,9 @@ pub enum TouchpadMessage {
     SetAccelSpeed(f32),
     SetAccelProfile(AccelProfile),
     SetScrollFactor(f32),
+    SetScrollFactorHorizontal(Option<f32>),
     SetScrollMethod(ScrollMethod),
+    SetScrollButton(Option<i32>),
     SetClickMethod(ClickMethod),
     SetTapButtonMap(TapButtonMap),
     ToggleLeftHanded(bool),
@@ -471,6 +477,19 @@ pub enum WindowRulesMessage {
     SetMatchIsUrgent(u32, usize, Option<bool>),       // (rule_id, match_index, value) v25.05+
     SetMatchAtStartup(u32, usize, Option<bool>),      // (rule_id, match_index, value) v0.1.6+
 
+    // Exclude criteria
+    AddExclude(u32),                                       // Rule ID
+    RemoveExclude(u32, usize),                             // (rule_id, exclude_index)
+    SetExcludeAppId(u32, usize, Option<String>),           // (rule_id, exclude_index, value)
+    SetExcludeTitle(u32, usize, Option<String>),           // (rule_id, exclude_index, value)
+    SetExcludeIsFloating(u32, usize, Option<bool>),        // (rule_id, exclude_index, value)
+    SetExcludeIsFocused(u32, usize, Option<bool>),         // (rule_id, exclude_index, value)
+    SetExcludeIsActive(u32, usize, Option<bool>),          // (rule_id, exclude_index, value)
+    SetExcludeIsActiveInColumn(u32, usize, Option<bool>),  // (rule_id, exclude_index, value)
+    SetExcludeIsWindowCastTarget(u32, usize, Option<bool>),// (rule_id, exclude_index, value)
+    SetExcludeIsUrgent(u32, usize, Option<bool>),          // (rule_id, exclude_index, value)
+    SetExcludeAtStartup(u32, usize, Option<bool>),         // (rule_id, exclude_index, value)
+
     // Opening behavior
     SetOpenBehavior(u32, crate::config::models::OpenBehavior),
     SetOpenFocused(u32, Option<bool>),
@@ -487,6 +506,8 @@ pub enum WindowRulesMessage {
     SetMaxHeight(u32, Option<i32>),
 
     // Styling
+    SetFocusRingEnabled(u32, Option<bool>),
+    SetBorderEnabled(u32, Option<bool>),
     SetOpacity(u32, Option<f32>),
     SetCornerRadius(u32, Option<i32>),
     SetClipToGeometry(u32, Option<bool>),
@@ -662,7 +683,7 @@ pub enum MiscellaneousMessage {
     SetHotkeyOverlaySkipAtStartup(bool),
     SetHotkeyOverlayHideNotBound(bool),
     SetConfigNotificationDisableFailed(bool),
-    SetSpawnShAtStartup(bool),
+    SetSpawnShAtStartup(String),
     SetXWaylandSatellite(crate::config::models::XWaylandSatelliteConfig),
 }
 

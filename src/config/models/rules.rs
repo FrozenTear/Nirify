@@ -245,6 +245,8 @@ pub struct WindowRule {
     pub max_height: Option<i32>,
 
     // Styling overrides
+    /// Focus ring enabled override (Some(false) = off)
+    pub focus_ring_enabled: Option<bool>,
     /// Focus ring width override
     pub focus_ring_width: Option<i32>,
     /// Focus ring active color override
@@ -253,6 +255,8 @@ pub struct WindowRule {
     pub focus_ring_inactive: Option<ColorOrGradient>,
     /// Focus ring urgent color override
     pub focus_ring_urgent: Option<ColorOrGradient>,
+    /// Border enabled override (Some(false) = off)
+    pub border_enabled: Option<bool>,
     /// Border width override
     pub border_width: Option<i32>,
     /// Border active color override
@@ -305,10 +309,12 @@ impl Default for WindowRule {
             min_height: None,
             max_height: None,
             // Styling overrides
+            focus_ring_enabled: None,
             focus_ring_width: None,
             focus_ring_active: None,
             focus_ring_inactive: None,
             focus_ring_urgent: None,
+            border_enabled: None,
             border_width: None,
             border_active: None,
             border_inactive: None,

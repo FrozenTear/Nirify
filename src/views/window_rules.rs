@@ -277,6 +277,121 @@ fn rule_detail_view<'a>(
         },
     ));
 
+    // Exclude Criteria Section
+    let excludes_expanded = sections_expanded.get(&(id, "excludes".to_string())).copied().unwrap_or(false);
+    content = content.push(expandable_section(
+        "Exclude Criteria",
+        excludes_expanded,
+        Message::WindowRules(WindowRulesMessage::ToggleSection(id, "excludes".to_string())),
+        {
+            let mut exclude_content = column![
+                info_text("Rule does NOT apply to windows matching ANY exclude criteria below"),
+            ]
+            .spacing(8);
+
+            for (exclude_idx, exclude_match) in rule.excludes.iter().enumerate() {
+                let app_id_value = exclude_match.app_id.clone().unwrap_or_default();
+                let title_value = exclude_match.title.clone().unwrap_or_default();
+
+                exclude_content = exclude_content.push(
+                    container(
+                        column![
+                            row![
+                                text(format!("Exclude {}", exclude_idx + 1)).size(13).color([0.8, 0.8, 0.8]),
+                                remove_button(Message::WindowRules(WindowRulesMessage::RemoveExclude(id, exclude_idx))),
+                            ]
+                            .spacing(8)
+                            .align_y(Alignment::Center),
+                            {
+                                let app_id_error_key = (id, format!("exclude_app_id_{}", exclude_idx));
+                                let app_id_error = regex_errors.get(&app_id_error_key);
+                                let mut app_id_col = column![
+                                    text("App ID (regex)").size(14),
+                                    text_input("e.g., firefox", &app_id_value)
+                                        .on_input(move |value| Message::WindowRules(WindowRulesMessage::SetExcludeAppId(id, exclude_idx, if value.is_empty() { None } else { Some(value) })))
+                                        .padding(8),
+                                ].spacing(4);
+                                if let Some(error) = app_id_error {
+                                    app_id_col = app_id_col.push(
+                                        text(error).size(12).color([0.9, 0.4, 0.4])
+                                    );
+                                }
+                                app_id_col
+                            },
+                            {
+                                let title_error_key = (id, format!("exclude_title_{}", exclude_idx));
+                                let title_error = regex_errors.get(&title_error_key);
+                                let mut title_col = column![
+                                    text("Title (regex)").size(14),
+                                    text_input("e.g., .*YouTube.*", &title_value)
+                                        .on_input(move |value| Message::WindowRules(WindowRulesMessage::SetExcludeTitle(id, exclude_idx, if value.is_empty() { None } else { Some(value) })))
+                                        .padding(8),
+                                ].spacing(4);
+                                if let Some(error) = title_error {
+                                    title_col = title_col.push(
+                                        text(error).size(12).color([0.9, 0.4, 0.4])
+                                    );
+                                }
+                                title_col
+                            },
+                            optional_bool_picker(
+                                "Is floating",
+                                "Exclude floating/tiled windows",
+                                exclude_match.is_floating,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetExcludeIsFloating(id, exclude_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "Is focused",
+                                "Exclude when window has keyboard focus",
+                                exclude_match.is_focused,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetExcludeIsFocused(id, exclude_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "Is active",
+                                "Exclude window with active border/focus ring",
+                                exclude_match.is_active,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetExcludeIsActive(id, exclude_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "Is active in column",
+                                "Exclude last-focused window in its column",
+                                exclude_match.is_active_in_column,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetExcludeIsActiveInColumn(id, exclude_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "Is window cast target",
+                                "Exclude window being screencast/recorded",
+                                exclude_match.is_window_cast_target,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetExcludeIsWindowCastTarget(id, exclude_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "Is urgent",
+                                "Exclude window requesting attention",
+                                exclude_match.is_urgent,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetExcludeIsUrgent(id, exclude_idx, value)),
+                            ),
+                            optional_bool_picker(
+                                "At startup only",
+                                "Exclude only during first 60 seconds after niri launch",
+                                exclude_match.at_startup,
+                                move |value| Message::WindowRules(WindowRulesMessage::SetExcludeAtStartup(id, exclude_idx, value)),
+                            ),
+                        ]
+                        .spacing(8)
+                    )
+                    .padding(12)
+                    .style(match_container_style)
+                );
+            }
+
+            exclude_content = exclude_content.push(
+                add_item_button("Add Exclude Criteria", Message::WindowRules(WindowRulesMessage::AddExclude(id)))
+            );
+
+            exclude_content
+        },
+    ));
+
     // Behavior Section
     content = content.push(expandable_section(
         "Opening Behavior",
@@ -355,6 +470,18 @@ fn rule_detail_view<'a>(
         Message::WindowRules(WindowRulesMessage::ToggleSection(id, "styling".to_string())),
         column![
             info_text("Override global appearance settings for this window"),
+            optional_bool_picker(
+                "Focus ring",
+                "Override focus ring on/off for this window",
+                rule.focus_ring_enabled,
+                move |value| Message::WindowRules(WindowRulesMessage::SetFocusRingEnabled(id, value)),
+            ),
+            optional_bool_picker(
+                "Border",
+                "Override border on/off for this window",
+                rule.border_enabled,
+                move |value| Message::WindowRules(WindowRulesMessage::SetBorderEnabled(id, value)),
+            ),
             optional_slider_row(
                 "Opacity",
                 "Window transparency (0.0-1.0)",

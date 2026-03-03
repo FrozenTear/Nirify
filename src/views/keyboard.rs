@@ -29,6 +29,8 @@ fn keyboard_text_input<'a>(
 /// Creates the keyboard settings view
 pub fn view(settings: &KeyboardSettings) -> Element<'_, Message> {
     let xkb_layout = settings.xkb_layout.clone();
+    let xkb_rules = settings.xkb_rules.clone();
+    let xkb_file = settings.xkb_file.clone();
     let repeat_rate = settings.repeat_rate;
     let repeat_delay = settings.repeat_delay;
     let track_layout = settings.track_layout.clone();
@@ -44,6 +46,18 @@ pub fn view(settings: &KeyboardSettings) -> Element<'_, Message> {
                 "Keyboard layout (e.g., us, de, fr)",
                 xkb_layout,
                 |value| Message::Keyboard(KeyboardMessage::SetXkbLayout(value)),
+            ),
+            keyboard_text_input(
+                "XKB rules",
+                "XKB ruleset (e.g., evdev)",
+                xkb_rules,
+                |value| Message::Keyboard(KeyboardMessage::SetXkbRules(value)),
+            ),
+            keyboard_text_input(
+                "XKB file",
+                "Path to .xkb keymap file (overrides other XKB settings)",
+                xkb_file,
+                |value| Message::Keyboard(KeyboardMessage::SetXkbFile(value)),
             ),
         ].spacing(0).width(Length::Fill)),
         section_header("Key Repeat"),

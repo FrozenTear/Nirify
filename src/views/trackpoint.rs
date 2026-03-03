@@ -2,12 +2,13 @@
 //!
 //! Configure trackpoint (pointing stick / nipple mouse) behavior.
 
-use iced::widget::{column, container, scrollable};
+use iced::widget::{column, container, scrollable, text, text_input};
 use iced::{Element, Length};
 
 use super::widgets::*;
 use crate::config::models::TrackpointSettings;
 use crate::messages::{Message, TrackpointMessage};
+use crate::theme::muted_text_container;
 use crate::types::{AccelProfile, ScrollMethod};
 
 /// Creates the trackpoint settings view
@@ -55,6 +56,7 @@ pub fn view(settings: &TrackpointSettings) -> Element<'_, Message> {
                 scroll_button_lock,
                 |value| Message::Trackpoint(TrackpointMessage::SetScrollButtonLock(value)),
             ),
+            scroll_button_input(settings.scroll_button, |v| Message::Trackpoint(TrackpointMessage::SetScrollButton(v))),
         ].spacing(0).width(Length::Fill)),
         section_header("Pointer Acceleration"),
         info_text(
@@ -100,4 +102,30 @@ pub fn view(settings: &TrackpointSettings) -> Element<'_, Message> {
     scrollable(container(content).padding(20).width(Length::Fill))
         .height(Length::Fill)
         .into()
+}
+
+/// Scroll button input (optional integer for on-button-down scrolling)
+fn scroll_button_input<'a>(
+    value: Option<i32>,
+    on_change: impl Fn(Option<i32>) -> Message + 'a,
+) -> Element<'a, Message> {
+    let display_value = value.map(|v| v.to_string()).unwrap_or_default();
+    column![
+        text("Scroll button").size(15),
+        container(text("Linux button code for on-button-down scrolling (e.g., 274 for middle button). Leave empty for default.").size(11)).style(muted_text_container),
+        text_input("e.g., 274", &display_value)
+            .on_input(move |s| {
+                if s.is_empty() {
+                    on_change(None)
+                } else if let Ok(v) = s.parse::<i32>() {
+                    on_change(Some(v))
+                } else {
+                    on_change(value)
+                }
+            })
+            .padding(8),
+    ]
+    .spacing(6)
+    .padding(12)
+    .into()
 }

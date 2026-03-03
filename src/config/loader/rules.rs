@@ -585,6 +585,11 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
     // Focus ring overrides
     if let Some(fr) = wr_children.get("focus-ring") {
         if let Some(fr_children) = fr.children() {
+            if has_flag(fr_children, &["off"]) {
+                rule.focus_ring_enabled = Some(false);
+            } else if has_flag(fr_children, &["on"]) {
+                rule.focus_ring_enabled = Some(true);
+            }
             if let Some(v) = get_i64(fr_children, &["width"]) {
                 rule.focus_ring_width = safe_i64_to_i32(v, "focus-ring width");
             }
@@ -609,6 +614,11 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
     // Border overrides
     if let Some(border) = wr_children.get("border") {
         if let Some(border_children) = border.children() {
+            if has_flag(border_children, &["off"]) {
+                rule.border_enabled = Some(false);
+            } else if has_flag(border_children, &["on"]) {
+                rule.border_enabled = Some(true);
+            }
             if let Some(v) = get_i64(border_children, &["width"]) {
                 rule.border_width = safe_i64_to_i32(v, "border width");
             }

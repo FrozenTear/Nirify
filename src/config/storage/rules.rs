@@ -335,12 +335,16 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings, float_settings_
             }
 
             // Focus ring overrides
-            if rule.focus_ring_width.is_some()
+            if rule.focus_ring_enabled.is_some()
+                || rule.focus_ring_width.is_some()
                 || rule.focus_ring_active.is_some()
                 || rule.focus_ring_inactive.is_some()
                 || rule.focus_ring_urgent.is_some()
             {
                 content.push_str("    focus-ring {\n");
+                if rule.focus_ring_enabled == Some(false) {
+                    content.push_str("        off\n");
+                }
                 if let Some(width) = rule.focus_ring_width {
                     content.push_str(&format!("        width {}\n", width));
                 }
@@ -357,12 +361,16 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings, float_settings_
             }
 
             // Border overrides
-            if rule.border_width.is_some()
+            if rule.border_enabled.is_some()
+                || rule.border_width.is_some()
                 || rule.border_active.is_some()
                 || rule.border_inactive.is_some()
                 || rule.border_urgent.is_some()
             {
                 content.push_str("    border {\n");
+                if rule.border_enabled == Some(false) {
+                    content.push_str("        off\n");
+                }
                 if let Some(width) = rule.border_width {
                     content.push_str(&format!("        width {}\n", width));
                 }

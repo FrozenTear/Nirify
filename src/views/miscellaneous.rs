@@ -19,7 +19,7 @@ pub fn view(settings: &MiscSettings) -> Element<'static, Message> {
     let hotkey_skip = settings.hotkey_overlay_skip_at_startup;
     let hotkey_hide = settings.hotkey_overlay_hide_not_bound;
     let config_disable = settings.config_notification_disable_failed;
-    let spawn_sh = settings.spawn_sh_at_startup;
+    let spawn_sh = settings.spawn_sh_at_startup.clone();
     let xwayland = settings.xwayland_satellite.clone();
 
     let xwayland_options = vec![
@@ -90,12 +90,16 @@ pub fn view(settings: &MiscSettings) -> Element<'static, Message> {
         // Startup Behavior
         subsection_header("Startup Behavior"),
         card(column![
-            toggle_row(
-                "Spawn Through Shell at Startup",
-                "Execute startup commands through the shell (enables shell features like ~)",
-                spawn_sh,
-                |v| Message::Miscellaneous(MiscellaneousMessage::SetSpawnShAtStartup(v)),
-            ),
+            column![
+                text("Spawn Shell Command at Startup").size(16),
+                container(text("Shell command to execute when niri starts (leave empty to disable)").size(12)).style(muted_text_container),
+                text_input("e.g., ~/.config/niri/startup.sh", &spawn_sh)
+                    .on_input(|s| Message::Miscellaneous(MiscellaneousMessage::SetSpawnShAtStartup(s)))
+                    .padding(8)
+                    .font(fonts::MONO_FONT),
+            ]
+            .spacing(6)
+            .padding(12),
         ].spacing(0).width(Length::Fill)),
 
         // Notifications

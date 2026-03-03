@@ -39,9 +39,8 @@ pub fn generate_misc_kdl(settings: &MiscSettings) -> String {
         },
     );
 
-    // Note: spawn-sh-at-startup requires a command argument, not a flag.
-    // The current boolean model is incorrect - this feature needs redesign.
-    // For now, we don't output it to avoid parsing errors.
+    // Spawn command through shell at startup (v25.08+)
+    kdl.field_string_if_not_empty("spawn-sh-at-startup", &settings.spawn_sh_at_startup);
 
     // XWayland satellite settings (v25.08+)
     match &settings.xwayland_satellite {

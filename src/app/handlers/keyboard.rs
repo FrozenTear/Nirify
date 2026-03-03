@@ -22,6 +22,12 @@ impl super::super::App {
             KeyboardMessage::SetXkbModel(value) => {
                 self.settings.keyboard.xkb_model = value;
             }
+            KeyboardMessage::SetXkbRules(value) => {
+                self.settings.keyboard.xkb_rules = value;
+            }
+            KeyboardMessage::SetXkbFile(value) => {
+                self.settings.keyboard.xkb_file = value;
+            }
             KeyboardMessage::SetRepeatDelay(value) => {
                 self.settings.keyboard.repeat_delay = value.clamp(100, 2000);
             }

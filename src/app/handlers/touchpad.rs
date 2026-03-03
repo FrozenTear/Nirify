@@ -31,8 +31,14 @@ impl super::super::App {
             TouchpadMessage::SetScrollFactor(value) => {
                 self.settings.touchpad.scroll_factor = value.clamp(0.1, 10.0) as f64;
             }
+            TouchpadMessage::SetScrollFactorHorizontal(value) => {
+                self.settings.touchpad.scroll_factor_horizontal = value.map(|v| v.clamp(0.1, 10.0) as f64);
+            }
             TouchpadMessage::SetScrollMethod(method) => {
                 self.settings.touchpad.scroll_method = method;
+            }
+            TouchpadMessage::SetScrollButton(value) => {
+                self.settings.touchpad.scroll_button = value;
             }
             TouchpadMessage::SetClickMethod(method) => {
                 self.settings.touchpad.click_method = method;

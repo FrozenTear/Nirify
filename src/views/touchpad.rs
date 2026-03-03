@@ -1,11 +1,12 @@
 //! Touchpad settings view
 
-use iced::widget::{column, container, scrollable};
+use iced::widget::{column, container, scrollable, text, text_input};
 use iced::{Element, Length};
 
 use super::widgets::*;
 use crate::config::models::TouchpadSettings;
 use crate::messages::{Message, TouchpadMessage};
+use crate::theme::muted_text_container;
 use crate::types::{AccelProfile, ClickMethod, ScrollMethod, TapButtonMap};
 
 /// Creates the touchpad settings view
@@ -73,6 +74,10 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
                 "x",
                 |value| Message::Touchpad(TouchpadMessage::SetScrollFactor(value)),
             ),
+            optional_scroll_factor(
+                settings.scroll_factor_horizontal,
+                |v| Message::Touchpad(TouchpadMessage::SetScrollFactorHorizontal(v)),
+            ),
             picker_row(
                 "Scroll method",
                 "How scrolling gestures are interpreted (two-finger, edge, etc.)",
@@ -80,6 +85,7 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
                 Some(scroll_method),
                 |value| Message::Touchpad(TouchpadMessage::SetScrollMethod(value)),
             ),
+            scroll_button_input(settings.scroll_button, |v| Message::Touchpad(TouchpadMessage::SetScrollButton(v))),
         ].spacing(0).width(Length::Fill)),
         section_header("Pointer Acceleration"),
         info_text(
@@ -151,4 +157,79 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
     scrollable(container(content).padding(20).width(iced::Length::Fill))
         .height(iced::Length::Fill)
         .into()
+}
+
+/// Optional horizontal scroll factor (toggler + slider)
+fn optional_scroll_factor<'a>(
+    value: Option<f64>,
+    on_change: impl Fn(Option<f32>) -> Message + 'a + Copy,
+) -> Element<'a, Message> {
+    use iced::widget::{row, slider, toggler};
+    use iced::Alignment;
+    let is_enabled = value.is_some();
+    let current_value = value.unwrap_or(1.0) as f32;
+
+    let mut col = column![
+        row![
+            column![
+                text("Horizontal scroll factor").size(15),
+                container(text("Override scroll speed for horizontal scrolling (leave disabled to match vertical)").size(11)).style(muted_text_container),
+            ]
+            .width(Length::Fill),
+            toggler(is_enabled)
+                .on_toggle(move |enabled| {
+                    if enabled {
+                        on_change(Some(1.0))
+                    } else {
+                        on_change(None)
+                    }
+                }),
+        ]
+        .spacing(20)
+        .align_y(Alignment::Center),
+    ]
+    .spacing(8)
+    .padding(12);
+
+    if is_enabled {
+        col = col.push(
+            row![
+                slider(0.1..=10.0, current_value, move |v| on_change(Some(v)))
+                    .width(Length::Fill),
+                text(format!("{:.1}x", current_value))
+                    .size(13)
+                    .width(Length::Fixed(60.0)),
+            ]
+            .spacing(12)
+            .align_y(Alignment::Center)
+        );
+    }
+
+    col.into()
+}
+
+/// Scroll button input (optional integer for on-button-down scrolling)
+fn scroll_button_input<'a>(
+    value: Option<i32>,
+    on_change: impl Fn(Option<i32>) -> Message + 'a,
+) -> Element<'a, Message> {
+    let display_value = value.map(|v| v.to_string()).unwrap_or_default();
+    column![
+        text("Scroll button").size(15),
+        container(text("Linux button code for on-button-down scrolling (e.g., 274 for middle button). Leave empty for default.").size(11)).style(muted_text_container),
+        text_input("e.g., 274", &display_value)
+            .on_input(move |s| {
+                if s.is_empty() {
+                    on_change(None)
+                } else if let Ok(v) = s.parse::<i32>() {
+                    on_change(Some(v))
+                } else {
+                    on_change(value)
+                }
+            })
+            .padding(8),
+    ]
+    .spacing(6)
+    .padding(12)
+    .into()
 }

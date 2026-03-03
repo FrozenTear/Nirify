@@ -33,8 +33,8 @@ pub struct MiscSettings {
     pub hotkey_overlay_hide_not_bound: bool,
     /// Disable "Failed to parse config" notifications (v25.08+)
     pub config_notification_disable_failed: bool,
-    /// Execute spawn-at-startup commands through shell (v25.08+)
-    pub spawn_sh_at_startup: bool,
+    /// Shell command to run at startup (v25.08+)
+    pub spawn_sh_at_startup: String,
     /// XWayland satellite configuration (v25.08+)
     pub xwayland_satellite: XWaylandSatelliteConfig,
 }
@@ -62,7 +62,7 @@ impl Default for MiscSettings {
             hotkey_overlay_skip_at_startup: false,
             hotkey_overlay_hide_not_bound: false,
             config_notification_disable_failed: false,
-            spawn_sh_at_startup: false,
+            spawn_sh_at_startup: String::new(),
             xwayland_satellite: XWaylandSatelliteConfig::Default,
         }
     }
