@@ -149,7 +149,7 @@ fn get_first_page_in_category(category: PageCategory) -> Page {
     match category {
         PageCategory::System => Page::Overview,
         PageCategory::Visual => Page::Appearance,
-        PageCategory::Input => Page::Keyboard,
+        PageCategory::Input => Page::Keybindings,
         PageCategory::Layout => Page::LayoutExtras,
         PageCategory::Rules => Page::WindowRules,
         PageCategory::Advanced => Page::Debug,
