@@ -56,9 +56,10 @@ fn pages_in_category(category: PageCategory) -> Vec<Page> {
     use Page::*;
 
     match category {
-        PageCategory::System => vec![Overview, Outputs, Miscellaneous, Startup, Environment],
+        PageCategory::System => vec![Overview, Outputs, Miscellaneous, Startup, Environment, Tools, Preferences, ConfigEditor, Backups],
         PageCategory::Visual => vec![Appearance, Behavior, Animations, Cursor],
         PageCategory::Input => vec![
+            Keybindings,
             Keyboard,
             Mouse,
             Touchpad,
@@ -66,9 +67,9 @@ fn pages_in_category(category: PageCategory) -> Vec<Page> {
             Trackball,
             Tablet,
             Touch,
-            Keybindings,
+            Gestures,
         ],
-        PageCategory::Layout => vec![LayoutExtras, Gestures, Workspaces],
+        PageCategory::Layout => vec![LayoutExtras, Workspaces],
         PageCategory::Rules => vec![WindowRules, LayerRules],
         PageCategory::Advanced => vec![Debug, SwitchEvents, RecentWindows],
     }

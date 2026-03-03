@@ -159,6 +159,8 @@ fn get_first_page_in_category(category: PageCategory) -> Page {
 /// Const arrays of pages per category (avoids runtime allocation)
 const SYSTEM_PAGES: &[Page] = &[
     Page::Overview,
+    Page::Outputs,
+    Page::Miscellaneous,
     Page::Startup,
     Page::Environment,
     Page::Tools,
@@ -169,6 +171,7 @@ const SYSTEM_PAGES: &[Page] = &[
 
 const VISUAL_PAGES: &[Page] = &[
     Page::Appearance,
+    Page::Behavior,
     Page::Animations,
     Page::Cursor,
 ];
@@ -188,7 +191,6 @@ const INPUT_PAGES: &[Page] = &[
 const LAYOUT_PAGES: &[Page] = &[
     Page::LayoutExtras,
     Page::Workspaces,
-    Page::Outputs,
 ];
 
 const RULES_PAGES: &[Page] = &[
@@ -198,8 +200,6 @@ const RULES_PAGES: &[Page] = &[
 
 const ADVANCED_PAGES: &[Page] = &[
     Page::Debug,
-    Page::Behavior,
-    Page::Miscellaneous,
     Page::SwitchEvents,
     Page::RecentWindows,
 ];

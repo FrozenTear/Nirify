@@ -235,14 +235,14 @@ impl Page {
             Page::Trackpoint | Page::Trackball | Page::Tablet |
             Page::Touch => PageCategory::Input,
             Page::Animations | Page::Cursor => PageCategory::Visual,
-            Page::LayoutExtras | Page::Gestures | Page::Workspaces => PageCategory::Layout,
+            Page::LayoutExtras | Page::Workspaces => PageCategory::Layout,
             Page::WindowRules | Page::LayerRules => PageCategory::Rules,
-            Page::Keybindings => PageCategory::Input,
+            Page::Keybindings | Page::Gestures => PageCategory::Input,
             Page::Outputs => PageCategory::System,
             Page::Miscellaneous | Page::Startup | Page::Environment => PageCategory::System,
             Page::Debug | Page::SwitchEvents | Page::RecentWindows => PageCategory::Advanced,
             Page::Tools | Page::Preferences => PageCategory::System,
-            Page::ConfigEditor | Page::Backups => PageCategory::Advanced,
+            Page::ConfigEditor | Page::Backups => PageCategory::System,
         }
     }
 }
