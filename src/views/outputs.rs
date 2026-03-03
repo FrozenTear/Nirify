@@ -1,15 +1,16 @@
 //! Outputs (displays) settings view - list-detail implementation
 
-use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input};
-use iced::{Alignment, Element, Length};
+use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input, toggler};
+use iced::{Alignment, Border, Element, Length};
+use iced::Color as IcedColor;
 use std::collections::HashMap;
 
 use super::widgets::*;
-use crate::config::models::{OutputConfig, OutputSettings};
+use crate::config::models::{DefaultColumnDisplay, LayoutOverride, OutputConfig, OutputSettings};
 use crate::ipc::FullOutputInfo;
 use crate::messages::{Message, OutputsMessage};
-use crate::theme::muted_text_container;
-use crate::types::{Transform, VrrMode};
+use crate::theme::{fonts, muted_text_container};
+use crate::types::{CenterFocusedColumn, Color, ColorOrGradient, Transform, VrrMode};
 
 /// Represents an available display mode for dropdown selection
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -259,6 +260,7 @@ fn output_detail_view<'a>(
     let basic_expanded = sections_expanded.get("basic").copied().unwrap_or(true);
     let hot_corners_expanded = sections_expanded.get("hot_corners").copied().unwrap_or(false);
     let advanced_expanded = sections_expanded.get("advanced").copied().unwrap_or(false);
+    let layout_override_expanded = sections_expanded.get("layout_override").copied().unwrap_or(false);
 
     // Extract text values with proper lifetimes
     let mode_str = output.mode.as_str();
@@ -427,15 +429,480 @@ fn output_detail_view<'a>(
             } else {
                 spacer(0.0)
             },
-            info_text(
-                "Layout overrides and other advanced settings will be added in a future update"
-            ),
         ]
         .spacing(8),
     ));
 
+    // Layout Override Section
+    content = content.push(expandable_section(
+        "Layout Override",
+        layout_override_expanded,
+        Message::Outputs(OutputsMessage::ToggleSection("layout_override".to_string())),
+        layout_override_content(output, idx),
+    ));
+
     scrollable(content).height(Length::Fill).into()
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Layout Override UI
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Main layout override content - shows enable button or full override controls
+fn layout_override_content(output: &OutputConfig, idx: usize) -> Element<'_, Message> {
+    if let Some(lo) = output.layout_override.as_ref() {
+        let mut content = column![
+            info_text("Override global layout settings for this output. Fields set to \"Use Global\" inherit from the global layout."),
+            button(text("Remove All Overrides").size(14))
+                .on_press(Message::Outputs(OutputsMessage::SetLayoutOverride(idx, None)))
+                .padding([8, 16])
+                .style(delete_button_style),
+        ]
+        .spacing(8);
+
+        content = content.push(gaps_struts_card(lo, idx));
+        content = content.push(column_behavior_card(lo, idx));
+        content = content.push(sizing_card(lo, idx));
+        content = content.push(focus_ring_card(lo, idx));
+        content = content.push(border_card(lo, idx));
+        content = content.push(shadow_card(lo, idx));
+
+        content.into()
+    } else {
+        column![
+            info_text("Override global layout settings (gaps, borders, focus ring, shadow, etc.) for this specific output."),
+            button(text("Enable Layout Override").size(14))
+                .on_press(Message::Outputs(OutputsMessage::SetLayoutOverride(idx, Some(LayoutOverride::default()))))
+                .padding([8, 16]),
+        ]
+        .spacing(8)
+        .into()
+    }
+}
+
+/// Helper: send a SetLayoutOverride message with a mutated clone of the current override
+fn set_lo_field(
+    lo: &LayoutOverride,
+    idx: usize,
+    mutate: impl FnOnce(&mut LayoutOverride),
+) -> Message {
+    let mut new_lo = lo.clone();
+    mutate(&mut new_lo);
+    let result = if new_lo.has_any() { Some(new_lo) } else { None };
+    Message::Outputs(OutputsMessage::SetLayoutOverride(idx, result))
+}
+
+/// Gaps & Struts sub-section card
+fn gaps_struts_card(lo: &LayoutOverride, idx: usize) -> Element<'_, Message> {
+    let lo1 = lo.clone();
+    let lo2 = lo.clone();
+    let lo3 = lo.clone();
+    let lo4 = lo.clone();
+    let lo5 = lo.clone();
+
+    card(column![
+        subsection_header("Gaps & Struts"),
+        optional_slider_row(
+            "Gaps",
+            "Space between windows (px)",
+            lo.gaps,
+            0.0, 64.0, "px",
+            move |v| set_lo_field(&lo1, idx, |o| o.gaps = v),
+        ),
+        optional_slider_row(
+            "Strut Left",
+            "Reserved space on the left edge (px)",
+            lo.strut_left,
+            0.0, 500.0, "px",
+            move |v| set_lo_field(&lo2, idx, |o| o.strut_left = v),
+        ),
+        optional_slider_row(
+            "Strut Right",
+            "Reserved space on the right edge (px)",
+            lo.strut_right,
+            0.0, 500.0, "px",
+            move |v| set_lo_field(&lo3, idx, |o| o.strut_right = v),
+        ),
+        optional_slider_row(
+            "Strut Top",
+            "Reserved space on the top edge (px)",
+            lo.strut_top,
+            0.0, 500.0, "px",
+            move |v| set_lo_field(&lo4, idx, |o| o.strut_top = v),
+        ),
+        optional_slider_row(
+            "Strut Bottom",
+            "Reserved space on the bottom edge (px)",
+            lo.strut_bottom,
+            0.0, 500.0, "px",
+            move |v| set_lo_field(&lo5, idx, |o| o.strut_bottom = v),
+        ),
+    ].spacing(4))
+}
+
+/// Column Behavior sub-section card
+fn column_behavior_card(lo: &LayoutOverride, idx: usize) -> Element<'_, Message> {
+    let lo1 = lo.clone();
+    let lo2 = lo.clone();
+    let lo3 = lo.clone();
+
+    card(column![
+        subsection_header("Column Behavior"),
+        optional_picker_row(
+            "Center Focused Column",
+            "When to auto-center the focused column",
+            CenterFocusedColumn::all(),
+            lo.center_focused_column,
+            move |v| set_lo_field(&lo1, idx, |o| o.center_focused_column = v),
+        ),
+        optional_bool_picker(
+            "Always Center Single Column",
+            "Center a single column even when it fits",
+            lo.always_center_single_column,
+            move |v| set_lo_field(&lo2, idx, |o| o.always_center_single_column = v),
+        ),
+        optional_picker_row(
+            "Default Column Display",
+            "How new columns are displayed",
+            &[DefaultColumnDisplay::Normal, DefaultColumnDisplay::Tabbed],
+            lo.default_column_display,
+            move |v| set_lo_field(&lo3, idx, |o| o.default_column_display = v),
+        ),
+    ].spacing(4))
+}
+
+/// Default Sizing sub-section card
+fn sizing_card(lo: &LayoutOverride, idx: usize) -> Element<'_, Message> {
+    let lo1 = lo.clone();
+
+    card(column![
+        subsection_header("Default Sizing"),
+        optional_slider_row(
+            "Column Width (Proportion)",
+            "Default column width as a fraction of screen width",
+            lo.default_column_width_proportion,
+            0.1, 1.0, "",
+            move |v| set_lo_field(&lo1, idx, |o| o.default_column_width_proportion = v),
+        ),
+        {
+            let lo_c = lo.clone();
+            optional_slider_row(
+                "Column Width (Fixed)",
+                "Default column width in pixels",
+                lo.default_column_width_fixed.map(|v| v as f32),
+                200.0, 4000.0, "px",
+                move |v| set_lo_field(&lo_c, idx, |o| o.default_column_width_fixed = v.map(|f| f as i32)),
+            )
+        },
+        info_text("Preset column widths and window heights can be configured via KDL config files"),
+    ].spacing(4))
+}
+
+/// Focus Ring sub-section card
+fn focus_ring_card(lo: &LayoutOverride, idx: usize) -> Element<'_, Message> {
+    let lo1 = lo.clone();
+    let lo2 = lo.clone();
+    let lo3 = lo.clone();
+
+    card(column![
+        subsection_header("Focus Ring"),
+        optional_bool_picker(
+            "Enabled",
+            "Show focus ring around focused window",
+            lo.focus_ring_enabled,
+            move |v| set_lo_field(&lo1, idx, |o| o.focus_ring_enabled = v),
+        ),
+        {
+            let lo_c = lo.clone();
+            optional_slider_row(
+                "Width",
+                "Focus ring thickness (px)",
+                lo.focus_ring_width.map(|v| v as f32),
+                1.0, 16.0, "px",
+                move |v| set_lo_field(&lo_c, idx, |o| o.focus_ring_width = v.map(|f| f as i32)),
+            )
+        },
+        optional_color_or_gradient_row(
+            "Active Color",
+            "Color of the focus ring on the focused window",
+            lo.focus_ring_active.as_ref(),
+            move |v| set_lo_field(&lo2, idx, |o| o.focus_ring_active = v),
+        ),
+        optional_color_or_gradient_row(
+            "Inactive Color",
+            "Color of the focus ring on unfocused windows",
+            lo.focus_ring_inactive.as_ref(),
+            move |v| set_lo_field(&lo3, idx, |o| o.focus_ring_inactive = v),
+        ),
+    ].spacing(4))
+}
+
+/// Border sub-section card
+fn border_card(lo: &LayoutOverride, idx: usize) -> Element<'_, Message> {
+    let lo1 = lo.clone();
+    let lo2 = lo.clone();
+    let lo3 = lo.clone();
+
+    card(column![
+        subsection_header("Border"),
+        optional_bool_picker(
+            "Enabled",
+            "Show border around windows",
+            lo.border_enabled,
+            move |v| set_lo_field(&lo1, idx, |o| o.border_enabled = v),
+        ),
+        {
+            let lo_c = lo.clone();
+            optional_slider_row(
+                "Width",
+                "Border thickness (px)",
+                lo.border_width.map(|v| v as f32),
+                1.0, 8.0, "px",
+                move |v| set_lo_field(&lo_c, idx, |o| o.border_width = v.map(|f| f as i32)),
+            )
+        },
+        optional_color_or_gradient_row(
+            "Active Color",
+            "Border color on the focused window",
+            lo.border_active.as_ref(),
+            move |v| set_lo_field(&lo2, idx, |o| o.border_active = v),
+        ),
+        optional_color_or_gradient_row(
+            "Inactive Color",
+            "Border color on unfocused windows",
+            lo.border_inactive.as_ref(),
+            move |v| set_lo_field(&lo3, idx, |o| o.border_inactive = v),
+        ),
+    ].spacing(4))
+}
+
+/// Shadow sub-section card
+fn shadow_card(lo: &LayoutOverride, idx: usize) -> Element<'_, Message> {
+    let lo1 = lo.clone();
+    let lo6 = lo.clone();
+
+    card(column![
+        subsection_header("Shadow"),
+        optional_bool_picker(
+            "Enabled",
+            "Show shadow behind windows",
+            lo.shadow_enabled,
+            move |v| set_lo_field(&lo1, idx, |o| o.shadow_enabled = v),
+        ),
+        {
+            let lo_c = lo.clone();
+            optional_slider_row(
+                "Softness",
+                "Shadow blur radius (px)",
+                lo.shadow_softness.map(|v| v as f32),
+                0.0, 100.0, "px",
+                move |v| set_lo_field(&lo_c, idx, |o| o.shadow_softness = v.map(|f| f as i32)),
+            )
+        },
+        {
+            let lo_c = lo.clone();
+            optional_slider_row(
+                "Spread",
+                "Shadow expansion (px)",
+                lo.shadow_spread.map(|v| v as f32),
+                0.0, 100.0, "px",
+                move |v| set_lo_field(&lo_c, idx, |o| o.shadow_spread = v.map(|f| f as i32)),
+            )
+        },
+        {
+            let lo_c = lo.clone();
+            optional_slider_row(
+                "Offset X",
+                "Horizontal shadow offset (px)",
+                lo.shadow_offset_x.map(|v| v as f32),
+                -100.0, 100.0, "px",
+                move |v| set_lo_field(&lo_c, idx, |o| o.shadow_offset_x = v.map(|f| f as i32)),
+            )
+        },
+        {
+            let lo_c = lo.clone();
+            optional_slider_row(
+                "Offset Y",
+                "Vertical shadow offset (px)",
+                lo.shadow_offset_y.map(|v| v as f32),
+                -100.0, 100.0, "px",
+                move |v| set_lo_field(&lo_c, idx, |o| o.shadow_offset_y = v.map(|f| f as i32)),
+            )
+        },
+        optional_color_row(
+            "Color",
+            "Shadow color",
+            lo.shadow_color.as_ref(),
+            move |v| set_lo_field(&lo6, idx, |o| o.shadow_color = v),
+        ),
+    ].spacing(4))
+}
+
+/// Optional color row for `Option<Color>` fields
+///
+/// Shows a toggler to enable/disable, and when enabled shows a hex color input with preview.
+fn optional_color_row<'a>(
+    label: &'a str,
+    description: &'a str,
+    value: Option<&Color>,
+    on_change: impl Fn(Option<Color>) -> Message + Clone + 'a,
+) -> Element<'a, Message> {
+    let is_enabled = value.is_some();
+    let color = value.cloned().unwrap_or_default();
+    let hex_value = color.to_hex();
+
+    let on_change_toggle = on_change.clone();
+    let on_change_input = on_change.clone();
+
+    let mut content = column![
+        row![
+            column![
+                text(label).size(15).font(fonts::UI_FONT_MEDIUM),
+                container(text(description).size(11)).style(muted_text_container),
+            ]
+            .spacing(2)
+            .width(Length::Fill),
+            toggler(is_enabled).on_toggle(move |enabled| {
+                if enabled {
+                    on_change_toggle(Some(Color::default()))
+                } else {
+                    on_change_toggle(None)
+                }
+            }),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Center),
+    ]
+    .spacing(6)
+    .padding(12);
+
+    if is_enabled {
+        let preview_color = IcedColor::from_rgb8(color.r, color.g, color.b);
+        let preview = container(text(""))
+            .width(Length::Fixed(32.0))
+            .height(Length::Fixed(32.0))
+            .style(move |_theme: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(preview_color)),
+                border: Border {
+                    color: IcedColor::from_rgb(0.4, 0.4, 0.4),
+                    width: 1.0,
+                    radius: 4.0.into(),
+                },
+                ..Default::default()
+            });
+
+        let hex_input = text_input("", &hex_value)
+            .on_input(move |hex| {
+                if let Some(c) = Color::from_hex(&hex) {
+                    on_change_input(Some(c))
+                } else {
+                    Message::None
+                }
+            })
+            .padding(8)
+            .width(Length::Fixed(100.0))
+            .font(fonts::MONO_FONT);
+
+        content = content.push(
+            row![preview, hex_input]
+                .spacing(8)
+                .align_y(Alignment::Center)
+        );
+    }
+
+    content.into()
+}
+
+/// Optional color-or-gradient row for `Option<ColorOrGradient>` fields
+///
+/// Shows a toggler to enable/disable. When enabled, shows a hex color input.
+/// Only supports solid colors in the UI; gradients set via KDL are preserved
+/// until the user changes the color.
+fn optional_color_or_gradient_row<'a>(
+    label: &'a str,
+    description: &'a str,
+    value: Option<&ColorOrGradient>,
+    on_change: impl Fn(Option<ColorOrGradient>) -> Message + Clone + 'a,
+) -> Element<'a, Message> {
+    let is_enabled = value.is_some();
+    let color = value
+        .map(|cog| *cog.primary_color())
+        .unwrap_or_default();
+    let hex_value = color.to_hex();
+    let is_gradient = value.map(|v| v.is_gradient()).unwrap_or(false);
+
+    let on_change_toggle = on_change.clone();
+    let on_change_input = on_change.clone();
+
+    let mut content = column![
+        row![
+            column![
+                text(label).size(15).font(fonts::UI_FONT_MEDIUM),
+                container(text(description).size(11)).style(muted_text_container),
+            ]
+            .spacing(2)
+            .width(Length::Fill),
+            toggler(is_enabled).on_toggle(move |enabled| {
+                if enabled {
+                    on_change_toggle(Some(ColorOrGradient::Color(Color::default())))
+                } else {
+                    on_change_toggle(None)
+                }
+            }),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Center),
+    ]
+    .spacing(6)
+    .padding(12);
+
+    if is_enabled {
+        let preview_color = IcedColor::from_rgb8(color.r, color.g, color.b);
+        let preview = container(text(""))
+            .width(Length::Fixed(32.0))
+            .height(Length::Fixed(32.0))
+            .style(move |_theme: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(preview_color)),
+                border: Border {
+                    color: IcedColor::from_rgb(0.4, 0.4, 0.4),
+                    width: 1.0,
+                    radius: 4.0.into(),
+                },
+                ..Default::default()
+            });
+
+        let hex_input = text_input("", &hex_value)
+            .on_input(move |hex| {
+                if let Some(c) = Color::from_hex(&hex) {
+                    on_change_input(Some(ColorOrGradient::Color(c)))
+                } else {
+                    Message::None
+                }
+            })
+            .padding(8)
+            .width(Length::Fixed(100.0))
+            .font(fonts::MONO_FONT);
+
+        let mut input_row = row![preview, hex_input]
+            .spacing(8)
+            .align_y(Alignment::Center);
+
+        if is_gradient {
+            input_row = input_row.push(
+                container(text("gradient (edit via KDL)").size(11))
+                    .style(muted_text_container)
+            );
+        }
+
+        content = content.push(input_row);
+    }
+
+    content.into()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Button Styles
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Style for delete buttons - uses theme danger color
 fn delete_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {

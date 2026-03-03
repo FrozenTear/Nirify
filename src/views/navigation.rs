@@ -174,6 +174,7 @@ const VISUAL_PAGES: &[Page] = &[
 ];
 
 const INPUT_PAGES: &[Page] = &[
+    Page::Keybindings,
     Page::Keyboard,
     Page::Mouse,
     Page::Touchpad,
@@ -193,7 +194,6 @@ const LAYOUT_PAGES: &[Page] = &[
 const RULES_PAGES: &[Page] = &[
     Page::WindowRules,
     Page::LayerRules,
-    Page::Keybindings,
 ];
 
 const ADVANCED_PAGES: &[Page] = &[
