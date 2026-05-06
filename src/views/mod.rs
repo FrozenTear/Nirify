@@ -17,8 +17,8 @@ pub mod cursor;
 pub mod debug;
 pub mod environment;
 pub mod gestures;
-pub mod keyboard;
 pub mod keybindings;
+pub mod keyboard;
 pub mod layer_rules;
 pub mod layout_extras;
 pub mod miscellaneous;
@@ -39,3 +39,5 @@ pub mod widget_demo;
 pub mod widgets;
 pub mod window_rules;
 pub mod workspaces;
+
+pub mod screens;

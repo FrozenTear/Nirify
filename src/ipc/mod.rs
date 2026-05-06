@@ -38,11 +38,7 @@ use std::time::Duration;
 use thiserror::Error;
 
 /// Standard paths where niri binary may be installed
-const NIRI_BINARY_PATHS: &[&str] = &[
-    "/usr/bin/niri",
-    "/usr/local/bin/niri",
-    "/bin/niri",
-];
+const NIRI_BINARY_PATHS: &[&str] = &["/usr/bin/niri", "/usr/local/bin/niri", "/bin/niri"];
 
 /// Find the niri binary in standard system paths
 ///

@@ -1,131 +1,206 @@
-//! Trackball settings view
-//!
-//! Configure trackball device behavior.
+//! Trackball settings view — neon modal style
 
-use iced::widget::{column, container, scrollable, text, text_input};
-use iced::{Element, Length};
+use iced::widget::{column, container, row, scrollable, text, text_input, Space};
+use iced::{Alignment, Element, Length};
 
-use super::widgets::*;
+use super::widgets::{picker_row, toggle_row};
 use crate::config::models::TrackballSettings;
 use crate::messages::{Message, TrackballMessage};
-use crate::theme::muted_text_container;
+use crate::theme::{fonts, neon};
 use crate::types::{AccelProfile, ScrollMethod};
 
-/// Creates the trackball settings view
 pub fn view(settings: &TrackballSettings) -> Element<'_, Message> {
-    let off = settings.off;
-    let natural_scroll = settings.natural_scroll;
-    let accel_speed = settings.accel_speed;
-    let accel_profile = settings.accel_profile;
-    let scroll_method = settings.scroll_method;
-    let left_handed = settings.left_handed;
-    let middle_emulation = settings.middle_emulation;
-    let scroll_button_lock = settings.scroll_button_lock;
-
     let content = column![
-        page_title("Trackball Settings"),
-        info_text(
-            "Configure trackball device behavior, acceleration, and scrolling."
-        ),
-        card(column![
-            toggle_row(
-                "Disable trackball",
-                "Completely disable this trackball device",
-                off,
-                |value| Message::Trackball(TrackballMessage::SetOff(value)),
-            ),
-        ].spacing(0).width(Length::Fill)),
-        section_header("Scrolling"),
-        card(column![
-            toggle_row(
-                "Natural scroll",
-                "Reverse scroll direction",
-                natural_scroll,
-                |value| Message::Trackball(TrackballMessage::SetNaturalScroll(value)),
-            ),
-            picker_row(
-                "Scroll method",
-                "How scrolling is performed",
-                ScrollMethod::all(),
-                Some(scroll_method),
-                |value| Message::Trackball(TrackballMessage::SetScrollMethod(value)),
-            ),
-            toggle_row(
-                "Scroll button lock",
-                "Lock scroll button state (don't need to hold)",
-                scroll_button_lock,
-                |value| Message::Trackball(TrackballMessage::SetScrollButtonLock(value)),
-            ),
-            scroll_button_input(settings.scroll_button, |v| Message::Trackball(TrackballMessage::SetScrollButton(v))),
-        ].spacing(0).width(Length::Fill)),
-        section_header("Pointer Acceleration"),
-        info_text(
-            "Control how trackball movement speed relates to physical rotation."
-        ),
-        card(column![
-            slider_row(
-                "Acceleration speed",
-                "Speed from -1.0 (slow) to 1.0 (fast)",
-                accel_speed as f32,
-                -1.0,
-                1.0,
-                "",
-                |value| Message::Trackball(TrackballMessage::SetAccelSpeed(value)),
-            ),
-            picker_row(
-                "Acceleration profile",
-                "Adaptive varies with speed, flat maintains constant ratio",
-                AccelProfile::all(),
-                Some(accel_profile),
-                |value| Message::Trackball(TrackballMessage::SetAccelProfile(value)),
-            ),
-        ].spacing(0).width(Length::Fill)),
-        section_header("Button Configuration"),
-        card(column![
-            toggle_row(
-                "Left-handed mode",
-                "Swap left and right buttons",
-                left_handed,
-                |value| Message::Trackball(TrackballMessage::SetLeftHanded(value)),
-            ),
-            toggle_row(
-                "Middle button emulation",
-                "Emulate middle click by pressing left+right simultaneously",
-                middle_emulation,
-                |value| Message::Trackball(TrackballMessage::SetMiddleEmulation(value)),
-            ),
-        ].spacing(0).width(Length::Fill)),
-        spacer(32.0),
+        // -- 2-COLUMN: SCROLLING | ACCELERATION --
+        row![
+            // Left column: Scrolling + Device
+            column![
+                modal_section("\u{25ce}", "SCROLLING", neon::SECONDARY),
+                Space::new().height(4),
+                container(
+                    column![
+                        toggle_row(
+                            "Natural scroll",
+                            "Reverse scroll direction",
+                            settings.natural_scroll,
+                            |v| Message::Trackball(TrackballMessage::SetNaturalScroll(v))
+                        ),
+                        toggle_row(
+                            "Scroll button lock",
+                            "Lock scroll state",
+                            settings.scroll_button_lock,
+                            |v| Message::Trackball(TrackballMessage::SetScrollButtonLock(v))
+                        ),
+                    ]
+                    .spacing(0)
+                )
+                .padding(8)
+                .style(crate::theme::card_style),
+                Space::new().height(8),
+                picker_row(
+                    "Scroll method",
+                    "How scrolling is performed",
+                    ScrollMethod::all(),
+                    Some(settings.scroll_method),
+                    |v| Message::Trackball(TrackballMessage::SetScrollMethod(v))
+                ),
+                Space::new().height(8),
+                scroll_button_input(settings.scroll_button, |v| Message::Trackball(
+                    TrackballMessage::SetScrollButton(v)
+                )),
+            ]
+            .spacing(6)
+            .width(Length::FillPortion(1)),
+            // Right column: Acceleration + Buttons
+            column![
+                modal_section("\u{26a1}", "ACCELERATION", neon::PRIMARY),
+                Space::new().height(4),
+                styled_slider(
+                    "ACCEL SPEED",
+                    &format!("{:.2}", settings.accel_speed),
+                    -1.0..=1.0,
+                    settings.accel_speed as f32,
+                    0.01,
+                    |v| Message::Trackball(TrackballMessage::SetAccelSpeed(v))
+                ),
+                picker_row(
+                    "Accel profile",
+                    "Adaptive or flat acceleration",
+                    AccelProfile::all(),
+                    Some(settings.accel_profile),
+                    |v| Message::Trackball(TrackballMessage::SetAccelProfile(v))
+                ),
+                Space::new().height(12),
+                modal_section("\u{25e7}", "BUTTONS", neon::TERTIARY),
+                Space::new().height(4),
+                container(
+                    column![
+                        toggle_row(
+                            "Left-handed mode",
+                            "Swap left and right buttons",
+                            settings.left_handed,
+                            |v| Message::Trackball(TrackballMessage::SetLeftHanded(v))
+                        ),
+                        toggle_row(
+                            "Middle emulation",
+                            "Left+right = middle click",
+                            settings.middle_emulation,
+                            |v| Message::Trackball(TrackballMessage::SetMiddleEmulation(v))
+                        ),
+                        toggle_row(
+                            "Disable trackball",
+                            "Completely disable this device",
+                            settings.off,
+                            |v| Message::Trackball(TrackballMessage::SetOff(v))
+                        ),
+                    ]
+                    .spacing(0)
+                )
+                .padding(8)
+                .style(crate::theme::card_style),
+            ]
+            .spacing(6)
+            .width(Length::FillPortion(1)),
+        ]
+        .spacing(32)
+        .align_y(Alignment::Start),
     ]
-    .spacing(4);
+    .spacing(0)
+    .width(Length::Fill);
 
-    scrollable(container(content).padding(20).width(Length::Fill))
+    scrollable(container(content).padding(8).width(Length::Fill))
         .height(Length::Fill)
         .into()
 }
 
-/// Scroll button input (optional integer for on-button-down scrolling)
+// -- Helpers --
+
+fn modal_section<'a>(icon: &'a str, label: &'a str, accent: iced::Color) -> Element<'a, Message> {
+    row![
+        text(icon).size(14).color(accent),
+        Space::new().width(6),
+        text(label)
+            .size(11)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(accent),
+        Space::new().width(12),
+        container(Space::new().width(Length::Fill).height(1))
+            .width(Length::Fill)
+            .style(move |_: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(iced::Color { a: 0.25, ..accent })),
+                ..Default::default()
+            }),
+    ]
+    .spacing(0)
+    .align_y(Alignment::Center)
+    .padding([14, 0])
+    .into()
+}
+
+fn styled_slider<'a>(
+    label: &'a str,
+    display: &str,
+    range: std::ops::RangeInclusive<f32>,
+    value: f32,
+    step: f32,
+    on_slide: impl Fn(f32) -> Message + 'a,
+) -> Element<'a, Message> {
+    let d = display.to_string();
+    container(
+        column![
+            row![
+                text(label)
+                    .size(10)
+                    .font(fonts::UI_FONT_SEMIBOLD)
+                    .color(neon::OUTLINE_VARIANT),
+                Space::new().width(Length::Fill),
+                text(d)
+                    .size(11)
+                    .font(fonts::MONO_FONT)
+                    .color(neon::SECONDARY),
+            ]
+            .align_y(Alignment::Center),
+            iced::widget::slider(range, value, on_slide)
+                .step(step)
+                .width(Length::Fill),
+        ]
+        .spacing(4),
+    )
+    .padding(12)
+    .style(crate::theme::card_style)
+    .into()
+}
+
 fn scroll_button_input<'a>(
     value: Option<i32>,
     on_change: impl Fn(Option<i32>) -> Message + 'a,
 ) -> Element<'a, Message> {
     let display_value = value.map(|v| v.to_string()).unwrap_or_default();
-    column![
-        text("Scroll button").size(15),
-        container(text("Linux button code for on-button-down scrolling (e.g., 274 for middle button). Leave empty for default.").size(11)).style(muted_text_container),
-        text_input("e.g., 274", &display_value)
-            .on_input(move |s| {
-                if s.is_empty() {
-                    on_change(None)
-                } else if let Ok(v) = s.parse::<i32>() {
-                    on_change(Some(v))
-                } else {
-                    on_change(value)
-                }
-            })
-            .padding(8),
-    ]
-    .spacing(6)
+    container(
+        column![
+            text("SCROLL BUTTON")
+                .size(10)
+                .font(fonts::UI_FONT_SEMIBOLD)
+                .color(neon::OUTLINE_VARIANT),
+            text("Linux button code for on-button-down scrolling (e.g., 274)")
+                .size(11)
+                .color(neon::OUTLINE_VARIANT),
+            text_input("e.g., 274", &display_value)
+                .on_input(move |s| {
+                    if s.is_empty() {
+                        on_change(None)
+                    } else if let Ok(v) = s.parse::<i32>() {
+                        on_change(Some(v))
+                    } else {
+                        on_change(value)
+                    }
+                })
+                .padding(10)
+                .size(13),
+        ]
+        .spacing(4),
+    )
     .padding(12)
+    .style(crate::theme::card_style)
     .into()
 }

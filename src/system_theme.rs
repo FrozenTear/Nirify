@@ -122,7 +122,10 @@ impl WalColors {
 
     /// Get color by index (0-15)
     pub fn color(&self, index: usize) -> &str {
-        self.colors.get(index).map(|s| s.as_str()).unwrap_or("#000000")
+        self.colors
+            .get(index)
+            .map(|s| s.as_str())
+            .unwrap_or("#000000")
     }
 }
 
@@ -163,13 +166,18 @@ impl SystemThemeState {
             SystemThemeEvent::AccentColor { r, g, b } => {
                 log::info!(
                     "System theme: accent color changed to RGB({:.3}, {:.3}, {:.3})",
-                    r, g, b
+                    r,
+                    g,
+                    b
                 );
                 self.accent_color = Some((r, g, b));
                 self.available = true;
             }
             SystemThemeEvent::FileColors(colors) => {
-                log::info!("System theme: loaded colors from file (bg: {})", colors.background);
+                log::info!(
+                    "System theme: loaded colors from file (bg: {})",
+                    colors.background
+                );
                 self.wal_colors = Some(colors);
                 self.available = true;
             }
@@ -241,9 +249,9 @@ impl SystemThemeState {
                 background: Color::from_rgb(0.102, 0.114, 0.137), // #1a1d23
                 text: Color::from_rgb(0.902, 0.910, 0.922),       // #e6e8eb
                 primary: accent,
-                success: Color::from_rgb(0.063, 0.725, 0.506),    // #10b981
-                warning: Color::from_rgb(0.961, 0.620, 0.043),    // #f59e0b
-                danger: Color::from_rgb(0.937, 0.267, 0.267),     // #ef4444
+                success: Color::from_rgb(0.063, 0.725, 0.506), // #10b981
+                warning: Color::from_rgb(0.961, 0.620, 0.043), // #f59e0b
+                danger: Color::from_rgb(0.937, 0.267, 0.267),  // #ef4444
             }
         } else {
             Palette {

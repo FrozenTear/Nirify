@@ -128,10 +128,12 @@ pub fn parse_debug_from_doc(doc: &KdlDocument, settings: &mut Settings) {
     if let Some(debug_node) = doc.get("debug") {
         if let Some(debug_children) = debug_node.children() {
             if let Some(value) = get_string(debug_children, &["preview-render"]) {
-                settings.debug.preview_render = crate::config::models::PreviewRenderMode::from_kdl(&value);
+                settings.debug.preview_render =
+                    crate::config::models::PreviewRenderMode::from_kdl(&value);
             } else if has_flag(debug_children, &["preview-render"]) {
                 // Legacy: bare flag without value defaults to screencast
-                settings.debug.preview_render = crate::config::models::PreviewRenderMode::Screencast;
+                settings.debug.preview_render =
+                    crate::config::models::PreviewRenderMode::Screencast;
             }
             if has_flag(debug_children, &["enable-overlay-planes"]) {
                 settings.debug.enable_overlay_planes = true;

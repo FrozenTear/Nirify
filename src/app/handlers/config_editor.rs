@@ -8,7 +8,10 @@ use crate::views::config_editor::CONFIG_FILES;
 
 impl super::super::App {
     /// Updates config editor state
-    pub(in crate::app) fn update_config_editor(&mut self, msg: ConfigEditorMessage) -> Task<Message> {
+    pub(in crate::app) fn update_config_editor(
+        &mut self,
+        msg: ConfigEditorMessage,
+    ) -> Task<Message> {
         match msg {
             ConfigEditorMessage::SelectFile(idx) => {
                 self.ui.config_editor_state.selected_file = Some(idx);
@@ -20,9 +23,7 @@ impl super::super::App {
                 let filename = CONFIG_FILES[idx].to_string();
 
                 Task::perform(
-                    async move {
-                        load_config_file(&paths.managed_dir, &filename)
-                    },
+                    async move { load_config_file(&paths.managed_dir, &filename) },
                     |result| Message::ConfigEditor(ConfigEditorMessage::FileLoaded(result)),
                 )
             }
@@ -35,9 +36,7 @@ impl super::super::App {
                     let filename = CONFIG_FILES[idx].to_string();
 
                     Task::perform(
-                        async move {
-                            load_config_file(&paths.managed_dir, &filename)
-                        },
+                        async move { load_config_file(&paths.managed_dir, &filename) },
                         |result| Message::ConfigEditor(ConfigEditorMessage::FileLoaded(result)),
                     )
                 } else {
@@ -90,9 +89,7 @@ impl super::super::App {
                     let content = self.ui.config_editor_content.text();
 
                     Task::perform(
-                        async move {
-                            save_config_file(&paths.managed_dir, &filename, &content)
-                        },
+                        async move { save_config_file(&paths.managed_dir, &filename, &content) },
                         |result| Message::ConfigEditor(ConfigEditorMessage::SaveCompleted(result)),
                     )
                 } else {
@@ -139,12 +136,15 @@ fn load_config_file(managed_dir: &std::path::Path, filename: &str) -> Result<Str
         ));
     }
 
-    std::fs::read_to_string(&file_path)
-        .map_err(|e| format!("Failed to read file: {}", e))
+    std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))
 }
 
 /// Save content to a config file in the managed directory
-fn save_config_file(managed_dir: &std::path::Path, filename: &str, content: &str) -> Result<(), String> {
+fn save_config_file(
+    managed_dir: &std::path::Path,
+    filename: &str,
+    content: &str,
+) -> Result<(), String> {
     let file_path = managed_dir.join(filename);
 
     // Ensure the directory exists
@@ -153,6 +153,5 @@ fn save_config_file(managed_dir: &std::path::Path, filename: &str, content: &str
             .map_err(|e| format!("Failed to create directory: {}", e))?;
     }
 
-    std::fs::write(&file_path, content)
-        .map_err(|e| format!("Failed to write file: {}", e))
+    std::fs::write(&file_path, content).map_err(|e| format!("Failed to write file: {}", e))
 }

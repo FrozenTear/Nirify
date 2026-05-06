@@ -1,14 +1,13 @@
 //! Touch settings message handler
 
 use crate::config::SettingsCategory;
-use crate::messages::{TouchMessage, Message};
+use crate::messages::{Message, TouchMessage};
 use crate::views::widgets::format_matrix_values;
 use iced::Task;
 
 impl super::super::App {
     /// Handle touch settings messages
     pub(in crate::app) fn update_touch(&mut self, msg: TouchMessage) -> Task<Message> {
-        
         let touch = &mut self.settings.touch;
 
         match msg {
@@ -25,7 +24,8 @@ impl super::super::App {
                     self.ui.touch_calibration_cache[idx] = value.clone();
                     // Parse and update actual matrix
                     if let Ok(val) = value.parse::<f64>() {
-                        let matrix = touch.calibration_matrix
+                        let matrix = touch
+                            .calibration_matrix
                             .get_or_insert([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
                         matrix[idx] = val;
                     }
@@ -38,9 +38,8 @@ impl super::super::App {
             }
             TouchMessage::ResetCalibration => {
                 touch.calibration_matrix = Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
-                self.ui.touch_calibration_cache = format_matrix_values(
-                    Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
-                );
+                self.ui.touch_calibration_cache =
+                    format_matrix_values(Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]));
             }
         }
 

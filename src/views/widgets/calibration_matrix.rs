@@ -25,8 +25,8 @@ pub enum CalibrationMatrixMessage {
 pub fn calibration_matrix<'a, Message: Clone + 'a>(
     label: &'a str,
     description: &'a str,
-    _matrix: Option<[f64; 6]>,  // Preserved for API compatibility
-    formatted_values: &'a [String; 6],  // Pre-formatted strings to avoid memory leak
+    _matrix: Option<[f64; 6]>,         // Preserved for API compatibility
+    formatted_values: &'a [String; 6], // Pre-formatted strings to avoid memory leak
     on_change: impl Fn(CalibrationMatrixMessage) -> Message + 'a + Copy,
 ) -> Element<'a, Message> {
     let mut content = column![
@@ -66,7 +66,7 @@ pub fn calibration_matrix<'a, Message: Clone + 'a>(
                     radius: 4.0.into(),
                 },
                 ..Default::default()
-            })
+            }),
     );
 
     // Action buttons
@@ -89,12 +89,10 @@ pub fn calibration_matrix<'a, Message: Clone + 'a>(
     content = content.push(
         text("Note: Identity matrix [1 0 0; 0 1 0] means no transformation")
             .size(11)
-            .color([0.75, 0.75, 0.75])
+            .color([0.75, 0.75, 0.75]),
     );
 
-    container(content)
-        .padding(12)
-        .into()
+    container(content).padding(12).into()
 }
 
 /// Helper to format calibration matrix values for display
@@ -113,7 +111,7 @@ pub fn format_matrix_values(matrix: Option<[f64; 6]>) -> [String; 6] {
 /// Creates a single matrix value input field
 fn matrix_input<'a, Message: Clone + 'a>(
     label: &'a str,
-    value_str: &'a str,  // Pre-formatted string to avoid memory leak
+    value_str: &'a str, // Pre-formatted string to avoid memory leak
     index: usize,
     on_change: impl Fn(CalibrationMatrixMessage) -> Message + 'a + Copy,
 ) -> Element<'a, Message> {

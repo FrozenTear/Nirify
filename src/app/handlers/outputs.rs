@@ -1,17 +1,18 @@
 //! Outputs (displays) settings message handler
 
 use crate::config::SettingsCategory;
-use crate::messages::{OutputsMessage as M, ToolsMessage, Message};
+use crate::messages::{Message, OutputsMessage as M, ToolsMessage};
 use iced::Task;
 
 impl super::super::App {
     /// Updates outputs (displays) settings
     pub(in crate::app) fn update_outputs(&mut self, msg: M) -> Task<Message> {
-        
-
         match msg {
             M::AddOutput => {
-                self.settings.outputs.outputs.push(crate::config::models::OutputConfig::default());
+                self.settings
+                    .outputs
+                    .outputs
+                    .push(crate::config::models::OutputConfig::default());
                 self.ui.selected_output_index = Some(self.settings.outputs.outputs.len() - 1);
                 log::info!("Added new output");
             }
@@ -20,7 +21,8 @@ impl super::super::App {
                 if idx < self.settings.outputs.outputs.len() {
                     self.settings.outputs.outputs.remove(idx);
                     if self.ui.selected_output_index == Some(idx) {
-                        self.ui.selected_output_index = if self.settings.outputs.outputs.is_empty() {
+                        self.ui.selected_output_index = if self.settings.outputs.outputs.is_empty()
+                        {
                             None
                         } else {
                             Some(0)
@@ -191,9 +193,26 @@ impl super::super::App {
             }
 
             M::ToggleSection(section_name) => {
-                let expanded = self.ui.output_sections_expanded.get(&section_name).copied().unwrap_or(true);
-                self.ui.output_sections_expanded.insert(section_name, !expanded);
-                // Don't mark dirty for UI-only changes
+                let expanded = self
+                    .ui
+                    .output_sections_expanded
+                    .get(&section_name)
+                    .copied()
+                    .unwrap_or(true);
+                self.ui
+                    .output_sections_expanded
+                    .insert(section_name, !expanded);
+                return Task::none();
+            }
+
+            M::OpenEditor(idx) => {
+                self.ui.editing_output_index = Some(idx);
+                self.ui.selected_output_index = Some(idx);
+                return Task::none();
+            }
+
+            M::CloseEditor => {
+                self.ui.editing_output_index = None;
                 return Task::none();
             }
         }

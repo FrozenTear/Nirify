@@ -226,11 +226,15 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
             DefaultColumnDisplay::Normal => "normal",
             DefaultColumnDisplay::Tabbed => "tabbed",
         };
-        content.push_str(&format!("{}default-column-display \"{}\"\n", inner_indent, mode));
+        content.push_str(&format!(
+            "{}default-column-display \"{}\"\n",
+            inner_indent, mode
+        ));
     }
 
     // default-column-width
-    if layout.default_column_width_proportion.is_some() || layout.default_column_width_fixed.is_some()
+    if layout.default_column_width_proportion.is_some()
+        || layout.default_column_width_fixed.is_some()
     {
         content.push_str(&format!("{}default-column-width {{\n", inner_indent));
         if let Some(p) = layout.default_column_width_proportion {
@@ -289,7 +293,11 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
             }
             if let Some(ref c) = layout.focus_ring_active {
                 if let ColorOrGradient::Color(color) = c {
-                    content.push_str(&format!("{}active-color \"{}\"\n", deep_indent, color.to_hex()));
+                    content.push_str(&format!(
+                        "{}active-color \"{}\"\n",
+                        deep_indent,
+                        color.to_hex()
+                    ));
                 }
             }
             if let Some(ref c) = layout.focus_ring_inactive {
@@ -320,7 +328,11 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
             }
             if let Some(ref c) = layout.border_active {
                 if let ColorOrGradient::Color(color) = c {
-                    content.push_str(&format!("{}active-color \"{}\"\n", deep_indent, color.to_hex()));
+                    content.push_str(&format!(
+                        "{}active-color \"{}\"\n",
+                        deep_indent,
+                        color.to_hex()
+                    ));
                 }
             }
             if let Some(ref c) = layout.border_inactive {

@@ -14,12 +14,9 @@ impl super::super::App {
 
                 let backup_dir = self.paths.backup_dir.clone();
 
-                Task::perform(
-                    async move {
-                        list_backups(&backup_dir)
-                    },
-                    |result| Message::Backups(BackupsMessage::ListLoaded(result)),
-                )
+                Task::perform(async move { list_backups(&backup_dir) }, |result| {
+                    Message::Backups(BackupsMessage::ListLoaded(result))
+                })
             }
 
             BackupsMessage::ListLoaded(result) => {
@@ -28,7 +25,8 @@ impl super::super::App {
                     Ok(backups) => {
                         let count = backups.len();
                         self.ui.backups_state.backups = backups;
-                        self.ui.backups_state.status_message = Some(format!("Found {} backup(s)", count));
+                        self.ui.backups_state.status_message =
+                            Some(format!("Found {} backup(s)", count));
                         // Clear selection when list refreshes
                         self.ui.backups_state.selected_backup = None;
                         self.ui.backups_state.preview_content = None;
@@ -98,14 +96,13 @@ impl super::super::App {
                     let backup_dir = self.paths.backup_dir.clone();
 
                     Task::perform(
-                        async move {
-                            restore_backup(&backup_path, &config_path, &backup_dir)
-                        },
+                        async move { restore_backup(&backup_path, &config_path, &backup_dir) },
                         |result| Message::Backups(BackupsMessage::RestoreCompleted(result)),
                     )
                 } else {
                     self.ui.backups_state.restoring = false;
-                    self.ui.backups_state.status_message = Some("Error: Backup not found".to_string());
+                    self.ui.backups_state.status_message =
+                        Some("Error: Backup not found".to_string());
                     Task::none()
                 }
             }
@@ -114,12 +111,15 @@ impl super::super::App {
                 self.ui.backups_state.restoring = false;
                 match result {
                     Ok(()) => {
-                        self.ui.backups_state.status_message = Some("Backup restored successfully!".to_string());
-                        self.ui.toast = Some("Backup restored! Restart Nirify to see changes.".to_string());
+                        self.ui.backups_state.status_message =
+                            Some("Backup restored successfully!".to_string());
+                        self.ui.toast =
+                            Some("Backup restored! Restart Nirify to see changes.".to_string());
                         self.ui.toast_shown_at = Some(std::time::Instant::now());
                     }
                     Err(e) => {
-                        self.ui.backups_state.status_message = Some(format!("Failed to restore: {}", e));
+                        self.ui.backups_state.status_message =
+                            Some(format!("Failed to restore: {}", e));
                     }
                 }
                 Task::none()
@@ -169,12 +169,8 @@ fn list_backups(backup_dir: &std::path::Path) -> Result<Vec<BackupEntry>, String
 
     // Sort by modification time (newest first)
     entries.sort_by(|a, b| {
-        let a_time = std::fs::metadata(&a.path)
-            .and_then(|m| m.modified())
-            .ok();
-        let b_time = std::fs::metadata(&b.path)
-            .and_then(|m| m.modified())
-            .ok();
+        let a_time = std::fs::metadata(&a.path).and_then(|m| m.modified()).ok();
+        let b_time = std::fs::metadata(&b.path).and_then(|m| m.modified()).ok();
         b_time.cmp(&a_time)
     });
 
@@ -202,7 +198,11 @@ fn format_system_time(time: std::time::SystemTime) -> String {
 
     format!(
         "{:04}-{:02}-{:02} {:02}:{:02}",
-        year, month.min(12), day.min(31), hours, minutes
+        year,
+        month.min(12),
+        day.min(31),
+        hours,
+        minutes
     )
 }
 
@@ -273,7 +273,10 @@ fn restore_backup(
         crate::config::atomic_write(&current_backup_path, &current_content)
             .map_err(|e| format!("Failed to backup current config: {}", e))?;
 
-        log::info!("Created backup of current config: {}", current_backup_path.display());
+        log::info!(
+            "Created backup of current config: {}",
+            current_backup_path.display()
+        );
     }
 
     // Write to config file using atomic write (safe against crashes)

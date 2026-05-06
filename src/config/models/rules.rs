@@ -34,6 +34,8 @@ pub struct LayerRuleMatch {
 pub struct LayerRule {
     /// Unique identifier for this rule
     pub id: u32,
+    /// Whether this rule is enabled
+    pub enabled: bool,
     /// Display name for the rule
     pub name: String,
     /// Match criteria (multiple allowed - rule applies if ANY match)
@@ -56,6 +58,7 @@ impl Default for LayerRule {
     fn default() -> Self {
         Self {
             id: 0,
+            enabled: true,
             name: String::from("New Layer Rule"),
             matches: vec![LayerRuleMatch::default()],
             block_out_from: None,
@@ -149,7 +152,37 @@ pub enum PositionRelativeTo {
     Center,
 }
 
+impl std::fmt::Display for PositionRelativeTo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TopLeft => write!(f, "Top Left"),
+            Self::TopRight => write!(f, "Top Right"),
+            Self::BottomLeft => write!(f, "Bottom Left"),
+            Self::BottomRight => write!(f, "Bottom Right"),
+            Self::Top => write!(f, "Top"),
+            Self::Bottom => write!(f, "Bottom"),
+            Self::Left => write!(f, "Left"),
+            Self::Right => write!(f, "Right"),
+            Self::Center => write!(f, "Center"),
+        }
+    }
+}
+
 impl PositionRelativeTo {
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::TopLeft,
+            Self::TopRight,
+            Self::BottomLeft,
+            Self::BottomRight,
+            Self::Top,
+            Self::Bottom,
+            Self::Left,
+            Self::Right,
+            Self::Center,
+        ]
+    }
+
     /// Convert to KDL string
     pub fn to_kdl(&self) -> &'static str {
         match self {
@@ -197,6 +230,8 @@ pub struct FloatingPosition {
 pub struct WindowRule {
     /// Unique identifier for this rule
     pub id: u32,
+    /// Whether this rule is enabled
+    pub enabled: bool,
     /// Display name for the rule
     pub name: String,
     /// Match criteria (multiple allowed - rule applies if ANY match)
@@ -285,6 +320,7 @@ impl Default for WindowRule {
     fn default() -> Self {
         Self {
             id: 0,
+            enabled: true,
             name: String::from("New Rule"),
             matches: vec![WindowRuleMatch::default()],
             excludes: vec![],

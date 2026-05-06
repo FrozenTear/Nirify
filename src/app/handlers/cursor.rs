@@ -7,8 +7,6 @@ use iced::Task;
 impl super::super::App {
     /// Updates cursor settings
     pub(in crate::app) fn update_cursor(&mut self, msg: CursorMessage) -> Task<Message> {
-        
-
         match msg {
             CursorMessage::SetTheme(value) => {
                 self.settings.cursor.theme = value;
@@ -25,7 +23,6 @@ impl super::super::App {
         }
 
         // Update cache for view borrowing
-
 
         self.save.dirty_tracker.mark(SettingsCategory::Cursor);
         self.mark_changed();

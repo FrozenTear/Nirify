@@ -1,14 +1,12 @@
 //! Touchpad settings message handler
 
 use crate::config::SettingsCategory;
-use crate::messages::{TouchpadMessage, Message};
+use crate::messages::{Message, TouchpadMessage};
 use iced::Task;
 
 impl super::super::App {
     /// Updates touchpad settings
     pub(in crate::app) fn update_touchpad(&mut self, msg: TouchpadMessage) -> Task<Message> {
-        
-
         match msg {
             TouchpadMessage::ToggleTapToClick(value) => {
                 self.settings.touchpad.tap = value;
@@ -32,7 +30,8 @@ impl super::super::App {
                 self.settings.touchpad.scroll_factor = value.clamp(0.1, 10.0) as f64;
             }
             TouchpadMessage::SetScrollFactorHorizontal(value) => {
-                self.settings.touchpad.scroll_factor_horizontal = value.map(|v| v.clamp(0.1, 10.0) as f64);
+                self.settings.touchpad.scroll_factor_horizontal =
+                    value.map(|v| v.clamp(0.1, 10.0) as f64);
             }
             TouchpadMessage::SetScrollMethod(method) => {
                 self.settings.touchpad.scroll_method = method;
@@ -62,7 +61,6 @@ impl super::super::App {
                 self.settings.touchpad.disabled_on_external_mouse = value;
             }
         }
-
 
         self.save.dirty_tracker.mark(SettingsCategory::Touchpad);
         self.mark_changed();

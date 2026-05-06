@@ -73,8 +73,7 @@ pub use misc::{load_misc, parse_misc_from_doc};
 pub use preferences::{load_preferences, parse_preferences_from_doc};
 pub use rules::{
     extract_name_from_leading_comment, has_flag_in_node, load_layer_rules, load_window_rules,
-    parse_layer_rule_node_children,
-    parse_window_rule_node_children,
+    parse_layer_rule_node_children, parse_window_rule_node_children,
 };
 pub use system::{
     load_debug, load_environment, load_recent_windows, load_startup, load_switch_events,
@@ -715,7 +714,8 @@ animations {
         original.overview.zoom = 0.75;
 
         // Save settings (use all_enabled for tests)
-        save_settings(&paths, &original, FeatureCompat::all_enabled()).expect("Failed to save settings");
+        save_settings(&paths, &original, FeatureCompat::all_enabled())
+            .expect("Failed to save settings");
 
         // Load settings back
         let loaded = load_settings(&paths);

@@ -52,7 +52,8 @@ fn test_full_lifecycle_save_load_modify() {
     settings.miscellaneous.prefer_no_csd = true;
 
     // Step 2: Save settings
-    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save settings");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled())
+        .expect("Failed to save settings");
 
     // Verify files were created
     assert!(paths.main_kdl.exists(), "main.kdl should exist");
@@ -83,7 +84,8 @@ fn test_full_lifecycle_save_load_modify() {
     modified.touchpad.natural_scroll = false;
 
     // Step 6: Save modified settings
-    save_settings(&paths, &modified, FeatureCompat::all_enabled()).expect("Failed to save modified settings");
+    save_settings(&paths, &modified, FeatureCompat::all_enabled())
+        .expect("Failed to save modified settings");
 
     // Step 7: Load again and verify modifications persisted
     let reloaded = load_settings(&paths);
@@ -140,7 +142,8 @@ fn test_corrupted_file_recovery() {
     let mut settings = Settings::default();
     settings.appearance.gaps = 24.0;
     settings.keyboard.repeat_delay = 400;
-    save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save settings");
+    save_settings(&paths, &settings, FeatureCompat::all_enabled())
+        .expect("Failed to save settings");
 
     // Now corrupt one file with invalid KDL
     fs::write(&paths.appearance_kdl, "this is { not valid kdl {{{{").unwrap();
@@ -366,7 +369,8 @@ fn test_repair_corrupted_configs() {
     assert!((loaded.mouse.accel_speed - 0.5).abs() < 0.01); // Our value preserved
 
     // Repair corrupted configs
-    let repaired = repair_corrupted_configs(&paths, &loaded, FeatureCompat::all_enabled()).expect("Repair failed");
+    let repaired = repair_corrupted_configs(&paths, &loaded, FeatureCompat::all_enabled())
+        .expect("Repair failed");
     assert_eq!(repaired.len(), 1);
     assert!(repaired.contains(&"appearance.kdl".to_string()));
 
@@ -397,7 +401,8 @@ fn test_repair_no_corrupted_files() {
     save_settings(&paths, &settings, FeatureCompat::all_enabled()).expect("Failed to save");
 
     // Try to repair - should do nothing
-    let repaired = repair_corrupted_configs(&paths, &settings, FeatureCompat::all_enabled()).expect("Repair failed");
+    let repaired = repair_corrupted_configs(&paths, &settings, FeatureCompat::all_enabled())
+        .expect("Repair failed");
     assert!(repaired.is_empty());
 
     // Backup directory should be empty (or not exist)

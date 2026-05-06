@@ -188,7 +188,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Thickness of window borders",
             &["border", "width", "thickness", "outline"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // LAYOUT EXTRAS (shadows, etc.)
         // ═══════════════════════════════════════════════════════════════════
@@ -228,7 +227,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Default width for new columns",
             &["column", "width", "default", "size"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // BEHAVIOR
         // ═══════════════════════════════════════════════════════════════════
@@ -256,7 +254,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Key used for window management (Super, Alt, etc.)",
             &["modifier", "mod", "key", "super", "alt", "ctrl", "meta"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // KEYBOARD
         // ═══════════════════════════════════════════════════════════════════
@@ -284,7 +281,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "What Caps Lock does (e.g., swap with Ctrl)",
             &["caps", "lock", "ctrl", "escape", "swap", "remap"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // MOUSE
         // ═══════════════════════════════════════════════════════════════════
@@ -312,7 +308,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Swap left and right mouse buttons",
             &["left", "handed", "swap", "buttons", "mouse"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // TOUCHPAD
         // ═══════════════════════════════════════════════════════════════════
@@ -346,7 +341,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Cursor speed when using touchpad",
             &["touchpad", "speed", "sensitivity", "acceleration"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // CURSOR
         // ═══════════════════════════════════════════════════════════════════
@@ -368,7 +362,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Hide cursor after period of inactivity",
             &["hide", "cursor", "inactive", "timeout", "disappear"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // ANIMATIONS
         // ═══════════════════════════════════════════════════════════════════
@@ -402,7 +395,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Animation when switching workspaces",
             &["workspace", "switch", "animation", "transition"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // WORKSPACES
         // ═══════════════════════════════════════════════════════════════════
@@ -412,7 +404,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Create workspaces with custom names",
             &["workspace", "name", "named", "label", "create"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // WINDOW RULES
         // ═══════════════════════════════════════════════════════════════════
@@ -446,7 +437,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Transparency for specific windows",
             &["opacity", "transparent", "alpha", "window"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // LAYER RULES
         // ═══════════════════════════════════════════════════════════════════
@@ -456,7 +446,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Rules for panels, bars, and overlays",
             &["layer", "rules", "panel", "bar", "waybar", "overlay"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // KEYBINDINGS
         // ═══════════════════════════════════════════════════════════════════
@@ -484,7 +473,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Keyboard shortcut for screenshots",
             &["screenshot", "shortcut", "capture", "screen", "print"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // OUTPUTS
         // ═══════════════════════════════════════════════════════════════════
@@ -518,7 +506,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Rotate display orientation",
             &["rotate", "rotation", "orientation", "portrait", "landscape"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // STARTUP
         // ═══════════════════════════════════════════════════════════════════
@@ -528,7 +515,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Programs to launch when niri starts",
             &["startup", "autostart", "launch", "boot", "programs"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // ENVIRONMENT
         // ═══════════════════════════════════════════════════════════════════
@@ -538,7 +524,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Set environment variables for niri session",
             &["environment", "variables", "env", "export", "path"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // DEBUG
         // ═══════════════════════════════════════════════════════════════════
@@ -554,7 +539,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Visualize screen redraw regions",
             &["damage", "render", "debug", "redraw"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // MISCELLANEOUS
         // ═══════════════════════════════════════════════════════════════════
@@ -570,7 +554,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Use compositor window decorations",
             &["decoration", "csd", "ssd", "titlebar", "server"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // GESTURES
         // ═══════════════════════════════════════════════════════════════════
@@ -586,7 +569,6 @@ fn build_settings_index() -> Vec<SettingEntry> {
             "Swipe to switch workspaces",
             &["swipe", "workspace", "gesture", "switch"],
         ),
-
         // ═══════════════════════════════════════════════════════════════════
         // SWITCH EVENTS
         // ═══════════════════════════════════════════════════════════════════

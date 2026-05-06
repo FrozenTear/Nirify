@@ -17,13 +17,22 @@ impl super::super::App {
                 self.settings.appearance.focus_ring_width = value.clamp(1.0, 20.0);
             }
             AppearanceMessage::FocusRingActive(gradient_msg) => {
-                apply_gradient_message(&mut self.settings.appearance.focus_ring_active, gradient_msg);
+                apply_gradient_message(
+                    &mut self.settings.appearance.focus_ring_active,
+                    gradient_msg,
+                );
             }
             AppearanceMessage::FocusRingInactive(gradient_msg) => {
-                apply_gradient_message(&mut self.settings.appearance.focus_ring_inactive, gradient_msg);
+                apply_gradient_message(
+                    &mut self.settings.appearance.focus_ring_inactive,
+                    gradient_msg,
+                );
             }
             AppearanceMessage::FocusRingUrgent(gradient_msg) => {
-                apply_gradient_message(&mut self.settings.appearance.focus_ring_urgent, gradient_msg);
+                apply_gradient_message(
+                    &mut self.settings.appearance.focus_ring_urgent,
+                    gradient_msg,
+                );
             }
 
             // Border
@@ -54,7 +63,8 @@ impl super::super::App {
             // Background
             AppearanceMessage::SetBackgroundColor(hex_opt) => {
                 use crate::types::Color;
-                self.settings.appearance.background_color = hex_opt.and_then(|hex| Color::from_hex(&hex));
+                self.settings.appearance.background_color =
+                    hex_opt.and_then(|hex| Color::from_hex(&hex));
             }
         }
 

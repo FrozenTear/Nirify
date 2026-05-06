@@ -15,13 +15,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use iced::time;
-use iced::widget::{column, container, stack, text};
+use iced::widget::{column, container, row, stack, text};
 use iced::{alignment::Horizontal, Element, Length, Subscription, Task};
 
 use crate::config::{ConfigPaths, DirtyTracker, Settings, SettingsCategory};
 use crate::messages::{DialogState, Message, Page, SaveMessage};
 use crate::save_manager::{ReloadResult, SaveResult};
-use crate::theme::fonts;
+use crate::theme::{fonts, neon};
 use crate::views;
 
 /// Groups save-related state for cleaner App organization
@@ -147,7 +147,9 @@ impl App {
         if !feature_compat.recent_windows {
             log::info!(
                 "Recent windows feature disabled (requires niri 25.11+, detected: {})",
-                niri_version.map(|v| v.to_string()).unwrap_or_else(|| "unknown".to_string())
+                niri_version
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "unknown".to_string())
             );
         }
 
@@ -196,7 +198,24 @@ impl App {
             ui,
         };
 
-        (app, Task::none())
+        // If niri is connected at startup, fetch dashboard data immediately
+        let startup_task = if matches!(niri_status, crate::views::status_bar::NiriStatus::Connected)
+        {
+            Task::batch([
+                Task::perform(
+                    async { crate::ipc::get_windows().map_err(|e| e.to_string()) },
+                    |r| Message::Tools(crate::messages::ToolsMessage::WindowsLoaded(r)),
+                ),
+                Task::perform(
+                    async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
+                    |r| Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(r)),
+                ),
+            ])
+        } else {
+            Task::none()
+        };
+
+        (app, startup_task)
     }
 
     /// Creates an App in error state for displaying initialization failures.
@@ -233,6 +252,8 @@ impl App {
     /// Updates application state based on messages
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::NoOp => return Task::none(),
+
             // Navigation
             Message::NavigateToPage(page) => {
                 self.ui.current_page = page;
@@ -285,9 +306,29 @@ impl App {
             }
 
             Message::SearchResultSelected(index) => {
-                // Navigate to the selected page
+                // Navigate to the correct screen + sub-tab
                 if let Some(result) = self.ui.search_results.get(index) {
-                    self.ui.current_page = result.page;
+                    use crate::messages::{GearSubTab, RulesSubTab, Screen};
+
+                    let page = result.page;
+                    let screen = Screen::from_page(page);
+                    self.ui.current_screen = screen;
+                    self.ui.current_page = page;
+
+                    // Set appropriate sub-tab based on page
+                    if let Some(input_tab) = Screen::input_sub_tab_from_page(page) {
+                        self.ui.input_sub_tab = input_tab;
+                    }
+                    match page {
+                        Page::WindowRules => self.ui.rules_sub_tab = RulesSubTab::WindowRules,
+                        Page::LayerRules => self.ui.rules_sub_tab = RulesSubTab::LayerRules,
+                        Page::Tools => self.ui.gear_sub_tab = GearSubTab::Tools,
+                        Page::Preferences => self.ui.gear_sub_tab = GearSubTab::Preferences,
+                        Page::ConfigEditor => self.ui.gear_sub_tab = GearSubTab::ConfigEditor,
+                        Page::Backups => self.ui.gear_sub_tab = GearSubTab::Backups,
+                        _ => {}
+                    }
+
                     // Store setting name for highlighting on the target page
                     self.ui.highlight_setting = Some(result.setting_name.clone());
                     // Clear search after navigation
@@ -464,7 +505,8 @@ impl App {
                                         self.ui.selected_window_rule_id =
                                             self.settings.window_rules.rules.first().map(|r| r.id);
                                     }
-                                    self.save.dirty_tracker
+                                    self.save
+                                        .dirty_tracker
                                         .mark(crate::config::SettingsCategory::WindowRules);
                                 } else if self.settings.layer_rules.remove(rule_id) {
                                     log::info!("Deleted layer rule {}", rule_id);
@@ -472,7 +514,8 @@ impl App {
                                         self.ui.selected_layer_rule_id =
                                             self.settings.layer_rules.rules.first().map(|r| r.id);
                                     }
-                                    self.save.dirty_tracker
+                                    self.save
+                                        .dirty_tracker
                                         .mark(crate::config::SettingsCategory::LayerRules);
                                 }
                                 self.mark_changed();
@@ -486,7 +529,8 @@ impl App {
                             ConfirmAction::ClearAllKeybindings => {
                                 log::info!("Clearing all keybindings");
                                 self.settings.keybindings.bindings.clear();
-                                self.save.dirty_tracker
+                                self.save
+                                    .dirty_tracker
                                     .mark(crate::config::SettingsCategory::Keybindings);
                                 self.mark_changed();
                             }
@@ -576,8 +620,12 @@ impl App {
                 // This ensures niri can load the config even if the app crashes
                 // before the debounced save completes
                 if !self.paths.main_kdl.exists() {
-                    let main_kdl_content = crate::config::storage::generate_main_kdl(self.ui.feature_compat);
-                    if let Err(e) = crate::config::storage::atomic_write(&self.paths.main_kdl, &main_kdl_content) {
+                    let main_kdl_content =
+                        crate::config::storage::generate_main_kdl(self.ui.feature_compat);
+                    if let Err(e) = crate::config::storage::atomic_write(
+                        &self.paths.main_kdl,
+                        &main_kdl_content,
+                    ) {
                         log::error!("Failed to create main.kdl: {}", e);
                         self.ui.dialog_state = DialogState::Error {
                             title: "Setup Error".to_string(),
@@ -591,7 +639,10 @@ impl App {
 
                 // Replace user's config.kdl with our managed version
                 // This removes managed nodes and adds the include directive
-                match crate::config::smart_replace_config(&self.paths.niri_config, &self.paths.backup_dir) {
+                match crate::config::smart_replace_config(
+                    &self.paths.niri_config,
+                    &self.paths.backup_dir,
+                ) {
                     Ok(result) => {
                         log::info!(
                             "Smart replace complete: {} nodes replaced, {} preserved, backup at {:?}",
@@ -814,11 +865,13 @@ impl App {
 
                         // Mark affected categories as dirty
                         if window_rules_changed {
-                            self.save.dirty_tracker
+                            self.save
+                                .dirty_tracker
                                 .mark(crate::config::SettingsCategory::WindowRules);
                         }
                         if layer_rules_changed {
-                            self.save.dirty_tracker
+                            self.save
+                                .dirty_tracker
                                 .mark(crate::config::SettingsCategory::LayerRules);
                         }
 
@@ -841,7 +894,12 @@ impl App {
                     let dirty = self.save.dirty_tracker.take();
 
                     // Perform blocking save (acceptable since typically <100ms)
-                    match crate::config::save_dirty(&self.paths, &self.settings, &dirty, self.ui.feature_compat) {
+                    match crate::config::save_dirty(
+                        &self.paths,
+                        &self.settings,
+                        &dirty,
+                        self.ui.feature_compat,
+                    ) {
                         Ok(count) => {
                             log::info!("Successfully saved {} file(s) before exit", count);
                         }
@@ -862,11 +920,31 @@ impl App {
             }
 
             Message::NiriStatusChecked(is_connected) => {
+                let was_connected = matches!(
+                    self.ui.niri_status,
+                    crate::views::status_bar::NiriStatus::Connected
+                );
                 self.ui.niri_status = if is_connected {
                     crate::views::status_bar::NiriStatus::Connected
                 } else {
                     crate::views::status_bar::NiriStatus::Disconnected
                 };
+                // On first connection, fetch dashboard data
+                if is_connected && !was_connected {
+                    let t1 = Task::perform(
+                        async { crate::ipc::get_windows().map_err(|e| e.to_string()) },
+                        |r| Message::Tools(crate::messages::ToolsMessage::WindowsLoaded(r)),
+                    );
+                    let t2 = Task::perform(
+                        async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
+                        |r| Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(r)),
+                    );
+                    let t3 = Task::perform(
+                        async { crate::ipc::get_version().map_err(|e| e.to_string()) },
+                        |r| Message::Tools(crate::messages::ToolsMessage::VersionLoaded(r)),
+                    );
+                    return Task::batch([t1, t2, t3]);
+                }
                 Task::none()
             }
 
@@ -888,6 +966,97 @@ impl App {
             Message::Backups(msg) => self.update_backups(msg),
 
             Message::None => Task::none(),
+
+            // Redesign navigation
+            Message::NavigateToScreen(screen) => {
+                use crate::messages::Screen;
+                self.ui.current_screen = screen;
+                self.ui.highlight_setting = None;
+
+                let is_connected = matches!(
+                    self.ui.niri_status,
+                    crate::views::status_bar::NiriStatus::Connected
+                );
+
+                // Auto-refresh IPC data for relevant screens
+                if screen == Screen::Dashboard && is_connected {
+                    // Fetch windows + workspaces for dashboard stats
+                    let t1 = Task::perform(
+                        async { crate::ipc::get_windows().map_err(|e| e.to_string()) },
+                        |result| {
+                            Message::Tools(crate::messages::ToolsMessage::WindowsLoaded(result))
+                        },
+                    );
+                    let t2 = Task::perform(
+                        async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
+                        |result| {
+                            Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(result))
+                        },
+                    );
+                    return Task::batch([t1, t2]);
+                }
+                if screen == Screen::Displays && is_connected {
+                    return Task::perform(
+                        async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
+                        |result| {
+                            Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(result))
+                        },
+                    );
+                }
+                if screen == Screen::Rules && is_connected {
+                    return Task::perform(
+                        async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
+                        |result| {
+                            Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(result))
+                        },
+                    );
+                }
+                Task::none()
+            }
+            Message::SetInputSubTab(tab) => {
+                self.ui.input_sub_tab = tab;
+                self.ui.highlight_setting = None;
+                Task::none()
+            }
+            Message::OpenSectionEditor(section) => {
+                self.ui.editing_section = Some(section);
+                Task::none()
+            }
+            Message::CloseSectionEditor => {
+                self.ui.editing_section = None;
+                Task::none()
+            }
+            Message::OpenDeviceEditor(device) => {
+                self.ui.editing_device = Some(device);
+                Task::none()
+            }
+            Message::CloseDeviceEditor => {
+                self.ui.editing_device = None;
+                Task::none()
+            }
+            Message::OpenKeybindingEditor(idx) => {
+                self.ui.editing_keybinding_index = Some(idx);
+                self.ui.selected_keybinding_index = Some(idx);
+                Task::none()
+            }
+            Message::CloseKeybindingEditor => {
+                self.ui.editing_keybinding_index = None;
+                Task::none()
+            }
+            Message::SetKeybindingsSearch(text) => {
+                self.ui.keybindings_search = text;
+                Task::none()
+            }
+            Message::SetRulesSubTab(tab) => {
+                self.ui.rules_sub_tab = tab;
+                self.ui.highlight_setting = None;
+                Task::none()
+            }
+            Message::SetGearSubTab(tab) => {
+                self.ui.gear_sub_tab = tab;
+                self.ui.highlight_setting = None;
+                Task::none()
+            }
         }
     }
 
@@ -909,8 +1078,7 @@ impl App {
     fn base_subscriptions(&self) -> Vec<Subscription<Message>> {
         let mut subs = vec![
             // Periodic save checks (every 200ms - sufficient with 300ms debounce)
-            time::every(Duration::from_millis(200))
-                .map(|_| Message::Save(SaveMessage::CheckSave)),
+            time::every(Duration::from_millis(200)).map(|_| Message::Save(SaveMessage::CheckSave)),
             // Niri status check (every 5 seconds)
             time::every(Duration::from_secs(5)).map(|_| Message::CheckNiriStatus),
             // System theme detection (portal or file watcher)
@@ -930,7 +1098,12 @@ impl App {
         use iced::keyboard;
 
         keyboard::listen().map(|event| match event {
-            keyboard::Event::KeyPressed { key, modifiers, location, .. } => {
+            keyboard::Event::KeyPressed {
+                key,
+                modifiers,
+                location,
+                ..
+            } => {
                 // ESC cancels capture
                 if matches!(key, keyboard::Key::Named(keyboard::key::Named::Escape)) {
                     return Message::Keybindings(
@@ -963,7 +1136,12 @@ impl App {
         keyboard::listen()
             .with(search_hotkey)
             .map(|(hotkey, event): (String, keyboard::Event)| match event {
-                keyboard::Event::KeyPressed { key, modifiers, location, .. } => {
+                keyboard::Event::KeyPressed {
+                    key,
+                    modifiers,
+                    location,
+                    ..
+                } => {
                     let key_combo = helpers::format_key_combo(&key, modifiers, location);
                     if helpers::hotkey_matches(&key_combo, &hotkey) {
                         Message::ToggleSearch
@@ -977,18 +1155,11 @@ impl App {
 
     /// Constructs the UI from current state
     pub fn view(&self) -> Element<'_, Message> {
-        // Primary navigation bar (top)
-        let primary_nav = views::navigation::primary_nav(
-            self.ui.current_page,
-            &self.ui.search_query,
-            self.ui.show_search_bar,
-        );
+        // Sidebar navigation
+        let sidebar = views::sidebar::view(self.ui.current_screen);
 
-        // Secondary navigation bar (sub-tabs)
-        let secondary_nav = views::navigation::secondary_nav(self.ui.current_page);
-
-        // Main content area (always show current page)
-        let content_area = self.page_content();
+        // Main content area
+        let content_area = self.screen_content();
 
         // Status bar (bottom)
         let is_dirty = self.save.dirty_tracker.is_dirty();
@@ -1000,16 +1171,19 @@ impl App {
             self.ui.niri_status,
         );
 
-        // Stack everything vertically
-        let layout = column![primary_nav, secondary_nav, content_area, status_bar,].spacing(0);
+        // Sidebar + content/status stacked horizontally
+        let right_side = column![content_area, status_bar].spacing(0);
+        let layout = row![sidebar, right_side];
 
-        let main_view: Element<'_, Message> =
-            container(layout).width(Length::Fill).height(Length::Fill).into();
+        let main_view: Element<'_, Message> = container(layout)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into();
 
         // Check for search modal (when search bar is hidden but search is active)
         let with_search_modal = if !self.ui.show_search_bar && self.ui.search_focused {
+            use crate::theme::{fonts, search_dropdown_style};
             use iced::widget::{column as col, row, text_input, Space};
-            use crate::theme::{search_dropdown_style, fonts};
 
             // Build search input
             let search_input = text_input("Search settings...", &self.ui.search_query)
@@ -1025,7 +1199,7 @@ impl App {
                     container(
                         text("No matching settings found")
                             .size(14)
-                            .color([0.6, 0.6, 0.6])
+                            .color([0.6, 0.6, 0.6]),
                     )
                     .padding(16)
                     .into()
@@ -1035,7 +1209,9 @@ impl App {
                         let item = iced::widget::button(
                             row![
                                 col![
-                                    text(&result.setting_name).size(14).font(fonts::UI_FONT_MEDIUM),
+                                    text(&result.setting_name)
+                                        .size(14)
+                                        .font(fonts::UI_FONT_MEDIUM),
                                     text(&result.description).size(11).color([0.6, 0.6, 0.6]),
                                 ]
                                 .spacing(2)
@@ -1043,7 +1219,7 @@ impl App {
                                 text(result.page.name()).size(10).color([0.5, 0.5, 0.5]),
                             ]
                             .spacing(8)
-                            .padding([10, 12])
+                            .padding([10, 12]),
                         )
                         .on_press(Message::SearchResultSelected(index))
                         .width(Length::Fill)
@@ -1056,9 +1232,9 @@ impl App {
                             container(
                                 text(format!("and {} more...", self.ui.search_results.len() - 8))
                                     .size(12)
-                                    .color([0.5, 0.5, 0.5])
+                                    .color([0.5, 0.5, 0.5]),
                             )
-                            .padding([8, 16])
+                            .padding([8, 16]),
                         );
                     }
                     results_col.into()
@@ -1067,7 +1243,7 @@ impl App {
                 container(
                     text("Type to search settings...")
                         .size(13)
-                        .color([0.5, 0.5, 0.5])
+                        .color([0.5, 0.5, 0.5]),
                 )
                 .padding(16)
                 .into()
@@ -1075,12 +1251,9 @@ impl App {
 
             // Build the modal
             let modal_content = col![
-                row![
-                    text("🔍").size(16),
-                    search_input,
-                ]
-                .spacing(12)
-                .align_y(iced::Alignment::Center),
+                row![text("🔍").size(16), search_input,]
+                    .spacing(12)
+                    .align_y(iced::Alignment::Center),
                 results_content,
             ]
             .spacing(8);
@@ -1095,14 +1268,16 @@ impl App {
                 iced::widget::mouse_area(
                     container(Space::new())
                         .width(Length::Fill)
-                        .height(Length::Fill)
+                        .height(Length::Fill),
                 )
-                .on_press(Message::ToggleSearch) // Click backdrop to close
+                .on_press(Message::ToggleSearch), // Click backdrop to close
             )
             .width(Length::Fill)
             .height(Length::Fill)
             .style(|_| container::Style {
-                background: Some(iced::Background::Color(iced::Color::from_rgba(0.0, 0.0, 0.0, 0.5))),
+                background: Some(iced::Background::Color(iced::Color::from_rgba(
+                    0.0, 0.0, 0.0, 0.5,
+                ))),
                 ..Default::default()
             });
 
@@ -1144,17 +1319,248 @@ impl App {
             with_search_modal
         };
 
-        // If there's an active dialog, render it on top of everything
-        if let Some(dialog) =
-            views::dialogs::view(&self.ui.dialog_state, &self.ui.wizard_suggestions, self.ui.niri_version)
-        {
-            dialog
+        // If there's a rule editor modal, render it on top
+        let with_rule_editor = if let Some(rule_id) = self.ui.editing_window_rule_id {
+            if let Some(rule) = self.settings.window_rules.find(rule_id) {
+                let modal = views::window_rules::editor_modal(
+                    rule,
+                    &self.ui.window_rule_sections_expanded,
+                    &self.ui.window_rule_regex_errors,
+                    &self.ui.available_workspaces,
+                );
+                stack![with_dropdown, modal].into()
+            } else {
+                with_dropdown
+            }
+        } else if let Some(rule_id) = self.ui.editing_layer_rule_id {
+            if let Some(rule) = self.settings.layer_rules.find(rule_id) {
+                let modal = views::layer_rules::editor_modal(
+                    rule,
+                    &self.ui.layer_rule_sections_expanded,
+                    &self.ui.layer_rule_regex_errors,
+                );
+                stack![with_dropdown, modal].into()
+            } else {
+                with_dropdown
+            }
+        } else if let Some(idx) = self.ui.editing_keybinding_index {
+            if let Some(binding) = self.settings.keybindings.bindings.get(idx) {
+                let modal = views::keybindings::editor_modal(
+                    binding,
+                    idx,
+                    &self.ui.keybinding_sections_expanded,
+                    self.ui.key_capture_active,
+                );
+                stack![with_dropdown, modal].into()
+            } else {
+                with_dropdown
+            }
+        } else if let Some(section) = self.ui.editing_section {
+            let content = self.section_editor_content(section);
+            let modal = views::screens::section_editor_modal(section, content);
+            stack![with_dropdown, modal].into()
+        } else if let Some(output_idx) = self.ui.editing_output_index {
+            if output_idx < self.settings.outputs.outputs.len() {
+                let modal = views::screens::displays::output_editor_modal(
+                    output_idx,
+                    &self.settings.outputs,
+                    &self.ui.output_sections_expanded,
+                    &self.ui.tools_state.outputs,
+                );
+                stack![with_dropdown, modal].into()
+            } else {
+                with_dropdown
+            }
+        } else if let Some(device) = self.ui.editing_device {
+            let modal =
+                views::screens::input::device_editor_modal(device, &self.settings, &self.ui);
+            stack![with_dropdown, modal].into()
         } else {
             with_dropdown
+        };
+
+        // If there's an active dialog, render it on top of everything
+        if let Some(dialog) = views::dialogs::view(
+            &self.ui.dialog_state,
+            &self.ui.wizard_suggestions,
+            self.ui.niri_version,
+        ) {
+            dialog
+        } else {
+            with_rule_editor
         }
     }
 
-    /// Creates the content area for the current page
+    /// Returns the view content for a given editable section
+    fn section_editor_content(
+        &self,
+        section: crate::messages::EditableSection,
+    ) -> Element<'_, Message> {
+        use crate::messages::EditableSection as S;
+        match section {
+            // Layout sections
+            S::SpatialGaps => views::appearance::gaps_section(&self.settings.appearance),
+            S::CenteringDynamics => iced::widget::row![
+                iced::widget::column![views::behavior::focus_section(&self.settings.behavior),]
+                    .width(iced::Length::FillPortion(1)),
+                iced::widget::column![views::behavior::workspace_section(&self.settings.behavior),]
+                    .width(iced::Length::FillPortion(1)),
+            ]
+            .spacing(32)
+            .align_y(iced::Alignment::Start)
+            .into(),
+            S::ColumnManager => iced::widget::row![
+                iced::widget::column![views::behavior::column_section(&self.settings.behavior),]
+                    .width(iced::Length::FillPortion(1)),
+                iced::widget::column![views::layout_extras::column_display_section(
+                    &self.settings.layout_extras
+                ),]
+                .width(iced::Length::FillPortion(1)),
+            ]
+            .spacing(32)
+            .align_y(iced::Alignment::Start)
+            .into(),
+            S::ScreenEdgeStruts => views::behavior::struts_section(&self.settings.behavior),
+            S::TabIndicator => {
+                views::layout_extras::tab_indicator_section(&self.settings.layout_extras)
+            }
+            S::InsertHint => {
+                views::layout_extras::insert_hint_section(&self.settings.layout_extras)
+            }
+            S::NamedWorkspaces => views::workspaces::view(&self.settings.workspaces),
+            // Visuals sections
+            S::FocusRing => views::appearance::focus_ring_section(&self.settings.appearance),
+            S::WindowBorder => views::appearance::border_section(&self.settings.appearance),
+            S::WindowShadow => views::layout_extras::shadow_section(&self.settings.layout_extras),
+            S::ModifierKeys => views::behavior::modifier_keys_section(&self.settings.behavior),
+            S::Animations => views::animations::view(&self.settings.animations),
+            S::Cursor => views::cursor::view(&self.settings.cursor),
+            // System sections
+            S::StartupPrograms => views::startup::view_section(&self.settings.startup),
+            S::EnvironmentVars => views::environment::view_section(&self.settings.environment),
+            S::Miscellaneous => views::miscellaneous::view_section(&self.settings.miscellaneous),
+            S::SwitchEvents => views::switch_events::view_section(&self.settings.switch_events),
+            S::Debug => views::debug::view_section(&self.settings.debug),
+            S::RecentWindows => views::recent_windows::view(&self.settings.recent_windows),
+        }
+    }
+
+    /// Creates the content area for the current screen (redesign)
+    fn screen_content(&self) -> Element<'_, Message> {
+        if self.ui.highlight_setting.is_some() {
+            return self.search_result_content();
+        }
+
+        use crate::messages::Screen;
+        match self.ui.current_screen {
+            Screen::Dashboard => views::screens::dashboard::view(
+                self.ui.niri_status,
+                self.ui.niri_version,
+                &self.ui.tools_state,
+                &self.settings,
+            ),
+            Screen::Layout => views::screens::layout::view(
+                &self.settings.layout_extras,
+                &self.settings.workspaces,
+                &self.settings.behavior,
+                &self.settings.appearance,
+            ),
+            Screen::Visuals => views::screens::visuals::view(
+                &self.settings.appearance,
+                &self.settings.animations,
+                &self.settings.cursor,
+                &self.settings.layout_extras,
+                &self.settings.behavior,
+            ),
+            Screen::Input => views::screens::input::view(&self.settings, &self.ui),
+            Screen::Rules => views::screens::rules::view(
+                self.ui.rules_sub_tab,
+                &self.settings.window_rules,
+                &self.ui.rules_search,
+                self.ui.rules_filter,
+                &self.ui.window_rule_sections_expanded,
+                &self.ui.window_rule_regex_errors,
+                &self.ui.available_workspaces,
+                &self.settings.layer_rules,
+                &self.ui.layer_rule_sections_expanded,
+                &self.ui.layer_rule_regex_errors,
+            ),
+            Screen::Displays => views::screens::displays::view(
+                &self.settings.outputs,
+                self.ui.selected_output_index,
+                &self.ui.output_sections_expanded,
+                &self.ui.tools_state.outputs,
+            ),
+            Screen::System => views::screens::system::view(
+                &self.settings.startup,
+                &self.settings.environment,
+                &self.settings.miscellaneous,
+                &self.settings.switch_events,
+                &self.settings.debug,
+                &self.settings.recent_windows,
+            ),
+            Screen::Gear => views::screens::gear::view(
+                self.ui.gear_sub_tab,
+                &self.ui.tools_state,
+                self.ui.niri_status,
+                &self.settings.preferences,
+                self.ui.show_search_bar,
+                &self.ui.config_editor_state,
+                &self.ui.config_editor_content,
+                &self.ui.backups_state,
+            ),
+        }
+    }
+
+    /// Shows the detailed legacy page for a matched search result.
+    fn search_result_content(&self) -> Element<'_, Message> {
+        let setting_name = self.ui.highlight_setting.as_deref().unwrap_or_default();
+
+        let banner = container(
+            column![
+                row![
+                    text("SEARCH MATCH")
+                        .size(10)
+                        .font(fonts::UI_FONT_SEMIBOLD)
+                        .color(neon::SECONDARY),
+                    text(self.ui.current_page.name())
+                        .size(10)
+                        .font(fonts::UI_FONT_MEDIUM)
+                        .color(neon::ON_SURFACE_VARIANT),
+                ]
+                .spacing(12)
+                .align_y(iced::Alignment::Center),
+                text(setting_name).size(24).font(fonts::UI_FONT_SEMIBOLD),
+                text("Showing the detailed page for the matched setting.")
+                    .size(12)
+                    .color(neon::ON_SURFACE_VARIANT),
+            ]
+            .spacing(6),
+        )
+        .padding(24)
+        .width(Length::Fill)
+        .style(|_: &iced::Theme| container::Style {
+            background: Some(iced::Background::Color(neon::SURFACE_CONTAINER_HIGH)),
+            border: iced::Border {
+                color: iced::Color {
+                    a: 0.18,
+                    ..neon::SECONDARY
+                },
+                width: 1.0,
+                radius: 20.0.into(),
+            },
+            ..Default::default()
+        });
+
+        column![container(banner).padding(24), self.page_content()]
+            .spacing(0)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
+    }
+
+    /// Creates the content area for the current page (legacy — used during transition)
+    #[allow(dead_code)]
     fn page_content(&self) -> Element<'_, Message> {
         // Each page handles its own scrollable container
         match self.ui.current_page {
@@ -1207,7 +1613,8 @@ impl App {
             Page::WindowRules => {
                 return views::window_rules::view(
                     &self.settings.window_rules,
-                    self.ui.selected_window_rule_id,
+                    &self.ui.rules_search,
+                    self.ui.rules_filter,
                     &self.ui.window_rule_sections_expanded,
                     &self.ui.window_rule_regex_errors,
                     &self.ui.available_workspaces,
@@ -1216,7 +1623,8 @@ impl App {
             Page::LayerRules => {
                 return views::layer_rules::view(
                     &self.settings.layer_rules,
-                    self.ui.selected_layer_rule_id,
+                    &self.ui.rules_search,
+                    self.ui.rules_filter,
                     &self.ui.layer_rule_sections_expanded,
                     &self.ui.layer_rule_regex_errors,
                 );

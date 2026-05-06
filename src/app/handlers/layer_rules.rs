@@ -16,13 +16,15 @@ impl super::super::App {
                 self.settings.layer_rules.next_id += 1;
                 self.settings.layer_rules.rules.push(new_rule.clone());
                 self.ui.selected_layer_rule_id = Some(new_rule.id);
+                self.ui.editing_layer_rule_id = Some(new_rule.id);
                 log::info!("Added new layer rule with ID {}", new_rule.id);
             }
 
             M::DeleteRule(rule_id) => {
                 self.settings.layer_rules.remove(rule_id);
                 if self.ui.selected_layer_rule_id == Some(rule_id) {
-                    self.ui.selected_layer_rule_id = self.settings.layer_rules.rules.first().map(|r| r.id);
+                    self.ui.selected_layer_rule_id =
+                        self.settings.layer_rules.rules.first().map(|r| r.id);
                 }
                 log::info!("Deleted layer rule {}", rule_id);
             }
@@ -43,8 +45,40 @@ impl super::super::App {
                 }
             }
 
+            M::SetRuleEnabled(rule_id, enabled) => {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
+                    rule.enabled = enabled;
+                }
+            }
+
+            M::OpenEditor(rule_id) => {
+                self.ui.editing_layer_rule_id = Some(rule_id);
+                return Task::none();
+            }
+
+            M::CloseEditor => {
+                self.ui.editing_layer_rule_id = None;
+                return Task::none();
+            }
+
+            M::SetSearch(text) => {
+                self.ui.rules_search = text;
+                return Task::none();
+            }
+
+            M::SetFilter(filter) => {
+                self.ui.rules_filter = filter;
+                return Task::none();
+            }
+
             M::ReorderRule(rule_id, move_up) => {
-                if let Some(idx) = self.settings.layer_rules.rules.iter().position(|r| r.id == rule_id) {
+                if let Some(idx) = self
+                    .settings
+                    .layer_rules
+                    .rules
+                    .iter()
+                    .position(|r| r.id == rule_id)
+                {
                     let new_idx = if move_up && idx > 0 {
                         idx - 1
                     } else if !move_up && idx < self.settings.layer_rules.rules.len() - 1 {
@@ -68,7 +102,8 @@ impl super::super::App {
 
             M::AddMatch(rule_id) => {
                 if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
-                    rule.matches.push(crate::config::models::LayerRuleMatch::default());
+                    rule.matches
+                        .push(crate::config::models::LayerRuleMatch::default());
                 }
             }
 
@@ -83,7 +118,11 @@ impl super::super::App {
             M::SetMatchNamespace(rule_id, match_idx, namespace) => {
                 if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     if let Some(match_data) = rule.matches.get_mut(match_idx) {
-                        match_data.namespace = if namespace.is_empty() { None } else { Some(namespace) };
+                        match_data.namespace = if namespace.is_empty() {
+                            None
+                        } else {
+                            Some(namespace)
+                        };
                     }
                 }
             }
@@ -134,7 +173,12 @@ impl super::super::App {
 
             M::ToggleSection(rule_id, section_name) => {
                 let key = (rule_id, section_name);
-                let expanded = self.ui.layer_rule_sections_expanded.get(&key).copied().unwrap_or(true);
+                let expanded = self
+                    .ui
+                    .layer_rule_sections_expanded
+                    .get(&key)
+                    .copied()
+                    .unwrap_or(true);
                 self.ui.layer_rule_sections_expanded.insert(key, !expanded);
                 // Don't mark dirty for UI-only changes
                 return Task::none();
@@ -143,14 +187,20 @@ impl super::super::App {
             M::ValidateRegex(rule_id, _match_idx, field_name, regex) => {
                 // Validate regex pattern
                 if regex.is_empty() {
-                    self.ui.layer_rule_regex_errors.remove(&(rule_id, field_name));
+                    self.ui
+                        .layer_rule_regex_errors
+                        .remove(&(rule_id, field_name));
                 } else {
                     match regex_syntax::Parser::new().parse(&regex) {
                         Ok(_) => {
-                            self.ui.layer_rule_regex_errors.remove(&(rule_id, field_name));
+                            self.ui
+                                .layer_rule_regex_errors
+                                .remove(&(rule_id, field_name));
                         }
                         Err(e) => {
-                            self.ui.layer_rule_regex_errors.insert((rule_id, field_name), e.to_string());
+                            self.ui
+                                .layer_rule_regex_errors
+                                .insert((rule_id, field_name), e.to_string());
                         }
                     }
                 }

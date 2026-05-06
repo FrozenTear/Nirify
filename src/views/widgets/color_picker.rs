@@ -5,8 +5,8 @@
 use iced::widget::{button, column, container, row, text, text_input};
 use iced::{Alignment, Border, Color as IcedColor, Element, Length};
 
-use crate::types::Color;
 use crate::theme::{fonts, muted_text_container};
+use crate::types::Color;
 
 /// Creates a color picker row with hex input and color preview
 ///

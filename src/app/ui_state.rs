@@ -8,9 +8,11 @@
 
 use std::collections::HashMap;
 
+use crate::messages::RulesFilter;
+
 use iced::widget::text_editor;
 
-use crate::messages::{DialogState, Page};
+use crate::messages::{DialogState, GearSubTab, InputSubTab, Page, RulesSubTab, Screen};
 use crate::version::{FeatureCompat, NiriVersion};
 use crate::views;
 
@@ -18,8 +20,16 @@ use crate::views;
 #[derive(Default)]
 pub struct UiState {
     // Navigation & Display
-    /// Current active page
+    /// Current active page (legacy, used for sub-page routing)
     pub current_page: Page,
+    /// Current active screen (redesign navigation)
+    pub current_screen: Screen,
+    /// Active sub-tab within the Input screen
+    pub input_sub_tab: InputSubTab,
+    /// Active sub-tab within the Rules screen
+    pub rules_sub_tab: RulesSubTab,
+    /// Active sub-tab within the Gear screen
+    pub gear_sub_tab: GearSubTab,
     /// Search query
     pub search_query: String,
     /// Search results
@@ -56,12 +66,22 @@ pub struct UiState {
     // Outputs state
     /// Selected output index for list-detail view
     pub selected_output_index: Option<usize>,
+    /// Output being edited in modal
+    pub editing_output_index: Option<usize>,
     /// Expanded sections in outputs view
     pub output_sections_expanded: HashMap<String, bool>,
+
+    // Rules shared state
+    /// Search text for rules card grid
+    pub rules_search: String,
+    /// Filter mode for rules card grid
+    pub rules_filter: RulesFilter,
 
     // Layer Rules state
     /// Selected layer rule ID for list-detail view
     pub selected_layer_rule_id: Option<u32>,
+    /// Layer rule being edited in modal
+    pub editing_layer_rule_id: Option<u32>,
     /// Expanded sections in layer rules view
     pub layer_rule_sections_expanded: HashMap<(u32, String), bool>,
     /// Regex validation errors
@@ -70,6 +90,8 @@ pub struct UiState {
     // Window Rules state
     /// Selected window rule ID for list-detail view
     pub selected_window_rule_id: Option<u32>,
+    /// Window rule being edited in modal
+    pub editing_window_rule_id: Option<u32>,
     /// Expanded sections in window rules view
     pub window_rule_sections_expanded: HashMap<(u32, String), bool>,
     /// Regex validation errors
@@ -77,13 +99,25 @@ pub struct UiState {
     /// Available workspace names from niri (for dropdowns)
     pub available_workspaces: Vec<String>,
 
+    // Section editor state (Layout/Visuals/System)
+    /// Which section modal is open
+    pub editing_section: Option<crate::messages::EditableSection>,
+
+    // Input device editor state
+    /// Which device modal is open
+    pub editing_device: Option<crate::messages::EditableDevice>,
+
     // Keybindings state
     /// Selected keybinding index for list-detail view
     pub selected_keybinding_index: Option<usize>,
+    /// Keybinding being edited in modal
+    pub editing_keybinding_index: Option<usize>,
     /// Expanded sections in keybindings view
     pub keybinding_sections_expanded: HashMap<String, bool>,
     /// Which keybinding is currently capturing key input
     pub key_capture_active: Option<usize>,
+    /// Search filter for keybindings table
+    pub keybindings_search: String,
 
     // Calibration matrix caches
     /// Cached formatted values for tablet calibration matrix

@@ -1,15 +1,13 @@
 //! Animations settings message handler
 
+use crate::config::models::{AnimationId, AnimationType, EasingCurve};
 use crate::config::SettingsCategory;
-use crate::config::models::{AnimationType, AnimationId, EasingCurve};
 use crate::messages::{AnimationsMessage, Message};
 use iced::Task;
 
 impl super::super::App {
     /// Updates animation settings
     pub(in crate::app) fn update_animations(&mut self, msg: AnimationsMessage) -> Task<Message> {
-        
-
         match msg {
             AnimationsMessage::ToggleSlowdown(enabled) => {
                 // Toggle between slowdown factor and normal speed (1.0)
@@ -31,7 +29,7 @@ impl super::super::App {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
                     let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
                     anim_config.animation_type = if enabled {
-                        AnimationType::Spring  // Default to spring when enabled
+                        AnimationType::Spring // Default to spring when enabled
                     } else {
                         AnimationType::Off
                     };
@@ -77,7 +75,8 @@ impl super::super::App {
             AnimationsMessage::SetCustomShader(name, code) => {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
                     if anim_id.supports_custom_shader() {
-                        let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
+                        let anim_config =
+                            anim_id.get_mut(&mut self.settings.animations.per_animation);
                         anim_config.custom_shader = Some(code);
                         anim_config.animation_type = AnimationType::CustomShader;
                     }
@@ -104,14 +103,14 @@ impl super::super::App {
 }}"#,
                             func_name
                         );
-                        let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
+                        let anim_config =
+                            anim_id.get_mut(&mut self.settings.animations.per_animation);
                         anim_config.custom_shader = Some(template);
                         anim_config.animation_type = AnimationType::CustomShader;
                     }
                 }
             }
         }
-
 
         self.save.dirty_tracker.mark(SettingsCategory::Animations);
         self.mark_changed();
@@ -128,7 +127,10 @@ impl super::super::App {
             "window_close" | "window-close" => Some(AnimationId::WindowClose),
             "window_movement" | "window-movement" => Some(AnimationId::WindowMovement),
             "window_resize" | "window-resize" => Some(AnimationId::WindowResize),
-            "horizontal_view" | "horizontal-view" | "horizontal_view_movement" | "horizontal-view-movement" => Some(AnimationId::HorizontalViewMovement),
+            "horizontal_view"
+            | "horizontal-view"
+            | "horizontal_view_movement"
+            | "horizontal-view-movement" => Some(AnimationId::HorizontalViewMovement),
             "config_notification" | "config-notification" => Some(AnimationId::ConfigNotification),
             "exit_confirmation" | "exit-confirmation" => Some(AnimationId::ExitConfirmation),
             "screenshot_ui" | "screenshot-ui" => Some(AnimationId::ScreenshotUi),

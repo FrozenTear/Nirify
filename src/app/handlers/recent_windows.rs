@@ -1,13 +1,15 @@
 //! Recent windows settings message handler
 
 use crate::config::SettingsCategory;
-use crate::messages::{RecentWindowsMessage, Message};
+use crate::messages::{Message, RecentWindowsMessage};
 use iced::Task;
 
 impl super::super::App {
     /// Handle recent windows settings messages
-    pub(in crate::app) fn update_recent_windows(&mut self, msg: RecentWindowsMessage) -> Task<Message> {
-        
+    pub(in crate::app) fn update_recent_windows(
+        &mut self,
+        msg: RecentWindowsMessage,
+    ) -> Task<Message> {
         let recent = &mut self.settings.recent_windows;
 
         match msg {
@@ -27,16 +29,26 @@ impl super::super::App {
                     recent.highlight.urgent_color = color;
                 }
             }
-            RecentWindowsMessage::SetHighlightPadding(v) => recent.highlight.padding = v.clamp(0, 100),
-            RecentWindowsMessage::SetHighlightCornerRadius(v) => recent.highlight.corner_radius = v.clamp(0, 100),
+            RecentWindowsMessage::SetHighlightPadding(v) => {
+                recent.highlight.padding = v.clamp(0, 100)
+            }
+            RecentWindowsMessage::SetHighlightCornerRadius(v) => {
+                recent.highlight.corner_radius = v.clamp(0, 100)
+            }
 
             // Preview settings
-            RecentWindowsMessage::SetPreviewMaxHeight(v) => recent.previews.max_height = v.clamp(50, 1000),
-            RecentWindowsMessage::SetPreviewMaxScale(v) => recent.previews.max_scale = v.clamp(0.1, 1.0),
+            RecentWindowsMessage::SetPreviewMaxHeight(v) => {
+                recent.previews.max_height = v.clamp(50, 1000)
+            }
+            RecentWindowsMessage::SetPreviewMaxScale(v) => {
+                recent.previews.max_scale = v.clamp(0.1, 1.0)
+            }
 
             // Keybind management
             RecentWindowsMessage::AddBind => {
-                recent.binds.push(crate::config::models::RecentWindowsBind::default());
+                recent
+                    .binds
+                    .push(crate::config::models::RecentWindowsBind::default());
             }
             RecentWindowsMessage::RemoveBind(idx) => {
                 if idx < recent.binds.len() {
@@ -70,7 +82,9 @@ impl super::super::App {
             }
         }
 
-        self.save.dirty_tracker.mark(SettingsCategory::RecentWindows);
+        self.save
+            .dirty_tracker
+            .mark(SettingsCategory::RecentWindows);
         self.mark_changed();
         Task::none()
     }

@@ -4,9 +4,7 @@
 //! to applying merges and verifying the results.
 
 use nirify::config::analyze_rules;
-use nirify::config::models::{
-    LayerRule, LayerRuleMatch, Settings, WindowRule, WindowRuleMatch,
-};
+use nirify::config::models::{LayerRule, LayerRuleMatch, Settings, WindowRule, WindowRuleMatch};
 
 /// Helper to create a simple window rule with app-id match
 fn window_rule(id: u32, app_id: &str, opacity: f32) -> WindowRule {

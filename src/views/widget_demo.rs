@@ -26,7 +26,7 @@ pub struct DemoState {
     pub color_value: Color,
     pub gradient_value: ColorOrGradient,
     pub calibration_matrix: Option<[f64; 6]>,
-    pub calibration_matrix_formatted: [String; 6],  // Pre-formatted for widget
+    pub calibration_matrix_formatted: [String; 6], // Pre-formatted for widget
     pub file_path: String,
 }
 

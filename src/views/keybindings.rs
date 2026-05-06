@@ -6,13 +6,16 @@
 //! - Action type selection (spawn command, niri action)
 //! - Advanced options (cooldown, repeat, allow when locked)
 
-use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input, toggler};
+use iced::widget::{
+    button, column, container, pick_list, row, scrollable, text, text_input, toggler, Space,
+};
 use iced::{Alignment, Element, Length};
 use std::collections::HashMap;
 
 use super::widgets::*;
 use crate::config::models::{KeybindAction, Keybinding, KeybindingsSettings};
 use crate::messages::{KeybindingsMessage, Message};
+use crate::theme::{fonts, neon};
 use crate::types::ModKey;
 
 /// Common niri actions for quick selection
@@ -93,15 +96,13 @@ fn keybinding_list<'a>(
     settings: &'a KeybindingsSettings,
     selected_index: Option<usize>,
 ) -> Element<'a, Message> {
-    let mut list = column![
-        row![
-            text("Keybindings").size(18),
-            add_button(Message::Keybindings(KeybindingsMessage::AddKeybinding)),
-        ]
-        .spacing(10)
-        .padding([12, 20])
-        .align_y(Alignment::Center),
+    let mut list = column![row![
+        text("Keybindings").size(18),
+        add_button(Message::Keybindings(KeybindingsMessage::AddKeybinding)),
     ]
+    .spacing(10)
+    .padding([12, 20])
+    .align_y(Alignment::Center),]
     .spacing(0);
 
     // Show error if loading failed
@@ -110,14 +111,16 @@ fn keybinding_list<'a>(
             container(
                 text(format!("Error loading keybindings:\n{}", error))
                     .size(12)
-                    .color([0.9, 0.4, 0.4])
+                    .color([0.9, 0.4, 0.4]),
             )
-            .padding(12)
+            .padding(12),
         );
     }
 
     if settings.bindings.is_empty() {
-        list = list.push(empty_list_placeholder("No keybindings configured\nClick + to add one"));
+        list = list.push(empty_list_placeholder(
+            "No keybindings configured\nClick + to add one",
+        ));
     } else {
         for (idx, binding) in settings.bindings.iter().enumerate() {
             let is_selected = selected_index == Some(idx);
@@ -146,22 +149,24 @@ fn keybinding_list<'a>(
                     column![
                         row![
                             selection_indicator(is_selected),
-                            text(key_display)
-                                .size(14)
-                                .color(if is_selected { [1.0, 1.0, 1.0] } else { [0.9, 0.9, 0.9] }),
+                            text(key_display).size(14).color(if is_selected {
+                                [1.0, 1.0, 1.0]
+                            } else {
+                                [0.9, 0.9, 0.9]
+                            }),
                         ]
                         .spacing(8)
                         .align_y(Alignment::Center),
-                        text(action_preview)
-                            .size(11)
-                            .color([0.75, 0.75, 0.75]),
+                        text(action_preview).size(11).color([0.75, 0.75, 0.75]),
                     ]
-                    .spacing(2)
+                    .spacing(2),
                 )
-                .on_press(Message::Keybindings(KeybindingsMessage::SelectKeybinding(idx)))
+                .on_press(Message::Keybindings(KeybindingsMessage::SelectKeybinding(
+                    idx,
+                )))
                 .padding([8, 12])
                 .width(Length::Fill)
-                .style(list_item_style(is_selected))
+                .style(list_item_style(is_selected)),
             );
         }
     }
@@ -171,10 +176,7 @@ fn keybinding_list<'a>(
 
 /// Empty detail view shown when no keybinding is selected
 fn empty_detail_view() -> Element<'static, Message> {
-    empty_detail_placeholder(
-        "Select a keybinding to edit",
-        "Or click + to add a new one",
-    )
+    empty_detail_placeholder("Select a keybinding to edit", "Or click + to add a new one")
 }
 
 /// Detail view for a selected keybinding
@@ -193,7 +195,9 @@ fn keybinding_detail_view<'a>(
         // Header with delete button
         row![
             text("Edit Keybinding").size(20),
-            delete_button(Message::Keybindings(KeybindingsMessage::RemoveKeybinding(idx))),
+            delete_button(Message::Keybindings(KeybindingsMessage::RemoveKeybinding(
+                idx
+            ))),
         ]
         .spacing(20)
         .align_y(Alignment::Center),
@@ -221,13 +225,8 @@ fn keybinding_detail_view<'a>(
 
     // Action Section
     content = content.push(spacer(12.0));
-    content = content.push(
-        column![
-            section_header("Action"),
-            action_editor(binding, idx),
-        ]
-        .spacing(8)
-    );
+    content =
+        content.push(column![section_header("Action"), action_editor(binding, idx),].spacing(8));
 
     // Advanced Options Section
     content = content.push(spacer(12.0));
@@ -239,7 +238,9 @@ fn keybinding_detail_view<'a>(
             // Overlay title
             column![
                 text("Hotkey Overlay Title").size(14),
-                text("Optional title shown in niri's hotkey overlay").size(11).color([0.75, 0.75, 0.75]),
+                text("Optional title shown in niri's hotkey overlay")
+                    .size(11)
+                    .color([0.75, 0.75, 0.75]),
                 text_input(
                     "Leave empty for auto-generated",
                     binding.hotkey_overlay_title.as_deref().unwrap_or("")
@@ -257,11 +258,14 @@ fn keybinding_detail_view<'a>(
             row![
                 column![
                     text("Allow when locked").size(14),
-                    text("Binding works even when screen is locked").size(11).color([0.75, 0.75, 0.75]),
+                    text("Binding works even when screen is locked")
+                        .size(11)
+                        .color([0.75, 0.75, 0.75]),
                 ]
                 .width(Length::Fill),
-                toggler(binding.allow_when_locked)
-                    .on_toggle(move |value| Message::Keybindings(KeybindingsMessage::SetAllowWhenLocked(idx, value))),
+                toggler(binding.allow_when_locked).on_toggle(move |value| Message::Keybindings(
+                    KeybindingsMessage::SetAllowWhenLocked(idx, value)
+                )),
             ]
             .spacing(12)
             .align_y(Alignment::Center),
@@ -270,11 +274,14 @@ fn keybinding_detail_view<'a>(
             row![
                 column![
                     text("Repeat when held").size(14),
-                    text("Action repeats while key is held down").size(11).color([0.75, 0.75, 0.75]),
+                    text("Action repeats while key is held down")
+                        .size(11)
+                        .color([0.75, 0.75, 0.75]),
                 ]
                 .width(Length::Fill),
-                toggler(binding.repeat)
-                    .on_toggle(move |value| Message::Keybindings(KeybindingsMessage::SetRepeat(idx, value))),
+                toggler(binding.repeat).on_toggle(move |value| Message::Keybindings(
+                    KeybindingsMessage::SetRepeat(idx, value)
+                )),
             ]
             .spacing(12)
             .align_y(Alignment::Center),
@@ -283,7 +290,9 @@ fn keybinding_detail_view<'a>(
             if let Some(cooldown) = binding.cooldown_ms {
                 column![
                     text("Cooldown").size(14),
-                    text(format!("{} ms between activations", cooldown)).size(11).color([0.75, 0.75, 0.75]),
+                    text(format!("{} ms between activations", cooldown))
+                        .size(11)
+                        .color([0.75, 0.75, 0.75]),
                 ]
             } else {
                 column![
@@ -309,13 +318,15 @@ fn key_capture_display<'a>(
             button(
                 text("Press any key combination... (ESC to cancel)")
                     .size(16)
-                    .color([0.0, 0.0, 0.0])
+                    .color([0.0, 0.0, 0.0]),
             )
             .on_press(Message::Keybindings(KeybindingsMessage::CancelKeyCapture))
             .padding([12, 20])
             .width(Length::Fill)
             .style(|_theme, _status| button::Style {
-                background: Some(iced::Background::Color(iced::Color::from_rgb(0.9, 0.7, 0.2))),
+                background: Some(iced::Background::Color(iced::Color::from_rgb(
+                    0.9, 0.7, 0.2,
+                ))),
                 text_color: iced::Color::BLACK,
                 border: iced::Border {
                     color: iced::Color::from_rgb(1.0, 0.8, 0.3),
@@ -323,66 +334,64 @@ fn key_capture_display<'a>(
                     radius: 6.0.into(),
                 },
                 ..Default::default()
-            })
+            }),
         )
         .width(Length::Fill)
         .into()
     } else if binding.key_combo.is_empty() {
         container(
-            button(
-                text("Click to set key combination")
-                    .size(16)
-            )
-            .on_press(Message::Keybindings(KeybindingsMessage::StartKeyCapture(idx)))
-            .padding([12, 20])
-            .width(Length::Fill)
-            .style(|_theme, status| {
-                let bg = match status {
-                    button::Status::Hovered => iced::Color::from_rgba(0.3, 0.35, 0.4, 0.8),
-                    button::Status::Pressed => iced::Color::from_rgba(0.35, 0.4, 0.45, 0.8),
-                    _ => iced::Color::from_rgba(0.2, 0.25, 0.3, 0.8),
-                };
-                button::Style {
-                    background: Some(iced::Background::Color(bg)),
-                    text_color: iced::Color::WHITE,
-                    border: iced::Border {
-                        color: iced::Color::from_rgb(0.4, 0.45, 0.5),
-                        width: 1.0,
-                        radius: 6.0.into(),
-                    },
-                    ..Default::default()
-                }
-            })
+            button(text("Click to set key combination").size(16))
+                .on_press(Message::Keybindings(KeybindingsMessage::StartKeyCapture(
+                    idx,
+                )))
+                .padding([12, 20])
+                .width(Length::Fill)
+                .style(|_theme, status| {
+                    let bg = match status {
+                        button::Status::Hovered => iced::Color::from_rgba(0.3, 0.35, 0.4, 0.8),
+                        button::Status::Pressed => iced::Color::from_rgba(0.35, 0.4, 0.45, 0.8),
+                        _ => iced::Color::from_rgba(0.2, 0.25, 0.3, 0.8),
+                    };
+                    button::Style {
+                        background: Some(iced::Background::Color(bg)),
+                        text_color: iced::Color::WHITE,
+                        border: iced::Border {
+                            color: iced::Color::from_rgb(0.4, 0.45, 0.5),
+                            width: 1.0,
+                            radius: 6.0.into(),
+                        },
+                        ..Default::default()
+                    }
+                }),
         )
         .width(Length::Fill)
         .into()
     } else {
         // Borrow from binding.key_combo which has lifetime 'a
         container(
-            button(
-                text(&binding.key_combo)
-                    .size(16)
-            )
-            .on_press(Message::Keybindings(KeybindingsMessage::StartKeyCapture(idx)))
-            .padding([12, 20])
-            .width(Length::Fill)
-            .style(|_theme, status| {
-                let bg = match status {
-                    button::Status::Hovered => iced::Color::from_rgba(0.3, 0.35, 0.4, 0.8),
-                    button::Status::Pressed => iced::Color::from_rgba(0.35, 0.4, 0.45, 0.8),
-                    _ => iced::Color::from_rgba(0.2, 0.25, 0.3, 0.8),
-                };
-                button::Style {
-                    background: Some(iced::Background::Color(bg)),
-                    text_color: iced::Color::WHITE,
-                    border: iced::Border {
-                        color: iced::Color::from_rgb(0.4, 0.45, 0.5),
-                        width: 1.0,
-                        radius: 6.0.into(),
-                    },
-                    ..Default::default()
-                }
-            })
+            button(text(&binding.key_combo).size(16))
+                .on_press(Message::Keybindings(KeybindingsMessage::StartKeyCapture(
+                    idx,
+                )))
+                .padding([12, 20])
+                .width(Length::Fill)
+                .style(|_theme, status| {
+                    let bg = match status {
+                        button::Status::Hovered => iced::Color::from_rgba(0.3, 0.35, 0.4, 0.8),
+                        button::Status::Pressed => iced::Color::from_rgba(0.35, 0.4, 0.45, 0.8),
+                        _ => iced::Color::from_rgba(0.2, 0.25, 0.3, 0.8),
+                    };
+                    button::Style {
+                        background: Some(iced::Background::Color(bg)),
+                        text_color: iced::Color::WHITE,
+                        border: iced::Border {
+                            color: iced::Color::from_rgb(0.4, 0.45, 0.5),
+                            width: 1.0,
+                            radius: 6.0.into(),
+                        },
+                        ..Default::default()
+                    }
+                }),
         )
         .width(Length::Fill)
         .into()
@@ -419,7 +428,10 @@ fn action_editor<'a>(binding: &'a Keybinding, idx: usize) -> Element<'a, Message
                 action_options,
                 Some(current_action),
                 move |selected: &str| {
-                    Message::Keybindings(KeybindingsMessage::UpdateAction(idx, selected.to_string()))
+                    Message::Keybindings(KeybindingsMessage::UpdateAction(
+                        idx,
+                        selected.to_string(),
+                    ))
                 }
             )
             .width(Length::Fixed(200.0))
@@ -446,11 +458,11 @@ fn action_editor<'a>(binding: &'a Keybinding, idx: usize) -> Element<'a, Message
                         .width(Length::Fill),
                 ]
                 .spacing(12)
-                .align_y(Alignment::Center)
+                .align_y(Alignment::Center),
             );
-            content = content.push(
-                info_text("Enter the command to run (e.g., 'alacritty' or 'firefox --new-window')")
-            );
+            content = content.push(info_text(
+                "Enter the command to run (e.g., 'alacritty' or 'firefox --new-window')",
+            ));
         }
     }
 
@@ -520,48 +532,450 @@ fn modifier_toggle_button<'a>(
 ) -> Element<'a, Message> {
     // Build new modifiers list by toggling this modifier
     let new_mods: Vec<ModKey> = if is_active {
-        current_mods.iter().filter(|m| **m != modifier).cloned().collect()
+        current_mods
+            .iter()
+            .filter(|m| **m != modifier)
+            .cloned()
+            .collect()
     } else {
         let mut mods = current_mods.to_vec();
         mods.push(modifier);
         mods
     };
 
+    let color = if is_active {
+        neon::SECONDARY
+    } else {
+        neon::OUTLINE_VARIANT
+    };
     button(
         text(label)
-            .size(13)
-            .color(if is_active { [1.0, 1.0, 1.0] } else { [0.6, 0.6, 0.6] })
+            .size(12)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(color),
     )
-    .on_press(Message::Keybindings(KeybindingsMessage::UpdateModifiers(idx, new_mods)))
-    .padding([6, 12])
-    .style(move |_theme, status| {
-        let bg = if is_active {
-            match status {
-                button::Status::Hovered => iced::Color::from_rgba(0.3, 0.5, 0.7, 0.7),
-                button::Status::Pressed => iced::Color::from_rgba(0.4, 0.6, 0.8, 0.8),
-                _ => iced::Color::from_rgba(0.2, 0.4, 0.6, 0.6),
-            }
-        } else {
-            match status {
-                button::Status::Hovered => iced::Color::from_rgba(0.3, 0.3, 0.3, 0.5),
-                button::Status::Pressed => iced::Color::from_rgba(0.35, 0.35, 0.35, 0.6),
-                _ => iced::Color::from_rgba(0.2, 0.2, 0.2, 0.4),
-            }
+    .on_press(Message::Keybindings(KeybindingsMessage::UpdateModifiers(
+        idx, new_mods,
+    )))
+    .padding([6, 14])
+    .style(move |_theme: &iced::Theme, status| {
+        let bg = match status {
+            button::Status::Hovered => iced::Color { a: 0.15, ..color },
+            _ => iced::Color {
+                a: if is_active { 0.10 } else { 0.05 },
+                ..color
+            },
         };
         button::Style {
             background: Some(iced::Background::Color(bg)),
-            text_color: if is_active { iced::Color::WHITE } else { iced::Color::from_rgb(0.6, 0.6, 0.6) },
+            text_color: color,
             border: iced::Border {
-                color: if is_active {
-                    iced::Color::from_rgba(0.4, 0.6, 0.8, 0.5)
-                } else {
-                    iced::Color::from_rgba(0.3, 0.3, 0.3, 0.3)
+                color: iced::Color {
+                    a: if is_active { 0.3 } else { 0.15 },
+                    ..color
                 },
                 width: 1.0,
-                radius: 4.0.into(),
+                radius: 8.0.into(),
             },
             ..Default::default()
         }
     })
     .into()
+}
+
+// ── Keybinding Editor Modal ────────────────────────────────────────────────
+
+/// Creates a modal overlay for editing a keybinding
+pub fn editor_modal<'a>(
+    binding: &'a Keybinding,
+    idx: usize,
+    sections_expanded: &'a HashMap<String, bool>,
+    key_capture_active: Option<usize>,
+) -> Element<'a, Message> {
+    let is_capturing = key_capture_active == Some(idx);
+
+    let actual_action: &str = match &binding.action {
+        KeybindAction::Spawn(_) => "spawn",
+        KeybindAction::NiriAction(action) => action.as_str(),
+        KeybindAction::NiriActionWithArgs(action, _) => action.as_str(),
+    };
+
+    let mut action_options: Vec<&str> = COMMON_ACTIONS.to_vec();
+    if !action_options.contains(&actual_action) {
+        action_options.insert(0, actual_action);
+    }
+
+    let editor = column![
+        // Header
+        row![
+            container(text("⌘").size(24).color(neon::PRIMARY))
+                .width(48)
+                .height(48)
+                .center(Length::Shrink)
+                .style(|_: &iced::Theme| container::Style {
+                    background: Some(iced::Background::Color(iced::Color {
+                        a: 0.15,
+                        ..neon::PRIMARY
+                    })),
+                    border: iced::Border {
+                        radius: 14.0.into(),
+                        color: iced::Color {
+                            a: 0.25,
+                            ..neon::PRIMARY
+                        },
+                        width: 1.0
+                    },
+                    ..Default::default()
+                }),
+            Space::new().width(16),
+            column![
+                text("KEYBINDING EDITOR")
+                    .size(10)
+                    .font(fonts::UI_FONT_SEMIBOLD)
+                    .color(neon::SECONDARY),
+                text(format!("Modify: {}", binding.display_name()))
+                    .size(22)
+                    .font(fonts::UI_FONT_SEMIBOLD),
+            ]
+            .spacing(4)
+            .width(Length::Fill),
+            row![
+                button(text("Delete").size(12).color(neon::ERROR))
+                    .on_press(Message::Keybindings(KeybindingsMessage::RemoveKeybinding(
+                        idx
+                    )))
+                    .padding([6, 12])
+                    .style(ghost_button_style),
+                button(text("✕").size(16).color(neon::ON_SURFACE_VARIANT))
+                    .on_press(Message::CloseKeybindingEditor)
+                    .padding([8, 12])
+                    .style(|_: &iced::Theme, status| {
+                        let bg = match status {
+                            button::Status::Hovered => iced::Color {
+                                a: 0.15,
+                                ..neon::ON_SURFACE
+                            },
+                            _ => iced::Color {
+                                a: 0.08,
+                                ..neon::ON_SURFACE
+                            },
+                        };
+                        button::Style {
+                            background: Some(iced::Background::Color(bg)),
+                            text_color: neon::ON_SURFACE,
+                            border: iced::Border {
+                                radius: 999.0.into(),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }
+                    }),
+            ]
+            .spacing(8),
+        ]
+        .spacing(0)
+        .align_y(Alignment::Center),
+        Space::new().height(20),
+        // ── 2-COLUMN: KEY COMBO | ACTION ──
+        row![
+            // Left: Key Combination
+            column![
+                modal_section("⌨", "KEY COMBINATION", neon::SECONDARY),
+                Space::new().height(8),
+                container(
+                    column![
+                        text("CURRENT BINDING")
+                            .size(10)
+                            .font(fonts::UI_FONT_SEMIBOLD)
+                            .color(neon::OUTLINE_VARIANT),
+                        Space::new().height(6),
+                        key_capture_display(binding, idx, is_capturing),
+                        Space::new().height(14),
+                        text("MODIFIERS")
+                            .size(10)
+                            .font(fonts::UI_FONT_SEMIBOLD)
+                            .color(neon::OUTLINE_VARIANT),
+                        Space::new().height(6),
+                        modifier_toggles(binding, idx),
+                    ]
+                    .spacing(0)
+                )
+                .padding(12)
+                .style(crate::theme::card_style),
+            ]
+            .spacing(0)
+            .width(Length::FillPortion(1)),
+            // Right: Action
+            column![
+                modal_section("⚡", "ACTION", neon::PRIMARY),
+                Space::new().height(8),
+                container(
+                    column![
+                        text("ACTION TYPE")
+                            .size(10)
+                            .font(fonts::UI_FONT_SEMIBOLD)
+                            .color(neon::OUTLINE_VARIANT),
+                        Space::new().height(6),
+                        pick_list(
+                            action_options,
+                            Some(actual_action),
+                            move |selected: &str| {
+                                Message::Keybindings(KeybindingsMessage::UpdateAction(
+                                    idx,
+                                    selected.to_string(),
+                                ))
+                            }
+                        )
+                        .width(Length::Fill)
+                        .padding(10),
+                        {
+                            let is_spawn = matches!(&binding.action, KeybindAction::Spawn(_));
+                            if is_spawn {
+                                let cmd = match &binding.action {
+                                    KeybindAction::Spawn(args) => args.join(" "),
+                                    _ => String::new(),
+                                };
+                                Element::from(
+                                    column![
+                                        Space::new().height(12),
+                                        text("COMMAND")
+                                            .size(10)
+                                            .font(fonts::UI_FONT_SEMIBOLD)
+                                            .color(neon::OUTLINE_VARIANT),
+                                        Space::new().height(6),
+                                        text_input("e.g., alacritty --new-window", &cmd)
+                                            .on_input(move |v| Message::Keybindings(
+                                                KeybindingsMessage::SetCommand(idx, v)
+                                            ))
+                                            .padding(10)
+                                            .size(13),
+                                    ]
+                                    .spacing(0),
+                                )
+                            } else {
+                                Space::new().into()
+                            }
+                        },
+                    ]
+                    .spacing(0)
+                )
+                .padding(12)
+                .style(crate::theme::card_style),
+            ]
+            .spacing(0)
+            .width(Length::FillPortion(1)),
+        ]
+        .spacing(32)
+        .align_y(Alignment::Start),
+        Space::new().height(20),
+        // ── ADVANCED OPTIONS ──
+        modal_section("⬡", "ADVANCED OPTIONS", neon::OUTLINE),
+        Space::new().height(4),
+        row![
+            column![container(
+                column![
+                    toggle_row(
+                        "Allow when locked",
+                        "Works even when screen is locked",
+                        binding.allow_when_locked,
+                        move |v| Message::Keybindings(KeybindingsMessage::SetAllowWhenLocked(
+                            idx, v
+                        ))
+                    ),
+                    toggle_row(
+                        "Repeat when held",
+                        "Action repeats while key held",
+                        binding.repeat,
+                        move |v| Message::Keybindings(KeybindingsMessage::SetRepeat(idx, v))
+                    ),
+                ]
+                .spacing(0)
+            )
+            .padding(8)
+            .style(crate::theme::card_style),]
+            .spacing(4)
+            .width(Length::FillPortion(1)),
+            column![container(
+                column![
+                    text("HOTKEY OVERLAY TITLE")
+                        .size(10)
+                        .font(fonts::UI_FONT_SEMIBOLD)
+                        .color(neon::OUTLINE_VARIANT),
+                    Space::new().height(4),
+                    text_input(
+                        "Auto-generated if empty",
+                        binding.hotkey_overlay_title.as_deref().unwrap_or("")
+                    )
+                    .on_input(move |v| {
+                        let title = if v.is_empty() { None } else { Some(v) };
+                        Message::Keybindings(KeybindingsMessage::SetHotkeyOverlayTitle(idx, title))
+                    })
+                    .padding(10)
+                    .size(13),
+                    Space::new().height(8),
+                    text("COOLDOWN")
+                        .size(10)
+                        .font(fonts::UI_FONT_SEMIBOLD)
+                        .color(neon::OUTLINE_VARIANT),
+                    Space::new().height(4),
+                    text_input(
+                        "ms between activations",
+                        &binding
+                            .cooldown_ms
+                            .map(|c| c.to_string())
+                            .unwrap_or_default()
+                    )
+                    .on_input(move |v| {
+                        let cd = if v.is_empty() {
+                            None
+                        } else {
+                            v.parse::<i32>().ok()
+                        };
+                        Message::Keybindings(KeybindingsMessage::SetCooldown(idx, cd))
+                    })
+                    .padding(10)
+                    .size(13),
+                ]
+                .spacing(0)
+                .padding(12)
+            )
+            .style(crate::theme::card_style),]
+            .spacing(4)
+            .width(Length::FillPortion(1)),
+        ]
+        .spacing(32)
+        .align_y(Alignment::Start),
+        // ── Footer ──
+        Space::new().height(20),
+        container(Space::new().width(Length::Fill).height(1))
+            .width(Length::Fill)
+            .style(|_: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(iced::Color {
+                    a: 0.15,
+                    ..neon::OUTLINE_VARIANT
+                })),
+                ..Default::default()
+            }),
+        container(
+            row![
+                row![
+                    text("●").size(10).color(neon::SECONDARY),
+                    text("Live Configuration Sync Active")
+                        .size(12)
+                        .color(neon::ON_SURFACE_VARIANT),
+                ]
+                .spacing(6)
+                .align_y(Alignment::Center)
+                .width(Length::Fill),
+                button(text("Discard").size(13).font(fonts::UI_FONT_MEDIUM))
+                    .on_press(Message::CloseKeybindingEditor)
+                    .padding([10, 20])
+                    .style(ghost_button_style),
+                Space::new().width(8),
+                button(text("Save Changes").size(13).font(fonts::UI_FONT_MEDIUM))
+                    .on_press(Message::CloseKeybindingEditor)
+                    .padding([10, 24])
+                    .style(|_: &iced::Theme, status| {
+                        let bg = match status {
+                            button::Status::Hovered => neon::PRIMARY,
+                            _ => iced::Color {
+                                a: 0.85,
+                                ..neon::PRIMARY
+                            },
+                        };
+                        button::Style {
+                            background: Some(iced::Background::Color(bg)),
+                            text_color: neon::SURFACE_LOW,
+                            border: iced::Border {
+                                radius: 12.0.into(),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }
+                    }),
+            ]
+            .align_y(Alignment::Center)
+        )
+        .padding([16, 0]),
+    ];
+
+    let modal_content = scrollable(editor.spacing(0).width(Length::Fill)).height(Length::Fill);
+
+    let dialog = container(modal_content)
+        .padding(32)
+        .width(Length::Fixed(900.0))
+        .max_height(700.0)
+        .style(|_: &iced::Theme| container::Style {
+            background: Some(iced::Background::Color(neon::SURFACE_CONTAINER_HIGH)),
+            border: iced::Border {
+                color: iced::Color {
+                    a: 0.3,
+                    ..neon::PRIMARY
+                },
+                width: 2.0,
+                radius: 20.0.into(),
+            },
+            shadow: iced::Shadow {
+                color: iced::Color::from_rgba(0.0, 0.0, 0.0, 0.4),
+                offset: iced::Vector::new(0.0, 8.0),
+                blur_radius: 40.0,
+            },
+            ..Default::default()
+        });
+
+    container(dialog)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center(Length::Fill)
+        .style(|_: &iced::Theme| container::Style {
+            background: Some(iced::Background::Color(iced::Color {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.7,
+            })),
+            ..Default::default()
+        })
+        .into()
+}
+
+fn modal_section<'a>(icon: &'a str, label: &'a str, accent: iced::Color) -> Element<'a, Message> {
+    row![
+        text(icon).size(14).color(accent),
+        Space::new().width(6),
+        text(label)
+            .size(11)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(accent),
+        Space::new().width(12),
+        container(Space::new().width(Length::Fill).height(1))
+            .width(Length::Fill)
+            .style(move |_: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(iced::Color { a: 0.25, ..accent })),
+                ..Default::default()
+            }),
+    ]
+    .spacing(0)
+    .align_y(Alignment::Center)
+    .padding([14, 0])
+    .into()
+}
+
+fn ghost_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => iced::Color {
+            a: 0.08,
+            ..neon::ON_SURFACE
+        },
+        _ => iced::Color::TRANSPARENT,
+    };
+    button::Style {
+        background: Some(iced::Background::Color(bg)),
+        text_color: neon::ON_SURFACE,
+        border: iced::Border {
+            radius: 8.0.into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    }
 }

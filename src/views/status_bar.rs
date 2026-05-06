@@ -4,7 +4,7 @@ use iced::widget::{button, container, row, text};
 use iced::{Alignment, Element, Length, Theme};
 
 use crate::messages::Message;
-use crate::theme::{status_bar_style, AppTheme, muted_text_container, secondary_text_container};
+use crate::theme::{muted_text_container, secondary_text_container, status_bar_style, AppTheme};
 
 /// Niri connection status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -29,22 +29,19 @@ pub fn view(
         "✓ Changes saved automatically"
     };
 
-    let status = container(text(status_text).size(12))
-        .style(move |theme: &Theme| {
-            let color = if dirty {
-                theme.palette().warning
-            } else {
-                theme.palette().success
-            };
-            container::Style {
-                text_color: Some(color),
-                ..Default::default()
-            }
-        });
+    let status = container(text(status_text).size(12)).style(move |theme: &Theme| {
+        let color = if dirty {
+            theme.palette().warning
+        } else {
+            theme.palette().success
+        };
+        container::Style {
+            text_color: Some(color),
+            ..Default::default()
+        }
+    });
 
-    let status_row = row![status]
-        .spacing(8)
-        .align_y(Alignment::Center);
+    let status_row = row![status].spacing(8).align_y(Alignment::Center);
 
     // Niri connection status - uses theme's success/danger colors
     let (niri_icon, niri_text) = match niri_status {
@@ -54,12 +51,9 @@ pub fn view(
     };
 
     let niri_indicator = container(
-        row![
-            text(niri_icon).size(10),
-            text(niri_text).size(12),
-        ]
-        .spacing(4)
-        .align_y(Alignment::Center)
+        row![text(niri_icon).size(10), text(niri_text).size(12),]
+            .spacing(4)
+            .align_y(Alignment::Center),
     )
     .style(move |theme: &Theme| {
         let color = match niri_status {
@@ -77,11 +71,14 @@ pub fn view(
     });
 
     // Optional save status message (e.g., "Saved 3 files")
-    let mut content = row![status_row, niri_indicator].spacing(16).padding([8, 20]);
+    let mut content = row![status_row, niri_indicator]
+        .spacing(16)
+        .padding([8, 20]);
 
     if let Some(ref message) = save_status {
         content = content.push(container(text("•").size(12)).style(muted_text_container));
-        content = content.push(container(text(message.clone()).size(12)).style(secondary_text_container));
+        content =
+            content.push(container(text(message.clone()).size(12)).style(secondary_text_container));
     }
 
     // Theme selector - cycles through available themes
@@ -99,7 +96,8 @@ pub fn view(
 
     // App info and theme selector on the right
     let right_section = row![
-        container(text(format!("niri settings v{}", env!("CARGO_PKG_VERSION"))).size(12)).style(muted_text_container),
+        container(text(format!("niri settings v{}", env!("CARGO_PKG_VERSION"))).size(12))
+            .style(muted_text_container),
         container(text("•").size(12)).style(muted_text_container),
         theme_button,
     ]
@@ -134,10 +132,30 @@ fn theme_button_style(theme: &iced::Theme, status: button::Status) -> button::St
     let bg_base = palette.background;
 
     // Derive surface colors from background
-    let bg_surface_hover = Color { r: bg_base.r + 0.08, g: bg_base.g + 0.08, b: bg_base.b + 0.08, a: 1.0 };
-    let bg_surface = Color { r: bg_base.r + 0.05, g: bg_base.g + 0.05, b: bg_base.b + 0.05, a: 1.0 };
-    let border_subtle = Color { r: bg_base.r + 0.12, g: bg_base.g + 0.12, b: bg_base.b + 0.12, a: 1.0 };
-    let border_strong = Color { r: bg_base.r + 0.18, g: bg_base.g + 0.18, b: bg_base.b + 0.18, a: 1.0 };
+    let bg_surface_hover = Color {
+        r: bg_base.r + 0.08,
+        g: bg_base.g + 0.08,
+        b: bg_base.b + 0.08,
+        a: 1.0,
+    };
+    let bg_surface = Color {
+        r: bg_base.r + 0.05,
+        g: bg_base.g + 0.05,
+        b: bg_base.b + 0.05,
+        a: 1.0,
+    };
+    let border_subtle = Color {
+        r: bg_base.r + 0.12,
+        g: bg_base.g + 0.12,
+        b: bg_base.b + 0.12,
+        a: 1.0,
+    };
+    let border_strong = Color {
+        r: bg_base.r + 0.18,
+        g: bg_base.g + 0.18,
+        b: bg_base.b + 0.18,
+        a: 1.0,
+    };
 
     match status {
         button::Status::Hovered => button::Style {
@@ -164,7 +182,10 @@ fn theme_button_style(theme: &iced::Theme, status: button::Status) -> button::St
         },
         _ => button::Style {
             background: Some(iced::Background::Color(Color::TRANSPARENT)),
-            text_color: Color { a: 0.7, ..palette.text },
+            text_color: Color {
+                a: 0.7,
+                ..palette.text
+            },
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,

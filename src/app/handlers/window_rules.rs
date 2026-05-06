@@ -1,8 +1,8 @@
 //! Window rules settings message handler
 
-use crate::config::SettingsCategory;
 use crate::config::models::{WindowRule, WindowRuleMatch};
-use crate::messages::{WindowRulesMessage as M, Message};
+use crate::config::SettingsCategory;
+use crate::messages::{Message, WindowRulesMessage as M};
 use iced::Task;
 
 impl super::super::App {
@@ -21,12 +21,14 @@ impl super::super::App {
                 };
                 self.settings.window_rules.rules.push(new_rule);
                 self.ui.selected_window_rule_id = Some(new_id);
+                self.ui.editing_window_rule_id = Some(new_id);
             }
 
             M::DeleteRule(id) => {
                 self.settings.window_rules.remove(id);
                 if self.ui.selected_window_rule_id == Some(id) {
-                    self.ui.selected_window_rule_id = self.settings.window_rules.rules.first().map(|r| r.id);
+                    self.ui.selected_window_rule_id =
+                        self.settings.window_rules.rules.first().map(|r| r.id);
                 }
             }
 
@@ -45,6 +47,32 @@ impl super::super::App {
                     self.settings.window_rules.rules.push(new_rule);
                     self.ui.selected_window_rule_id = Some(new_id);
                 }
+            }
+
+            M::SetRuleEnabled(id, enabled) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.enabled = enabled;
+                }
+            }
+
+            M::OpenEditor(id) => {
+                self.ui.editing_window_rule_id = Some(id);
+                should_mark_dirty = false;
+            }
+
+            M::CloseEditor => {
+                self.ui.editing_window_rule_id = None;
+                should_mark_dirty = false;
+            }
+
+            M::SetSearch(text) => {
+                self.ui.rules_search = text;
+                should_mark_dirty = false;
+            }
+
+            M::SetFilter(filter) => {
+                self.ui.rules_filter = filter;
+                should_mark_dirty = false;
             }
 
             M::SetRuleName(id, name) => {
@@ -318,6 +346,90 @@ impl super::super::App {
                 }
             }
 
+            M::SetFocusRingWidth(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.focus_ring_width = value;
+                }
+            }
+
+            M::SetBorderWidth(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.border_width = value;
+                }
+            }
+
+            M::SetDefaultColumnDisplay(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.default_column_display = value;
+                }
+            }
+
+            M::SetOpenMaximizedToEdges(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.open_maximized_to_edges = value;
+                }
+            }
+
+            M::SetScrollFactor(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.scroll_factor = value;
+                }
+            }
+
+            M::SetFocusRingActive(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.focus_ring_active = value;
+                }
+            }
+
+            M::SetFocusRingInactive(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.focus_ring_inactive = value;
+                }
+            }
+
+            M::SetFocusRingUrgent(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.focus_ring_urgent = value;
+                }
+            }
+
+            M::SetBorderActive(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.border_active = value;
+                }
+            }
+
+            M::SetBorderInactive(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.border_inactive = value;
+                }
+            }
+
+            M::SetBorderUrgent(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.border_urgent = value;
+                }
+            }
+
+            M::SetShadow(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.shadow = value;
+                }
+            }
+
+            M::SetTabIndicator(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.tab_indicator = value;
+                }
+            }
+
+            M::SetDefaultFloatingPosition(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.default_floating_position = value;
+                }
+            }
+
             M::SetOpacity(id, value) => {
                 if let Some(rule) = self.settings.window_rules.find_mut(id) {
                     rule.opacity = value;
@@ -362,7 +474,12 @@ impl super::super::App {
 
             M::ToggleSection(id, section) => {
                 let key = (id, section);
-                let current = self.ui.window_rule_sections_expanded.get(&key).copied().unwrap_or(false);
+                let current = self
+                    .ui
+                    .window_rule_sections_expanded
+                    .get(&key)
+                    .copied()
+                    .unwrap_or(false);
                 self.ui.window_rule_sections_expanded.insert(key, !current);
                 should_mark_dirty = false;
             }
@@ -381,7 +498,9 @@ impl super::super::App {
         match regex_str {
             Some(s) if !s.is_empty() => {
                 if let Err(e) = regex_syntax::Parser::new().parse(s) {
-                    self.ui.window_rule_regex_errors.insert(error_key.clone(), format!("Invalid regex: {}", e));
+                    self.ui
+                        .window_rule_regex_errors
+                        .insert(error_key.clone(), format!("Invalid regex: {}", e));
                 } else {
                     self.ui.window_rule_regex_errors.remove(error_key);
                 }

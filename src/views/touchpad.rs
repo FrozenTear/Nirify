@@ -1,235 +1,287 @@
-//! Touchpad settings view
+//! Touchpad settings view — neon modal style
 
-use iced::widget::{column, container, scrollable, text, text_input};
-use iced::{Element, Length};
+use iced::widget::{column, container, row, scrollable, text_input, Space};
+use iced::{Alignment, Element, Length};
 
-use super::widgets::*;
+use super::widgets::{picker_row, toggle_row};
 use crate::config::models::TouchpadSettings;
 use crate::messages::{Message, TouchpadMessage};
-use crate::theme::muted_text_container;
+use crate::theme::{fonts, neon};
 use crate::types::{AccelProfile, ClickMethod, ScrollMethod, TapButtonMap};
 
-/// Creates the touchpad settings view
 pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
-    let tap = settings.tap;
-    let dwt = settings.dwt;
-    let dwtp = settings.dwtp;
-    let natural_scroll = settings.natural_scroll;
-    let accel_speed = settings.accel_speed;
-    let accel_profile = settings.accel_profile;
-    let scroll_factor = settings.scroll_factor;
-    let scroll_method = settings.scroll_method;
-    let click_method = settings.click_method;
-    let tap_button_map = settings.tap_button_map;
-    let left_handed = settings.left_handed;
-    let middle_emulation = settings.middle_emulation;
-    let drag = settings.drag;
-    let drag_lock = settings.drag_lock;
-
     let content = column![
-        page_title("Tap Settings"),
-        info_text(
-            "Configure tap-to-click behavior and multi-finger tap gestures."
-        ),
-        card(column![
-            toggle_row(
-                "Tap to click",
-                "Enable tapping the touchpad to register clicks",
-                tap,
-                |value| Message::Touchpad(TouchpadMessage::ToggleTapToClick(value)),
-            ),
-        ].spacing(0).width(Length::Fill)),
-        section_header("Disable While Typing"),
-        info_text(
-            "Prevent accidental touchpad input while typing. DWT = disable while typing, DWTP = disable while trackpoint is active."
-        ),
-        card(column![
-            toggle_row(
-                "Disable while typing (DWT)",
-                "Temporarily disable touchpad when keyboard is in use",
-                dwt,
-                |value| Message::Touchpad(TouchpadMessage::ToggleDwt(value)),
-            ),
-            toggle_row(
-                "Disable while trackpoint active (DWTP)",
-                "Disable touchpad when trackpoint is being used",
-                dwtp,
-                |value| Message::Touchpad(TouchpadMessage::ToggleDwtp(value)),
-            ),
-        ].spacing(0).width(Length::Fill)),
-        section_header("Scrolling"),
-        card(column![
-            toggle_row(
-                "Natural scroll",
-                "Reverse scroll direction (like on macOS)",
-                natural_scroll,
-                |value| Message::Touchpad(TouchpadMessage::ToggleNaturalScroll(value)),
-            ),
-            slider_row(
-                "Scroll factor",
-                "Multiplier for scroll speed (1.0 = default)",
-                scroll_factor as f32,
-                0.1,
-                10.0,
-                "x",
-                |value| Message::Touchpad(TouchpadMessage::SetScrollFactor(value)),
-            ),
-            optional_scroll_factor(
-                settings.scroll_factor_horizontal,
-                |v| Message::Touchpad(TouchpadMessage::SetScrollFactorHorizontal(v)),
-            ),
-            picker_row(
-                "Scroll method",
-                "How scrolling gestures are interpreted (two-finger, edge, etc.)",
-                ScrollMethod::all(),
-                Some(scroll_method),
-                |value| Message::Touchpad(TouchpadMessage::SetScrollMethod(value)),
-            ),
-            scroll_button_input(settings.scroll_button, |v| Message::Touchpad(TouchpadMessage::SetScrollButton(v))),
-        ].spacing(0).width(Length::Fill)),
-        section_header("Pointer Acceleration"),
-        info_text(
-            "Control how pointer movement speed relates to finger movement. Speed ranges from -1 (slower) to 1 (faster)."
-        ),
-        card(column![
-            slider_row(
-                "Acceleration speed",
-                "Pointer acceleration from -1.0 (slow) to 1.0 (fast)",
-                accel_speed as f32,
-                -1.0,
-                1.0,
-                "",
-                |value| Message::Touchpad(TouchpadMessage::SetAccelSpeed(value)),
-            ),
-            picker_row(
-                "Acceleration profile",
-                "Choose between adaptive (varies with speed) or flat (constant ratio)",
-                AccelProfile::all(),
-                Some(accel_profile),
-                |value| Message::Touchpad(TouchpadMessage::SetAccelProfile(value)),
-            ),
-            picker_row(
-                "Click method",
-                "How multi-finger taps are interpreted (button areas vs clickfinger)",
-                ClickMethod::all(),
-                Some(click_method),
-                |value| Message::Touchpad(TouchpadMessage::SetClickMethod(value)),
-            ),
-            picker_row(
-                "Tap button map",
-                "Mapping of 2/3-finger taps to mouse buttons",
-                TapButtonMap::all(),
-                Some(tap_button_map),
-                |value| Message::Touchpad(TouchpadMessage::SetTapButtonMap(value)),
-            ),
-        ].spacing(0).width(Length::Fill)),
-        section_header("Additional Settings"),
-        card(column![
-            toggle_row(
-                "Left-handed mode",
-                "Swap left and right button areas/gestures",
-                left_handed,
-                |value| Message::Touchpad(TouchpadMessage::ToggleLeftHanded(value)),
-            ),
-            toggle_row(
-                "Middle button emulation",
-                "Emulate middle click by tapping with two fingers simultaneously",
-                middle_emulation,
-                |value| Message::Touchpad(TouchpadMessage::ToggleMiddleEmulation(value)),
-            ),
-            toggle_row(
-                "Drag",
-                "Enable tap-and-drag gesture",
-                drag,
-                |value| Message::Touchpad(TouchpadMessage::ToggleDrag(value)),
-            ),
-            toggle_row(
-                "Drag lock",
-                "Lock drag state until tapped again (requires drag enabled)",
-                drag_lock,
-                |value| Message::Touchpad(TouchpadMessage::ToggleDragLock(value)),
-            ),
-        ].spacing(0).width(Length::Fill)),
-        spacer(32.0),
+        // ── ROW 1: TAP & BEHAVIOR | SCROLLING ──
+        row![
+            column![
+                modal_section("▦", "TAP & BEHAVIOR", neon::TERTIARY),
+                Space::new().height(4),
+                container(
+                    column![
+                        toggle_row(
+                            "Tap to click",
+                            "Tap touchpad to register clicks",
+                            settings.tap,
+                            |v| Message::Touchpad(TouchpadMessage::ToggleTapToClick(v))
+                        ),
+                        toggle_row(
+                            "Disable while typing",
+                            "DWT — prevent accidental input",
+                            settings.dwt,
+                            |v| Message::Touchpad(TouchpadMessage::ToggleDwt(v))
+                        ),
+                        toggle_row(
+                            "Disable while trackpoint",
+                            "DWTP — disable on trackpoint use",
+                            settings.dwtp,
+                            |v| Message::Touchpad(TouchpadMessage::ToggleDwtp(v))
+                        ),
+                        toggle_row("Drag", "Tap-and-drag gesture", settings.drag, |v| {
+                            Message::Touchpad(TouchpadMessage::ToggleDrag(v))
+                        }),
+                        toggle_row(
+                            "Drag lock",
+                            "Lock drag until tapped again",
+                            settings.drag_lock,
+                            |v| Message::Touchpad(TouchpadMessage::ToggleDragLock(v))
+                        ),
+                    ]
+                    .spacing(0)
+                )
+                .padding(8)
+                .style(crate::theme::card_style),
+            ]
+            .spacing(6)
+            .width(Length::FillPortion(1)),
+            column![
+                modal_section("◎", "SCROLLING", neon::SECONDARY),
+                Space::new().height(4),
+                container(
+                    column![toggle_row(
+                        "Natural scroll",
+                        "Reverse direction (macOS-style)",
+                        settings.natural_scroll,
+                        |v| Message::Touchpad(TouchpadMessage::ToggleNaturalScroll(v))
+                    ),]
+                    .spacing(0)
+                )
+                .padding(8)
+                .style(crate::theme::card_style),
+                Space::new().height(4),
+                styled_slider(
+                    "SCROLL FACTOR",
+                    &format!("{:.1}x", settings.scroll_factor),
+                    0.1..=10.0,
+                    settings.scroll_factor as f32,
+                    0.1,
+                    |v| Message::Touchpad(TouchpadMessage::SetScrollFactor(v))
+                ),
+                styled_slider(
+                    "HORIZ SCROLL",
+                    &format!(
+                        "{:.1}x",
+                        settings
+                            .scroll_factor_horizontal
+                            .unwrap_or(settings.scroll_factor) as f32
+                    ),
+                    0.1..=10.0,
+                    settings
+                        .scroll_factor_horizontal
+                        .unwrap_or(settings.scroll_factor) as f32,
+                    0.1,
+                    |v| Message::Touchpad(TouchpadMessage::SetScrollFactorHorizontal(Some(v)))
+                ),
+                picker_row(
+                    "Scroll method",
+                    "Two-finger, edge, or button",
+                    ScrollMethod::all(),
+                    Some(settings.scroll_method),
+                    |v| Message::Touchpad(TouchpadMessage::SetScrollMethod(v))
+                ),
+            ]
+            .spacing(6)
+            .width(Length::FillPortion(1)),
+        ]
+        .spacing(32)
+        .align_y(Alignment::Start),
+        Space::new().height(20),
+        // ── ROW 2: ACCELERATION | BUTTONS ──
+        row![
+            column![
+                modal_section("⚡", "ACCELERATION", neon::PRIMARY),
+                Space::new().height(4),
+                styled_slider(
+                    "ACCEL SPEED",
+                    &format!("{:.2}", settings.accel_speed),
+                    -1.0..=1.0,
+                    settings.accel_speed as f32,
+                    0.01,
+                    |v| Message::Touchpad(TouchpadMessage::SetAccelSpeed(v))
+                ),
+                picker_row(
+                    "Accel profile",
+                    "Adaptive or flat",
+                    AccelProfile::all(),
+                    Some(settings.accel_profile),
+                    |v| Message::Touchpad(TouchpadMessage::SetAccelProfile(v))
+                ),
+                picker_row(
+                    "Click method",
+                    "Button areas or clickfinger",
+                    ClickMethod::all(),
+                    Some(settings.click_method),
+                    |v| Message::Touchpad(TouchpadMessage::SetClickMethod(v))
+                ),
+                picker_row(
+                    "Tap button map",
+                    "2/3-finger tap mapping",
+                    TapButtonMap::all(),
+                    Some(settings.tap_button_map),
+                    |v| Message::Touchpad(TouchpadMessage::SetTapButtonMap(v))
+                ),
+            ]
+            .spacing(6)
+            .width(Length::FillPortion(1)),
+            column![
+                modal_section("◧", "BUTTONS & MODE", neon::TERTIARY),
+                Space::new().height(4),
+                container(
+                    column![
+                        toggle_row(
+                            "Left-handed mode",
+                            "Swap button areas",
+                            settings.left_handed,
+                            |v| Message::Touchpad(TouchpadMessage::ToggleLeftHanded(v))
+                        ),
+                        toggle_row(
+                            "Middle emulation",
+                            "Two-finger tap = middle",
+                            settings.middle_emulation,
+                            |v| Message::Touchpad(TouchpadMessage::ToggleMiddleEmulation(v))
+                        ),
+                        toggle_row(
+                            "Disable on ext. mouse",
+                            "Auto-disable with external mouse",
+                            settings.disabled_on_external_mouse,
+                            |v| Message::Touchpad(TouchpadMessage::ToggleDisabledOnExternalMouse(
+                                v
+                            ))
+                        ),
+                    ]
+                    .spacing(0)
+                )
+                .padding(8)
+                .style(crate::theme::card_style),
+                {
+                    let sb = settings
+                        .scroll_button
+                        .map(|v| v.to_string())
+                        .unwrap_or_default();
+                    styled_text_input("SCROLL BUTTON", "Button code (e.g., 274)", &sb, |s| {
+                        if s.is_empty() {
+                            Message::Touchpad(TouchpadMessage::SetScrollButton(None))
+                        } else if let Ok(v) = s.parse::<i32>() {
+                            Message::Touchpad(TouchpadMessage::SetScrollButton(Some(v)))
+                        } else {
+                            Message::NoOp
+                        }
+                    })
+                },
+            ]
+            .spacing(6)
+            .width(Length::FillPortion(1)),
+        ]
+        .spacing(32)
+        .align_y(Alignment::Start),
     ]
-    .spacing(4);
+    .spacing(0)
+    .width(Length::Fill);
 
-    scrollable(container(content).padding(20).width(iced::Length::Fill))
-        .height(iced::Length::Fill)
+    scrollable(container(content).padding(8).width(Length::Fill))
+        .height(Length::Fill)
         .into()
 }
 
-/// Optional horizontal scroll factor (toggler + slider)
-fn optional_scroll_factor<'a>(
-    value: Option<f64>,
-    on_change: impl Fn(Option<f32>) -> Message + 'a + Copy,
-) -> Element<'a, Message> {
-    use iced::widget::{row, slider, toggler};
-    use iced::Alignment;
-    let is_enabled = value.is_some();
-    let current_value = value.unwrap_or(1.0) as f32;
-
-    let mut col = column![
-        row![
-            column![
-                text("Horizontal scroll factor").size(15),
-                container(text("Override scroll speed for horizontal scrolling (leave disabled to match vertical)").size(11)).style(muted_text_container),
-            ]
-            .width(Length::Fill),
-            toggler(is_enabled)
-                .on_toggle(move |enabled| {
-                    if enabled {
-                        on_change(Some(1.0))
-                    } else {
-                        on_change(None)
-                    }
-                }),
-        ]
-        .spacing(20)
-        .align_y(Alignment::Center),
+fn modal_section<'a>(icon: &'a str, label: &'a str, accent: iced::Color) -> Element<'a, Message> {
+    row![
+        text(icon).size(14).color(accent),
+        Space::new().width(6),
+        text(label)
+            .size(11)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(accent),
+        Space::new().width(12),
+        container(Space::new().width(Length::Fill).height(1))
+            .width(Length::Fill)
+            .style(move |_: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(iced::Color { a: 0.25, ..accent })),
+                ..Default::default()
+            }),
     ]
-    .spacing(8)
-    .padding(12);
-
-    if is_enabled {
-        col = col.push(
-            row![
-                slider(0.1..=10.0, current_value, move |v| on_change(Some(v)))
-                    .width(Length::Fill),
-                text(format!("{:.1}x", current_value))
-                    .size(13)
-                    .width(Length::Fixed(60.0)),
-            ]
-            .spacing(12)
-            .align_y(Alignment::Center)
-        );
-    }
-
-    col.into()
-}
-
-/// Scroll button input (optional integer for on-button-down scrolling)
-fn scroll_button_input<'a>(
-    value: Option<i32>,
-    on_change: impl Fn(Option<i32>) -> Message + 'a,
-) -> Element<'a, Message> {
-    let display_value = value.map(|v| v.to_string()).unwrap_or_default();
-    column![
-        text("Scroll button").size(15),
-        container(text("Linux button code for on-button-down scrolling (e.g., 274 for middle button). Leave empty for default.").size(11)).style(muted_text_container),
-        text_input("e.g., 274", &display_value)
-            .on_input(move |s| {
-                if s.is_empty() {
-                    on_change(None)
-                } else if let Ok(v) = s.parse::<i32>() {
-                    on_change(Some(v))
-                } else {
-                    on_change(value)
-                }
-            })
-            .padding(8),
-    ]
-    .spacing(6)
-    .padding(12)
+    .spacing(0)
+    .align_y(Alignment::Center)
+    .padding([14, 0])
     .into()
 }
+
+fn styled_slider<'a>(
+    label: &'a str,
+    display: &str,
+    range: std::ops::RangeInclusive<f32>,
+    value: f32,
+    step: f32,
+    on_slide: impl Fn(f32) -> Message + 'a,
+) -> Element<'a, Message> {
+    let d = display.to_string();
+    container(
+        column![
+            row![
+                text(label)
+                    .size(10)
+                    .font(fonts::UI_FONT_SEMIBOLD)
+                    .color(neon::OUTLINE_VARIANT),
+                Space::new().width(Length::Fill),
+                text(d)
+                    .size(11)
+                    .font(fonts::MONO_FONT)
+                    .color(neon::SECONDARY),
+            ]
+            .align_y(Alignment::Center),
+            iced::widget::slider(range, value, on_slide)
+                .step(step)
+                .width(Length::Fill),
+        ]
+        .spacing(4),
+    )
+    .padding(12)
+    .style(crate::theme::card_style)
+    .into()
+}
+
+fn styled_text_input<'a>(
+    label: &'a str,
+    placeholder: &'a str,
+    value: &str,
+    on_change: impl Fn(String) -> Message + 'a,
+) -> Element<'a, Message> {
+    let v = value.to_string();
+    container(
+        column![
+            text(label)
+                .size(10)
+                .font(fonts::UI_FONT_SEMIBOLD)
+                .color(neon::OUTLINE_VARIANT),
+            text_input(placeholder, &v)
+                .on_input(on_change)
+                .padding(10)
+                .size(13),
+        ]
+        .spacing(4),
+    )
+    .padding(12)
+    .style(crate::theme::card_style)
+    .into()
+}
+
+// Keep text import for use by toggle_row/picker_row
+use iced::widget::text;

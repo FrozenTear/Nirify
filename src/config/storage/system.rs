@@ -306,8 +306,7 @@ pub fn generate_switch_events_kdl(settings: &SwitchEventsSettings) -> String {
 /// Creates KDL configuration for the recent windows (Alt-Tab) switcher.
 /// Includes highlight styling and preview settings.
 pub fn generate_recent_windows_kdl(settings: &RecentWindowsSettings) -> String {
-    let mut kdl =
-        KdlBuilder::with_header("Recent windows switcher - managed by Nirify");
+    let mut kdl = KdlBuilder::with_header("Recent windows switcher - managed by Nirify");
     kdl.comment("Configures the Alt-Tab window switcher appearance.");
     kdl.newline();
 

@@ -1,14 +1,12 @@
 //! Mouse settings message handler
 
 use crate::config::SettingsCategory;
-use crate::messages::{MouseMessage, Message};
+use crate::messages::{Message, MouseMessage};
 use iced::Task;
 
 impl super::super::App {
     /// Updates mouse settings
     pub(in crate::app) fn update_mouse(&mut self, msg: MouseMessage) -> Task<Message> {
-        
-
         match msg {
             MouseMessage::ToggleOffOnTouchpad(value) => {
                 self.settings.mouse.off = value;
@@ -26,7 +24,8 @@ impl super::super::App {
                 self.settings.mouse.scroll_factor = value.clamp(0.1, 10.0) as f64;
             }
             MouseMessage::SetScrollFactorHorizontal(value) => {
-                self.settings.mouse.scroll_factor_horizontal = value.map(|v| v.clamp(0.1, 10.0) as f64);
+                self.settings.mouse.scroll_factor_horizontal =
+                    value.map(|v| v.clamp(0.1, 10.0) as f64);
             }
             MouseMessage::SetScrollMethod(method) => {
                 self.settings.mouse.scroll_method = method;
@@ -44,7 +43,6 @@ impl super::super::App {
                 self.settings.mouse.scroll_button_lock = value;
             }
         }
-
 
         self.save.dirty_tracker.mark(SettingsCategory::Mouse);
         self.mark_changed();

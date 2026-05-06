@@ -87,7 +87,11 @@ impl SaveManager {
     /// Checks if enough time has elapsed to trigger a save
     pub fn should_save(&self) -> bool {
         // Don't save if already saving
-        if *self.save_in_progress.lock().expect("save_in_progress mutex poisoned") {
+        if *self
+            .save_in_progress
+            .lock()
+            .expect("save_in_progress mutex poisoned")
+        {
             debug!("Save already in progress, skipping");
             return false;
         }
@@ -140,15 +144,18 @@ impl SaveManager {
             }
 
             let dirty_categories_vec: Vec<SettingsCategory> = dirty_set.iter().copied().collect();
-            info!("Saving {} dirty categories: {:?}", dirty_set.len(), dirty_categories_vec);
+            info!(
+                "Saving {} dirty categories: {:?}",
+                dirty_set.len(),
+                dirty_categories_vec
+            );
 
             // Clone settings for async save (releases lock immediately)
-            let settings_snapshot = {
-                settings.lock().expect("settings mutex poisoned").clone()
-            };
+            let settings_snapshot = { settings.lock().expect("settings mutex poisoned").clone() };
 
             // Validate settings before saving
-            let validation_result = crate::config::validation::validate_settings(&settings_snapshot);
+            let validation_result =
+                crate::config::validation::validate_settings(&settings_snapshot);
             if !validation_result.is_valid() {
                 // Log errors but don't block save - warnings are logged in validate_settings
                 for err in &validation_result.errors {
@@ -194,10 +201,8 @@ impl SaveManager {
     /// Creates a Task that reloads niri config via IPC
     pub fn reload_niri_config_task() -> Task<ReloadResult> {
         Task::future(async move {
-            let result: Result<Result<(), _>, _> = tokio::task::spawn_blocking(|| {
-                crate::ipc::reload_config()
-            })
-            .await;
+            let result: Result<Result<(), _>, _> =
+                tokio::task::spawn_blocking(|| crate::ipc::reload_config()).await;
 
             match result {
                 Ok(Ok(())) => {

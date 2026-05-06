@@ -47,18 +47,12 @@ pub fn list_panel_style(theme: &iced::Theme) -> container::Style {
 }
 
 /// Creates the list panel header with title and add button.
-pub fn list_header<'a, M: Clone + 'a>(
-    title: &'a str,
-    on_add: M,
-) -> Element<'a, M> {
-    row![
-        text(title).size(18),
-        add_button(on_add),
-    ]
-    .spacing(10)
-    .padding([12, 20])
-    .align_y(Alignment::Center)
-    .into()
+pub fn list_header<'a, M: Clone + 'a>(title: &'a str, on_add: M) -> Element<'a, M> {
+    row![text(title).size(18), add_button(on_add),]
+        .spacing(10)
+        .padding([12, 20])
+        .align_y(Alignment::Center)
+        .into()
 }
 
 /// Standard "+" add button with blue styling.
@@ -91,10 +85,7 @@ pub fn add_button_style(theme: &iced::Theme, status: button::Status) -> button::
 }
 
 /// Creates an action button (duplicate, reorder, etc.) with neutral styling.
-pub fn action_button<'a, M: Clone + 'a>(
-    label: &'a str,
-    on_press: M,
-) -> Element<'a, M> {
+pub fn action_button<'a, M: Clone + 'a>(label: &'a str, on_press: M) -> Element<'a, M> {
     button(text(label).size(13))
         .on_press(on_press)
         .padding([8, 12])
@@ -107,9 +98,24 @@ pub fn action_button<'a, M: Clone + 'a>(
 pub fn action_button_style(theme: &iced::Theme, status: button::Status) -> button::Style {
     let bg_base = theme.palette().background;
     let bg = match status {
-        button::Status::Hovered => iced::Color { r: bg_base.r + 0.15, g: bg_base.g + 0.15, b: bg_base.b + 0.15, a: 0.5 },
-        button::Status::Pressed => iced::Color { r: bg_base.r + 0.20, g: bg_base.g + 0.20, b: bg_base.b + 0.20, a: 0.5 },
-        _ => iced::Color { r: bg_base.r + 0.10, g: bg_base.g + 0.10, b: bg_base.b + 0.10, a: 0.4 },
+        button::Status::Hovered => iced::Color {
+            r: bg_base.r + 0.15,
+            g: bg_base.g + 0.15,
+            b: bg_base.b + 0.15,
+            a: 0.5,
+        },
+        button::Status::Pressed => iced::Color {
+            r: bg_base.r + 0.20,
+            g: bg_base.g + 0.20,
+            b: bg_base.b + 0.20,
+            a: 0.5,
+        },
+        _ => iced::Color {
+            r: bg_base.r + 0.10,
+            g: bg_base.g + 0.10,
+            b: bg_base.b + 0.10,
+            a: 0.4,
+        },
     };
     button::Style {
         background: Some(iced::Background::Color(bg)),
@@ -177,7 +183,9 @@ pub fn remove_button_style(theme: &iced::Theme, status: button::Status) -> butto
 
 /// Style function for list item buttons (selection-aware).
 /// Uses theme's primary color for selected state.
-pub fn list_item_style(is_selected: bool) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
+pub fn list_item_style(
+    is_selected: bool,
+) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
     move |theme, status| {
         let primary = theme.palette().primary;
         let bg_base = theme.palette().background;
@@ -186,8 +194,18 @@ pub fn list_item_style(is_selected: bool) -> impl Fn(&iced::Theme, button::Statu
             (true, button::Status::Hovered) => iced::Color { a: 0.5, ..primary },
             (true, button::Status::Pressed) => iced::Color { a: 0.6, ..primary },
             (true, _) => iced::Color { a: 0.4, ..primary },
-            (false, button::Status::Hovered) => iced::Color { r: bg_base.r + 0.1, g: bg_base.g + 0.1, b: bg_base.b + 0.1, a: 0.5 },
-            (false, button::Status::Pressed) => iced::Color { r: bg_base.r + 0.15, g: bg_base.g + 0.15, b: bg_base.b + 0.15, a: 0.5 },
+            (false, button::Status::Hovered) => iced::Color {
+                r: bg_base.r + 0.1,
+                g: bg_base.g + 0.1,
+                b: bg_base.b + 0.1,
+                a: 0.5,
+            },
+            (false, button::Status::Pressed) => iced::Color {
+                r: bg_base.r + 0.15,
+                g: bg_base.g + 0.15,
+                b: bg_base.b + 0.15,
+                a: 0.5,
+            },
             (false, _) => iced::Color::TRANSPARENT,
         };
 
@@ -202,23 +220,16 @@ pub fn list_item_style(is_selected: bool) -> impl Fn(&iced::Theme, button::Statu
 
 /// Creates an empty list placeholder message.
 /// Uses muted text via container style for theme awareness.
-pub fn empty_list_placeholder<'a, M: 'a>(
-    message: &'a str,
-) -> Element<'a, M> {
-    container(
-        container(text(message).size(13).center()).style(muted_text_container)
-    )
-    .padding(20)
-    .center(Length::Fill)
-    .into()
+pub fn empty_list_placeholder<'a, M: 'a>(message: &'a str) -> Element<'a, M> {
+    container(container(text(message).size(13).center()).style(muted_text_container))
+        .padding(20)
+        .center(Length::Fill)
+        .into()
 }
 
 /// Creates an empty detail view placeholder.
 /// Uses muted text via container style for theme awareness.
-pub fn empty_detail_placeholder<'a, M: 'a>(
-    title: &'a str,
-    subtitle: &'a str,
-) -> Element<'a, M> {
+pub fn empty_detail_placeholder<'a, M: 'a>(title: &'a str, subtitle: &'a str) -> Element<'a, M> {
     container(
         column![
             container(text(title).size(16)).style(muted_text_container),
@@ -244,7 +255,7 @@ pub fn selection_indicator<'a, M: 'a>(is_selected: bool) -> Element<'a, M> {
     container(
         text(if is_selected { "●" } else { "○" })
             .size(12)
-            .width(Length::Fixed(20.0))
+            .width(Length::Fixed(20.0)),
     )
     .style(move |theme: &iced::Theme| {
         let color = if is_selected {
@@ -263,10 +274,7 @@ pub fn selection_indicator<'a, M: 'a>(is_selected: bool) -> Element<'a, M> {
 
 /// Creates a small badge container (for status indicators like "max", "float", etc.).
 /// Uses theme text color for badge text.
-pub fn badge<'a, M: 'a>(
-    label: &'a str,
-    color: iced::Color,
-) -> Element<'a, M> {
+pub fn badge<'a, M: 'a>(label: &'a str, color: iced::Color) -> Element<'a, M> {
     container(text(label).size(10))
         .padding([2, 6])
         .style(move |theme: &iced::Theme| container::Style {
@@ -325,17 +333,12 @@ pub fn match_container_style(theme: &iced::Theme) -> container::Style {
 }
 
 /// Creates an "Add X" button for adding items within sections.
-pub fn add_item_button<'a, M: Clone + 'a>(
-    label: &'a str,
-    on_press: M,
-) -> Element<'a, M> {
-    button(
-        row![text("+").size(14), text(label).size(13),].spacing(6),
-    )
-    .on_press(on_press)
-    .padding([8, 16])
-    .style(add_item_button_style)
-    .into()
+pub fn add_item_button<'a, M: Clone + 'a>(label: &'a str, on_press: M) -> Element<'a, M> {
+    button(row![text("+").size(14), text(label).size(13),].spacing(6))
+        .on_press(on_press)
+        .padding([8, 16])
+        .style(add_item_button_style)
+        .into()
 }
 
 /// Style for "Add X" buttons within sections.
@@ -344,8 +347,18 @@ pub fn add_item_button_style(theme: &iced::Theme, status: button::Status) -> but
     let primary = theme.palette().primary;
     let bg_base = theme.palette().background;
     let bg = match status {
-        button::Status::Hovered => iced::Color { r: bg_base.r + 0.15, g: bg_base.g + 0.15, b: bg_base.b + 0.15, a: 0.4 },
-        _ => iced::Color { r: bg_base.r + 0.10, g: bg_base.g + 0.10, b: bg_base.b + 0.10, a: 0.3 },
+        button::Status::Hovered => iced::Color {
+            r: bg_base.r + 0.15,
+            g: bg_base.g + 0.15,
+            b: bg_base.b + 0.15,
+            a: 0.4,
+        },
+        _ => iced::Color {
+            r: bg_base.r + 0.10,
+            g: bg_base.g + 0.10,
+            b: bg_base.b + 0.10,
+            a: 0.3,
+        },
     };
     button::Style {
         background: Some(iced::Background::Color(bg)),

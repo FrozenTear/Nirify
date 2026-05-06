@@ -81,6 +81,9 @@ pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
         for rule in &settings.rules {
             content.push_str(&format!("// {}\n", rule.name));
             content.push_str("layer-rule {\n");
+            if !rule.enabled {
+                content.push_str("    off\n");
+            }
 
             // Match criteria
             for m in &rule.matches {
@@ -154,18 +157,19 @@ pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
 /// # Arguments
 /// * `settings` - Window rules settings
 /// * `float_settings_app` - Whether to add a rule to float the settings app
-pub fn generate_window_rules_kdl(settings: &WindowRulesSettings, float_settings_app: bool) -> String {
+pub fn generate_window_rules_kdl(
+    settings: &WindowRulesSettings,
+    float_settings_app: bool,
+) -> String {
     // Pre-allocate ~2KB for window rules (can be complex)
     let mut content = String::with_capacity(2048);
     content.push_str("// Window rules - managed by Nirify\n\n");
 
     // Check if there's already a rule for Nirify
     let has_nirify_rule = settings.rules.iter().any(|rule| {
-        rule.matches.iter().any(|m| {
-            m.app_id
-                .as_ref()
-                .is_some_and(|id| id.contains("nirify"))
-        })
+        rule.matches
+            .iter()
+            .any(|m| m.app_id.as_ref().is_some_and(|id| id.contains("nirify")))
     });
 
     // Auto-generated rule to float the settings app (only if preference is enabled AND no existing rule)
@@ -189,6 +193,9 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings, float_settings_
         for rule in &settings.rules {
             content.push_str(&format!("// {}\n", rule.name));
             content.push_str("window-rule {\n");
+            if !rule.enabled {
+                content.push_str("    off\n");
+            }
 
             // Match criteria (multiple matches supported - rule applies if ANY match)
             for m in &rule.matches {
@@ -491,4 +498,40 @@ pub fn generate_window_rules_kdl(settings: &WindowRulesSettings, float_settings_
     }
 
     content
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::models::{LayerRule, WindowRule};
+
+    #[test]
+    fn generate_layer_rules_kdl_marks_disabled_rules_off() {
+        let settings = LayerRulesSettings {
+            rules: vec![LayerRule {
+                enabled: false,
+                ..Default::default()
+            }],
+            next_id: 1,
+        };
+
+        let content = generate_layer_rules_kdl(&settings);
+
+        assert!(content.contains("layer-rule {\n    off\n"));
+    }
+
+    #[test]
+    fn generate_window_rules_kdl_marks_disabled_rules_off() {
+        let settings = WindowRulesSettings {
+            rules: vec![WindowRule {
+                enabled: false,
+                ..Default::default()
+            }],
+            next_id: 1,
+        };
+
+        let content = generate_window_rules_kdl(&settings, false);
+
+        assert!(content.contains("window-rule {\n    off\n"));
+    }
 }

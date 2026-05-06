@@ -2,23 +2,24 @@
 
 use crate::app::helpers::parse_spawn_command;
 use crate::config::SettingsCategory;
-use crate::messages::{StartupMessage, Message};
+use crate::messages::{Message, StartupMessage};
 use iced::Task;
 
 impl super::super::App {
     /// Handle startup commands messages
     pub(in crate::app) fn update_startup(&mut self, msg: StartupMessage) -> Task<Message> {
-        
         let startup = &mut self.settings.startup;
 
         match msg {
             StartupMessage::AddCommand => {
                 let id = startup.next_id;
                 startup.next_id += 1;
-                startup.commands.push(crate::config::models::StartupCommand {
-                    id,
-                    command: vec![String::new()],
-                });
+                startup
+                    .commands
+                    .push(crate::config::models::StartupCommand {
+                        id,
+                        command: vec![String::new()],
+                    });
             }
             StartupMessage::RemoveCommand(id) => {
                 startup.commands.retain(|c| c.id != id);

@@ -3,9 +3,12 @@
 //! These helper functions create consistent, well-styled setting rows
 //! that are used throughout the application.
 
-use iced::widget::{column, container, pick_list, row, slider, text, text_input, toggler};
+use crate::theme::{
+    card_style, disabled_text_container, fonts, info_block_style, muted_text_container,
+    secondary_text_container,
+};
+use iced::widget::{column, container, pick_list, row, slider, text, text_input, toggler, Space};
 use iced::{Alignment, Element, Length};
-use crate::theme::{fonts, card_style, info_block_style, accent_color, muted_text_container, disabled_text_container, secondary_text_container};
 
 /// Creates a toggle row with label and description
 ///
@@ -69,12 +72,16 @@ pub fn slider_row<'a, Message: Clone + 'a>(
     column![
         // Top: Label and current value
         row![
-            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill),
+            text(label)
+                .size(15)
+                .font(fonts::UI_FONT_MEDIUM)
+                .width(Length::Fill),
             container(
                 text(format!("{:.1}{}", value, unit))
                     .size(13)
                     .font(fonts::MONO_FONT)
-            ).style(secondary_text_container),
+            )
+            .style(secondary_text_container),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
@@ -118,12 +125,16 @@ pub fn slider_row_with_state<'a, Message: Clone + 'a>(
     let content = column![
         // Top: Label and current value
         row![
-            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill),
+            text(label)
+                .size(15)
+                .font(fonts::UI_FONT_MEDIUM)
+                .width(Length::Fill),
             container(
                 text(format!("{:.1}{}", value, unit))
                     .size(13)
                     .font(fonts::MONO_FONT)
-            ).style(secondary_text_container),
+            )
+            .style(secondary_text_container),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
@@ -167,12 +178,16 @@ pub fn slider_row_int<'a, Message: Clone + 'a>(
     column![
         // Top: Label and current value
         row![
-            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill),
+            text(label)
+                .size(15)
+                .font(fonts::UI_FONT_MEDIUM)
+                .width(Length::Fill),
             container(
                 text(format!("{}{}", value, unit))
                     .size(13)
                     .font(fonts::MONO_FONT)
-            ).style(secondary_text_container),
+            )
+            .style(secondary_text_container),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
@@ -216,12 +231,16 @@ pub fn slider_row_int_with_state<'a, Message: Clone + 'a>(
     let content = column![
         // Top: Label and current value
         row![
-            text(label).size(15).font(fonts::UI_FONT_MEDIUM).width(Length::Fill),
+            text(label)
+                .size(15)
+                .font(fonts::UI_FONT_MEDIUM)
+                .width(Length::Fill),
             container(
                 text(format!("{}{}", value, unit))
                     .size(13)
                     .font(fonts::MONO_FONT)
-            ).style(secondary_text_container),
+            )
+            .style(secondary_text_container),
         ]
         .align_y(Alignment::Center),
         // Middle: Description
@@ -338,18 +357,26 @@ pub fn text_input_with_suggestions<'a, Message: Clone + 'a>(
 /// page_title("Appearance Settings")
 /// ```
 pub fn page_title<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
-    // Uses theme's default text color (no .color() call)
-    container(
+    use crate::theme::neon;
+    row![
         text(label)
-            .size(22)
+            .size(18)
             .font(fonts::UI_FONT_SEMIBOLD)
-    )
-    .padding(iced::Padding {
-        top: 0.0,
-        right: 0.0,
-        bottom: 8.0,
-        left: 0.0,
-    })
+            .color(neon::ON_SURFACE),
+        Space::new().width(12),
+        container(Space::new().width(Length::Fill).height(1))
+            .width(Length::Fill)
+            .style(|_: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(iced::Color {
+                    a: 0.15,
+                    ..neon::OUTLINE_VARIANT
+                })),
+                ..Default::default()
+            }),
+    ]
+    .spacing(0)
+    .align_y(iced::Alignment::Center)
+    .padding([4, 0])
     .into()
 }
 
@@ -364,30 +391,26 @@ pub fn page_title<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
 /// section_header("Focus Ring")
 /// ```
 pub fn section_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
-    // Section header with accent line (theme-aware)
-    column![
-        // Thin accent line using theme's primary color
-        container(text(""))
-            .width(Length::Fixed(40.0))
-            .height(Length::Fixed(2.0))
-            .style(|theme| {
-                container::Style {
-                    background: Some(iced::Background::Color(accent_color(theme))),
-                    ..Default::default()
-                }
-            }),
-        // Section title (uses theme's default text color)
-        text(label)
-            .size(20)
+    use crate::theme::neon;
+    let accent = neon::SECONDARY;
+    row![
+        text("●").size(8).color(accent),
+        Space::new().width(6),
+        text(label.to_uppercase())
+            .size(11)
             .font(fonts::UI_FONT_SEMIBOLD)
+            .color(accent),
+        Space::new().width(12),
+        container(Space::new().width(Length::Fill).height(1))
+            .width(Length::Fill)
+            .style(move |_: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(iced::Color { a: 0.25, ..accent })),
+                ..Default::default()
+            }),
     ]
-    .spacing(6)
-    .padding(iced::Padding {
-        top: 24.0,
-        right: 0.0,
-        bottom: 8.0,
-        left: 0.0,
-    })
+    .spacing(0)
+    .align_y(iced::Alignment::Center)
+    .padding([16, 0])
     .into()
 }
 
@@ -400,28 +423,32 @@ pub fn section_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
 /// subsection_header("Advanced Options")
 /// ```
 pub fn subsection_header<'a, Message: 'a>(label: &'a str) -> Element<'a, Message> {
-    // Uses secondary_text_container for muted appearance
-    container(
-        container(
-            text(label)
-                .size(16)
-                .font(fonts::UI_FONT_MEDIUM)
-        ).style(secondary_text_container)
-    )
-    .padding(iced::Padding {
-        top: 16.0,
-        right: 0.0,
-        bottom: 4.0,
-        left: 0.0,
-    })
+    use crate::theme::neon;
+    row![
+        text(label.to_uppercase())
+            .size(10)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(neon::OUTLINE_VARIANT),
+        Space::new().width(12),
+        container(Space::new().width(Length::Fill).height(1))
+            .width(Length::Fill)
+            .style(|_: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(iced::Color {
+                    a: 0.12,
+                    ..neon::OUTLINE_VARIANT
+                })),
+                ..Default::default()
+            }),
+    ]
+    .spacing(0)
+    .align_y(iced::Alignment::Center)
+    .padding([10, 0])
     .into()
 }
 
 /// Creates a spacer element for vertical spacing
 pub fn spacer<'a, Message: 'a>(height: f32) -> Element<'a, Message> {
-    container(text(""))
-        .height(Length::Fixed(height))
-        .into()
+    container(text("")).height(Length::Fixed(height)).into()
 }
 
 /// Creates a picker/dropdown row for enum selections
@@ -472,12 +499,9 @@ where
 pub fn info_text<'a, Message: 'a>(content: &'a str) -> Element<'a, Message> {
     // Uses info_block_style which derives colors from theme
     container(
-        row![
-            text("ℹ").size(13),
-            text(content).size(12),
-        ]
-        .spacing(8)
-        .align_y(Alignment::Start)
+        row![text("ℹ").size(13), text(content).size(12),]
+            .spacing(8)
+            .align_y(Alignment::Start),
     )
     .padding(12)
     .style(info_block_style)
@@ -487,10 +511,7 @@ pub fn info_text<'a, Message: 'a>(content: &'a str) -> Element<'a, Message> {
 /// Wraps content in a card container with elevated surface styling.
 /// Use this to group related settings visually.
 pub fn card<'a, Message: 'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
-    container(content)
-        .padding(4)
-        .style(card_style)
-        .into()
+    container(content).padding(4).style(card_style).into()
 }
 
 /// Creates an optional slider row with a checkbox to enable/disable
@@ -559,11 +580,9 @@ pub fn optional_slider_row<'a, Message: Clone + 'a>(
         {
             let on_change_slider = on_change.clone();
             if is_enabled {
-                slider(min..=max, current_value, move |v| on_change_slider(Some(v)))
-                    .step(1.0)
+                slider(min..=max, current_value, move |v| on_change_slider(Some(v))).step(1.0)
             } else {
-                slider(min..=max, current_value, move |_v| on_change(None))
-                    .step(1.0)
+                slider(min..=max, current_value, move |_v| on_change(None)).step(1.0)
             }
         },
     ]
@@ -643,4 +662,51 @@ where
     .padding(12)
     .align_y(Alignment::Center)
     .into()
+}
+
+/// Creates a card group — a titled card wrapping settings content
+///
+/// Uses Tokyo Neon styling: uppercase label, neon card background, 16px radius.
+pub fn card_group<'a, Message: 'a>(
+    title: &'a str,
+    content: impl Into<Element<'a, Message>>,
+) -> Element<'a, Message> {
+    use crate::theme::neon;
+
+    column![
+        text(title.to_uppercase())
+            .size(10)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(neon::OUTLINE_VARIANT),
+        container(content)
+            .padding(20)
+            .width(Length::Fill)
+            .style(|_theme: &iced::Theme| iced::widget::container::Style {
+                background: Some(iced::Background::Color(neon::SURFACE_CONTAINER)),
+                border: iced::Border {
+                    color: iced::Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: 16.0.into(),
+                },
+                shadow: iced::Shadow {
+                    color: iced::Color::from_rgba(0.0, 0.0, 0.0, 0.15),
+                    offset: iced::Vector::new(0.0, 4.0),
+                    blur_radius: 16.0,
+                },
+                ..Default::default()
+            }),
+    ]
+    .spacing(8)
+    .into()
+}
+
+/// Creates a status pill — a small rounded badge with colored text
+pub fn status_pill<'a, Message: 'a>(
+    label: &'a str,
+    variant: crate::theme::PillVariant,
+) -> Element<'a, Message> {
+    container(text(label).size(12).font(fonts::UI_FONT_MEDIUM))
+        .padding([4, 12])
+        .style(move |theme: &iced::Theme| crate::theme::status_pill_style(theme, variant))
+        .into()
 }

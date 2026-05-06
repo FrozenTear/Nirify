@@ -22,28 +22,44 @@ pub fn view<'a>(
 ) -> Option<Element<'a, Message>> {
     match dialog {
         DialogState::None => None,
-        DialogState::Error { title, message, details } => {
-            Some(error_dialog(title, message, details.as_deref()))
-        }
+        DialogState::Error {
+            title,
+            message,
+            details,
+        } => Some(error_dialog(title, message, details.as_deref())),
         DialogState::Confirm {
             title,
             message,
             confirm_label,
             on_confirm,
         } => Some(confirm_dialog(title, message, confirm_label, on_confirm)),
-        DialogState::FirstRunWizard { step } => Some(wizard_dialog(step, wizard_suggestions, niri_version)),
+        DialogState::FirstRunWizard { step } => {
+            Some(wizard_dialog(step, wizard_suggestions, niri_version))
+        }
         DialogState::ImportSummary {
             imported_count,
             defaulted_count,
             warnings,
-        } => Some(import_summary_dialog(*imported_count, *defaulted_count, warnings)),
+        } => Some(import_summary_dialog(
+            *imported_count,
+            *defaulted_count,
+            warnings,
+        )),
         DialogState::Consolidation { suggestions } => Some(consolidation_dialog(suggestions)),
-        DialogState::DiffView { title, before, after } => Some(diff_view_dialog(title, before, after)),
+        DialogState::DiffView {
+            title,
+            before,
+            after,
+        } => Some(diff_view_dialog(title, before, after)),
     }
 }
 
 /// Error dialog
-fn error_dialog<'a>(title: &'a str, message: &'a str, details: Option<&'a str>) -> Element<'a, Message> {
+fn error_dialog<'a>(
+    title: &'a str,
+    message: &'a str,
+    details: Option<&'a str>,
+) -> Element<'a, Message> {
     let mut content = column![
         text(title).size(24),
         text(message).size(14).color([0.9, 0.9, 0.9]),
@@ -56,36 +72,36 @@ fn error_dialog<'a>(title: &'a str, message: &'a str, details: Option<&'a str>) 
                 container(text(details_str).size(12))
                     .padding(8)
                     .style(|_theme| container::Style {
-                        background: Some(iced::Background::Color(IcedColor::from_rgb(0.15, 0.15, 0.15))),
+                        background: Some(iced::Background::Color(IcedColor::from_rgb(
+                            0.15, 0.15, 0.15,
+                        ))),
                         border: Border {
                             color: IcedColor::from_rgb(0.3, 0.3, 0.3),
                             width: 1.0,
                             radius: 4.0.into(),
                         },
                         ..Default::default()
-                    })
+                    }),
             )
-            .height(Length::Fixed(150.0))
+            .height(Length::Fixed(150.0)),
         );
     }
 
     content = content.push(
-        row![
-            button(text("Close"))
-                .on_press(Message::CloseDialog)
-                .padding([8, 24])
-                .style(|_theme, _status| button::Style {
-                    background: Some(iced::Background::Color(IcedColor::from_rgb(0.3, 0.6, 0.9))),
-                    text_color: IcedColor::from_rgb(1.0, 1.0, 1.0),
-                    border: Border {
-                        radius: 4.0.into(),
-                        ..Default::default()
-                    },
+        row![button(text("Close"))
+            .on_press(Message::CloseDialog)
+            .padding([8, 24])
+            .style(|_theme, _status| button::Style {
+                background: Some(iced::Background::Color(IcedColor::from_rgb(0.3, 0.6, 0.9))),
+                text_color: IcedColor::from_rgb(1.0, 1.0, 1.0),
+                border: Border {
+                    radius: 4.0.into(),
                     ..Default::default()
-                }),
-        ]
+                },
+                ..Default::default()
+            }),]
         .spacing(8)
-        .align_y(Alignment::Center)
+        .align_y(Alignment::Center),
     );
 
     dialog_container(content)
@@ -161,17 +177,29 @@ fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> 
         container(
             column![
                 text("Features:").size(13).color([0.7, 0.8, 0.9]),
-                text("  - Visual configuration for all niri settings").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Window & layer rules with regex pattern matching").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Smart rule consolidation to merge similar rules").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Live preview - changes apply instantly").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Import your existing config automatically").size(12).color([0.7, 0.7, 0.7]),
+                text("  - Visual configuration for all niri settings")
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
+                text("  - Window & layer rules with regex pattern matching")
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
+                text("  - Smart rule consolidation to merge similar rules")
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
+                text("  - Live preview - changes apply instantly")
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
+                text("  - Import your existing config automatically")
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
             ]
             .spacing(4)
         )
         .padding([12, 16])
         .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(0.12, 0.14, 0.18))),
+            background: Some(iced::Background::Color(IcedColor::from_rgb(
+                0.12, 0.14, 0.18
+            ))),
             border: Border {
                 color: IcedColor::from_rgb(0.25, 0.3, 0.4),
                 width: 1.0,
@@ -201,11 +229,9 @@ fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> 
                         text("Some features are not available in your version:")
                             .size(11)
                             .color([0.8, 0.6, 0.3]),
-                        text(feature_list)
-                            .size(11)
-                            .color([0.7, 0.6, 0.4]),
+                        text(feature_list).size(11).color([0.7, 0.6, 0.4]),
                     ]
-                    .spacing(4)
+                    .spacing(4),
                 )
                 .padding([10, 14])
                 .style(|_theme| container::Style {
@@ -216,7 +242,7 @@ fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> 
                         radius: 6.0.into(),
                     },
                     ..Default::default()
-                })
+                }),
             );
         }
     }
@@ -224,7 +250,7 @@ fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> 
     content = content.push(
         text("This wizard will help you set up the application.")
             .size(13)
-            .color([0.6, 0.6, 0.6])
+            .color([0.6, 0.6, 0.6]),
     );
 
     content = content.push(
@@ -245,7 +271,7 @@ fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> 
                     ..Default::default()
                 }),
         ]
-        .spacing(12)
+        .spacing(12),
     );
 
     content
@@ -261,9 +287,11 @@ fn wizard_config_setup<'a>() -> Column<'a, Message> {
             column![
                 text("How it works:").size(13).color([0.7, 0.8, 0.9]),
                 text("1. We create separate .kdl files in a nirify/ subdirectory")
-                    .size(12).color([0.7, 0.7, 0.7]),
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
                 text("2. One include line is added to your config.kdl:")
-                    .size(12).color([0.7, 0.7, 0.7]),
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
                 container(
                     text("include \"nirify/main.kdl\"")
                         .size(11)
@@ -271,13 +299,16 @@ fn wizard_config_setup<'a>() -> Column<'a, Message> {
                 )
                 .padding([4, 12]),
                 text("3. Your original config.kdl stays mostly untouched")
-                    .size(12).color([0.7, 0.7, 0.7]),
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
             ]
             .spacing(6)
         )
         .padding([12, 16])
         .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(0.12, 0.14, 0.12))),
+            background: Some(iced::Background::Color(IcedColor::from_rgb(
+                0.12, 0.14, 0.12
+            ))),
             border: Border {
                 color: IcedColor::from_rgb(0.25, 0.35, 0.25),
                 width: 1.0,
@@ -372,8 +403,8 @@ fn wizard_consolidation<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Colum
             "Found {} rules that could be merged to reduce duplication.",
             total_count
         ))
-            .size(14)
-            .color([0.8, 0.8, 0.8]),
+        .size(14)
+        .color([0.8, 0.8, 0.8]),
         text("Select which suggestions to apply:")
             .size(13)
             .color([0.7, 0.7, 0.7]),
@@ -384,7 +415,11 @@ fn wizard_consolidation<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Colum
     let mut suggestion_list = Column::new().spacing(8);
 
     for (index, suggestion) in suggestions.iter().enumerate() {
-        let rule_type = if suggestion.is_window_rule { "window" } else { "layer" };
+        let rule_type = if suggestion.is_window_rule {
+            "window"
+        } else {
+            "layer"
+        };
         let patterns_preview = if suggestion.patterns.len() <= 3 {
             suggestion.patterns.join(", ")
         } else {
@@ -419,7 +454,7 @@ fn wizard_consolidation<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Colum
                     .width(Length::Fill),
                 ]
                 .spacing(12)
-                .align_y(Alignment::Center)
+                .align_y(Alignment::Center),
             )
             .padding(10)
             .width(Length::Fill)
@@ -431,14 +466,11 @@ fn wizard_consolidation<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Colum
                     radius: 4.0.into(),
                 },
                 ..Default::default()
-            })
+            }),
         );
     }
 
-    content = content.push(
-        scrollable(suggestion_list)
-            .height(Length::Fixed(200.0))
-    );
+    content = content.push(scrollable(suggestion_list).height(Length::Fixed(200.0)));
 
     // Buttons
     content = content.push(
@@ -459,7 +491,7 @@ fn wizard_consolidation<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Colum
                     ..Default::default()
                 }),
         ]
-        .spacing(12)
+        .spacing(12),
     );
 
     content
@@ -474,16 +506,26 @@ fn wizard_complete<'a>() -> Column<'a, Message> {
         container(
             column![
                 text("Tips:").size(13).color([0.7, 0.8, 0.9]),
-                text("  - Changes apply instantly - no need to save manually").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Use Window Rules to customize per-app behavior").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Check Tools > Analyze Rules to consolidate similar rules").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Backups are saved to ~/.config/niri/.nirify-backups/").size(12).color([0.7, 0.7, 0.7]),
+                text("  - Changes apply instantly - no need to save manually")
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
+                text("  - Use Window Rules to customize per-app behavior")
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
+                text("  - Check Tools > Analyze Rules to consolidate similar rules")
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
+                text("  - Backups are saved to ~/.config/niri/.nirify-backups/")
+                    .size(12)
+                    .color([0.7, 0.7, 0.7]),
             ]
             .spacing(4)
         )
         .padding([12, 16])
         .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(0.12, 0.15, 0.12))),
+            background: Some(iced::Background::Color(IcedColor::from_rgb(
+                0.12, 0.15, 0.12
+            ))),
             border: Border {
                 color: IcedColor::from_rgb(0.25, 0.35, 0.25),
                 width: 1.0,
@@ -533,23 +575,25 @@ fn import_summary_dialog<'a>(
                 container(text(warnings_text).size(12))
                     .padding(8)
                     .style(|_theme| container::Style {
-                        background: Some(iced::Background::Color(IcedColor::from_rgb(0.2, 0.15, 0.1))),
+                        background: Some(iced::Background::Color(IcedColor::from_rgb(
+                            0.2, 0.15, 0.1,
+                        ))),
                         border: Border {
                             color: IcedColor::from_rgb(0.5, 0.3, 0.2),
                             width: 1.0,
                             radius: 4.0.into(),
                         },
                         ..Default::default()
-                    })
+                    }),
             )
-            .height(Length::Fixed(150.0))
+            .height(Length::Fixed(150.0)),
         );
     }
 
     content = content.push(
         button(text("Close"))
             .on_press(Message::CloseDialog)
-            .padding([8, 24])
+            .padding([8, 24]),
     );
 
     dialog_container(content)
@@ -566,8 +610,8 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
             "Found {} opportunities to merge similar rules ({} selected)",
             suggestion_count, selected_count
         ))
-            .size(14)
-            .color([0.8, 0.8, 0.8]),
+        .size(14)
+        .color([0.8, 0.8, 0.8]),
         text("Select suggestions to apply:")
             .size(13)
             .color([0.7, 0.7, 0.7]),
@@ -576,7 +620,11 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
 
     // Add suggestion items with checkboxes
     for (index, suggestion) in suggestions.iter().enumerate() {
-        let rule_type = if suggestion.is_window_rule { "window" } else { "layer" };
+        let rule_type = if suggestion.is_window_rule {
+            "window"
+        } else {
+            "layer"
+        };
         let patterns_preview = if suggestion.patterns.len() <= 3 {
             suggestion.patterns.join(", ")
         } else {
@@ -614,7 +662,7 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
                     .width(Length::Fill),
                 ]
                 .spacing(12)
-                .align_y(Alignment::Center)
+                .align_y(Alignment::Center),
             )
             .padding(12)
             .width(Length::Fill)
@@ -626,7 +674,7 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
                     radius: 4.0.into(),
                 },
                 ..Default::default()
-            })
+            }),
         );
     }
 
@@ -666,7 +714,7 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
                 .padding([8, 24]),
             apply_btn,
         ]
-        .spacing(12)
+        .spacing(12),
     );
 
     dialog_container(content)
@@ -684,22 +732,20 @@ fn diff_view_dialog<'a>(title: &'a str, before: &'a str, after: &'a str) -> Elem
             column![
                 text("Before").size(14).color([0.9, 0.5, 0.5]),
                 scrollable(
-                    container(
-                        text(before)
-                            .size(12)
-                            .font(iced::Font::MONOSPACE)
-                    )
-                    .padding(12)
-                    .width(Length::Fill)
-                    .style(|_theme| container::Style {
-                        background: Some(iced::Background::Color(IcedColor::from_rgb(0.12, 0.10, 0.10))),
-                        border: Border {
-                            color: IcedColor::from_rgb(0.4, 0.25, 0.25),
-                            width: 1.0,
-                            radius: 4.0.into(),
-                        },
-                        ..Default::default()
-                    })
+                    container(text(before).size(12).font(iced::Font::MONOSPACE))
+                        .padding(12)
+                        .width(Length::Fill)
+                        .style(|_theme| container::Style {
+                            background: Some(iced::Background::Color(IcedColor::from_rgb(
+                                0.12, 0.10, 0.10
+                            ))),
+                            border: Border {
+                                color: IcedColor::from_rgb(0.4, 0.25, 0.25),
+                                width: 1.0,
+                                radius: 4.0.into(),
+                            },
+                            ..Default::default()
+                        })
                 )
                 .height(Length::Fixed(300.0))
             ]
@@ -709,22 +755,20 @@ fn diff_view_dialog<'a>(title: &'a str, before: &'a str, after: &'a str) -> Elem
             column![
                 text("After").size(14).color([0.5, 0.9, 0.5]),
                 scrollable(
-                    container(
-                        text(after)
-                            .size(12)
-                            .font(iced::Font::MONOSPACE)
-                    )
-                    .padding(12)
-                    .width(Length::Fill)
-                    .style(|_theme| container::Style {
-                        background: Some(iced::Background::Color(IcedColor::from_rgb(0.10, 0.12, 0.10))),
-                        border: Border {
-                            color: IcedColor::from_rgb(0.25, 0.4, 0.25),
-                            width: 1.0,
-                            radius: 4.0.into(),
-                        },
-                        ..Default::default()
-                    })
+                    container(text(after).size(12).font(iced::Font::MONOSPACE))
+                        .padding(12)
+                        .width(Length::Fill)
+                        .style(|_theme| container::Style {
+                            background: Some(iced::Background::Color(IcedColor::from_rgb(
+                                0.10, 0.12, 0.10
+                            ))),
+                            border: Border {
+                                color: IcedColor::from_rgb(0.25, 0.4, 0.25),
+                                width: 1.0,
+                                radius: 4.0.into(),
+                            },
+                            ..Default::default()
+                        })
                 )
                 .height(Length::Fixed(300.0))
             ]
@@ -768,7 +812,9 @@ fn diff_view_dialog<'a>(title: &'a str, before: &'a str, after: &'a str) -> Elem
         .width(Length::Fixed(900.0))
         .max_height(600.0)
         .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(0.18, 0.18, 0.20))),
+            background: Some(iced::Background::Color(IcedColor::from_rgb(
+                0.18, 0.18, 0.20,
+            ))),
             border: Border {
                 color: IcedColor::from_rgb(0.4, 0.4, 0.4),
                 width: 2.0,
@@ -801,7 +847,9 @@ fn dialog_container<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a,
         .width(Length::Fixed(600.0))
         .max_height(700.0)
         .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(0.18, 0.18, 0.20))),
+            background: Some(iced::Background::Color(IcedColor::from_rgb(
+                0.18, 0.18, 0.20,
+            ))),
             border: Border {
                 color: IcedColor::from_rgb(0.4, 0.4, 0.4),
                 width: 2.0,

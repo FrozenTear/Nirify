@@ -5,6 +5,7 @@
 pub mod app;
 pub mod config;
 pub mod constants;
+pub mod ipc;
 pub mod messages;
 pub mod save_manager;
 pub mod search;
@@ -13,7 +14,6 @@ pub mod theme;
 pub mod types;
 pub mod version;
 pub mod views;
-pub mod ipc;
 
 // Re-export config types
 pub use config::{ConfigPaths, DirtyTracker, Settings, SettingsCategory};
