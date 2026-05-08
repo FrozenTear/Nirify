@@ -55,10 +55,7 @@ fn build_results_list(results: &[SearchResult]) -> Element<'static, Message> {
                 ]
                 .spacing(2)
                 .width(Length::Fill),
-                column![
-                    text(page_name).size(10).color([0.5, 0.5, 0.5]),
-                ]
-                .width(Length::Shrink),
+                column![text(page_name).size(10).color([0.5, 0.5, 0.5]),].width(Length::Shrink),
             ]
             .align_y(Alignment::Center)
             .spacing(8)

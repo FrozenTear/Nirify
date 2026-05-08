@@ -10,7 +10,9 @@ use iced::widget::{button, container, row, text, text_input, Id, Row};
 use iced::{Alignment, Element, Length};
 
 use crate::messages::{Message, Page, PageCategory};
-use crate::theme::{fonts, nav_bar_style, nav_tab_style, search_container_style, subnav_bar_style, subnav_tab_style};
+use crate::theme::{
+    fonts, nav_bar_style, nav_tab_style, search_container_style, subnav_bar_style, subnav_tab_style,
+};
 
 /// Stable ID for search input to maintain focus
 pub fn search_input_id() -> Id {
@@ -43,11 +45,11 @@ pub fn primary_nav<'a>(
         // Get first page in category to navigate to
         let target_page = get_first_page_in_category(category);
 
-        let tab = button(
-            text(label)
-                .size(14)
-                .font(if is_active { fonts::UI_FONT_SEMIBOLD } else { fonts::UI_FONT_MEDIUM })
-        )
+        let tab = button(text(label).size(14).font(if is_active {
+            fonts::UI_FONT_SEMIBOLD
+        } else {
+            fonts::UI_FONT_MEDIUM
+        }))
         .on_press(Message::NavigateToPage(target_page))
         .padding([8, 16])
         .style(nav_tab_style(is_active));
@@ -67,30 +69,33 @@ pub fn primary_nav<'a>(
                     .width(Length::Fixed(300.0))
             ]
             .spacing(8)
-            .align_y(Alignment::Center)
+            .align_y(Alignment::Center),
         )
         .padding([6, 12])
         .style(search_container_style);
 
         row![tabs]
-            .push(container(search).width(Length::Fill).align_x(iced::alignment::Horizontal::Right))
+            .push(
+                container(search)
+                    .width(Length::Fill)
+                    .align_x(iced::alignment::Horizontal::Right),
+            )
             .align_y(Alignment::Center)
     } else {
         // Search button (opens search modal on Ctrl+K or click)
         let search_btn = button(
-            row![
-                text("🔍").size(14),
-                text("Search").size(13),
-            ]
-            .spacing(6)
-            .align_y(Alignment::Center)
+            row![text("🔍").size(14), text("Search").size(13),]
+                .spacing(6)
+                .align_y(Alignment::Center),
         )
         .on_press(Message::ToggleSearch)
         .padding([6, 12])
         .style(|theme: &iced::Theme, status| {
             let mut style = search_container_style(theme);
             if matches!(status, iced::widget::button::Status::Hovered) {
-                style.background = Some(iced::Background::Color(iced::Color::from_rgba(0.25, 0.25, 0.25, 0.9)));
+                style.background = Some(iced::Background::Color(iced::Color::from_rgba(
+                    0.25, 0.25, 0.25, 0.9,
+                )));
             }
             iced::widget::button::Style {
                 background: style.background,
@@ -105,7 +110,7 @@ pub fn primary_nav<'a>(
                 container(search_btn)
                     .width(Length::Fill)
                     .align_x(iced::alignment::Horizontal::Right)
-                    .padding([0, 12])
+                    .padding([0, 12]),
             )
             .align_y(Alignment::Center)
     };
@@ -126,11 +131,11 @@ pub fn secondary_nav(current_page: Page) -> Element<'static, Message> {
     for &page in pages_in_category {
         let is_active = page == current_page;
 
-        let tab = button(
-            text(page.name())
-                .size(13)
-                .font(if is_active { fonts::UI_FONT_MEDIUM } else { fonts::UI_FONT })
-        )
+        let tab = button(text(page.name()).size(13).font(if is_active {
+            fonts::UI_FONT_MEDIUM
+        } else {
+            fonts::UI_FONT
+        }))
         .on_press(Message::NavigateToPage(page))
         .padding([6, 12])
         .style(subnav_tab_style(is_active));
@@ -149,7 +154,7 @@ fn get_first_page_in_category(category: PageCategory) -> Page {
     match category {
         PageCategory::System => Page::Overview,
         PageCategory::Visual => Page::Appearance,
-        PageCategory::Input => Page::Keyboard,
+        PageCategory::Input => Page::Keybindings,
         PageCategory::Layout => Page::LayoutExtras,
         PageCategory::Rules => Page::WindowRules,
         PageCategory::Advanced => Page::Debug,
@@ -159,6 +164,8 @@ fn get_first_page_in_category(category: PageCategory) -> Page {
 /// Const arrays of pages per category (avoids runtime allocation)
 const SYSTEM_PAGES: &[Page] = &[
     Page::Overview,
+    Page::Outputs,
+    Page::Miscellaneous,
     Page::Startup,
     Page::Environment,
     Page::Tools,
@@ -169,6 +176,7 @@ const SYSTEM_PAGES: &[Page] = &[
 
 const VISUAL_PAGES: &[Page] = &[
     Page::Appearance,
+    Page::Behavior,
     Page::Animations,
     Page::Cursor,
 ];
@@ -185,24 +193,11 @@ const INPUT_PAGES: &[Page] = &[
     Page::Gestures,
 ];
 
-const LAYOUT_PAGES: &[Page] = &[
-    Page::LayoutExtras,
-    Page::Workspaces,
-    Page::Outputs,
-];
+const LAYOUT_PAGES: &[Page] = &[Page::LayoutExtras, Page::Workspaces];
 
-const RULES_PAGES: &[Page] = &[
-    Page::WindowRules,
-    Page::LayerRules,
-];
+const RULES_PAGES: &[Page] = &[Page::WindowRules, Page::LayerRules];
 
-const ADVANCED_PAGES: &[Page] = &[
-    Page::Debug,
-    Page::Behavior,
-    Page::Miscellaneous,
-    Page::SwitchEvents,
-    Page::RecentWindows,
-];
+const ADVANCED_PAGES: &[Page] = &[Page::Debug, Page::SwitchEvents, Page::RecentWindows];
 
 /// Helper: Get all pages in a category (uses const arrays, no allocation)
 fn get_pages_in_category(category: PageCategory) -> &'static [Page] {

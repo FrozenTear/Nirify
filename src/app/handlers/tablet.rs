@@ -1,14 +1,13 @@
 //! Tablet settings message handler
 
 use crate::config::SettingsCategory;
-use crate::messages::{TabletMessage, Message};
+use crate::messages::{Message, TabletMessage};
 use crate::views::widgets::format_matrix_values;
 use iced::Task;
 
 impl super::super::App {
     /// Handle tablet settings messages
     pub(in crate::app) fn update_tablet(&mut self, msg: TabletMessage) -> Task<Message> {
-        
         let tablet = &mut self.settings.tablet;
 
         match msg {
@@ -26,7 +25,8 @@ impl super::super::App {
                     self.ui.tablet_calibration_cache[idx] = value.clone();
                     // Parse and update actual matrix
                     if let Ok(val) = value.parse::<f64>() {
-                        let matrix = tablet.calibration_matrix
+                        let matrix = tablet
+                            .calibration_matrix
                             .get_or_insert([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
                         matrix[idx] = val;
                     }
@@ -39,9 +39,8 @@ impl super::super::App {
             }
             TabletMessage::ResetCalibration => {
                 tablet.calibration_matrix = Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
-                self.ui.tablet_calibration_cache = format_matrix_values(
-                    Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
-                );
+                self.ui.tablet_calibration_cache =
+                    format_matrix_values(Some([1.0, 0.0, 0.0, 0.0, 1.0, 0.0]));
             }
         }
 

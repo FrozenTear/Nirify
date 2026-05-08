@@ -162,7 +162,14 @@ fn bench_save_load(c: &mut Criterion) {
         let paths = create_test_paths(dir.path());
         let settings = Settings::default();
 
-        b.iter(|| save_settings(black_box(&paths), black_box(&settings), FeatureCompat::all_enabled()).unwrap())
+        b.iter(|| {
+            save_settings(
+                black_box(&paths),
+                black_box(&settings),
+                FeatureCompat::all_enabled(),
+            )
+            .unwrap()
+        })
     });
 
     // Load all settings
@@ -185,7 +192,15 @@ fn bench_save_load(c: &mut Criterion) {
         let mut dirty = HashSet::new();
         dirty.insert(SettingsCategory::Appearance);
 
-        b.iter(|| save_dirty(black_box(&paths), black_box(&settings), black_box(&dirty), FeatureCompat::all_enabled()).unwrap())
+        b.iter(|| {
+            save_dirty(
+                black_box(&paths),
+                black_box(&settings),
+                black_box(&dirty),
+                FeatureCompat::all_enabled(),
+            )
+            .unwrap()
+        })
     });
 
     // Save multiple dirty categories
@@ -200,7 +215,15 @@ fn bench_save_load(c: &mut Criterion) {
         dirty.insert(SettingsCategory::Mouse);
         dirty.insert(SettingsCategory::Keyboard);
 
-        b.iter(|| save_dirty(black_box(&paths), black_box(&settings), black_box(&dirty), FeatureCompat::all_enabled()).unwrap())
+        b.iter(|| {
+            save_dirty(
+                black_box(&paths),
+                black_box(&settings),
+                black_box(&dirty),
+                FeatureCompat::all_enabled(),
+            )
+            .unwrap()
+        })
     });
 
     group.finish();

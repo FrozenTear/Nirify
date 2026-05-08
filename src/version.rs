@@ -70,7 +70,10 @@ impl NiriFeature {
     /// Get the minimum niri version required for this feature
     pub fn min_version(&self) -> NiriVersion {
         match self {
-            Self::RecentWindows => NiriVersion { major: 25, minor: 11 },
+            Self::RecentWindows => NiriVersion {
+                major: 25,
+                minor: 11,
+            },
         }
     }
 
@@ -152,9 +155,18 @@ mod tests {
 
     #[test]
     fn test_version_comparison() {
-        let v25_08 = NiriVersion { major: 25, minor: 8 };
-        let v25_11 = NiriVersion { major: 25, minor: 11 };
-        let v26_00 = NiriVersion { major: 26, minor: 0 };
+        let v25_08 = NiriVersion {
+            major: 25,
+            minor: 8,
+        };
+        let v25_11 = NiriVersion {
+            major: 25,
+            minor: 11,
+        };
+        let v26_00 = NiriVersion {
+            major: 26,
+            minor: 0,
+        };
 
         assert!(v25_08 < v25_11);
         assert!(v25_11 < v26_00);
@@ -168,8 +180,14 @@ mod tests {
 
     #[test]
     fn test_feature_support() {
-        let v25_08 = NiriVersion { major: 25, minor: 8 };
-        let v25_11 = NiriVersion { major: 25, minor: 11 };
+        let v25_08 = NiriVersion {
+            major: 25,
+            minor: 8,
+        };
+        let v25_11 = NiriVersion {
+            major: 25,
+            minor: 11,
+        };
 
         assert!(!NiriFeature::RecentWindows.is_supported_by(v25_08));
         assert!(NiriFeature::RecentWindows.is_supported_by(v25_11));
@@ -177,18 +195,27 @@ mod tests {
 
     #[test]
     fn test_get_unsupported_features() {
-        let v25_08 = NiriVersion { major: 25, minor: 8 };
+        let v25_08 = NiriVersion {
+            major: 25,
+            minor: 8,
+        };
         let unsupported = get_unsupported_features(v25_08);
         assert!(unsupported.contains(&NiriFeature::RecentWindows));
 
-        let v25_11 = NiriVersion { major: 25, minor: 11 };
+        let v25_11 = NiriVersion {
+            major: 25,
+            minor: 11,
+        };
         let unsupported = get_unsupported_features(v25_11);
         assert!(unsupported.is_empty());
     }
 
     #[test]
     fn test_display() {
-        let v = NiriVersion { major: 25, minor: 8 };
+        let v = NiriVersion {
+            major: 25,
+            minor: 8,
+        };
         assert_eq!(v.to_string(), "25.08");
     }
 }

@@ -1,12 +1,12 @@
-//! Animations settings view with custom GLSL shader support
+//! Animations settings view — neon modal style
 
-use iced::widget::{button, column, container, pick_list, row, scrollable, text};
-use iced::{Element, Length};
+use iced::widget::{button, column, container, pick_list, row, scrollable, text, Space};
+use iced::{Alignment, Element, Length};
 
-use super::widgets::*;
+use super::widgets::toggle_row;
 use crate::config::models::{AnimationId, AnimationSettings, AnimationType, SingleAnimationConfig};
 use crate::messages::{AnimationsMessage, Message};
-use crate::theme::fonts;
+use crate::theme::{fonts, neon};
 
 /// Animation type options for the dropdown
 const ANIMATION_TYPES: [&str; 5] = ["Default", "Off", "Spring", "Easing", "Custom Shader"];
@@ -17,53 +17,124 @@ pub fn view(settings: &AnimationSettings) -> Element<'_, Message> {
     let slowdown_enabled = (settings.slowdown - 1.0).abs() > 0.01;
 
     let content = column![
-        page_title("Animations"),
-        info_text(
-            "Configure niri's window and workspace animations. Each animation can use spring physics, \
-             easing curves, or custom GLSL shaders."
-        ),
-        subsection_header("Global Settings"),
-        toggle_row(
-            "Enable slowdown",
-            "Slow down all animations for debugging or effect",
-            slowdown_enabled,
-            |enabled| Message::Animations(AnimationsMessage::ToggleSlowdown(enabled)),
-        ),
+        // ── GLOBAL SETTINGS ──
+        modal_section("\u{26A1}", "GLOBAL SETTINGS", neon::PRIMARY),
+        Space::new().height(4),
+        container(
+            column![toggle_row(
+                "Enable slowdown",
+                "Slow down all animations for debugging or effect",
+                slowdown_enabled,
+                |enabled| Message::Animations(AnimationsMessage::ToggleSlowdown(enabled)),
+            ),]
+            .spacing(0),
+        )
+        .padding(8)
+        .style(crate::theme::card_style),
         if slowdown_enabled {
-            slider_row(
-                "Slowdown factor",
-                "How much to slow down animations",
+            styled_slider(
+                "SLOWDOWN FACTOR",
+                &format!("{:.1}x", settings.slowdown),
+                1.0..=10.0,
                 settings.slowdown as f32,
-                1.0,
-                10.0,
-                "x",
-                |value| Message::Animations(AnimationsMessage::SetSlowdownFactor(value)),
+                0.1,
+                |v| Message::Animations(AnimationsMessage::SetSlowdownFactor(v)),
             )
         } else {
             column![].into()
         },
-        subsection_header("Window Animations (Shader Support)"),
-        info_text(
-            "These animations support custom GLSL shaders for advanced visual effects."
-        ),
-        animation_card("window-open", AnimationId::WindowOpen, &settings.per_animation.window_open, true),
-        animation_card("window-close", AnimationId::WindowClose, &settings.per_animation.window_close, true),
-        animation_card("window-resize", AnimationId::WindowResize, &settings.per_animation.window_resize, true),
-        subsection_header("Other Animations"),
-        animation_card("workspace-switch", AnimationId::WorkspaceSwitch, &settings.per_animation.workspace_switch, false),
-        animation_card("window-movement", AnimationId::WindowMovement, &settings.per_animation.window_movement, false),
-        animation_card("horizontal-view", AnimationId::HorizontalViewMovement, &settings.per_animation.horizontal_view_movement, false),
-        animation_card("overview", AnimationId::Overview, &settings.per_animation.overview_open_close, false),
-        animation_card("config-notification", AnimationId::ConfigNotification, &settings.per_animation.config_notification_open_close, false),
-        animation_card("exit-confirmation", AnimationId::ExitConfirmation, &settings.per_animation.exit_confirmation_open_close, false),
-        animation_card("screenshot-ui", AnimationId::ScreenshotUi, &settings.per_animation.screenshot_ui_open, false),
-        animation_card("recent-windows", AnimationId::RecentWindows, &settings.per_animation.recent_windows_close, false),
-        spacer(32.0),
+        Space::new().height(12),
+        // ── 2-COLUMN: WINDOW ANIMS (SHADER) | OTHER ANIMS ──
+        row![
+            // Left: Window Animations (support custom shaders)
+            column![
+                modal_section("\u{25A3}", "WINDOW ANIMATIONS", neon::SECONDARY),
+                Space::new().height(4),
+                animation_card(
+                    "window-open",
+                    AnimationId::WindowOpen,
+                    &settings.per_animation.window_open,
+                    true,
+                ),
+                animation_card(
+                    "window-close",
+                    AnimationId::WindowClose,
+                    &settings.per_animation.window_close,
+                    true,
+                ),
+                animation_card(
+                    "window-resize",
+                    AnimationId::WindowResize,
+                    &settings.per_animation.window_resize,
+                    true,
+                ),
+            ]
+            .spacing(6)
+            .width(Length::FillPortion(1)),
+            // Right: Other Animations
+            column![
+                modal_section("\u{25CE}", "OTHER ANIMATIONS", neon::TERTIARY),
+                Space::new().height(4),
+                animation_card(
+                    "workspace-switch",
+                    AnimationId::WorkspaceSwitch,
+                    &settings.per_animation.workspace_switch,
+                    false,
+                ),
+                animation_card(
+                    "window-movement",
+                    AnimationId::WindowMovement,
+                    &settings.per_animation.window_movement,
+                    false,
+                ),
+                animation_card(
+                    "horizontal-view",
+                    AnimationId::HorizontalViewMovement,
+                    &settings.per_animation.horizontal_view_movement,
+                    false,
+                ),
+                animation_card(
+                    "overview",
+                    AnimationId::Overview,
+                    &settings.per_animation.overview_open_close,
+                    false,
+                ),
+                animation_card(
+                    "config-notification",
+                    AnimationId::ConfigNotification,
+                    &settings.per_animation.config_notification_open_close,
+                    false,
+                ),
+                animation_card(
+                    "exit-confirmation",
+                    AnimationId::ExitConfirmation,
+                    &settings.per_animation.exit_confirmation_open_close,
+                    false,
+                ),
+                animation_card(
+                    "screenshot-ui",
+                    AnimationId::ScreenshotUi,
+                    &settings.per_animation.screenshot_ui_open,
+                    false,
+                ),
+                animation_card(
+                    "recent-windows",
+                    AnimationId::RecentWindows,
+                    &settings.per_animation.recent_windows_close,
+                    false,
+                ),
+            ]
+            .spacing(6)
+            .width(Length::FillPortion(1)),
+        ]
+        .spacing(32)
+        .align_y(Alignment::Start),
     ]
-    .spacing(4);
+    .spacing(0)
+    .width(Length::Fill);
 
-    scrollable(container(content).padding(20).width(iced::Length::Fill))
-        .height(iced::Length::Fill)
+    scrollable(container(content).padding(8).width(Length::Fill))
+        .height(Length::Fill)
         .into()
 }
 
@@ -91,32 +162,29 @@ fn animation_card<'a>(
     let selected_type = type_options.get(type_index).copied();
 
     let name_owned = name.to_string();
-    let type_selector = pick_list(
-        type_options,
-        selected_type,
-        move |selected: &str| {
-            let idx = match selected {
-                "Default" => 0,
-                "Off" => 1,
-                "Spring" => 2,
-                "Easing" => 3,
-                "Custom Shader" => 4,
-                _ => 0,
-            };
-            Message::Animations(AnimationsMessage::SetAnimationType(name_owned.clone(), idx))
-        },
-    )
-    .width(Length::Fixed(150.0));
+    let type_selector = pick_list(type_options, selected_type, move |selected: &str| {
+        let idx = match selected {
+            "Default" => 0,
+            "Off" => 1,
+            "Spring" => 2,
+            "Easing" => 3,
+            "Custom Shader" => 4,
+            _ => 0,
+        };
+        Message::Animations(AnimationsMessage::SetAnimationType(name_owned.clone(), idx))
+    })
+    .width(Length::Fixed(140.0));
 
-    let mut card_content = column![
-        row![
-            text(id.name()).size(14).font(fonts::UI_FONT_SEMIBOLD),
-            container(type_selector).width(Length::Fill).align_x(iced::alignment::Horizontal::Right),
-        ]
-        .spacing(12)
-        .align_y(iced::Alignment::Center),
+    let mut card_content = column![row![
+        text(id.name())
+            .size(12)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(neon::ON_SURFACE),
+        Space::new().width(Length::Fill),
+        type_selector,
     ]
-    .spacing(8);
+    .align_y(Alignment::Center),]
+    .spacing(6);
 
     // Show parameters based on animation type
     match config.animation_type {
@@ -125,57 +193,94 @@ fn animation_card<'a>(
             let name_ep = name.to_string();
             card_content = card_content
                 .push(
-                    row![
-                        text("Damping ratio:").size(12),
-                        text(format!("{:.2}", config.spring.damping_ratio)).size(12).font(fonts::MONO_FONT),
+                    column![
+                        row![
+                            text("DAMPING RATIO")
+                                .size(10)
+                                .font(fonts::UI_FONT_SEMIBOLD)
+                                .color(neon::OUTLINE_VARIANT),
+                            Space::new().width(Length::Fill),
+                            text(format!("{:.2}", config.spring.damping_ratio))
+                                .size(11)
+                                .font(fonts::MONO_FONT)
+                                .color(neon::SECONDARY),
+                        ]
+                        .align_y(Alignment::Center),
+                        iced::widget::slider(
+                            0.1..=2.0,
+                            config.spring.damping_ratio as f32,
+                            move |v| {
+                                Message::Animations(
+                                    AnimationsMessage::SetAnimationSpringDampingRatio(
+                                        name_dr.clone(),
+                                        v,
+                                    ),
+                                )
+                            }
+                        )
+                        .width(Length::Fill),
                     ]
-                    .spacing(8),
+                    .spacing(4),
                 )
                 .push(
-                    iced::widget::slider(0.1..=2.0, config.spring.damping_ratio as f32, move |v| {
-                        Message::Animations(AnimationsMessage::SetAnimationSpringDampingRatio(
-                            name_dr.clone(),
-                            v,
-                        ))
-                    })
-                    .width(Length::Fill),
-                )
-                .push(
-                    row![
-                        text("Epsilon:").size(12),
-                        text(format!("{:.4}", config.spring.epsilon)).size(12).font(fonts::MONO_FONT),
+                    column![
+                        row![
+                            text("EPSILON")
+                                .size(10)
+                                .font(fonts::UI_FONT_SEMIBOLD)
+                                .color(neon::OUTLINE_VARIANT),
+                            Space::new().width(Length::Fill),
+                            text(format!("{:.4}", config.spring.epsilon))
+                                .size(11)
+                                .font(fonts::MONO_FONT)
+                                .color(neon::SECONDARY),
+                        ]
+                        .align_y(Alignment::Center),
+                        iced::widget::slider(
+                            0.0001..=0.01,
+                            config.spring.epsilon as f32,
+                            move |v| {
+                                Message::Animations(AnimationsMessage::SetAnimationSpringEpsilon(
+                                    name_ep.clone(),
+                                    v,
+                                ))
+                            }
+                        )
+                        .width(Length::Fill),
                     ]
-                    .spacing(8),
-                )
-                .push(
-                    iced::widget::slider(0.0001..=0.01, config.spring.epsilon as f32, move |v| {
-                        Message::Animations(AnimationsMessage::SetAnimationSpringEpsilon(
-                            name_ep.clone(),
-                            v,
-                        ))
-                    })
-                    .width(Length::Fill),
+                    .spacing(4),
                 );
         }
         AnimationType::Easing => {
             let name_dur = name.to_string();
-            card_content = card_content
-                .push(
+            card_content = card_content.push(
+                column![
                     row![
-                        text("Duration:").size(12),
-                        text(format!("{} ms", config.easing.duration_ms)).size(12).font(fonts::MONO_FONT),
+                        text("DURATION")
+                            .size(10)
+                            .font(fonts::UI_FONT_SEMIBOLD)
+                            .color(neon::OUTLINE_VARIANT),
+                        Space::new().width(Length::Fill),
+                        text(format!("{} ms", config.easing.duration_ms))
+                            .size(11)
+                            .font(fonts::MONO_FONT)
+                            .color(neon::SECONDARY),
                     ]
-                    .spacing(8),
-                )
-                .push(
-                    iced::widget::slider(50.0..=2000.0, config.easing.duration_ms as f32, move |v| {
-                        Message::Animations(AnimationsMessage::SetAnimationDuration(
-                            name_dur.clone(),
-                            v as i32,
-                        ))
-                    })
+                    .align_y(Alignment::Center),
+                    iced::widget::slider(
+                        50.0..=2000.0,
+                        config.easing.duration_ms as f32,
+                        move |v| {
+                            Message::Animations(AnimationsMessage::SetAnimationDuration(
+                                name_dur.clone(),
+                                v as i32,
+                            ))
+                        }
+                    )
                     .width(Length::Fill),
-                );
+                ]
+                .spacing(4),
+            );
         }
         AnimationType::CustomShader if supports_shader => {
             let shader_code = config.custom_shader.clone().unwrap_or_default();
@@ -184,40 +289,45 @@ fn animation_card<'a>(
             let name_clear = name.to_string();
 
             card_content = card_content
-                .push(spacer(8.0))
                 .push(
                     row![
-                        text("GLSL Code:").size(12).font(fonts::UI_FONT_SEMIBOLD),
-                        container(
-                            row![
-                                button(text("Insert Template").size(11))
-                                    .on_press(Message::Animations(AnimationsMessage::InsertShaderTemplate(name_template)))
-                                    .padding([4, 8]),
-                                button(text("Clear").size(11))
-                                    .on_press(Message::Animations(AnimationsMessage::ClearCustomShader(name_clear)))
-                                    .padding([4, 8]),
-                            ]
-                            .spacing(4)
-                        )
-                        .width(Length::Fill)
-                        .align_x(iced::alignment::Horizontal::Right),
+                        text("GLSL CODE")
+                            .size(10)
+                            .font(fonts::UI_FONT_SEMIBOLD)
+                            .color(neon::OUTLINE_VARIANT),
+                        Space::new().width(Length::Fill),
+                        button(text("Template").size(10).font(fonts::UI_FONT_SEMIBOLD))
+                            .on_press(Message::Animations(
+                                AnimationsMessage::InsertShaderTemplate(name_template),
+                            ))
+                            .padding([3, 8]),
+                        button(text("Clear").size(10).font(fonts::UI_FONT_SEMIBOLD))
+                            .on_press(Message::Animations(AnimationsMessage::ClearCustomShader(
+                                name_clear
+                            ),))
+                            .padding([3, 8]),
                     ]
-                    .spacing(8)
-                    .align_y(iced::Alignment::Center),
+                    .spacing(4)
+                    .align_y(Alignment::Center),
                 )
                 .push(
                     container(
                         iced::widget::text_input("Enter GLSL shader code...", &shader_code)
                             .on_input(move |code| {
-                                Message::Animations(AnimationsMessage::SetCustomShader(name_shader.clone(), code))
+                                Message::Animations(AnimationsMessage::SetCustomShader(
+                                    name_shader.clone(),
+                                    code,
+                                ))
                             })
                             .font(fonts::MONO_FONT)
-                            .size(12)
+                            .size(11)
                             .padding(8)
-                            .width(Length::Fill)
+                            .width(Length::Fill),
                     )
                     .style(|_theme| container::Style {
-                        background: Some(iced::Background::Color(iced::Color::from_rgb(0.1, 0.1, 0.12))),
+                        background: Some(iced::Background::Color(iced::Color::from_rgb(
+                            0.1, 0.1, 0.12,
+                        ))),
                         border: iced::Border {
                             color: iced::Color::from_rgb(0.3, 0.3, 0.35),
                             width: 1.0,
@@ -227,9 +337,9 @@ fn animation_card<'a>(
                     }),
                 )
                 .push(
-                    text("Note: Custom shaders have no backwards compatibility guarantee from niri.")
-                        .size(11)
-                        .color([0.6, 0.5, 0.4]),
+                    text("Note: Custom shaders have no backwards compatibility guarantee.")
+                        .size(10)
+                        .color(neon::OUTLINE_VARIANT),
                 );
         }
         _ => {}
@@ -238,14 +348,64 @@ fn animation_card<'a>(
     container(card_content)
         .padding(12)
         .width(Length::Fill)
-        .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(iced::Color::from_rgb(0.12, 0.12, 0.14))),
-            border: iced::Border {
-                color: iced::Color::from_rgb(0.2, 0.2, 0.25),
-                width: 1.0,
-                radius: 8.0.into(),
-            },
-            ..Default::default()
-        })
+        .style(crate::theme::card_style)
         .into()
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+fn modal_section<'a>(icon: &'a str, label: &'a str, accent: iced::Color) -> Element<'a, Message> {
+    row![
+        text(icon).size(14).color(accent),
+        Space::new().width(6),
+        text(label)
+            .size(11)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(accent),
+        Space::new().width(12),
+        container(Space::new().width(Length::Fill).height(1))
+            .width(Length::Fill)
+            .style(move |_: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(iced::Color { a: 0.25, ..accent })),
+                ..Default::default()
+            }),
+    ]
+    .spacing(0)
+    .align_y(Alignment::Center)
+    .padding([14, 0])
+    .into()
+}
+
+fn styled_slider<'a>(
+    label: &'a str,
+    display: &str,
+    range: std::ops::RangeInclusive<f32>,
+    value: f32,
+    step: f32,
+    on_slide: impl Fn(f32) -> Message + 'a,
+) -> Element<'a, Message> {
+    let d = display.to_string();
+    container(
+        column![
+            row![
+                text(label)
+                    .size(10)
+                    .font(fonts::UI_FONT_SEMIBOLD)
+                    .color(neon::OUTLINE_VARIANT),
+                Space::new().width(Length::Fill),
+                text(d)
+                    .size(11)
+                    .font(fonts::MONO_FONT)
+                    .color(neon::SECONDARY),
+            ]
+            .align_y(Alignment::Center),
+            iced::widget::slider(range, value, on_slide)
+                .step(step)
+                .width(Length::Fill),
+        ]
+        .spacing(4),
+    )
+    .padding(12)
+    .style(crate::theme::card_style)
+    .into()
 }

@@ -14,8 +14,8 @@ use common::create_test_paths;
 use nirify::config::{
     load_settings, save_dirty, save_settings, DirtyTracker, Settings, SettingsCategory,
 };
-use nirify::version::FeatureCompat;
 use nirify::constants::*;
+use nirify::version::FeatureCompat;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -99,7 +99,8 @@ fn test_save_dirty_single_category() {
     let mut dirty = HashSet::new();
     dirty.insert(SettingsCategory::Appearance);
 
-    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("save_dirty failed");
+    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled())
+        .expect("save_dirty failed");
     assert_eq!(files_written, 1, "Should write exactly 1 file");
 
     // Verify the change persisted
@@ -127,7 +128,8 @@ fn test_save_dirty_multiple_categories() {
     dirty.insert(SettingsCategory::Cursor);
     dirty.insert(SettingsCategory::Keyboard);
 
-    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("save_dirty failed");
+    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled())
+        .expect("save_dirty failed");
     assert_eq!(files_written, 3, "Should write exactly 3 files");
 
     // Verify all changes persisted
@@ -148,7 +150,8 @@ fn test_save_dirty_empty() {
 
     // Empty dirty set
     let dirty = HashSet::new();
-    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("save_dirty failed");
+    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled())
+        .expect("save_dirty failed");
     assert_eq!(files_written, 0, "Should write 0 files for empty dirty set");
 }
 
@@ -175,7 +178,8 @@ fn test_dirty_tracker_save_integration() {
     assert_eq!(dirty.len(), 2);
 
     // Save dirty categories
-    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("save_dirty failed");
+    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled())
+        .expect("save_dirty failed");
     assert_eq!(files_written, 2);
 
     // Tracker should be empty now

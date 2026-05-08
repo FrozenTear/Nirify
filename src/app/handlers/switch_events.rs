@@ -1,13 +1,15 @@
 //! Switch events settings message handler
 
 use crate::config::SettingsCategory;
-use crate::messages::{SwitchEventsMessage, Message};
+use crate::messages::{Message, SwitchEventsMessage};
 use iced::Task;
 
 impl super::super::App {
     /// Handle switch events settings messages
-    pub(in crate::app) fn update_switch_events(&mut self, msg: SwitchEventsMessage) -> Task<Message> {
-        
+    pub(in crate::app) fn update_switch_events(
+        &mut self,
+        msg: SwitchEventsMessage,
+    ) -> Task<Message> {
         let switch = &mut self.settings.switch_events;
 
         // Helper to parse command string into Vec<String>

@@ -1,75 +1,80 @@
-//! Sidebar navigation component
+//! Sidebar navigation component — redesigned with 7 screens + gear
 
-use iced::widget::{button, container, scrollable, text, Column};
+use iced::widget::{button, column, container, text, Column, Space};
 use iced::{Element, Length};
 
-use crate::messages::{Message, Page, PageCategory};
+use crate::messages::{Message, Screen};
+use crate::theme::{fonts, sidebar_item_style, sidebar_style};
 
 /// Creates the sidebar navigation UI
-pub fn view(current_page: Page) -> Element<'static, Message> {
-    let mut sidebar = Column::new()
-        .spacing(8)
-        .padding(12)
-        .width(Length::Fixed(220.0));
+pub fn view(current_screen: Screen) -> Element<'static, Message> {
+    let mut items = Column::new().spacing(4).padding([16, 12]);
 
-    // Group pages by category
-    for category in &[
-        PageCategory::System,
-        PageCategory::Visual,
-        PageCategory::Input,
-        PageCategory::Layout,
-        PageCategory::Rules,
-        PageCategory::Advanced,
-    ] {
-        // Category header
-        sidebar = sidebar.push(
-            text(category.name())
-                .size(12)
-                .color([0.75, 0.75, 0.75])
-        );
+    // App title
+    items = items.push(
+        column![
+            text("Nirify").size(20).font(fonts::UI_FONT_SEMIBOLD),
+            text("Window Manager")
+                .size(11)
+                .font(fonts::UI_FONT)
+                .color([0.5, 0.5, 0.55]),
+        ]
+        .spacing(2)
+        .padding([0, 8]),
+    );
 
-        // Pages in this category
-        for page in pages_in_category(*category) {
-            let is_active = current_page == page;
+    items = items.push(Space::new().height(16));
 
-            let btn = button(text(page.name()).size(14))
-                .on_press(Message::NavigateToPage(page))
-                .width(Length::Fill)
-                .style(if is_active {
-                    button::primary
-                } else {
-                    button::secondary
-                });
+    // Main screen items
+    for screen in Screen::sidebar_items() {
+        let is_active = current_screen == *screen;
 
-            sidebar = sidebar.push(btn);
-        }
+        let btn = button(text(screen.name()).size(14).font(if is_active {
+            fonts::UI_FONT_MEDIUM
+        } else {
+            fonts::UI_FONT
+        }))
+        .on_press(Message::NavigateToScreen(*screen))
+        .width(Length::Fill)
+        .padding([10, 16])
+        .style(sidebar_item_style(is_active));
 
-        // Spacer between categories
-        sidebar = sidebar.push(container(text("")).height(Length::Fixed(8.0)));
+        items = items.push(btn);
     }
 
-    scrollable(sidebar).into()
-}
+    // Spacer to push gear to bottom
+    items = items.push(Space::new().height(Length::Fill));
 
-/// Returns all pages in a given category
-fn pages_in_category(category: PageCategory) -> Vec<Page> {
-    use Page::*;
+    // Separator line
+    items = items.push(container(Space::new().height(1)).width(Length::Fill).style(
+        |theme: &iced::Theme| {
+            let bg = theme.palette().background;
+            container::Style {
+                background: Some(iced::Background::Color(crate::theme::lighten_pub(bg, 0.10))),
+                ..Default::default()
+            }
+        },
+    ));
 
-    match category {
-        PageCategory::System => vec![Overview, Outputs, Miscellaneous, Startup, Environment],
-        PageCategory::Visual => vec![Appearance, Behavior, Animations, Cursor],
-        PageCategory::Input => vec![
-            Keyboard,
-            Mouse,
-            Touchpad,
-            Trackpoint,
-            Trackball,
-            Tablet,
-            Touch,
-            Keybindings,
-        ],
-        PageCategory::Layout => vec![LayoutExtras, Gestures, Workspaces],
-        PageCategory::Rules => vec![WindowRules, LayerRules],
-        PageCategory::Advanced => vec![Debug, SwitchEvents, RecentWindows],
-    }
+    items = items.push(Space::new().height(4));
+
+    // Gear/Settings button
+    let gear_active = current_screen == Screen::Gear;
+    items = items.push(
+        button(text("Settings").size(14).font(if gear_active {
+            fonts::UI_FONT_MEDIUM
+        } else {
+            fonts::UI_FONT
+        }))
+        .on_press(Message::NavigateToScreen(Screen::Gear))
+        .width(Length::Fill)
+        .padding([10, 16])
+        .style(sidebar_item_style(gear_active)),
+    );
+
+    container(items)
+        .width(Length::Fixed(220.0))
+        .height(Length::Fill)
+        .style(sidebar_style)
+        .into()
 }

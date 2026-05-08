@@ -34,13 +34,19 @@
 
 use iced::widget::text_editor;
 
-use crate::types::{AccelProfile, CenterFocusedColumn, ClickMethod, ModKey, ScrollMethod, TapButtonMap, WarpMouseMode};
 use crate::config::ColumnWidthType;
+use crate::types::{
+    AccelProfile, CenterFocusedColumn, ClickMethod, ModKey, ScrollMethod, TapButtonMap,
+    WarpMouseMode,
+};
 use crate::views::widgets::GradientPickerMessage;
 
 /// Root message enum - all possible application events
 #[derive(Debug, Clone)]
 pub enum Message {
+    /// No-op message (used when text parse fails in slider inputs)
+    NoOp,
+
     // ═══════════════════════════════════════════════════════════════════════════
     // Navigation & UI
     // ═══════════════════════════════════════════════════════════════════════════
@@ -152,6 +158,32 @@ pub enum Message {
     ClearToast,
     /// No-op message (for optional callbacks that don't need action)
     None,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Redesign Navigation
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Navigate to a redesigned screen
+    NavigateToScreen(Screen),
+    /// Change sub-tab within the Input screen (legacy)
+    SetInputSubTab(InputSubTab),
+    /// Open a section editor modal (Layout/Visuals/System)
+    OpenSectionEditor(EditableSection),
+    /// Close the section editor modal
+    CloseSectionEditor,
+    /// Open a device editor modal
+    OpenDeviceEditor(EditableDevice),
+    /// Close the device editor modal
+    CloseDeviceEditor,
+    /// Open a keybinding editor modal
+    OpenKeybindingEditor(usize),
+    /// Close the keybinding editor modal
+    CloseKeybindingEditor,
+    /// Set keybindings search filter
+    SetKeybindingsSearch(String),
+    /// Change sub-tab within the Rules screen
+    SetRulesSubTab(RulesSubTab),
+    /// Change sub-tab within the Gear screen
+    SetGearSubTab(GearSubTab),
 }
 
 /// Page navigation enum
@@ -231,18 +263,22 @@ impl Page {
             Page::Overview => PageCategory::System,
             Page::Appearance => PageCategory::Visual,
             Page::Behavior => PageCategory::Visual,
-            Page::Keyboard | Page::Mouse | Page::Touchpad |
-            Page::Trackpoint | Page::Trackball | Page::Tablet |
-            Page::Touch => PageCategory::Input,
+            Page::Keyboard
+            | Page::Mouse
+            | Page::Touchpad
+            | Page::Trackpoint
+            | Page::Trackball
+            | Page::Tablet
+            | Page::Touch => PageCategory::Input,
             Page::Animations | Page::Cursor => PageCategory::Visual,
-            Page::LayoutExtras | Page::Gestures | Page::Workspaces => PageCategory::Layout,
+            Page::LayoutExtras | Page::Workspaces => PageCategory::Layout,
             Page::WindowRules | Page::LayerRules => PageCategory::Rules,
-            Page::Keybindings => PageCategory::Input,
+            Page::Keybindings | Page::Gestures => PageCategory::Input,
             Page::Outputs => PageCategory::System,
             Page::Miscellaneous | Page::Startup | Page::Environment => PageCategory::System,
             Page::Debug | Page::SwitchEvents | Page::RecentWindows => PageCategory::Advanced,
             Page::Tools | Page::Preferences => PageCategory::System,
-            Page::ConfigEditor | Page::Backups => PageCategory::Advanced,
+            Page::ConfigEditor | Page::Backups => PageCategory::System,
         }
     }
 }
@@ -268,6 +304,354 @@ impl PageCategory {
             PageCategory::Rules => "Rules",
             PageCategory::Advanced => "Advanced",
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCREEN NAVIGATION (Redesign)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Top-level screen in the redesigned navigation
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Screen {
+    #[default]
+    Dashboard,
+    Layout,
+    Visuals,
+    Input,
+    Rules,
+    Displays,
+    System,
+    Gear,
+}
+
+impl Screen {
+    /// Returns the display name for the screen
+    pub fn name(&self) -> &'static str {
+        match self {
+            Screen::Dashboard => "Dashboard",
+            Screen::Layout => "Layout",
+            Screen::Visuals => "Visuals",
+            Screen::Input => "Input",
+            Screen::Rules => "Rules",
+            Screen::Displays => "Displays",
+            Screen::System => "System",
+            Screen::Gear => "Settings",
+        }
+    }
+
+    /// Maps a legacy Page to the Screen it now lives in
+    pub fn from_page(page: Page) -> Screen {
+        match page {
+            Page::Overview => Screen::Dashboard,
+            Page::Appearance | Page::Animations | Page::Cursor => Screen::Visuals,
+            Page::Behavior | Page::LayoutExtras | Page::Workspaces => Screen::Layout,
+            Page::Keyboard
+            | Page::Mouse
+            | Page::Touchpad
+            | Page::Trackpoint
+            | Page::Trackball
+            | Page::Tablet
+            | Page::Touch
+            | Page::Keybindings
+            | Page::Gestures => Screen::Input,
+            Page::WindowRules | Page::LayerRules => Screen::Rules,
+            Page::Outputs => Screen::Displays,
+            Page::Miscellaneous
+            | Page::Startup
+            | Page::Environment
+            | Page::Debug
+            | Page::SwitchEvents
+            | Page::RecentWindows => Screen::System,
+            Page::Tools | Page::Preferences | Page::ConfigEditor | Page::Backups => Screen::Gear,
+        }
+    }
+
+    /// Maps a legacy Page to the InputSubTab (if applicable)
+    pub fn input_sub_tab_from_page(page: Page) -> Option<InputSubTab> {
+        match page {
+            Page::Keybindings => Some(InputSubTab::Keybindings),
+            Page::Keyboard => Some(InputSubTab::Keyboard),
+            Page::Mouse => Some(InputSubTab::Mouse),
+            Page::Touchpad => Some(InputSubTab::Touchpad),
+            Page::Trackpoint => Some(InputSubTab::Trackpoint),
+            Page::Trackball => Some(InputSubTab::Trackball),
+            Page::Tablet => Some(InputSubTab::Tablet),
+            Page::Touch => Some(InputSubTab::Touch),
+            Page::Gestures => Some(InputSubTab::Gestures),
+            _ => None,
+        }
+    }
+
+    /// All screens in sidebar order (excluding Gear which is bottom-anchored)
+    pub fn sidebar_items() -> &'static [Screen] {
+        &[
+            Screen::Dashboard,
+            Screen::Layout,
+            Screen::Visuals,
+            Screen::Input,
+            Screen::Rules,
+            Screen::Displays,
+            Screen::System,
+        ]
+    }
+}
+
+/// Sub-tab within the Input screen
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum InputSubTab {
+    #[default]
+    Keybindings,
+    Keyboard,
+    Mouse,
+    Touchpad,
+    Trackpoint,
+    Trackball,
+    Tablet,
+    Touch,
+    Gestures,
+}
+
+impl InputSubTab {
+    pub fn name(&self) -> &'static str {
+        match self {
+            InputSubTab::Keybindings => "Keybindings",
+            InputSubTab::Keyboard => "Keyboard",
+            InputSubTab::Mouse => "Mouse",
+            InputSubTab::Touchpad => "Touchpad",
+            InputSubTab::Trackpoint => "Trackpoint",
+            InputSubTab::Trackball => "Trackball",
+            InputSubTab::Tablet => "Tablet",
+            InputSubTab::Touch => "Touch",
+            InputSubTab::Gestures => "Gestures",
+        }
+    }
+
+    pub fn all() -> &'static [InputSubTab] {
+        &[
+            InputSubTab::Keybindings,
+            InputSubTab::Keyboard,
+            InputSubTab::Mouse,
+            InputSubTab::Touchpad,
+            InputSubTab::Trackpoint,
+            InputSubTab::Trackball,
+            InputSubTab::Tablet,
+            InputSubTab::Touch,
+            InputSubTab::Gestures,
+        ]
+    }
+}
+
+/// Device types that can be edited in a modal
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditableDevice {
+    Keyboard,
+    Mouse,
+    Touchpad,
+    Trackpoint,
+    Trackball,
+    Tablet,
+    Touch,
+    Gestures,
+}
+
+impl EditableDevice {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Keyboard => "Keyboard",
+            Self::Mouse => "Mouse",
+            Self::Touchpad => "Touchpad",
+            Self::Trackpoint => "Trackpoint",
+            Self::Trackball => "Trackball",
+            Self::Tablet => "Tablet",
+            Self::Touch => "Touch Screen",
+            Self::Gestures => "Gestures",
+        }
+    }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::Keyboard => "⌨",
+            Self::Mouse => "◎",
+            Self::Touchpad => "▦",
+            Self::Trackpoint => "◉",
+            Self::Trackball => "◉",
+            Self::Tablet => "▭",
+            Self::Touch => "☐",
+            Self::Gestures => "✋",
+        }
+    }
+}
+
+/// Sub-tab within the Rules screen
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RulesSubTab {
+    #[default]
+    WindowRules,
+    LayerRules,
+}
+
+impl RulesSubTab {
+    pub fn name(&self) -> &'static str {
+        match self {
+            RulesSubTab::WindowRules => "Window Rules",
+            RulesSubTab::LayerRules => "Layer Rules",
+        }
+    }
+
+    pub fn all() -> &'static [RulesSubTab] {
+        &[RulesSubTab::WindowRules, RulesSubTab::LayerRules]
+    }
+}
+
+/// Filter for rules display
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RulesFilter {
+    #[default]
+    All,
+    Active,
+    Disabled,
+}
+
+/// Sections that can be edited in a modal (Layout, Visuals, System screens)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditableSection {
+    // Layout
+    SpatialGaps,
+    CenteringDynamics,
+    ColumnManager,
+    ScreenEdgeStruts,
+    TabIndicator,
+    InsertHint,
+    NamedWorkspaces,
+    // Visuals
+    FocusRing,
+    WindowBorder,
+    WindowShadow,
+    ModifierKeys,
+    Animations,
+    Cursor,
+    // System
+    StartupPrograms,
+    EnvironmentVars,
+    Miscellaneous,
+    SwitchEvents,
+    Debug,
+    RecentWindows,
+}
+
+impl EditableSection {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::SpatialGaps => "Spatial Gaps",
+            Self::CenteringDynamics => "Centering Dynamics",
+            Self::ColumnManager => "Column Manager",
+            Self::ScreenEdgeStruts => "Screen Edge Struts",
+            Self::TabIndicator => "Tab Indicator",
+            Self::InsertHint => "Insert Hint",
+            Self::NamedWorkspaces => "Named Workspaces",
+            Self::FocusRing => "Focus Ring",
+            Self::WindowBorder => "Window Border",
+            Self::WindowShadow => "Window Shadow",
+            Self::ModifierKeys => "Modifier Keys",
+            Self::Animations => "Animations",
+            Self::Cursor => "Cursor",
+            Self::StartupPrograms => "Startup Programs",
+            Self::EnvironmentVars => "Environment Variables",
+            Self::Miscellaneous => "Miscellaneous",
+            Self::SwitchEvents => "Switch Events",
+            Self::Debug => "Debug",
+            Self::RecentWindows => "Recent Windows",
+        }
+    }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::SpatialGaps => "⊞",
+            Self::CenteringDynamics => "◎",
+            Self::ColumnManager => "▦",
+            Self::ScreenEdgeStruts => "◧",
+            Self::TabIndicator => "▤",
+            Self::InsertHint => "◇",
+            Self::NamedWorkspaces => "▥",
+            Self::FocusRing => "◉",
+            Self::WindowBorder => "▭",
+            Self::WindowShadow => "◌",
+            Self::ModifierKeys => "⌥",
+            Self::Animations => "◈",
+            Self::Cursor => "↗",
+            Self::StartupPrograms => "⚡",
+            Self::EnvironmentVars => "⚙",
+            Self::Miscellaneous => "⬡",
+            Self::SwitchEvents => "⏻",
+            Self::Debug => "⊘",
+            Self::RecentWindows => "◫",
+        }
+    }
+
+    pub fn accent(&self) -> iced::Color {
+        use crate::theme::neon;
+        match self {
+            Self::SpatialGaps
+            | Self::CenteringDynamics
+            | Self::FocusRing
+            | Self::Animations
+            | Self::StartupPrograms => neon::PRIMARY,
+            Self::ColumnManager
+            | Self::TabIndicator
+            | Self::WindowBorder
+            | Self::ModifierKeys
+            | Self::EnvironmentVars
+            | Self::SwitchEvents => neon::SECONDARY,
+            _ => neon::TERTIARY,
+        }
+    }
+}
+
+/// Sub-tab within the Gear screen
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GearSubTab {
+    #[default]
+    Tools,
+    Preferences,
+    ConfigEditor,
+    Backups,
+}
+
+impl GearSubTab {
+    pub fn name(&self) -> &'static str {
+        match self {
+            GearSubTab::Tools => "Tools",
+            GearSubTab::Preferences => "Preferences",
+            GearSubTab::ConfigEditor => "Config Editor",
+            GearSubTab::Backups => "Backups",
+        }
+    }
+
+    pub fn all() -> &'static [GearSubTab] {
+        &[
+            GearSubTab::Tools,
+            GearSubTab::Preferences,
+            GearSubTab::ConfigEditor,
+            GearSubTab::Backups,
+        ]
+    }
+}
+
+// Implement TabLabel for sub-tab enums
+impl crate::views::screens::TabLabel for InputSubTab {
+    fn label(&self) -> &'static str {
+        self.name()
+    }
+}
+impl crate::views::screens::TabLabel for RulesSubTab {
+    fn label(&self) -> &'static str {
+        self.name()
+    }
+}
+impl crate::views::screens::TabLabel for GearSubTab {
+    fn label(&self) -> &'static str {
+        self.name()
     }
 }
 
@@ -352,6 +736,8 @@ pub enum KeyboardMessage {
     SetXkbVariant(String),
     SetXkbOptions(String),
     SetXkbModel(String),
+    SetXkbRules(String),
+    SetXkbFile(String),
     SetRepeatDelay(i32),
     SetRepeatRate(i32),
     SetTrackLayout(String),
@@ -368,7 +754,9 @@ pub enum MouseMessage {
     SetAccelSpeed(f32),
     SetAccelProfile(AccelProfile),
     SetScrollFactor(f32),
+    SetScrollFactorHorizontal(Option<f32>),
     SetScrollMethod(ScrollMethod),
+    SetScrollButton(Option<i32>),
     ToggleLeftHanded(bool),
     ToggleMiddleEmulation(bool),
     ToggleScrollButtonLock(bool),
@@ -386,7 +774,9 @@ pub enum TouchpadMessage {
     SetAccelSpeed(f32),
     SetAccelProfile(AccelProfile),
     SetScrollFactor(f32),
+    SetScrollFactorHorizontal(Option<f32>),
     SetScrollMethod(ScrollMethod),
+    SetScrollButton(Option<i32>),
     SetClickMethod(ClickMethod),
     SetTapButtonMap(TapButtonMap),
     ToggleLeftHanded(bool),
@@ -406,8 +796,8 @@ pub enum AnimationsMessage {
 
     // Per-animation messages (11 animation types)
     SetAnimationEnabled(String, bool), // (animation_name, enabled)
-    SetAnimationDuration(String, i32),  // (animation_name, duration_ms)
-    SetAnimationCurve(String, String),  // (animation_name, curve_name)
+    SetAnimationDuration(String, i32), // (animation_name, duration_ms)
+    SetAnimationCurve(String, String), // (animation_name, curve_name)
     SetAnimationSpringDampingRatio(String, f32),
     SetAnimationSpringEpsilon(String, f32),
 
@@ -451,25 +841,45 @@ pub enum WorkspacesMessage {
 pub enum WindowRulesMessage {
     // List management
     AddRule,
-    DeleteRule(u32),      // Rule ID
-    SelectRule(u32),      // Rule ID
-    DuplicateRule(u32),   // Rule ID
+    DeleteRule(u32),    // Rule ID
+    SelectRule(u32),    // Rule ID
+    DuplicateRule(u32), // Rule ID
+    SetRuleEnabled(u32, bool),
+
+    // UI state (card grid)
+    OpenEditor(u32),
+    CloseEditor,
+    SetSearch(String),
+    SetFilter(RulesFilter),
 
     // Name
     SetRuleName(u32, String),
 
     // Match criteria
-    AddMatch(u32),                                    // Rule ID
-    RemoveMatch(u32, usize),                          // (rule_id, match_index)
-    SetMatchAppId(u32, usize, Option<String>),        // (rule_id, match_index, value)
-    SetMatchTitle(u32, usize, Option<String>),        // (rule_id, match_index, value)
-    SetMatchIsFloating(u32, usize, Option<bool>),     // (rule_id, match_index, value)
-    SetMatchIsFocused(u32, usize, Option<bool>),      // (rule_id, match_index, value)
-    SetMatchIsActive(u32, usize, Option<bool>),       // (rule_id, match_index, value)
-    SetMatchIsActiveInColumn(u32, usize, Option<bool>), // (rule_id, match_index, value) v0.1.6+
+    AddMatch(u32),                                        // Rule ID
+    RemoveMatch(u32, usize),                              // (rule_id, match_index)
+    SetMatchAppId(u32, usize, Option<String>),            // (rule_id, match_index, value)
+    SetMatchTitle(u32, usize, Option<String>),            // (rule_id, match_index, value)
+    SetMatchIsFloating(u32, usize, Option<bool>),         // (rule_id, match_index, value)
+    SetMatchIsFocused(u32, usize, Option<bool>),          // (rule_id, match_index, value)
+    SetMatchIsActive(u32, usize, Option<bool>),           // (rule_id, match_index, value)
+    SetMatchIsActiveInColumn(u32, usize, Option<bool>),   // (rule_id, match_index, value) v0.1.6+
     SetMatchIsWindowCastTarget(u32, usize, Option<bool>), // (rule_id, match_index, value) v25.02+
-    SetMatchIsUrgent(u32, usize, Option<bool>),       // (rule_id, match_index, value) v25.05+
-    SetMatchAtStartup(u32, usize, Option<bool>),      // (rule_id, match_index, value) v0.1.6+
+    SetMatchIsUrgent(u32, usize, Option<bool>),           // (rule_id, match_index, value) v25.05+
+    SetMatchAtStartup(u32, usize, Option<bool>),          // (rule_id, match_index, value) v0.1.6+
+
+    // Exclude criteria
+    AddExclude(u32),                                        // Rule ID
+    RemoveExclude(u32, usize),                              // (rule_id, exclude_index)
+    SetExcludeAppId(u32, usize, Option<String>),            // (rule_id, exclude_index, value)
+    SetExcludeTitle(u32, usize, Option<String>),            // (rule_id, exclude_index, value)
+    SetExcludeIsFloating(u32, usize, Option<bool>),         // (rule_id, exclude_index, value)
+    SetExcludeIsFocused(u32, usize, Option<bool>),          // (rule_id, exclude_index, value)
+    SetExcludeIsActive(u32, usize, Option<bool>),           // (rule_id, exclude_index, value)
+    SetExcludeIsActiveInColumn(u32, usize, Option<bool>),   // (rule_id, exclude_index, value)
+    SetExcludeIsWindowCastTarget(u32, usize, Option<bool>), // (rule_id, exclude_index, value)
+    SetExcludeIsUrgent(u32, usize, Option<bool>),           // (rule_id, exclude_index, value)
+    SetExcludeAtStartup(u32, usize, Option<bool>),          // (rule_id, exclude_index, value)
 
     // Opening behavior
     SetOpenBehavior(u32, crate::config::models::OpenBehavior),
@@ -487,10 +897,32 @@ pub enum WindowRulesMessage {
     SetMaxHeight(u32, Option<i32>),
 
     // Styling
+    SetFocusRingEnabled(u32, Option<bool>),
+    SetFocusRingWidth(u32, Option<i32>),
+    SetBorderEnabled(u32, Option<bool>),
+    SetBorderWidth(u32, Option<i32>),
     SetOpacity(u32, Option<f32>),
     SetCornerRadius(u32, Option<i32>),
     SetClipToGeometry(u32, Option<bool>),
     SetDrawBorderWithBackground(u32, Option<bool>),
+
+    // Layout
+    SetDefaultColumnDisplay(u32, Option<crate::config::models::DefaultColumnDisplay>),
+    SetOpenMaximizedToEdges(u32, Option<bool>),
+    SetScrollFactor(u32, Option<f64>),
+
+    // Color overrides (whole-value set)
+    SetFocusRingActive(u32, Option<crate::types::ColorOrGradient>),
+    SetFocusRingInactive(u32, Option<crate::types::ColorOrGradient>),
+    SetFocusRingUrgent(u32, Option<crate::types::ColorOrGradient>),
+    SetBorderActive(u32, Option<crate::types::ColorOrGradient>),
+    SetBorderInactive(u32, Option<crate::types::ColorOrGradient>),
+    SetBorderUrgent(u32, Option<crate::types::ColorOrGradient>),
+
+    // Complex struct overrides
+    SetShadow(u32, Option<crate::config::models::ShadowSettings>),
+    SetTabIndicator(u32, Option<crate::config::models::TabIndicatorSettings>),
+    SetDefaultFloatingPosition(u32, Option<crate::config::models::FloatingPosition>),
 
     // Advanced
     SetVariableRefreshRate(u32, Option<bool>),
@@ -512,6 +944,13 @@ pub enum LayerRulesMessage {
     SelectRule(u32), // Rule ID
     DuplicateRule(u32),
     ReorderRule(u32, bool), // (rule_id, move_up)
+    SetRuleEnabled(u32, bool),
+
+    // UI state (card grid)
+    OpenEditor(u32),
+    CloseEditor,
+    SetSearch(String),
+    SetFilter(RulesFilter),
 
     // Name
     SetRuleName(u32, String),
@@ -577,6 +1016,8 @@ pub enum OutputsMessage {
 
     // UI state
     ToggleSection(String),
+    OpenEditor(usize),
+    CloseEditor,
 }
 
 /// Keybindings settings messages
@@ -662,7 +1103,7 @@ pub enum MiscellaneousMessage {
     SetHotkeyOverlaySkipAtStartup(bool),
     SetHotkeyOverlayHideNotBound(bool),
     SetConfigNotificationDisableFailed(bool),
-    SetSpawnShAtStartup(bool),
+    SetSpawnShAtStartup(String),
     SetXWaylandSatellite(crate::config::models::XWaylandSatelliteConfig),
 }
 
@@ -716,8 +1157,8 @@ pub enum RecentWindowsMessage {
     SetOpenDelayMs(i32),
 
     // Highlight settings
-    SetActiveColor(String),  // Hex color
-    SetUrgentColor(String),  // Hex color
+    SetActiveColor(String), // Hex color
+    SetUrgentColor(String), // Hex color
     SetHighlightPadding(i32),
     SetHighlightCornerRadius(i32),
 
@@ -1008,7 +1449,6 @@ pub enum DialogState {
         after: String,
     },
 }
-
 
 /// First-run wizard steps
 #[derive(Debug, Clone, PartialEq)]

@@ -12,9 +12,9 @@ use nirify::config::storage::{
     generate_mouse_kdl,
 };
 use nirify::config::{load_settings, save_settings};
-use nirify::version::FeatureCompat;
 use nirify::constants::*;
 use nirify::types::Color;
+use nirify::version::FeatureCompat;
 use proptest::prelude::*;
 use tempfile::tempdir;
 

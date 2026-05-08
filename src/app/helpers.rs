@@ -144,7 +144,9 @@ fn check_dangerous_command(args: &[String], full_command: &str) -> Option<String
 
     // Check for shell metacharacters that could be dangerous
     if full_command.contains('`') {
-        return Some("Warning: Command contains backticks which may execute subcommands".to_string());
+        return Some(
+            "Warning: Command contains backticks which may execute subcommands".to_string(),
+        );
     }
 
     if full_command.contains("$(") {
@@ -155,7 +157,9 @@ fn check_dangerous_command(args: &[String], full_command: &str) -> Option<String
     let semicolons = full_command.matches(';').count();
     let pipes = full_command.matches('|').count();
     if semicolons > 2 || pipes > 3 {
-        return Some("Warning: Complex command with multiple operations - please verify".to_string());
+        return Some(
+            "Warning: Complex command with multiple operations - please verify".to_string(),
+        );
     }
 
     // Basic executable validation - just check it doesn't start with suspicious paths
@@ -313,7 +317,7 @@ pub fn format_key_combo(
     modifiers: iced::keyboard::Modifiers,
     location: iced::keyboard::Location,
 ) -> String {
-    use iced::keyboard::{Key, Location, key::Named};
+    use iced::keyboard::{key::Named, Key, Location};
 
     // Skip if this is just a modifier key by itself
     let is_modifier_key = matches!(
@@ -414,7 +418,7 @@ pub fn format_key_combo(
                     _ => return String::new(), // Unknown named key
                 }
             }
-        },
+        }
         Key::Character(c) => {
             let s = c.as_str();
             if is_numpad {
@@ -479,60 +483,56 @@ pub fn format_key_combo(
 /// Helper to apply GradientPickerMessage to a ColorOrGradient field
 pub fn apply_gradient_message(target: &mut ColorOrGradient, msg: GradientPickerMessage) {
     match msg {
-            GradientPickerMessage::ToggleSolidGradient(is_gradient) => {
-                *target = if is_gradient {
-                    // Convert to gradient
-                    match target {
-                        ColorOrGradient::Color(color) => {
-                            ColorOrGradient::Gradient(Gradient {
-                                from: *color,
-                                to: *color,
-                                angle: 0,
-                                ..Default::default()
-                            })
-                        }
-                        ColorOrGradient::Gradient(_) => target.clone(),
-                    }
-                } else {
-                    // Convert to solid color
-                    match target {
-                        ColorOrGradient::Color(_) => target.clone(),
-                        ColorOrGradient::Gradient(gradient) => {
-                            ColorOrGradient::Color(gradient.from)
-                        }
-                    }
-                };
+        GradientPickerMessage::ToggleSolidGradient(is_gradient) => {
+            *target = if is_gradient {
+                // Convert to gradient
+                match target {
+                    ColorOrGradient::Color(color) => ColorOrGradient::Gradient(Gradient {
+                        from: *color,
+                        to: *color,
+                        angle: 0,
+                        ..Default::default()
+                    }),
+                    ColorOrGradient::Gradient(_) => target.clone(),
+                }
+            } else {
+                // Convert to solid color
+                match target {
+                    ColorOrGradient::Color(_) => target.clone(),
+                    ColorOrGradient::Gradient(gradient) => ColorOrGradient::Color(gradient.from),
+                }
+            };
+        }
+        GradientPickerMessage::SetFromColor(hex) => {
+            if let Some(color) = Color::from_hex(&hex) {
+                match target {
+                    ColorOrGradient::Color(c) => *c = color,
+                    ColorOrGradient::Gradient(g) => g.from = color,
+                }
             }
-            GradientPickerMessage::SetFromColor(hex) => {
+        }
+        GradientPickerMessage::SetToColor(hex) => {
+            if let ColorOrGradient::Gradient(gradient) = target {
                 if let Some(color) = Color::from_hex(&hex) {
-                    match target {
-                        ColorOrGradient::Color(c) => *c = color,
-                        ColorOrGradient::Gradient(g) => g.from = color,
-                    }
+                    gradient.to = color;
                 }
             }
-            GradientPickerMessage::SetToColor(hex) => {
-                if let ColorOrGradient::Gradient(gradient) = target {
-                    if let Some(color) = Color::from_hex(&hex) {
-                        gradient.to = color;
-                    }
-                }
+        }
+        GradientPickerMessage::SetAngle(angle) => {
+            if let ColorOrGradient::Gradient(gradient) = target {
+                gradient.angle = angle;
             }
-            GradientPickerMessage::SetAngle(angle) => {
-                if let ColorOrGradient::Gradient(gradient) = target {
-                    gradient.angle = angle;
-                }
+        }
+        GradientPickerMessage::SetColorSpace(color_space) => {
+            if let ColorOrGradient::Gradient(gradient) = target {
+                gradient.color_space = color_space;
             }
-            GradientPickerMessage::SetColorSpace(color_space) => {
-                if let ColorOrGradient::Gradient(gradient) = target {
-                    gradient.color_space = color_space;
-                }
+        }
+        GradientPickerMessage::SetRelativeTo(relative_to) => {
+            if let ColorOrGradient::Gradient(gradient) = target {
+                gradient.relative_to = relative_to;
             }
-            GradientPickerMessage::SetRelativeTo(relative_to) => {
-                if let ColorOrGradient::Gradient(gradient) = target {
-                    gradient.relative_to = relative_to;
-                }
-            }
+        }
         GradientPickerMessage::SetHueInterpolation(hue_interp) => {
             if let ColorOrGradient::Gradient(gradient) = target {
                 gradient.hue_interpolation = Some(hue_interp);

@@ -44,7 +44,9 @@ where
 /// Get windows asynchronously.
 ///
 /// Returns a Task that completes with the windows result.
-pub fn get_windows_async<M>(f: impl FnOnce(IpcResult<Vec<WindowInfo>>) -> M + Send + 'static) -> Task<M>
+pub fn get_windows_async<M>(
+    f: impl FnOnce(IpcResult<Vec<WindowInfo>>) -> M + Send + 'static,
+) -> Task<M>
 where
     M: Send + 'static,
 {

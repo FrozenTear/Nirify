@@ -18,7 +18,10 @@ pub fn generate_preferences_kdl(prefs: &PreferencesSettings) -> String {
     lines.push(format!("    theme \"{}\"", prefs.theme));
 
     // Float settings app (whether this app should float or tile)
-    lines.push(format!("    float-settings-app {}", prefs.float_settings_app));
+    lines.push(format!(
+        "    float-settings-app {}",
+        prefs.float_settings_app
+    ));
 
     // Show search bar in navigation
     lines.push(format!("    show-search-bar {}", prefs.show_search_bar));

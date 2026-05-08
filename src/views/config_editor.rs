@@ -1,14 +1,16 @@
-//! Config Editor view
+//! Config Editor view — neon modal style
 //!
 //! Viewer and editor for generated KDL config files.
 //! Read-only by default, with optional edit mode for advanced users.
 
-use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_editor, toggler};
+use iced::widget::{
+    button, column, container, pick_list, row, scrollable, text, text_editor, Space,
+};
 use iced::{Alignment, Element, Length};
 
-use super::widgets::*;
+use super::widgets::toggle_row;
 use crate::messages::{ConfigEditorMessage, Message};
-use crate::theme::fonts;
+use crate::theme::{fonts, neon};
 
 /// List of config files that can be viewed (relative paths from managed_dir)
 pub const CONFIG_FILES: &[&str] = &[
@@ -58,282 +60,289 @@ pub struct ConfigEditorState {
 }
 
 /// Creates the config editor view
-pub fn view<'a>(state: &'a ConfigEditorState, editor_content: &'a text_editor::Content) -> Element<'a, Message> {
-    let mut content = column![
-        page_title("Config Editor"),
-        info_text(
-            "View the generated KDL configuration files. \
-             These files are automatically generated from your settings."
-        ),
-    ]
-    .spacing(4);
-
-    // Edit mode toggle with warning
-    if state.edit_mode {
-        // Warning banner when edit mode is enabled
-        content = content.push(
-            container(
-                column![
-                    row![
-                        text("⚠ Edit Mode Active").size(14).color([0.95, 0.6, 0.2]),
+pub fn view<'a>(
+    state: &'a ConfigEditorState,
+    editor_content: &'a text_editor::Content,
+) -> Element<'a, Message> {
+    let content = column![
+        // ── 2-COLUMN: CONTROLS | EDITOR ──
+        row![
+            // Left: File selector, mode toggle, action buttons
+            column![
+                modal_section("\u{1F4C4}", "FILE SELECTOR", neon::SECONDARY),
+                Space::new().height(4),
+                container(
+                    column![
+                        text("CONFIG FILE")
+                            .size(10)
+                            .font(fonts::UI_FONT_SEMIBOLD)
+                            .color(neon::OUTLINE_VARIANT),
+                        {
+                            let file_names: Vec<&str> = CONFIG_FILES.to_vec();
+                            let selected_name = state.selected_file.map(|i| CONFIG_FILES[i]);
+                            pick_list(file_names, selected_name, |name| {
+                                let idx = CONFIG_FILES.iter().position(|&f| f == name).unwrap_or(0);
+                                Message::ConfigEditor(ConfigEditorMessage::SelectFile(idx))
+                            })
+                            .placeholder("Select a file...")
+                            .width(Length::Fill)
+                        },
                     ]
-                    .spacing(8)
-                    .align_y(Alignment::Center),
-                    text("Warning: Manual edits will be OVERWRITTEN when you change settings in the app. \
-                          Only edit if you know what you're doing!")
-                        .size(12)
-                        .color([0.9, 0.7, 0.4]),
-                ]
-                .spacing(4)
-            )
-            .padding([12, 16])
-            .style(|_theme| container::Style {
-                background: Some(iced::Background::Color(iced::Color::from_rgba(
-                    0.5, 0.25, 0.1, 0.4,
-                ))),
-                border: iced::Border {
-                    radius: 6.0.into(),
-                    color: iced::Color::from_rgba(0.8, 0.4, 0.1, 0.6),
-                    width: 1.0,
-                },
-                ..Default::default()
-            }),
-        );
-    } else {
-        // Info banner when in read-only mode
-        content = content.push(
-            container(
-                text("Read-only mode. Enable edit mode below to make changes.")
-                    .size(12)
-                    .color([0.6, 0.7, 0.9]),
-            )
-            .padding([8, 12])
-            .style(|_theme| container::Style {
-                background: Some(iced::Background::Color(iced::Color::from_rgba(
-                    0.2, 0.3, 0.5, 0.3,
-                ))),
-                border: iced::Border {
-                    radius: 4.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }),
-        );
-    }
-
-    // Edit mode toggle
-    content = content.push(
-        row![
-            text("Enable Edit Mode").size(14),
-            toggler(state.edit_mode)
-                .on_toggle(|enabled| Message::ConfigEditor(ConfigEditorMessage::ToggleEditMode(enabled))),
-            if state.has_unsaved_changes {
-                text("(unsaved changes)").size(12).color([0.9, 0.6, 0.3])
-            } else {
-                text("").size(12)
-            },
-        ]
-        .spacing(12)
-        .align_y(Alignment::Center)
-        .padding([8, 0]),
-    );
-
-    content = content.push(spacer(12.0));
-
-    // File selector
-    let file_names: Vec<&str> = CONFIG_FILES.to_vec();
-    let selected_name = state.selected_file.map(|i| CONFIG_FILES[i]);
-
-    let file_picker = pick_list(
-        file_names,
-        selected_name,
-        |name| {
-            let idx = CONFIG_FILES.iter().position(|&f| f == name).unwrap_or(0);
-            Message::ConfigEditor(ConfigEditorMessage::SelectFile(idx))
-        },
-    )
-    .placeholder("Select a file to view...")
-    .width(Length::Fixed(250.0));
-
-    let refresh_btn = button(
-        text(if state.loading { "Loading..." } else { "Refresh" }).size(13),
-    )
-    .padding([6, 12])
-    .on_press_maybe(
-        if state.selected_file.is_some() && !state.loading {
-            Some(Message::ConfigEditor(ConfigEditorMessage::Refresh))
-        } else {
-            None
-        },
-    );
-
-    content = content.push(
-        row![
-            text("File:").size(14),
-            file_picker,
-            refresh_btn,
-        ]
-        .spacing(12)
-        .align_y(Alignment::Center),
-    );
-
-    content = content.push(spacer(16.0));
-
-    // File content display
-    if let Some(selected_idx) = state.selected_file {
-        let filename = CONFIG_FILES[selected_idx];
-
-        // Header with filename and action buttons
-        let mut header_row = row![
-            text(format!("Contents of {}", filename))
-                .size(15)
-                .color([0.8, 0.8, 0.8]),
-        ]
-        .spacing(12)
-        .align_y(Alignment::Center);
-
-        // Add save/discard buttons when in edit mode with changes
-        if state.edit_mode && state.has_unsaved_changes {
-            header_row = header_row.push(
-                button(text("Save").size(12))
-                    .padding([4, 12])
-                    .on_press(Message::ConfigEditor(ConfigEditorMessage::SaveEdits))
-                    .style(|_theme, status| {
-                        let bg = match status {
-                            button::Status::Hovered => iced::Color::from_rgba(0.2, 0.5, 0.3, 0.7),
-                            button::Status::Pressed => iced::Color::from_rgba(0.3, 0.6, 0.4, 0.8),
-                            _ => iced::Color::from_rgba(0.2, 0.4, 0.3, 0.5),
-                        };
-                        button::Style {
-                            background: Some(iced::Background::Color(bg)),
-                            text_color: iced::Color::WHITE,
-                            border: iced::Border {
-                                radius: 4.0.into(),
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        }
-                    })
-            );
-            header_row = header_row.push(
-                button(text("Discard").size(12))
-                    .padding([4, 12])
-                    .on_press(Message::ConfigEditor(ConfigEditorMessage::DiscardEdits))
-                    .style(|_theme, status| {
-                        let bg = match status {
-                            button::Status::Hovered => iced::Color::from_rgba(0.5, 0.2, 0.2, 0.7),
-                            _ => iced::Color::from_rgba(0.4, 0.2, 0.2, 0.4),
-                        };
-                        button::Style {
-                            background: Some(iced::Background::Color(bg)),
-                            text_color: iced::Color::from_rgb(0.9, 0.7, 0.7),
-                            border: iced::Border {
-                                radius: 4.0.into(),
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        }
-                    })
-            );
-        }
-
-        content = content.push(header_row);
-        content = content.push(spacer(8.0));
-
-        // Content area - either editable or read-only
-        if state.edit_mode {
-            // Multi-line text editor
-            content = content.push(
-                container(
-                    text_editor(editor_content)
-                        .on_action(|action| Message::ConfigEditor(ConfigEditorMessage::EditorAction(action)))
-                        .font(fonts::MONO_FONT)
-                        .size(12)
-                        .padding(12)
-                        .height(Length::Fixed(500.0))
+                    .spacing(4),
                 )
-                .style(|_theme| container::Style {
-                    background: Some(iced::Background::Color(iced::Color::from_rgb(
-                        0.1, 0.1, 0.12,
-                    ))),
-                    border: iced::Border {
-                        radius: 4.0.into(),
-                        width: 1.0,
-                        color: iced::Color::from_rgb(0.4, 0.35, 0.2),
-                    },
-                    ..Default::default()
-                }),
-            );
-        } else {
-            // Read-only display
-            let content_display = match &state.file_content {
-                Some(Ok(file_text)) => {
-                    if file_text.is_empty() {
-                        text("(empty file)")
-                            .size(13)
-                            .color([0.5, 0.5, 0.5])
-                            .font(fonts::MONO_FONT)
-                    } else {
-                        text(file_text)
-                            .size(12)
-                            .font(fonts::MONO_FONT)
-                            .color([0.85, 0.85, 0.85])
-                    }
-                }
-                Some(Err(error)) => text(format!("Error: {}", error))
-                    .size(13)
-                    .color([0.9, 0.4, 0.4]),
-                None => {
-                    if state.loading {
-                        text("Loading...")
-                            .size(13)
-                            .color([0.6, 0.6, 0.6])
-                    } else {
-                        text("Click Refresh to load file contents")
-                            .size(13)
-                            .color([0.5, 0.5, 0.5])
-                    }
-                }
-            };
-
-            content = content.push(
+                .padding(12)
+                .style(crate::theme::card_style),
+                Space::new().height(8),
                 container(
-                    scrollable(
-                        container(content_display)
-                            .padding(12)
-                            .width(Length::Fill),
+                    column![
+                        styled_button(
+                            if state.loading { "Loading..." } else { "Refresh" },
+                            state.selected_file.is_some() && !state.loading,
+                            Message::ConfigEditor(ConfigEditorMessage::Refresh),
+                            neon::SECONDARY,
+                        ),
+                    ]
+                    .spacing(6),
+                )
+                .padding(12)
+                .style(crate::theme::card_style),
+                Space::new().height(12),
+                modal_section("\u{270F}", "EDIT MODE", neon::PRIMARY),
+                Space::new().height(4),
+                container(
+                    toggle_row(
+                        "Enable Editing",
+                        "Allow direct editing of KDL config files",
+                        state.edit_mode,
+                        |v| Message::ConfigEditor(ConfigEditorMessage::ToggleEditMode(v)),
+                    ),
+                )
+                .padding(8)
+                .style(crate::theme::card_style),
+                // Warning / info banner
+                Space::new().height(8),
+                if state.edit_mode {
+                    container(
+                        column![
+                            text("EDIT MODE ACTIVE")
+                                .size(10)
+                                .font(fonts::UI_FONT_SEMIBOLD)
+                                .color(neon::TERTIARY),
+                            Space::new().height(2),
+                            text("Manual edits will be OVERWRITTEN when you change settings in the app.")
+                                .size(11)
+                                .color(neon::ON_SURFACE_VARIANT),
+                        ]
+                        .spacing(2)
+                        .padding(4),
                     )
-                    .height(Length::Fixed(500.0)),
-                )
-                .style(|_theme| container::Style {
-                    background: Some(iced::Background::Color(iced::Color::from_rgb(
-                        0.12, 0.12, 0.14,
-                    ))),
-                    border: iced::Border {
-                        radius: 4.0.into(),
-                        width: 1.0,
-                        color: iced::Color::from_rgb(0.25, 0.25, 0.28),
-                    },
-                    ..Default::default()
-                }),
-            );
-        }
-    } else {
-        content = content.push(
-            container(
-                text("Select a file from the dropdown to view its contents")
-                    .size(14)
-                    .color([0.5, 0.5, 0.5]),
-            )
-            .padding(40)
+                    .padding(8)
+                    .style(crate::theme::card_style)
+                } else {
+                    container(
+                        text("Read-only mode. Enable editing above to make changes.")
+                            .size(11)
+                            .color(neon::OUTLINE),
+                    )
+                    .padding([8, 12])
+                },
+                // Save / Discard buttons when in edit mode with changes
+                if state.edit_mode && state.has_unsaved_changes {
+                    container(
+                        column![
+                            text("UNSAVED CHANGES")
+                                .size(10)
+                                .font(fonts::UI_FONT_SEMIBOLD)
+                                .color(neon::TERTIARY),
+                            Space::new().height(4),
+                            styled_button("Save", true,
+                                Message::ConfigEditor(ConfigEditorMessage::SaveEdits),
+                                neon::SECONDARY),
+                            styled_button("Discard", true,
+                                Message::ConfigEditor(ConfigEditorMessage::DiscardEdits),
+                                neon::TERTIARY),
+                        ]
+                        .spacing(6),
+                    )
+                    .padding(12)
+                    .style(crate::theme::card_style)
+                } else {
+                    container(Space::new().height(0))
+                },
+            ]
+            .spacing(6)
+            .width(Length::FillPortion(1)),
+
+            // Right: Editor / content display (takes more space)
+            column![
+                modal_section("\u{2728}", "CONTENTS", neon::TERTIARY),
+                Space::new().height(4),
+                if let Some(selected_idx) = state.selected_file {
+                    let filename = CONFIG_FILES[selected_idx];
+                    container(
+                        column![
+                            text(format!("{}", filename))
+                                .size(11)
+                                .font(fonts::MONO_FONT)
+                                .color(neon::SECONDARY),
+                            Space::new().height(6),
+                            if state.edit_mode {
+                                container(
+                                    text_editor(editor_content)
+                                        .on_action(|action| {
+                                            Message::ConfigEditor(ConfigEditorMessage::EditorAction(action))
+                                        })
+                                        .font(fonts::MONO_FONT)
+                                        .size(12)
+                                        .padding(12)
+                                        .height(Length::Fixed(550.0)),
+                                )
+                                .style(|_theme| container::Style {
+                                    background: Some(iced::Background::Color(neon::SURFACE_LOW)),
+                                    border: iced::Border {
+                                        radius: 6.0.into(),
+                                        width: 1.0,
+                                        color: iced::Color { a: 0.3, ..neon::PRIMARY },
+                                    },
+                                    ..Default::default()
+                                })
+                            } else {
+                                let content_display = match &state.file_content {
+                                    Some(Ok(file_text)) => {
+                                        if file_text.is_empty() {
+                                            text("(empty file)")
+                                                .size(12)
+                                                .color(neon::OUTLINE)
+                                                .font(fonts::MONO_FONT)
+                                        } else {
+                                            text(file_text)
+                                                .size(12)
+                                                .font(fonts::MONO_FONT)
+                                                .color(neon::ON_SURFACE)
+                                        }
+                                    }
+                                    Some(Err(error)) => text(format!("Error: {}", error))
+                                        .size(12)
+                                        .color(neon::ERROR),
+                                    None => {
+                                        if state.loading {
+                                            text("Loading...")
+                                                .size(12)
+                                                .color(neon::OUTLINE)
+                                        } else {
+                                            text("Click Refresh to load file contents")
+                                                .size(12)
+                                                .color(neon::OUTLINE)
+                                        }
+                                    }
+                                };
+                                container(
+                                    scrollable(
+                                        container(content_display)
+                                            .padding(12)
+                                            .width(Length::Fill),
+                                    )
+                                    .height(Length::Fixed(550.0)),
+                                )
+                                .style(|_theme| container::Style {
+                                    background: Some(iced::Background::Color(neon::SURFACE_LOW)),
+                                    border: iced::Border {
+                                        radius: 6.0.into(),
+                                        width: 1.0,
+                                        color: iced::Color { a: 0.2, ..neon::OUTLINE },
+                                    },
+                                    ..Default::default()
+                                })
+                            },
+                        ]
+                        .spacing(0),
+                    )
+                    .padding(12)
+                    .style(crate::theme::card_style)
+                } else {
+                    container(
+                        column![
+                            Space::new().height(40),
+                            text("Select a file from the dropdown to view its contents")
+                                .size(13)
+                                .color(neon::OUTLINE),
+                            Space::new().height(40),
+                        ]
+                        .width(Length::Fill)
+                        .align_x(Alignment::Center),
+                    )
+                    .padding(12)
+                    .style(crate::theme::card_style)
+                    .width(Length::Fill)
+                },
+            ]
+            .spacing(6)
+            .width(Length::FillPortion(2)),
+        ]
+        .spacing(32)
+        .align_y(Alignment::Start),
+    ]
+    .spacing(0)
+    .width(Length::Fill);
+
+    scrollable(container(content).padding(8).width(Length::Fill))
+        .height(Length::Fill)
+        .into()
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+fn modal_section<'a>(icon: &'a str, label: &'a str, accent: iced::Color) -> Element<'a, Message> {
+    row![
+        text(icon).size(14).color(accent),
+        Space::new().width(6),
+        text(label)
+            .size(11)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(accent),
+        Space::new().width(12),
+        container(Space::new().width(Length::Fill).height(1))
             .width(Length::Fill)
-            .align_x(iced::alignment::Horizontal::Center),
-        );
+            .style(move |_: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(iced::Color { a: 0.25, ..accent })),
+                ..Default::default()
+            }),
+    ]
+    .spacing(0)
+    .align_y(Alignment::Center)
+    .padding([14, 0])
+    .into()
+}
+
+fn styled_button<'a>(
+    label: &'a str,
+    enabled: bool,
+    message: Message,
+    accent: iced::Color,
+) -> Element<'a, Message> {
+    let mut btn = button(text(label).size(12).font(fonts::UI_FONT_SEMIBOLD))
+        .padding([6, 16])
+        .width(Length::Fill)
+        .style(move |_theme, status| {
+            let bg = match status {
+                button::Status::Hovered => iced::Color { a: 0.35, ..accent },
+                button::Status::Pressed => iced::Color { a: 0.45, ..accent },
+                _ => iced::Color { a: 0.2, ..accent },
+            };
+            button::Style {
+                background: Some(iced::Background::Color(bg)),
+                text_color: accent,
+                border: iced::Border {
+                    radius: 8.0.into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+        });
+
+    if enabled {
+        btn = btn.on_press(message);
     }
 
-    content = content.push(spacer(32.0));
-
-    scrollable(container(content).padding(20).width(iced::Length::Fill))
-        .height(iced::Length::Fill)
-        .into()
+    btn.into()
 }

@@ -271,7 +271,10 @@ fn write_all_settings(
     )?;
     write_config(
         &paths.window_rules_kdl,
-        &generate_window_rules_kdl(&settings.window_rules, settings.preferences.float_settings_app),
+        &generate_window_rules_kdl(
+            &settings.window_rules,
+            settings.preferences.float_settings_app,
+        ),
         strategy,
     )?;
     write_config(
@@ -501,7 +504,10 @@ pub fn save_dirty(
             SettingsCategory::WindowRules => {
                 write_config(
                     &paths.window_rules_kdl,
-                    &generate_window_rules_kdl(&settings.window_rules, settings.preferences.float_settings_app),
+                    &generate_window_rules_kdl(
+                        &settings.window_rules,
+                        settings.preferences.float_settings_app,
+                    ),
                     strategy,
                 )?;
             }
@@ -650,7 +656,9 @@ mod tests {
 
     #[test]
     fn test_generate_main_kdl_skips_recent_windows_when_disabled() {
-        let compat = FeatureCompat { recent_windows: false };
+        let compat = FeatureCompat {
+            recent_windows: false,
+        };
         let content = generate_main_kdl(compat);
         assert!(!content.contains("include \"advanced/recent-windows.kdl\""));
         assert!(content.contains("recent-windows.kdl requires niri 25.11+"));

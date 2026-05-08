@@ -25,7 +25,7 @@ pub enum FilePickerType {
 pub fn file_path_picker<'a, Message: Clone + 'a>(
     label: &'a str,
     description: &'a str,
-    path: &'a str,  // Add 'a lifetime to avoid memory leak
+    path: &'a str, // Add 'a lifetime to avoid memory leak
     _picker_type: FilePickerType,
     on_change: impl Fn(FilePathMessage) -> Message + 'a + Copy,
 ) -> Element<'a, Message> {
@@ -52,21 +52,15 @@ pub fn file_path_picker<'a, Message: Clone + 'a>(
 /// Helper function to open file dialog (use in async Task)
 pub fn open_file_dialog(picker_type: FilePickerType) -> Option<String> {
     let result = match picker_type {
-        FilePickerType::File => {
-            rfd::FileDialog::new()
-                .pick_file()
-                .map(|path| path.to_string_lossy().to_string())
-        }
-        FilePickerType::Directory => {
-            rfd::FileDialog::new()
-                .pick_folder()
-                .map(|path| path.to_string_lossy().to_string())
-        }
-        FilePickerType::Save => {
-            rfd::FileDialog::new()
-                .save_file()
-                .map(|path| path.to_string_lossy().to_string())
-        }
+        FilePickerType::File => rfd::FileDialog::new()
+            .pick_file()
+            .map(|path| path.to_string_lossy().to_string()),
+        FilePickerType::Directory => rfd::FileDialog::new()
+            .pick_folder()
+            .map(|path| path.to_string_lossy().to_string()),
+        FilePickerType::Save => rfd::FileDialog::new()
+            .save_file()
+            .map(|path| path.to_string_lossy().to_string()),
     };
     result
 }

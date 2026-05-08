@@ -1,14 +1,16 @@
 //! Keybindings settings message handler
 
 use crate::app::helpers::{parse_spawn_command, validate_spawn_command};
-use crate::config::SettingsCategory;
 use crate::config::models::KeybindAction;
+use crate::config::SettingsCategory;
 use crate::messages::{KeybindingsMessage as M, Message};
 use crate::types::ModKey;
 use iced::Task;
 
 /// Known modifier prefixes in niri keybindings
-const MODIFIER_PREFIXES: &[&str] = &["Mod", "Super", "Ctrl", "Control", "Shift", "Alt", "Mod3", "Mod5"];
+const MODIFIER_PREFIXES: &[&str] = &[
+    "Mod", "Super", "Ctrl", "Control", "Shift", "Alt", "Mod3", "Mod5",
+];
 
 /// Extract the base key from a key combo string (e.g., "Mod+Shift+Return" -> "Return")
 fn extract_base_key(key_combo: &str) -> String {
@@ -22,7 +24,10 @@ fn extract_base_key(key_combo: &str) -> String {
     // Work backwards to find the first non-modifier
     for part in parts.iter().rev() {
         let trimmed = part.trim();
-        if !MODIFIER_PREFIXES.iter().any(|m| m.eq_ignore_ascii_case(trimmed)) {
+        if !MODIFIER_PREFIXES
+            .iter()
+            .any(|m| m.eq_ignore_ascii_case(trimmed))
+        {
             return trimmed.to_string();
         }
     }
@@ -42,7 +47,7 @@ fn build_key_combo(modifiers: &[ModKey], base_key: &str) -> String {
     // Add modifiers in a consistent order
     for modifier in modifiers {
         let mod_str = match modifier {
-            ModKey::Super => "Mod",  // niri uses "Mod" for Super
+            ModKey::Super => "Mod", // niri uses "Mod" for Super
             ModKey::Ctrl => "Ctrl",
             ModKey::Shift => "Shift",
             ModKey::Alt => "Alt",
@@ -65,8 +70,6 @@ fn build_key_combo(modifiers: &[ModKey], base_key: &str) -> String {
 impl super::super::App {
     /// Updates keybindings settings
     pub(in crate::app) fn update_keybindings(&mut self, msg: M) -> Task<Message> {
-
-
         match msg {
             M::AddKeybinding => {
                 let new_binding = crate::config::models::Keybinding {
@@ -76,7 +79,9 @@ impl super::super::App {
                     ..Default::default()
                 };
                 self.settings.keybindings.bindings.push(new_binding);
-                self.ui.selected_keybinding_index = Some(self.settings.keybindings.bindings.len() - 1);
+                let new_idx = self.settings.keybindings.bindings.len() - 1;
+                self.ui.selected_keybinding_index = Some(new_idx);
+                self.ui.editing_keybinding_index = Some(new_idx);
                 log::info!("Added new keybinding");
             }
 
@@ -84,11 +89,12 @@ impl super::super::App {
                 if idx < self.settings.keybindings.bindings.len() {
                     self.settings.keybindings.bindings.remove(idx);
                     if self.ui.selected_keybinding_index == Some(idx) {
-                        self.ui.selected_keybinding_index = if self.settings.keybindings.bindings.is_empty() {
-                            None
-                        } else {
-                            Some(0)
-                        };
+                        self.ui.selected_keybinding_index =
+                            if self.settings.keybindings.bindings.is_empty() {
+                                None
+                            } else {
+                                Some(0)
+                            };
                     }
                     log::info!("Removed keybinding at index {}", idx);
                 }
@@ -212,8 +218,15 @@ impl super::super::App {
             }
 
             M::ToggleSection(section) => {
-                let expanded = self.ui.keybinding_sections_expanded.get(&section).copied().unwrap_or(false);
-                self.ui.keybinding_sections_expanded.insert(section, !expanded);
+                let expanded = self
+                    .ui
+                    .keybinding_sections_expanded
+                    .get(&section)
+                    .copied()
+                    .unwrap_or(false);
+                self.ui
+                    .keybinding_sections_expanded
+                    .insert(section, !expanded);
                 // Don't mark dirty for UI-only changes
                 return Task::none();
             }

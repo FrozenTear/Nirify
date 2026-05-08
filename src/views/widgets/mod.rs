@@ -25,17 +25,20 @@ pub use color_picker::{color_picker_row, color_picker_with_swatches};
 pub use expandable_section::expandable_section;
 pub use file_path::{browse_task, file_path_picker, FilePathMessage, FilePickerType};
 pub use gradient_picker::{gradient_picker, GradientPickerMessage};
-pub use key_capture::{format_key_combination, is_modifier_only, key_capture_row, KeyCaptureMessage, KeyCaptureState};
+pub use key_capture::{
+    format_key_combination, is_modifier_only, key_capture_row, KeyCaptureMessage, KeyCaptureState,
+};
+pub use list_detail::{
+    action_button, action_button_style, add_button, add_button_style, add_item_button, badge,
+    delete_button, delete_button_style, empty_detail_placeholder, empty_list_placeholder,
+    list_detail_layout, list_item_style, list_panel_style, match_container_style, remove_button,
+    selection_indicator, BADGE_BEHAVIOR, BADGE_VISIBILITY,
+};
 pub use list_item::list_item;
 pub use optional_picker::{optional_bool_picker, OptionalBool};
 pub use setting_row::{
-    card, info_text, optional_picker_row, optional_slider_row, page_title, picker_row,
+    card, card_group, info_text, optional_picker_row, optional_slider_row, page_title, picker_row,
     section_header, slider_row, slider_row_int, slider_row_int_with_state, slider_row_with_state,
-    spacer, subsection_header, text_input_row, text_input_with_suggestions, toggle_row,
-};
-pub use list_detail::{
-    action_button, action_button_style, add_button, add_button_style, add_item_button,
-    badge, delete_button, delete_button_style, empty_detail_placeholder, empty_list_placeholder,
-    list_detail_layout, list_item_style, list_panel_style, match_container_style,
-    remove_button, selection_indicator, BADGE_BEHAVIOR, BADGE_VISIBILITY,
+    spacer, status_pill, subsection_header, text_input_row, text_input_with_suggestions,
+    toggle_row,
 };

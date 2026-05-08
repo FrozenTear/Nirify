@@ -29,13 +29,15 @@ pub fn parse_preferences_from_doc(doc: &KdlDocument, settings: &mut Settings) {
             // Read float-settings-app
             // Only update if explicitly set (otherwise keep default of true)
             if children.get("float-settings-app").is_some() {
-                settings.preferences.float_settings_app = parser::has_flag(children, &["float-settings-app"]);
+                settings.preferences.float_settings_app =
+                    parser::has_flag(children, &["float-settings-app"]);
             }
 
             // Read show-search-bar
             // Only update if explicitly set (otherwise keep default of true)
             if children.get("show-search-bar").is_some() {
-                settings.preferences.show_search_bar = parser::has_flag(children, &["show-search-bar"]);
+                settings.preferences.show_search_bar =
+                    parser::has_flag(children, &["show-search-bar"]);
             }
 
             // Read search-hotkey

@@ -7,14 +7,13 @@ use iced::Task;
 impl super::super::App {
     /// Updates behavior settings
     pub(in crate::app) fn update_behavior(&mut self, msg: BehaviorMessage) -> Task<Message> {
-        
-
         match msg {
             BehaviorMessage::ToggleFocusFollowsMouse(value) => {
                 self.settings.behavior.focus_follows_mouse = value;
             }
             BehaviorMessage::SetFocusFollowsMouseMaxScroll(value) => {
-                self.settings.behavior.focus_follows_mouse_max_scroll_amount = value.map(|v| v.clamp(0.0, 100.0));
+                self.settings.behavior.focus_follows_mouse_max_scroll_amount =
+                    value.map(|v| v.clamp(0.0, 100.0));
             }
             BehaviorMessage::SetWarpMouseToFocus(mode) => {
                 self.settings.behavior.warp_mouse_to_focus = mode;
@@ -56,7 +55,6 @@ impl super::super::App {
                 self.settings.behavior.disable_power_key_handling = value;
             }
         }
-
 
         self.save.dirty_tracker.mark(SettingsCategory::Behavior);
         self.mark_changed();

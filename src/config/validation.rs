@@ -262,7 +262,10 @@ pub fn validate_settings(settings: &Settings) -> ValidationResult {
             }
         }
         if !result.warnings.is_empty() {
-            log::info!("Settings validation found {} warnings", result.warnings.len());
+            log::info!(
+                "Settings validation found {} warnings",
+                result.warnings.len()
+            );
             for warn in &result.warnings {
                 log::info!("  Validation warning: {}", warn);
             }

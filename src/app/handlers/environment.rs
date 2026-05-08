@@ -7,18 +7,18 @@ use iced::Task;
 impl super::super::App {
     /// Handle environment settings messages
     pub(in crate::app) fn update_environment(&mut self, msg: EnvironmentMessage) -> Task<Message> {
-        
         let env = &mut self.settings.environment;
 
         match msg {
             EnvironmentMessage::AddVariable => {
                 let id = env.next_id;
                 env.next_id += 1;
-                env.variables.push(crate::config::models::EnvironmentVariable {
-                    id,
-                    name: String::new(),
-                    value: String::new(),
-                });
+                env.variables
+                    .push(crate::config::models::EnvironmentVariable {
+                        id,
+                        name: String::new(),
+                        value: String::new(),
+                    });
             }
             EnvironmentMessage::RemoveVariable(id) => {
                 env.variables.retain(|v| v.id != id);

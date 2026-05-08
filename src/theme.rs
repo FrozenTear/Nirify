@@ -3,14 +3,85 @@
 //! A refined dark theme with warm undertones and precise spacing.
 //! Inspired by professional creative tools and audio software.
 
-use iced::widget::{button, container};
 use iced::theme::Palette;
+use iced::widget::{button, container};
 use iced::{Border, Color, Shadow, Theme, Vector};
+
+/// Tokyo Neon color constants — shared across all screens
+pub mod neon {
+    use iced::Color;
+
+    pub const SURFACE_LOW: Color = Color::from_rgb(
+        0x11 as f32 / 255.0,
+        0x12 as f32 / 255.0,
+        0x1e as f32 / 255.0,
+    );
+    pub const SURFACE_CONTAINER: Color = Color::from_rgb(
+        0x17 as f32 / 255.0,
+        0x19 as f32 / 255.0,
+        0x26 as f32 / 255.0,
+    );
+    pub const SURFACE_CONTAINER_HIGH: Color = Color::from_rgb(
+        0x1d as f32 / 255.0,
+        0x1f as f32 / 255.0,
+        0x2d as f32 / 255.0,
+    );
+    pub const SURFACE_CONTAINER_HIGHEST: Color = Color::from_rgb(
+        0x23 as f32 / 255.0,
+        0x25 as f32 / 255.0,
+        0x34 as f32 / 255.0,
+    );
+    pub const SURFACE_BRIGHT: Color = Color::from_rgb(
+        0x29 as f32 / 255.0,
+        0x2b as f32 / 255.0,
+        0x3c as f32 / 255.0,
+    );
+    pub const ON_SURFACE: Color = Color::from_rgb(
+        0xee as f32 / 255.0,
+        0xec as f32 / 255.0,
+        0xfc as f32 / 255.0,
+    );
+    pub const ON_SURFACE_VARIANT: Color = Color::from_rgb(
+        0xaa as f32 / 255.0,
+        0xaa as f32 / 255.0,
+        0xb8 as f32 / 255.0,
+    );
+    pub const OUTLINE: Color = Color::from_rgb(
+        0x74 as f32 / 255.0,
+        0x74 as f32 / 255.0,
+        0x82 as f32 / 255.0,
+    );
+    pub const OUTLINE_VARIANT: Color = Color::from_rgb(
+        0x46 as f32 / 255.0,
+        0x47 as f32 / 255.0,
+        0x53 as f32 / 255.0,
+    );
+    pub const PRIMARY: Color = Color::from_rgb(
+        0xc1 as f32 / 255.0,
+        0xa0 as f32 / 255.0,
+        0xfe as f32 / 255.0,
+    );
+    pub const SECONDARY: Color = Color::from_rgb(
+        0x59 as f32 / 255.0,
+        0xe3 as f32 / 255.0,
+        0xfe as f32 / 255.0,
+    );
+    pub const TERTIARY: Color = Color::from_rgb(
+        0xff as f32 / 255.0,
+        0x8b as f32 / 255.0,
+        0x9f as f32 / 255.0,
+    );
+    pub const ERROR: Color = Color::from_rgb(
+        0xff as f32 / 255.0,
+        0x71 as f32 / 255.0,
+        0x6c as f32 / 255.0,
+    );
+}
 
 /// Font constants for consistent typography
 pub mod fonts {
-    use iced::Font;
     use iced::font::{Family, Weight};
+    use iced::Font;
 
     /// Primary UI font - clean, modern sans-serif
     /// Using system defaults for maximum compatibility
@@ -54,8 +125,10 @@ pub mod fonts {
 pub enum AppTheme {
     /// Follow system theme (portal or pywal/wallust)
     System,
-    /// Default niri theme with warm amber/teal palette
+    /// Tokyo Neon - Deep nocturnal dark with violet/cyan accents
     #[default]
+    TokyoNeon,
+    /// Niri Amber - Warm amber/teal palette
     NiriAmber,
     /// Catppuccin Latte - Light, creamy pastels
     CatppuccinLatte,
@@ -81,7 +154,6 @@ pub enum AppTheme {
     SolarizedLight,
 }
 
-
 impl AppTheme {
     /// Returns the iced Theme for this app theme
     ///
@@ -89,7 +161,8 @@ impl AppTheme {
     /// The actual system theme should be resolved by the App using `SystemThemeState`.
     pub fn to_iced_theme(self) -> Theme {
         match self {
-            AppTheme::System => build_niri_amber_theme(), // Fallback; App handles actual system theme
+            AppTheme::System => build_tokyo_neon_theme(), // Fallback; App handles actual system theme
+            AppTheme::TokyoNeon => build_tokyo_neon_theme(),
             AppTheme::NiriAmber => build_niri_amber_theme(),
             AppTheme::CatppuccinLatte => Theme::CatppuccinLatte,
             AppTheme::CatppuccinFrappe => Theme::CatppuccinFrappe,
@@ -110,7 +183,8 @@ impl AppTheme {
         &[
             // System theme first (follows desktop/wallpaper)
             AppTheme::System,
-            // Custom theme
+            // Custom themes
+            AppTheme::TokyoNeon,
             AppTheme::NiriAmber,
             // Catppuccin family (most popular)
             AppTheme::CatppuccinMocha,
@@ -133,6 +207,7 @@ impl AppTheme {
     pub fn name(self) -> &'static str {
         match self {
             AppTheme::System => "System (Auto)",
+            AppTheme::TokyoNeon => "Tokyo Neon (Dark)",
             AppTheme::NiriAmber => "Niri Amber (Dark)",
             AppTheme::CatppuccinLatte => "Catppuccin Latte (Light)",
             AppTheme::CatppuccinFrappe => "Catppuccin Frappé (Dark)",
@@ -172,6 +247,7 @@ impl std::str::FromStr for AppTheme {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "System" => Ok(Self::System),
+            "TokyoNeon" => Ok(Self::TokyoNeon),
             "NiriAmber" => Ok(Self::NiriAmber),
             "CatppuccinLatte" => Ok(Self::CatppuccinLatte),
             "CatppuccinFrappe" => Ok(Self::CatppuccinFrappe),
@@ -194,6 +270,7 @@ impl AppTheme {
     pub fn to_str(self) -> &'static str {
         match self {
             Self::System => "System",
+            Self::TokyoNeon => "TokyoNeon",
             Self::NiriAmber => "NiriAmber",
             Self::CatppuccinLatte => "CatppuccinLatte",
             Self::CatppuccinFrappe => "CatppuccinFrappe",
@@ -213,62 +290,75 @@ impl AppTheme {
 /// Custom color palette for Nirify
 pub struct NiriColors {
     // Background layers
-    pub bg_base: Color,           // #1a1d23 - Deep charcoal base
-    pub bg_surface: Color,        // #23272f - Elevated surfaces
-    pub bg_surface_hover: Color,  // #2a2f38 - Hover state
-    pub bg_input: Color,          // #2d323c - Input fields
+    pub bg_base: Color,          // #1a1d23 - Deep charcoal base
+    pub bg_surface: Color,       // #23272f - Elevated surfaces
+    pub bg_surface_hover: Color, // #2a2f38 - Hover state
+    pub bg_input: Color,         // #2d323c - Input fields
 
     // Text hierarchy
-    pub text_primary: Color,      // #e6e8eb - High contrast text
-    pub text_secondary: Color,    // #9ca3af - Secondary text
-    pub text_tertiary: Color,     // #6b7280 - Disabled/tertiary
+    pub text_primary: Color,   // #e6e8eb - High contrast text
+    pub text_secondary: Color, // #9ca3af - Secondary text
+    pub text_tertiary: Color,  // #6b7280 - Disabled/tertiary
 
     // Accent colors
-    pub accent_primary: Color,    // #f59e42 - Warm amber
-    pub accent_secondary: Color,  // #4fd1c5 - Teal cyan
-    pub accent_tertiary: Color,   // #8b5cf6 - Purple (for special states)
+    pub accent_primary: Color,   // #f59e42 - Warm amber
+    pub accent_secondary: Color, // #4fd1c5 - Teal cyan
+    pub accent_tertiary: Color,  // #8b5cf6 - Purple (for special states)
 
     // Semantic colors
-    pub success: Color,           // #10b981 - Green
-    pub warning: Color,           // #f59e0b - Amber
-    pub error: Color,             // #ef4444 - Red
+    pub success: Color, // #10b981 - Green
+    pub warning: Color, // #f59e0b - Amber
+    pub error: Color,   // #ef4444 - Red
 
     // Borders and dividers
-    pub border_subtle: Color,     // #3a3f4b - Subtle borders
-    pub border_strong: Color,     // #4b5563 - Strong borders
+    pub border_subtle: Color, // #3a3f4b - Subtle borders
+    pub border_strong: Color, // #4b5563 - Strong borders
 
     // Special effects
-    pub glow_accent: Color,       // #f59e42 with alpha - Warm glow
-    pub shadow_color: Color,      // Black with alpha - Shadows
+    pub glow_accent: Color,  // #f59e42 with alpha - Warm glow
+    pub shadow_color: Color, // Black with alpha - Shadows
 }
 
 impl Default for NiriColors {
     fn default() -> Self {
         Self {
-            bg_base: Color::from_rgb(0.102, 0.114, 0.137),           // #1a1d23
-            bg_surface: Color::from_rgb(0.137, 0.153, 0.184),        // #23272f
-            bg_surface_hover: Color::from_rgb(0.165, 0.184, 0.220),  // #2a2f38
-            bg_input: Color::from_rgb(0.176, 0.196, 0.235),          // #2d323c
+            bg_base: Color::from_rgb(0.102, 0.114, 0.137), // #1a1d23
+            bg_surface: Color::from_rgb(0.137, 0.153, 0.184), // #23272f
+            bg_surface_hover: Color::from_rgb(0.165, 0.184, 0.220), // #2a2f38
+            bg_input: Color::from_rgb(0.176, 0.196, 0.235), // #2d323c
 
-            text_primary: Color::from_rgb(0.902, 0.910, 0.922),      // #e6e8eb
-            text_secondary: Color::from_rgb(0.612, 0.639, 0.686),    // #9ca3af
-            text_tertiary: Color::from_rgb(0.420, 0.447, 0.502),     // #6b7280
+            text_primary: Color::from_rgb(0.902, 0.910, 0.922), // #e6e8eb
+            text_secondary: Color::from_rgb(0.612, 0.639, 0.686), // #9ca3af
+            text_tertiary: Color::from_rgb(0.420, 0.447, 0.502), // #6b7280
 
-            accent_primary: Color::from_rgb(0.961, 0.620, 0.259),    // #f59e42
-            accent_secondary: Color::from_rgb(0.310, 0.820, 0.773),  // #4fd1c5
-            accent_tertiary: Color::from_rgb(0.545, 0.361, 0.965),   // #8b5cf6
+            accent_primary: Color::from_rgb(0.961, 0.620, 0.259), // #f59e42
+            accent_secondary: Color::from_rgb(0.310, 0.820, 0.773), // #4fd1c5
+            accent_tertiary: Color::from_rgb(0.545, 0.361, 0.965), // #8b5cf6
 
-            success: Color::from_rgb(0.063, 0.725, 0.506),           // #10b981
-            warning: Color::from_rgb(0.961, 0.620, 0.043),           // #f59e0b
-            error: Color::from_rgb(0.937, 0.267, 0.267),             // #ef4444
+            success: Color::from_rgb(0.063, 0.725, 0.506), // #10b981
+            warning: Color::from_rgb(0.961, 0.620, 0.043), // #f59e0b
+            error: Color::from_rgb(0.937, 0.267, 0.267),   // #ef4444
 
-            border_subtle: Color::from_rgb(0.227, 0.247, 0.294),     // #3a3f4b
-            border_strong: Color::from_rgb(0.294, 0.333, 0.388),     // #4b5563
+            border_subtle: Color::from_rgb(0.227, 0.247, 0.294), // #3a3f4b
+            border_strong: Color::from_rgb(0.294, 0.333, 0.388), // #4b5563
 
             glow_accent: Color::from_rgba(0.961, 0.620, 0.259, 0.15), // #f59e42 with alpha
             shadow_color: Color::from_rgba(0.0, 0.0, 0.0, 0.25),
         }
     }
+}
+
+/// Builds the Tokyo Neon theme — deep space-void dark with violet/cyan accents
+fn build_tokyo_neon_theme() -> Theme {
+    let palette = Palette {
+        background: Color::from_rgb(0.047, 0.051, 0.094), // #0c0d18
+        text: Color::from_rgb(0.933, 0.925, 0.988),       // #eeecfc
+        primary: Color::from_rgb(0.757, 0.627, 0.996),    // #c1a0fe
+        success: Color::from_rgb(0.063, 0.725, 0.506),    // #10b981
+        warning: Color::from_rgb(0.961, 0.620, 0.043),    // #f59e0b
+        danger: Color::from_rgb(1.0, 0.443, 0.424),       // #ff716c
+    };
+    Theme::custom("Tokyo Neon".to_string(), palette)
 }
 
 /// Builds the custom NiriAmber theme from NiriColors palette
@@ -314,18 +404,16 @@ pub fn nav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> button:
 
         match status {
             button::Status::Hovered => button::Style {
-                background: Some(iced::Background::Color(
-                    if active {
-                        Color { a: 0.9, ..primary }
-                    } else {
-                        surface_hover
-                    }
-                )),
+                background: Some(iced::Background::Color(if active {
+                    Color { a: 0.9, ..primary }
+                } else {
+                    surface_hover
+                })),
                 text_color,
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: 8.0.into(),
+                    radius: 12.0.into(),
                 },
                 shadow: Shadow {
                     color: if active { glow } else { Color::TRANSPARENT },
@@ -335,18 +423,16 @@ pub fn nav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> button:
                 snap: false,
             },
             button::Status::Pressed => button::Style {
-                background: Some(iced::Background::Color(
-                    if active {
-                        Color { a: 0.8, ..primary }
-                    } else {
-                        surface
-                    }
-                )),
+                background: Some(iced::Background::Color(if active {
+                    Color { a: 0.8, ..primary }
+                } else {
+                    surface
+                })),
                 text_color,
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: 8.0.into(),
+                    radius: 12.0.into(),
                 },
                 shadow: Shadow::default(),
                 snap: false,
@@ -355,9 +441,13 @@ pub fn nav_tab_style(active: bool) -> impl Fn(&Theme, button::Status) -> button:
                 background: Some(iced::Background::Color(base_bg)),
                 text_color,
                 border: Border {
-                    color: if active { Color::TRANSPARENT } else { border_subtle },
+                    color: if active {
+                        Color::TRANSPARENT
+                    } else {
+                        border_subtle
+                    },
                     width: if active { 0.0 } else { 1.0 },
-                    radius: 8.0.into(),
+                    radius: 12.0.into(),
                 },
                 shadow: Shadow {
                     color: if active { glow } else { Color::TRANSPARENT },
@@ -582,21 +672,20 @@ pub fn search_dropdown_item_style() -> impl Fn(&Theme, button::Status) -> button
 /// Respects the current theme's color palette.
 pub fn card_style(theme: &Theme) -> container::Style {
     let palette = theme.palette();
-    // Derive surface color: slightly lighter than background
-    let surface = lighten(palette.background, 0.05);
-    let border = lighten(palette.background, 0.12);
+    // Derive surface color: tonal shift for depth (no border)
+    let surface = lighten(palette.background, 0.07);
 
     container::Style {
         background: Some(iced::Background::Color(surface)),
         border: Border {
-            color: border,
-            width: 1.0,
-            radius: 8.0.into(),
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 12.0.into(),
         },
         shadow: Shadow {
-            color: Color::from_rgba(0.0, 0.0, 0.0, 0.2),
+            color: Color::from_rgba(0.0, 0.0, 0.0, 0.15),
             offset: Vector::new(0.0, 2.0),
-            blur_radius: 6.0,
+            blur_radius: 8.0,
         },
         text_color: Some(palette.text),
         snap: false,
@@ -608,8 +697,14 @@ pub fn card_style(theme: &Theme) -> container::Style {
 pub fn info_block_style(theme: &Theme) -> container::Style {
     let palette = theme.palette();
     // Use success color with low opacity for info blocks
-    let tint = Color { a: 0.15, ..palette.success };
-    let border = Color { a: 0.4, ..palette.success };
+    let tint = Color {
+        a: 0.15,
+        ..palette.success
+    };
+    let border = Color {
+        a: 0.4,
+        ..palette.success
+    };
 
     container::Style {
         background: Some(iced::Background::Color(tint)),
@@ -622,6 +717,12 @@ pub fn info_block_style(theme: &Theme) -> container::Style {
         text_color: Some(palette.text),
         snap: false,
     }
+}
+
+/// Helper: Lighten a color by a factor (0.0 = no change, 1.0 = white)
+/// Public version for use in view code
+pub fn lighten_pub(color: Color, factor: f32) -> Color {
+    lighten(color, factor)
 }
 
 /// Helper: Lighten a color by a factor (0.0 = no change, 1.0 = white)
@@ -682,5 +783,148 @@ pub fn code_text_container(theme: &Theme) -> container::Style {
     container::Style {
         text_color: Some(Color { a: 0.85, ..success }),
         ..Default::default()
+    }
+}
+
+/// Button style for sidebar navigation items
+pub fn sidebar_item_style(active: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
+    move |theme, status| {
+        let palette = theme.palette();
+        let primary = palette.primary;
+        let bg = palette.background;
+        let text = palette.text;
+
+        let surface_hover = lighten(bg, 0.10);
+        let text_secondary = Color { a: 0.6, ..text };
+        let active_bg = Color { a: 0.15, ..primary };
+
+        let (base_bg, text_color) = if active {
+            (active_bg, primary)
+        } else {
+            (Color::TRANSPARENT, text_secondary)
+        };
+
+        match status {
+            button::Status::Hovered => button::Style {
+                background: Some(iced::Background::Color(if active {
+                    Color { a: 0.20, ..primary }
+                } else {
+                    surface_hover
+                })),
+                text_color: if active { primary } else { text },
+                border: Border {
+                    color: if active {
+                        Color { a: 0.3, ..primary }
+                    } else {
+                        Color::TRANSPARENT
+                    },
+                    width: 0.0,
+                    radius: 12.0.into(),
+                },
+                shadow: Shadow::default(),
+                snap: false,
+            },
+            button::Status::Pressed => button::Style {
+                background: Some(iced::Background::Color(if active {
+                    Color { a: 0.25, ..primary }
+                } else {
+                    lighten(bg, 0.08)
+                })),
+                text_color: if active { primary } else { text },
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: 12.0.into(),
+                },
+                shadow: Shadow::default(),
+                snap: false,
+            },
+            _ => button::Style {
+                background: Some(iced::Background::Color(base_bg)),
+                text_color,
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: 12.0.into(),
+                },
+                shadow: Shadow::default(),
+                snap: false,
+            },
+        }
+    }
+}
+
+/// Container style for the sidebar panel
+pub fn sidebar_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    let surface = lighten(palette.background, 0.03);
+
+    container::Style {
+        background: Some(iced::Background::Color(surface)),
+        border: Border {
+            color: lighten(palette.background, 0.08),
+            width: 0.0,
+            radius: 0.0.into(),
+        },
+        shadow: Shadow::default(),
+        text_color: Some(palette.text),
+        snap: false,
+    }
+}
+
+/// Status pill variant
+#[derive(Debug, Clone, Copy)]
+pub enum PillVariant {
+    Active,
+    Warning,
+    Error,
+    Muted,
+}
+
+/// Container style for status pills
+pub fn status_pill_style(theme: &Theme, variant: PillVariant) -> container::Style {
+    let palette = theme.palette();
+
+    let (bg_color, text_color) = match variant {
+        PillVariant::Active => (
+            Color {
+                a: 0.15,
+                ..palette.success
+            },
+            palette.success,
+        ),
+        PillVariant::Warning => (
+            Color {
+                a: 0.15,
+                ..palette.warning
+            },
+            palette.warning,
+        ),
+        PillVariant::Error => (
+            Color {
+                a: 0.15,
+                ..palette.danger
+            },
+            palette.danger,
+        ),
+        PillVariant::Muted => (
+            lighten(palette.background, 0.10),
+            Color {
+                a: 0.6,
+                ..palette.text
+            },
+        ),
+    };
+
+    container::Style {
+        background: Some(iced::Background::Color(bg_color)),
+        border: Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 999.0.into(),
+        },
+        shadow: Shadow::default(),
+        text_color: Some(text_color),
+        snap: false,
     }
 }

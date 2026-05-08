@@ -1,6 +1,6 @@
 //! Tools page message handler (IPC operations)
 
-use crate::messages::{ToolsMessage, Message};
+use crate::messages::{Message, ToolsMessage};
 use iced::Task;
 
 impl super::super::App {
@@ -66,10 +66,8 @@ impl super::super::App {
                 match result {
                     Ok(workspaces) => {
                         // Extract named workspaces for use in dropdowns (e.g., window rules)
-                        self.ui.available_workspaces = workspaces
-                            .iter()
-                            .filter_map(|w| w.name.clone())
-                            .collect();
+                        self.ui.available_workspaces =
+                            workspaces.iter().filter_map(|w| w.name.clone()).collect();
                         self.ui.tools_state.workspaces = workspaces;
                     }
                     Err(e) => {

@@ -1,15 +1,13 @@
 //! Workspaces settings message handler
 
-use crate::config::SettingsCategory;
 use crate::config::models::NamedWorkspace;
-use crate::messages::{WorkspacesMessage, Message};
+use crate::config::SettingsCategory;
+use crate::messages::{Message, WorkspacesMessage};
 use iced::Task;
 
 impl super::super::App {
     /// Updates workspaces settings
     pub(in crate::app) fn update_workspaces(&mut self, msg: WorkspacesMessage) -> Task<Message> {
-        
-
         match msg {
             WorkspacesMessage::AddWorkspace => {
                 let id = self.settings.workspaces.next_id;
@@ -17,7 +15,10 @@ impl super::super::App {
 
                 let new_workspace = NamedWorkspace {
                     id,
-                    name: format!("Workspace {}", self.settings.workspaces.workspaces.len() + 1),
+                    name: format!(
+                        "Workspace {}",
+                        self.settings.workspaces.workspaces.len() + 1
+                    ),
                     open_on_output: None,
                     layout_override: None,
                 };
@@ -50,7 +51,6 @@ impl super::super::App {
                 }
             }
         }
-
 
         self.save.dirty_tracker.mark(SettingsCategory::Workspaces);
         self.mark_changed();

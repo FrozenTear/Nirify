@@ -139,7 +139,14 @@ impl std::fmt::Display for ModKey {
 impl ModKey {
     /// Returns all possible values for UI pickers
     pub fn all() -> &'static [Self] {
-        &[Self::Super, Self::Alt, Self::Ctrl, Self::Shift, Self::Mod3, Self::Mod5]
+        &[
+            Self::Super,
+            Self::Alt,
+            Self::Ctrl,
+            Self::Shift,
+            Self::Mod3,
+            Self::Mod5,
+        ]
     }
 
     /// Convert to KDL string representation
@@ -226,7 +233,12 @@ impl std::fmt::Display for ScrollMethod {
 
 impl ScrollMethod {
     pub fn all() -> &'static [Self] {
-        &[Self::TwoFinger, Self::Edge, Self::OnButtonDown, Self::NoScroll]
+        &[
+            Self::TwoFinger,
+            Self::Edge,
+            Self::OnButtonDown,
+            Self::NoScroll,
+        ]
     }
 }
 
@@ -527,7 +539,12 @@ impl std::fmt::Display for HueInterpolation {
 
 impl HueInterpolation {
     pub fn all() -> &'static [Self] {
-        &[Self::Shorter, Self::Longer, Self::Increasing, Self::Decreasing]
+        &[
+            Self::Shorter,
+            Self::Longer,
+            Self::Increasing,
+            Self::Decreasing,
+        ]
     }
 
     /// Convert to KDL string representation

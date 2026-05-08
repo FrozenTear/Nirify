@@ -286,9 +286,7 @@ pub fn generate_mouse_kdl(settings: &MouseSettings) -> String {
 pub fn generate_touchpad_kdl(settings: &TouchpadSettings) -> String {
     // Pre-allocate ~768 bytes for typical touchpad config (more options than mouse)
     let mut content = String::with_capacity(768);
-    content.push_str(
-        "// Touchpad settings - managed by Nirify\n\ninput {\n    touchpad {\n",
-    );
+    content.push_str("// Touchpad settings - managed by Nirify\n\ninput {\n    touchpad {\n");
 
     // Check if device is disabled
     if settings.off {

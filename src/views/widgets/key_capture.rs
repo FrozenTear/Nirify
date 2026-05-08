@@ -9,9 +9,9 @@ use iced::{Border, Color as IcedColor, Element, Length};
 /// State for key capture widget
 #[derive(Debug, Clone, PartialEq)]
 pub enum KeyCaptureState {
-    Idle(String),        // Displaying current binding
-    Capturing,           // Waiting for key press
-    Captured(String),    // Just captured, showing preview
+    Idle(String),     // Displaying current binding
+    Capturing,        // Waiting for key press
+    Captured(String), // Just captured, showing preview
 }
 
 impl Default for KeyCaptureState {
@@ -24,10 +24,7 @@ impl Default for KeyCaptureState {
 #[derive(Debug, Clone)]
 pub enum KeyCaptureMessage {
     StartCapture,
-    KeyPressed {
-        key: Key,
-        modifiers: Modifiers,
-    },
+    KeyPressed { key: Key, modifiers: Modifiers },
     CancelCapture,
     ConfirmCapture,
 }
@@ -43,15 +40,9 @@ pub fn key_capture_row<'a, Message: Clone + 'a>(
 ) -> Element<'a, Message> {
     // Use owned String to avoid memory leaks (text() accepts Into<String>)
     let display_text: String = match state {
-        KeyCaptureState::Idle(binding) if binding.is_empty() => {
-            "Click to set...".to_string()
-        }
-        KeyCaptureState::Idle(binding) => {
-            binding.clone()
-        }
-        KeyCaptureState::Capturing => {
-            "Press any key... (ESC to cancel)".to_string()
-        }
+        KeyCaptureState::Idle(binding) if binding.is_empty() => "Click to set...".to_string(),
+        KeyCaptureState::Idle(binding) => binding.clone(),
+        KeyCaptureState::Capturing => "Press any key... (ESC to cancel)".to_string(),
         KeyCaptureState::Captured(binding) => {
             format!("{} (click Confirm)", binding)
         }
@@ -103,7 +94,7 @@ pub fn key_capture_row<'a, Message: Clone + 'a>(
                     background: Some(iced::Background::Color(IcedColor::from_rgb(0.2, 0.8, 0.2))),
                     text_color: IcedColor::from_rgb(1.0, 1.0, 1.0),
                     ..Default::default()
-                })
+                }),
         );
         content = content.push(
             button(text("✗"))
@@ -113,13 +104,11 @@ pub fn key_capture_row<'a, Message: Clone + 'a>(
                     background: Some(iced::Background::Color(IcedColor::from_rgb(0.8, 0.2, 0.2))),
                     text_color: IcedColor::from_rgb(1.0, 1.0, 1.0),
                     ..Default::default()
-                })
+                }),
         );
     }
 
-    container(content)
-        .padding(12)
-        .into()
+    container(content).padding(12).into()
 }
 
 /// Format a key combination into a human-readable string

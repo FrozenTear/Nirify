@@ -51,9 +51,9 @@ pub fn parse_misc_from_doc(doc: &KdlDocument, settings: &mut Settings) {
         }
     }
 
-    // Spawn commands through shell (v25.08+)
-    if has_flag(doc, &["spawn-sh-at-startup"]) {
-        settings.miscellaneous.spawn_sh_at_startup = true;
+    // Spawn command through shell at startup (v25.08+)
+    if let Some(v) = get_string(doc, &["spawn-sh-at-startup"]) {
+        settings.miscellaneous.spawn_sh_at_startup = v;
     }
 
     // XWayland satellite (v25.08+)

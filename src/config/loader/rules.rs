@@ -170,6 +170,8 @@ where
 ///
 /// Shared parsing logic used by both file loader and import.
 pub fn parse_layer_rule_node_children(children: &KdlDocument, rule: &mut LayerRule) {
+    rule.enabled = !has_flag(children, &["off"]);
+
     // Parse matches
     rule.matches.clear();
     for match_node in children.nodes() {
@@ -319,6 +321,7 @@ pub fn load_layer_rules(path: &Path, settings: &mut Settings) {
 ///
 /// Shared parsing logic used by both file loader and import.
 pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut WindowRule) {
+    rule.enabled = !has_flag(wr_children, &["off"]);
     rule.matches.clear();
     rule.excludes.clear();
 
@@ -585,6 +588,11 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
     // Focus ring overrides
     if let Some(fr) = wr_children.get("focus-ring") {
         if let Some(fr_children) = fr.children() {
+            if has_flag(fr_children, &["off"]) {
+                rule.focus_ring_enabled = Some(false);
+            } else if has_flag(fr_children, &["on"]) {
+                rule.focus_ring_enabled = Some(true);
+            }
             if let Some(v) = get_i64(fr_children, &["width"]) {
                 rule.focus_ring_width = safe_i64_to_i32(v, "focus-ring width");
             }
@@ -609,6 +617,11 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
     // Border overrides
     if let Some(border) = wr_children.get("border") {
         if let Some(border_children) = border.children() {
+            if has_flag(border_children, &["off"]) {
+                rule.border_enabled = Some(false);
+            } else if has_flag(border_children, &["on"]) {
+                rule.border_enabled = Some(true);
+            }
             if let Some(v) = get_i64(border_children, &["width"]) {
                 rule.border_width = safe_i64_to_i32(v, "border width");
             }
@@ -785,4 +798,32 @@ pub fn load_window_rules(path: &Path, settings: &mut Settings) {
     let (rules, next_id) = load_rules(path, "window-rule", "Rule", parse_window_rule_node_children);
     settings.window_rules.rules = rules;
     settings.window_rules.next_id = next_id;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::parser::parse_document;
+
+    #[test]
+    fn parse_layer_rule_node_children_reads_off_flag() {
+        let document = parse_document("layer-rule {\n    off\n}\n").unwrap();
+        let children = document.get("layer-rule").unwrap().children().unwrap();
+        let mut rule = LayerRule::default();
+
+        parse_layer_rule_node_children(children, &mut rule);
+
+        assert!(!rule.enabled);
+    }
+
+    #[test]
+    fn parse_window_rule_node_children_reads_off_flag() {
+        let document = parse_document("window-rule {\n    off\n}\n").unwrap();
+        let children = document.get("window-rule").unwrap().children().unwrap();
+        let mut rule = WindowRule::default();
+
+        parse_window_rule_node_children(children, &mut rule);
+
+        assert!(!rule.enabled);
+    }
 }

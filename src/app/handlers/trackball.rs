@@ -1,13 +1,12 @@
 //! Trackball settings message handler
 
 use crate::config::SettingsCategory;
-use crate::messages::{TrackballMessage, Message};
+use crate::messages::{Message, TrackballMessage};
 use iced::Task;
 
 impl super::super::App {
     /// Handle trackball settings messages
     pub(in crate::app) fn update_trackball(&mut self, msg: TrackballMessage) -> Task<Message> {
-        
         let trackball = &mut self.settings.trackball;
 
         match msg {
