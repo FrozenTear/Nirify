@@ -32,6 +32,22 @@ pub enum NodeClassification {
     Unmanaged,
 }
 
+/// An `include` directive whose target file overlaps with Nirify-managed sections.
+///
+/// Niri merges top-level nodes across includes; for repeated single-instance
+/// blocks (e.g. `layout`), the later include wins. So a user-managed include
+/// that defines `layout` will silently override Nirify's layout settings unless
+/// Nirify's own include comes after it in `config.kdl`.
+#[derive(Debug, Clone)]
+pub struct ConflictingInclude {
+    /// Path as it appears in the include directive (e.g. `./cfg/layout.kdl`).
+    pub include_path: String,
+    /// Resolved absolute path of the included file.
+    pub resolved_path: PathBuf,
+    /// Names of top-level managed nodes found in the included file.
+    pub conflicting_nodes: Vec<String>,
+}
+
 /// Result of analyzing a config.kdl file
 #[derive(Debug)]
 pub struct ConfigAnalysis {
@@ -41,12 +57,49 @@ pub struct ConfigAnalysis {
     pub node_classifications: Vec<(usize, NodeClassification)>,
     /// Whether our include line already exists
     pub has_nirify_include: bool,
+    /// Number of Nirify include lines found (for duplicate detection)
+    pub nirify_include_count: usize,
+    /// Index of the last Nirify include line (for "include is last" check)
+    pub nirify_include_idx: Option<usize>,
     /// Count of managed nodes that will be removed
     pub managed_count: usize,
     /// Count of unmanaged nodes that will be preserved
     pub unmanaged_count: usize,
     /// Original file content
     pub original_content: String,
+    /// Other includes whose contents declare top-level managed nodes.
+    /// Even after we put Nirify's include last, surfacing these lets the UI
+    /// offer a one-shot import flow.
+    pub conflicting_includes: Vec<ConflictingInclude>,
+}
+
+impl ConfigAnalysis {
+    /// Whether smart_replace needs to rewrite the file.
+    ///
+    /// Returns true if any of the following holds:
+    /// - There are top-level managed nodes that should be removed.
+    /// - The Nirify include is missing.
+    /// - There are duplicate Nirify include lines.
+    /// - The Nirify include is not the last top-level node (so later content
+    ///   could override its values).
+    pub fn needs_rewrite(&self) -> bool {
+        if self.managed_count > 0 {
+            return true;
+        }
+        if !self.has_nirify_include {
+            return true;
+        }
+        if self.nirify_include_count > 1 {
+            return true;
+        }
+        let nodes_len = self.document.nodes().len();
+        if let Some(idx) = self.nirify_include_idx {
+            if idx != nodes_len.saturating_sub(1) {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 /// Result of the smart replace operation
@@ -62,6 +115,10 @@ pub struct SmartReplaceResult {
     pub include_added: bool,
     /// Any warnings generated during the process
     pub warnings: Vec<String>,
+    /// Other includes whose targets contain managed nodes.
+    /// Nirify's include is now placed last so it wins ties, but these
+    /// overlaps are surfaced so a future import flow can offer to absorb them.
+    pub conflicting_includes: Vec<ConflictingInclude>,
 }
 
 /// Top-level node names managed by Nirify
@@ -116,6 +173,78 @@ fn is_nirify_include(node: &KdlNode) -> bool {
         .unwrap_or(false)
 }
 
+/// Resolve the path of an `include` directive against `config.kdl`'s parent.
+///
+/// Returns `None` for tilde-prefixed paths because niri itself does not expand
+/// tildes in includes (see paths.rs::migrate_include_line); we don't want to
+/// scan a file niri can't actually load.
+fn resolve_include_path(include_value: &str, config_parent: &Path) -> Option<PathBuf> {
+    if include_value.starts_with("~/") || include_value == "~" {
+        return None;
+    }
+    let p = Path::new(include_value);
+    if p.is_absolute() {
+        Some(p.to_path_buf())
+    } else {
+        Some(config_parent.join(p))
+    }
+}
+
+/// Read an included file and collect any top-level managed nodes it declares.
+///
+/// Returns `None` if the file can't be read/parsed or contains no managed
+/// nodes — only files that actually conflict are surfaced.
+fn scan_include_for_conflicts(
+    include_value: &str,
+    config_parent: &Path,
+) -> Option<ConflictingInclude> {
+    let resolved = resolve_include_path(include_value, config_parent)?;
+    let content = match fs::read_to_string(&resolved) {
+        Ok(c) => c,
+        Err(e) => {
+            debug!(
+                "Could not read included file {:?} for conflict scan: {}",
+                resolved, e
+            );
+            return None;
+        }
+    };
+    let doc: KdlDocument = match content.parse() {
+        Ok(d) => d,
+        Err(e) => {
+            debug!(
+                "Could not parse included file {:?} for conflict scan: {}",
+                resolved, e
+            );
+            return None;
+        }
+    };
+
+    let mut seen = std::collections::HashSet::new();
+    let conflicting_nodes: Vec<String> = doc
+        .nodes()
+        .iter()
+        .filter_map(|n| {
+            let name = n.name().value();
+            if is_managed_node(name) && seen.insert(name.to_string()) {
+                Some(name.to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if conflicting_nodes.is_empty() {
+        None
+    } else {
+        Some(ConflictingInclude {
+            include_path: include_value.to_string(),
+            resolved_path: resolved,
+            conflicting_nodes,
+        })
+    }
+}
+
 /// Analyze a config.kdl file and classify its nodes
 ///
 /// Returns a ConfigAnalysis with node classifications for smart replacement.
@@ -127,11 +256,18 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
         .parse()
         .with_context(|| format!("Failed to parse {:?} as KDL", config_path))?;
 
+    let config_parent = config_path
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+
     let mut node_classifications = Vec::new();
     let mut has_nirify_include = false;
     let mut nirify_include_count = 0;
+    let mut nirify_include_idx: Option<usize> = None;
     let mut managed_count = 0;
     let mut unmanaged_count = 0;
+    let mut conflicting_includes: Vec<ConflictingInclude> = Vec::new();
 
     for (idx, node) in document.nodes().iter().enumerate() {
         let name = node.name().value();
@@ -139,11 +275,21 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
         let classification = if is_nirify_include(node) {
             has_nirify_include = true;
             nirify_include_count += 1;
+            nirify_include_idx = Some(idx);
             debug!("Found existing Nirify include at index {}", idx);
             NodeClassification::NirifyInclude
         } else if name == "include" {
             unmanaged_count += 1;
             debug!("Found other include at index {}: preserving", idx);
+            if let Some(value) = node.entries().first().and_then(|e| e.value().as_string()) {
+                if let Some(conflict) = scan_include_for_conflicts(value, &config_parent) {
+                    debug!(
+                        "Include {:?} declares managed nodes: {:?}",
+                        value, conflict.conflicting_nodes
+                    );
+                    conflicting_includes.push(conflict);
+                }
+            }
             NodeClassification::OtherInclude
         } else if is_managed_node(name) {
             managed_count += 1;
@@ -165,8 +311,11 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
     }
 
     info!(
-        "Config analysis: {} managed, {} unmanaged, Nirify include: {}",
-        managed_count, unmanaged_count, has_nirify_include
+        "Config analysis: {} managed, {} unmanaged, Nirify include: {}, conflicting includes: {}",
+        managed_count,
+        unmanaged_count,
+        has_nirify_include,
+        conflicting_includes.len()
     );
 
     // Warn about duplicate includes (they will all be removed and replaced with one)
@@ -177,13 +326,24 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
         );
     }
 
+    for conflict in &conflicting_includes {
+        warn!(
+            "Include {:?} defines managed nodes {:?} — Nirify settings for these sections \
+             only apply because the Nirify include is placed last",
+            conflict.include_path, conflict.conflicting_nodes
+        );
+    }
+
     Ok(ConfigAnalysis {
         document,
         node_classifications,
         has_nirify_include,
+        nirify_include_count,
+        nirify_include_idx,
         managed_count,
         unmanaged_count,
         original_content,
+        conflicting_includes,
     })
 }
 
@@ -199,29 +359,33 @@ include "nirify/main.kdl"
     .to_string()
 }
 
-/// Generate a new config.kdl preserving unmanaged content
+/// Generate a new config.kdl preserving unmanaged content.
+///
+/// The Nirify include is placed **last** so its top-level nodes win ties
+/// against any earlier `include` directives that declare the same sections
+/// (niri uses last-write-wins for repeated single-instance blocks like
+/// `layout`).
 fn generate_replaced_config(analysis: &ConfigAnalysis) -> String {
     let mut content = String::with_capacity(4096);
 
-    // Header comment
     content.push_str("// Configuration managed by Nirify\n");
     content.push_str("// Backup of original config saved before modification\n");
     content.push_str("//\n");
     content.push_str("// Managed settings (appearance, input, behavior, etc.) are in:\n");
     content.push_str("//   nirify/\n");
     content.push_str("//\n");
-    content.push_str("// Your custom settings below are preserved.\n\n");
+    content.push_str("// Your custom content is preserved above; the Nirify include is\n");
+    content.push_str("// placed at the end so its values win over any earlier includes\n");
+    content.push_str("// that define the same sections.\n");
 
-    // Add our include line (relative path from config.kdl location)
-    content.push_str("// === Nirify managed configuration ===\n");
-    content.push_str("include \"nirify/main.kdl\"\n");
-
-    // Extract and add unmanaged content
     let unmanaged = extract_unmanaged_nodes(analysis);
     if !unmanaged.is_empty() {
         content.push_str("\n// === Your custom configuration (preserved) ===\n");
         content.push_str(&unmanaged);
     }
+
+    content.push_str("\n// === Nirify managed configuration ===\n");
+    content.push_str("include \"nirify/main.kdl\"\n");
 
     content
 }
@@ -281,6 +445,7 @@ pub fn smart_replace_config(config_path: &Path, backup_dir: &Path) -> Result<Sma
             preserved_count: 0,
             include_added: true,
             warnings,
+            conflicting_includes: Vec::new(),
         });
     }
 
@@ -315,13 +480,25 @@ pub fn smart_replace_config(config_path: &Path, backup_dir: &Path) -> Result<Sma
                 preserved_count: 0,
                 include_added: true,
                 warnings,
+                conflicting_includes: Vec::new(),
             });
         }
     };
 
-    // Check if already set up with no managed nodes to clean
-    if analysis.has_nirify_include && analysis.managed_count == 0 {
-        info!("Config already set up with Nirify include, no changes needed");
+    // Append conflict warnings to the result so callers can surface them even
+    // if no rewrite is needed (e.g. a future "import these settings?" prompt).
+    for conflict in &analysis.conflicting_includes {
+        warnings.push(format!(
+            "Include {:?} defines managed sections {:?}; Nirify's include is placed last so it wins",
+            conflict.include_path, conflict.conflicting_nodes
+        ));
+    }
+
+    // Skip the rewrite when the config is already in the desired shape:
+    // include exists, no top-level managed nodes, no duplicates, and the
+    // include is the last node.
+    if !analysis.needs_rewrite() {
+        info!("Config already set up with Nirify include last, no changes needed");
         warnings.push("Config already set up, no changes needed".to_string());
         return Ok(SmartReplaceResult {
             backup_path: PathBuf::new(),
@@ -329,6 +506,7 @@ pub fn smart_replace_config(config_path: &Path, backup_dir: &Path) -> Result<Sma
             preserved_count: analysis.unmanaged_count,
             include_added: false,
             warnings,
+            conflicting_includes: analysis.conflicting_includes.clone(),
         });
     }
 
@@ -384,6 +562,7 @@ pub fn smart_replace_config(config_path: &Path, backup_dir: &Path) -> Result<Sma
         preserved_count: analysis.unmanaged_count,
         include_added: !analysis.has_nirify_include,
         warnings,
+        conflicting_includes: analysis.conflicting_includes,
     })
 }
 
@@ -440,5 +619,194 @@ mod tests {
 
         // animations is managed
         assert!(is_managed_node(nodes[3].name().value()));
+    }
+
+    /// Helper: write a config and run smart_replace_config against it.
+    fn run_smart_replace(
+        config_contents: &str,
+        extra_files: &[(&str, &str)],
+    ) -> (tempfile::TempDir, PathBuf, SmartReplaceResult) {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let niri_dir = temp_dir.path().join("niri");
+        std::fs::create_dir_all(&niri_dir).unwrap();
+        let config_path = niri_dir.join("config.kdl");
+        std::fs::write(&config_path, config_contents).unwrap();
+
+        for (rel_path, body) in extra_files {
+            let p = niri_dir.join(rel_path);
+            if let Some(parent) = p.parent() {
+                std::fs::create_dir_all(parent).unwrap();
+            }
+            std::fs::write(p, body).unwrap();
+        }
+
+        let backup_dir = temp_dir.path().join(".nirify-backups");
+        let result = smart_replace_config(&config_path, &backup_dir).unwrap();
+        (temp_dir, config_path, result)
+    }
+
+    #[test]
+    fn test_generated_config_places_nirify_include_last() {
+        // User has unmanaged content (other includes). After rewrite, the
+        // Nirify include must appear after them so its values win on overlap.
+        let original = r#"
+            include "./cfg/layout.kdl"
+            include "./cfg/animation.kdl"
+            custom-marker "hi"
+        "#;
+        let (_t, config_path, _result) = run_smart_replace(original, &[]);
+        let new_content = std::fs::read_to_string(&config_path).unwrap();
+
+        let nirify_pos = new_content
+            .find("include \"nirify/main.kdl\"")
+            .expect("nirify include present");
+        let cfg_layout_pos = new_content
+            .find("./cfg/layout.kdl")
+            .expect("user include preserved");
+        let cfg_anim_pos = new_content
+            .find("./cfg/animation.kdl")
+            .expect("user include preserved");
+        let custom_pos = new_content
+            .find("custom-marker")
+            .expect("custom node preserved");
+
+        assert!(
+            nirify_pos > cfg_layout_pos
+                && nirify_pos > cfg_anim_pos
+                && nirify_pos > custom_pos,
+            "Nirify include should be placed after preserved content.\n\nGot:\n{}",
+            new_content
+        );
+
+        // Sanity check the generated content parses as KDL.
+        new_content
+            .parse::<KdlDocument>()
+            .expect("Generated config should parse");
+    }
+
+    #[test]
+    fn test_rewrite_when_nirify_include_not_last() {
+        // Simulates the user's reported case: Nirify include first, user
+        // includes after it (which silently override managed sections).
+        let original = "\
+include \"nirify/main.kdl\"
+
+include \"./cfg/layout.kdl\"
+include \"./cfg/animation.kdl\"
+";
+        let (_t, config_path, result) = run_smart_replace(original, &[]);
+
+        // It should have rewritten (backup created).
+        assert!(
+            !result.backup_path.as_os_str().is_empty(),
+            "Expected a backup to be written when reordering"
+        );
+
+        let new_content = std::fs::read_to_string(&config_path).unwrap();
+        let nirify_pos = new_content
+            .find("include \"nirify/main.kdl\"")
+            .expect("nirify include present");
+        let cfg_layout_pos = new_content
+            .find("./cfg/layout.kdl")
+            .expect("user include preserved");
+        assert!(
+            nirify_pos > cfg_layout_pos,
+            "Nirify include should be reordered after user includes.\n\nGot:\n{}",
+            new_content
+        );
+
+        // Re-running on the now-correctly-ordered config should be a no-op.
+        let backup_dir = config_path
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join(".nirify-backups");
+        let second = smart_replace_config(&config_path, &backup_dir).unwrap();
+        assert!(
+            second.backup_path.as_os_str().is_empty(),
+            "Second run should be a no-op (no new backup)"
+        );
+    }
+
+    #[test]
+    fn test_no_rewrite_when_already_correctly_ordered() {
+        // Nirify include is the only and last node — nothing to do.
+        let original = r#"
+custom-marker "hi"
+
+include "nirify/main.kdl"
+"#;
+        let (_t, _config_path, result) = run_smart_replace(original, &[]);
+        assert!(
+            result.backup_path.as_os_str().is_empty(),
+            "Should not rewrite when already correctly ordered"
+        );
+        assert_eq!(result.replaced_count, 0);
+    }
+
+    #[test]
+    fn test_detects_conflicting_other_include() {
+        // User has `include "./cfg/layout.kdl"` and that file declares a
+        // top-level managed `layout` node — we should surface it as a conflict.
+        let original = r#"
+include "./cfg/layout.kdl"
+"#;
+        let layout_body = r#"layout {
+            gaps 16
+        }
+        "#;
+        let (_t, _config_path, result) =
+            run_smart_replace(original, &[("cfg/layout.kdl", layout_body)]);
+
+        assert_eq!(
+            result.conflicting_includes.len(),
+            1,
+            "Expected exactly one conflicting include, got {:?}",
+            result.conflicting_includes
+        );
+        let conflict = &result.conflicting_includes[0];
+        assert_eq!(conflict.include_path, "./cfg/layout.kdl");
+        assert!(
+            conflict
+                .conflicting_nodes
+                .iter()
+                .any(|n| n == "layout"),
+            "Expected `layout` in conflicting_nodes, got {:?}",
+            conflict.conflicting_nodes
+        );
+    }
+
+    #[test]
+    fn test_no_conflict_for_unmanaged_other_include() {
+        // Other include exists but only defines a custom (non-managed) node.
+        let original = r#"
+include "./cfg/custom.kdl"
+
+include "nirify/main.kdl"
+"#;
+        let custom_body = r#"my-custom-node "value"
+"#;
+        let (_t, _config_path, result) =
+            run_smart_replace(original, &[("cfg/custom.kdl", custom_body)]);
+        assert!(
+            result.conflicting_includes.is_empty(),
+            "Unmanaged include should not be flagged: {:?}",
+            result.conflicting_includes
+        );
+    }
+
+    #[test]
+    fn test_resolve_include_path_skips_tilde() {
+        let parent = Path::new("/some/dir");
+        assert!(resolve_include_path("~/foo.kdl", parent).is_none());
+        assert_eq!(
+            resolve_include_path("./cfg/x.kdl", parent),
+            Some(PathBuf::from("/some/dir/./cfg/x.kdl"))
+        );
+        assert_eq!(
+            resolve_include_path("/abs/x.kdl", parent),
+            Some(PathBuf::from("/abs/x.kdl"))
+        );
     }
 }
