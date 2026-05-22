@@ -114,12 +114,12 @@ pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
 
             // place-within-backdrop
             if rule.place_within_backdrop {
-                content.push_str("    place-within-backdrop\n");
+                content.push_str("    place-within-backdrop true\n");
             }
 
             // baba-is-float
             if rule.baba_is_float {
-                content.push_str("    baba-is-float\n");
+                content.push_str("    baba-is-float true\n");
             }
 
             // shadow
@@ -139,7 +139,7 @@ pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
                         shadow.inactive_color.to_hex()
                     ));
                     if shadow.draw_behind_window {
-                        content.push_str("        draw-behind-window\n");
+                        content.push_str("        draw-behind-window true\n");
                     }
                     content.push_str("    }\n");
                 }
@@ -227,7 +227,7 @@ pub fn generate_window_rules_kdl(
                 });
             }
 
-            // Opening behavior (these are flags in KDL, not boolean properties)
+            // Opening behavior (niri expects an explicit boolean argument)
             match rule.open_behavior {
                 OpenBehavior::Maximized => {
                     content.push_str("    open-maximized true\n");
@@ -314,7 +314,7 @@ pub fn generate_window_rules_kdl(
 
             // Open maximized to edges
             if let Some(true) = rule.open_maximized_to_edges {
-                content.push_str("    open-maximized-to-edges\n");
+                content.push_str("    open-maximized-to-edges true\n");
             }
 
             // Scroll factor
@@ -324,7 +324,7 @@ pub fn generate_window_rules_kdl(
 
             // Draw border with background
             if let Some(true) = rule.draw_border_with_background {
-                content.push_str("    draw-border-with-background\n");
+                content.push_str("    draw-border-with-background true\n");
             }
 
             // Size constraints
@@ -411,13 +411,12 @@ pub fn generate_window_rules_kdl(
 
             // Tiled state
             if let Some(tiled) = rule.tiled_state {
-                let state_str = if tiled { "tiled" } else { "floating" };
-                content.push_str(&format!("    tiled-state \"{}\"\n", state_str));
+                content.push_str(&format!("    tiled-state {}\n", tiled));
             }
 
             // Baba is float
             if rule.baba_is_float == Some(true) {
-                content.push_str("    baba-is-float\n");
+                content.push_str("    baba-is-float true\n");
             }
 
             // Per-window shadow settings
@@ -439,7 +438,7 @@ pub fn generate_window_rules_kdl(
                         shadow.inactive_color.to_hex()
                     ));
                     if shadow.draw_behind_window {
-                        content.push_str("        draw-behind-window\n");
+                        content.push_str("        draw-behind-window true\n");
                     }
                     content.push_str("    }\n");
                 }
@@ -462,7 +461,7 @@ pub fn generate_window_rules_kdl(
                     content.push_str(&format!("        gap {}\n", ti.gap));
                     content.push_str(&format!("        width {}\n", ti.width));
                     content.push_str(&format!(
-                        "        length {{ proportion {:.2}; }}\n",
+                        "        length total-proportion={:.2}\n",
                         ti.length_proportion
                     ));
                     let pos_str = match ti.position {
@@ -533,5 +532,61 @@ mod tests {
         let content = generate_window_rules_kdl(&settings, false);
 
         assert!(content.contains("window-rule {\n    off\n"));
+    }
+
+    /// niri requires an explicit boolean argument for these properties; writing
+    /// them as bare flags makes niri reject the config with "missing an argument".
+    #[test]
+    fn boolean_window_rule_properties_are_written_with_arguments() {
+        let settings = WindowRulesSettings {
+            rules: vec![WindowRule {
+                open_behavior: OpenBehavior::Maximized,
+                open_maximized_to_edges: Some(true),
+                draw_border_with_background: Some(true),
+                tiled_state: Some(true),
+                baba_is_float: Some(true),
+                ..Default::default()
+            }],
+            next_id: 1,
+        };
+
+        let content = generate_window_rules_kdl(&settings, false);
+
+        assert!(content.contains("open-maximized true"));
+        assert!(content.contains("open-maximized-to-edges true"));
+        assert!(content.contains("draw-border-with-background true"));
+        assert!(content.contains("tiled-state true"));
+        assert!(content.contains("baba-is-float true"));
+        // No bare flags should be emitted for these.
+        assert!(!content.contains("open-maximized-to-edges\n"));
+        assert!(!content.contains("baba-is-float\n"));
+        assert!(!content.contains("tiled-state \""));
+
+        // The generated KDL must be syntactically valid.
+        content
+            .parse::<kdl::KdlDocument>()
+            .expect("generated window-rules KDL should parse");
+    }
+
+    #[test]
+    fn boolean_layer_rule_properties_are_written_with_arguments() {
+        use crate::config::models::LayerRule;
+
+        let settings = LayerRulesSettings {
+            rules: vec![LayerRule {
+                place_within_backdrop: true,
+                baba_is_float: true,
+                ..Default::default()
+            }],
+            next_id: 1,
+        };
+
+        let content = generate_layer_rules_kdl(&settings);
+
+        assert!(content.contains("place-within-backdrop true"));
+        assert!(content.contains("baba-is-float true"));
+        content
+            .parse::<kdl::KdlDocument>()
+            .expect("generated layer-rules KDL should parse");
     }
 }

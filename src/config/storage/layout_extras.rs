@@ -22,6 +22,7 @@ pub fn generate_layout_extras_kdl(settings: &LayoutExtrasSettings) -> String {
         // Shadow settings
         if settings.shadow.enabled {
             b.block("shadow", |s| {
+                s.flag("on");
                 s.field_i32("softness", settings.shadow.softness);
                 s.field_i32("spread", settings.shadow.spread);
                 s.raw(&format!(
@@ -30,7 +31,9 @@ pub fn generate_layout_extras_kdl(settings: &LayoutExtrasSettings) -> String {
                 ));
                 s.field_color("color", &settings.shadow.color);
                 s.field_color("inactive-color", &settings.shadow.inactive_color);
-                s.optional_flag("draw-behind-window", settings.shadow.draw_behind_window);
+                if settings.shadow.draw_behind_window {
+                    s.raw("draw-behind-window true");
+                }
             });
         } else {
             b.block("shadow", |s| {

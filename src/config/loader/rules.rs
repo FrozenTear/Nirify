@@ -668,12 +668,17 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
         });
     }
 
-    // Tiled state (for X11 compatibility)
+    // Tiled state (niri expects a boolean argument: `tiled-state true`)
     if let Some(ts) = wr_children.get("tiled-state") {
-        if has_flag_in_node(ts, "tiled") {
-            rule.tiled_state = Some(true);
-        } else if has_flag_in_node(ts, "floating") {
-            rule.tiled_state = Some(false);
+        if let Some(entry) = ts.entries().first() {
+            if let Some(b) = entry.value().as_bool() {
+                rule.tiled_state = Some(b);
+            } else if entry.value().as_string() == Some("tiled") {
+                // Backwards-compat with older Nirify output
+                rule.tiled_state = Some(true);
+            } else if entry.value().as_string() == Some("floating") {
+                rule.tiled_state = Some(false);
+            }
         }
     }
 
