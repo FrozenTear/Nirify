@@ -145,3 +145,111 @@ pub fn parse_tap_button_map(s: &str) -> TapButtonMap {
         _ => TapButtonMap::LeftRightMiddle,
     }
 }
+
+/// Returns the raw UTF-8 content of a file if it can be read.
+/// Intended for secondary analysis passes (e.g. slashdash disabled rule extraction)
+/// that require source text the KDL parser elides.
+pub(crate) fn read_raw_file(path: &Path) -> Option<String> {
+    fs::read_to_string(path).ok()
+}
+
+/// Represents a slashdash-elided (disabled) rule found via raw text scanning.
+/// This is used for Option 2 persistent disabled rules support.
+#[derive(Debug, Clone)]
+pub struct SlashdashRule {
+    /// "window-rule" or "layer-rule"
+    pub kind: String,
+    /// The name extracted from a preceding `// Name` comment, if any.
+    pub name: Option<String>,
+    /// The full matched text including the `/-` prefix.
+    pub full_block: String,
+    /// The inner content (everything between the first `{` and the matching `}`).
+    pub inner_content: String,
+}
+
+/// Scans raw KDL text for `/-window-rule` and `/-layer-rule` blocks using
+/// simple brace counting.
+///
+/// This is deliberately lightweight (not a full KDL parser) because we control
+/// the output format from the storage side.
+pub fn extract_slashdash_rule_blocks(raw: &str) -> Vec<SlashdashRule> {
+    let mut results = Vec::new();
+    let bytes = raw.as_bytes();
+    let mut i = 0;
+
+    while i < bytes.len() {
+        let is_window = bytes[i..].starts_with(b"/-window-rule");
+        let is_layer = bytes[i..].starts_with(b"/-layer-rule");
+
+        if is_window || is_layer {
+            let block_start = i;
+            let kind = if is_window { "window-rule" } else { "layer-rule" };
+
+            let name = extract_preceding_name_comment(raw, block_start);
+
+            // Advance to the opening '{'
+            while i < bytes.len() && bytes[i] != b'{' {
+                i += 1;
+            }
+            if i >= bytes.len() {
+                break;
+            }
+
+            let open_brace_pos = i;
+            let mut depth = 1;
+            i += 1; // skip '{'
+
+            while i < bytes.len() && depth > 0 {
+                match bytes[i] {
+                    b'{' => depth += 1,
+                    b'}' => depth -= 1,
+                    _ => {}
+                }
+                i += 1;
+            }
+
+            if depth == 0 {
+                let full_block = &raw[block_start..i];
+                let inner_content = &raw[open_brace_pos + 1..i - 1];
+
+                results.push(SlashdashRule {
+                    kind: kind.to_string(),
+                    name,
+                    full_block: full_block.to_string(),
+                    inner_content: inner_content.to_string(),
+                });
+            }
+        } else {
+            i += 1;
+        }
+    }
+
+    results
+}
+
+/// Looks backwards from `pos` for a Nirify-style `// Name` comment.
+fn extract_preceding_name_comment(text: &str, pos: usize) -> Option<String> {
+    let before = &text[..pos];
+    let lines: Vec<&str> = before.lines().rev().take(6).collect();
+
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some(comment) = trimmed.strip_prefix("//") {
+            let name = comment.trim();
+            if !name.is_empty()
+                && !name.starts_with("Window rules")
+                && !name.starts_with("Layer rules")
+                && !name.starts_with("managed by Nirify")
+            {
+                return Some(name.to_string());
+            }
+        }
+        if !trimmed.starts_with("//") {
+            break;
+        }
+    }
+    None
+}

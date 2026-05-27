@@ -40,7 +40,7 @@ mod display;
 mod gestures;
 mod gradient;
 mod health;
-mod helpers;
+pub(crate) mod helpers;
 mod import;
 mod input;
 mod keybindings;
@@ -486,52 +486,18 @@ pub fn load_settings_with_result(paths: &ConfigPaths) -> LoadResult {
 
     {
         let status = read_kdl_file_with_status(&paths.layer_rules_kdl);
-        if let Some(doc) = status.document() {
-            result.settings.layer_rules.rules.clear();
-            let mut next_id = 0u32;
-            for node in doc.nodes() {
-                if node.name().value() == "layer-rule" {
-                    let name = extract_name_from_leading_comment(node)
-                        .unwrap_or_else(|| format!("Layer Rule {}", next_id + 1));
-                    let mut rule = crate::config::models::LayerRule {
-                        id: next_id,
-                        name,
-                        ..Default::default()
-                    };
-                    next_id += 1;
-                    if let Some(children) = node.children() {
-                        parse_layer_rule_node_children(children, &mut rule);
-                    }
-                    result.settings.layer_rules.rules.push(rule);
-                }
-            }
-            result.settings.layer_rules.next_id = next_id;
+        if status.document().is_some() {
+            // Full load (visible + disabled slashdash rules) is now handled inside
+            // the public load_layer_rules function.
+            load_layer_rules(&paths.layer_rules_kdl, &mut result.settings);
         }
         result.track("advanced/layer-rules.kdl", &status);
     }
 
     {
         let status = read_kdl_file_with_status(&paths.window_rules_kdl);
-        if let Some(doc) = status.document() {
-            result.settings.window_rules.rules.clear();
-            let mut next_id = 0u32;
-            for node in doc.nodes() {
-                if node.name().value() == "window-rule" {
-                    let name = extract_name_from_leading_comment(node)
-                        .unwrap_or_else(|| format!("Rule {}", next_id + 1));
-                    let mut rule = crate::config::models::WindowRule {
-                        id: next_id,
-                        name,
-                        ..Default::default()
-                    };
-                    next_id += 1;
-                    if let Some(children) = node.children() {
-                        parse_window_rule_node_children(children, &mut rule);
-                    }
-                    result.settings.window_rules.rules.push(rule);
-                }
-            }
-            result.settings.window_rules.next_id = next_id;
+        if status.document().is_some() {
+            load_window_rules(&paths.window_rules_kdl, &mut result.settings);
         }
         result.track("advanced/window-rules.kdl", &status);
     }

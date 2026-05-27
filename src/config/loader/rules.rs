@@ -5,12 +5,12 @@
 //! Uses generic `load_rules` helper to eliminate boilerplate between
 //! window rules and layer rules loaders.
 
-use super::helpers::{parse_color, read_kdl_file};
+use super::helpers::{extract_slashdash_rule_blocks, parse_color, read_kdl_file, read_raw_file};
 use crate::config::models::{
     BlockOutFrom, FloatingPosition, LayerRule, LayerRuleMatch, OpenBehavior, PositionRelativeTo,
     Settings, ShadowSettings, TabIndicatorSettings, WindowRule, WindowRuleMatch,
 };
-use crate::config::parser::{get_f64, get_i64, get_string, has_flag};
+use crate::config::parser::{get_f64, get_i64, get_string, has_flag, parse_document};
 use crate::config::validation::validate_regex_pattern;
 use crate::types::{Color, ColorOrGradient};
 use kdl::{KdlDocument, KdlNode};
@@ -86,6 +86,7 @@ pub fn has_flag_in_node(node: &kdl::KdlNode, flag: &str) -> bool {
 trait RuleWithId {
     fn set_id(&mut self, id: u32);
     fn set_name(&mut self, name: String);
+    fn set_enabled(&mut self, enabled: bool);
 }
 
 impl RuleWithId for LayerRule {
@@ -95,6 +96,9 @@ impl RuleWithId for LayerRule {
     fn set_name(&mut self, name: String) {
         self.name = name;
     }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
 }
 
 impl RuleWithId for WindowRule {
@@ -103,6 +107,9 @@ impl RuleWithId for WindowRule {
     }
     fn set_name(&mut self, name: String) {
         self.name = name;
+    }
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
     }
 }
 
@@ -158,6 +165,69 @@ where
         rule_node_name.replace('-', " ") + "s",
         path
     );
+
+    (rules, next_id)
+}
+
+/// Loads disabled (slashdash-elided) rules by scanning raw text and reusing
+/// the existing child parsers on the extracted inner content.
+///
+/// This is the key piece for Option 2 persistent disabled rule support.
+fn load_disabled_rules_from_raw<R, F>(
+    raw_text: &str,
+    disabled_kind: &str,
+    name_prefix: &str,
+    parser: F,
+    starting_next_id: u32,
+) -> (Vec<R>, u32)
+where
+    R: Default + RuleWithId,
+    F: Fn(&KdlDocument, &mut R),
+{
+    let blocks = extract_slashdash_rule_blocks(raw_text);
+    let mut rules = Vec::new();
+    let mut next_id = starting_next_id;
+
+    for slash in blocks {
+        if slash.kind != disabled_kind {
+            continue;
+        }
+
+        let mut rule = R::default();
+        rule.set_id(next_id);
+
+        let name = slash.name.clone().unwrap_or_else(|| {
+            format!("{} {}", name_prefix, next_id + 1)
+        });
+        rule.set_name(name);
+
+        // Parse the inner content as child nodes
+        let inner = slash.inner_content.trim();
+        if !inner.is_empty() {
+            let wrapped = format!("_dummy_ {{\n{}\n}}", inner);
+            match parse_document(&wrapped) {
+                Ok(doc) => {
+                    if let Some(dummy) = doc.get("_dummy_") {
+                        if let Some(children) = dummy.children() {
+                            parser(children, &mut rule);
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to parse inner content of disabled {} rule (id {}): {}. \
+                         The rule will be loaded as disabled with defaulted fields.",
+                        disabled_kind, next_id, e
+                    );
+                }
+            }
+        }
+
+        rule.set_enabled(false);
+
+        rules.push(rule);
+        next_id += 1;
+    }
 
     (rules, next_id)
 }
@@ -303,12 +373,37 @@ pub fn parse_layer_rule_node_children(children: &KdlDocument, rule: &mut LayerRu
 
 /// Load layer rules from KDL file
 pub fn load_layer_rules(path: &Path, settings: &mut Settings) {
-    let (rules, next_id) = load_rules(
+    // Pass 1: visible/active rules
+    let (mut rules, mut next_id) = load_rules(
         path,
         "layer-rule",
         "Layer Rule",
         parse_layer_rule_node_children,
     );
+
+    // Pass 2: disabled (slashdash) rules via raw text
+    if let Some(raw) = read_raw_file(path) {
+        // Legacy detection: old bare "off" at rule level (from Option 1 era)
+        if raw.contains("layer-rule {\n    off") || raw.contains("layer-rule{off") {
+            warn!(
+                "Legacy disabled layer rule syntax detected in {:?}. \
+                 The old bare 'off' format is no longer supported. \
+                 Please re-save the rules from Nirify to migrate to /- syntax.",
+                path
+            );
+        }
+
+        let (disabled, new_next) = load_disabled_rules_from_raw(
+            &raw,
+            "layer-rule",
+            "Layer Rule",
+            parse_layer_rule_node_children,
+            next_id,
+        );
+        rules.extend(disabled);
+        next_id = new_next;
+    }
+
     settings.layer_rules.rules = rules;
     settings.layer_rules.next_id = next_id;
 }
@@ -800,7 +895,33 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
 
 /// Load window rules from KDL file
 pub fn load_window_rules(path: &Path, settings: &mut Settings) {
-    let (rules, next_id) = load_rules(path, "window-rule", "Rule", parse_window_rule_node_children);
+    // Pass 1: visible/active rules
+    let (mut rules, mut next_id) =
+        load_rules(path, "window-rule", "Rule", parse_window_rule_node_children);
+
+    // Pass 2: disabled (slashdash) rules via raw text
+    if let Some(raw) = read_raw_file(path) {
+        // Legacy detection: old bare "off" at rule level (from Option 1 era)
+        if raw.contains("window-rule {\n    off") || raw.contains("window-rule{off") {
+            warn!(
+                "Legacy disabled window rule syntax detected in {:?}. \
+                 The old bare 'off' format is no longer supported. \
+                 Please re-save the rules from Nirify to migrate to /- syntax.",
+                path
+            );
+        }
+
+        let (disabled, new_next) = load_disabled_rules_from_raw(
+            &raw,
+            "window-rule",
+            "Rule",
+            parse_window_rule_node_children,
+            next_id,
+        );
+        rules.extend(disabled);
+        next_id = new_next;
+    }
+
     settings.window_rules.rules = rules;
     settings.window_rules.next_id = next_id;
 }
