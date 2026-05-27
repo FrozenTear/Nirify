@@ -671,9 +671,7 @@ mod tests {
             .expect("custom node preserved");
 
         assert!(
-            nirify_pos > cfg_layout_pos
-                && nirify_pos > cfg_anim_pos
-                && nirify_pos > custom_pos,
+            nirify_pos > cfg_layout_pos && nirify_pos > cfg_anim_pos && nirify_pos > custom_pos,
             "Nirify include should be placed after preserved content.\n\nGot:\n{}",
             new_content
         );
@@ -768,10 +766,7 @@ include "./cfg/layout.kdl"
         let conflict = &result.conflicting_includes[0];
         assert_eq!(conflict.include_path, "./cfg/layout.kdl");
         assert!(
-            conflict
-                .conflicting_nodes
-                .iter()
-                .any(|n| n == "layout"),
+            conflict.conflicting_nodes.iter().any(|n| n == "layout"),
             "Expected `layout` in conflicting_nodes, got {:?}",
             conflict.conflicting_nodes
         );
