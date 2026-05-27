@@ -69,7 +69,17 @@ pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
     content.push_str("// Layer rules - managed by Nirify\n");
     content.push_str("// Rules for layer-shell surfaces (panels, notifications, etc.)\n\n");
 
-    if settings.rules.is_empty() {
+    let active_rules: Vec<_> = settings.rules.iter().filter(|r| r.enabled).collect();
+    let disabled_count = settings.rules.iter().filter(|r| !r.enabled).count();
+
+    if disabled_count > 0 {
+        content.push_str(&format!(
+            "// Note: {} rule(s) are disabled in Nirify and omitted from this file (niri will not see them).\n\n",
+            disabled_count
+        ));
+    }
+
+    if active_rules.is_empty() {
         content.push_str("// No layer rules configured yet.\n");
         content.push_str("// Add rules through the UI or manually here.\n");
         content.push_str("// Example:\n");
@@ -78,12 +88,9 @@ pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
         content.push_str("//     opacity 0.95\n");
         content.push_str("// }\n");
     } else {
-        for rule in &settings.rules {
+        for rule in &active_rules {
             content.push_str(&format!("// {}\n", rule.name));
             content.push_str("layer-rule {\n");
-            if !rule.enabled {
-                content.push_str("    off\n");
-            }
 
             // Match criteria
             for m in &rule.matches {
@@ -181,7 +188,17 @@ pub fn generate_window_rules_kdl(
         content.push_str("}\n\n");
     }
 
-    if settings.rules.is_empty() && !float_settings_app {
+    let active_rules: Vec<_> = settings.rules.iter().filter(|r| r.enabled).collect();
+    let disabled_count = settings.rules.iter().filter(|r| !r.enabled).count();
+
+    if disabled_count > 0 {
+        content.push_str(&format!(
+            "// Note: {} rule(s) are disabled in Nirify and omitted from this file (niri will not see them).\n\n",
+            disabled_count
+        ));
+    }
+
+    if active_rules.is_empty() && !float_settings_app {
         content.push_str("// No window rules configured yet.\n");
         content.push_str("// Add rules through the UI or manually here.\n");
         content.push_str("// Example:\n");
@@ -189,13 +206,10 @@ pub fn generate_window_rules_kdl(
         content.push_str("//     match app-id=\"firefox\"\n");
         content.push_str("//     open-maximized true\n");
         content.push_str("// }\n");
-    } else if !settings.rules.is_empty() {
-        for rule in &settings.rules {
+    } else if !active_rules.is_empty() {
+        for rule in &active_rules {
             content.push_str(&format!("// {}\n", rule.name));
             content.push_str("window-rule {\n");
-            if !rule.enabled {
-                content.push_str("    off\n");
-            }
 
             // Match criteria (multiple matches supported - rule applies if ANY match)
             for m in &rule.matches {
@@ -505,10 +519,11 @@ mod tests {
     use crate::config::models::{LayerRule, WindowRule};
 
     #[test]
-    fn generate_layer_rules_kdl_marks_disabled_rules_off() {
+    fn generate_layer_rules_kdl_omits_disabled_rules() {
         let settings = LayerRulesSettings {
             rules: vec![LayerRule {
                 enabled: false,
+                name: "Disabled Layer Rule".to_string(),
                 ..Default::default()
             }],
             next_id: 1,
@@ -516,14 +531,19 @@ mod tests {
 
         let content = generate_layer_rules_kdl(&settings);
 
-        assert!(content.contains("layer-rule {\n    off\n"));
+        // The disabled rule's name and any active rule block for it must not be present.
+        // (The fallback message contains commented example syntax, so we check the specific name.)
+        assert!(!content.contains("Disabled Layer Rule"));
+        // Header should still be present
+        assert!(content.contains("Layer rules - managed by Nirify"));
     }
 
     #[test]
-    fn generate_window_rules_kdl_marks_disabled_rules_off() {
+    fn generate_window_rules_kdl_omits_disabled_rules() {
         let settings = WindowRulesSettings {
             rules: vec![WindowRule {
                 enabled: false,
+                name: "Disabled Window Rule".to_string(),
                 ..Default::default()
             }],
             next_id: 1,
@@ -531,7 +551,54 @@ mod tests {
 
         let content = generate_window_rules_kdl(&settings, false);
 
-        assert!(content.contains("window-rule {\n    off\n"));
+        // The disabled rule's name and any active rule block for it must not be present.
+        assert!(!content.contains("Disabled Window Rule"));
+        // Header should still be present
+        assert!(content.contains("Window rules - managed by Nirify"));
+    }
+
+    #[test]
+    fn generate_rules_kdl_only_emits_enabled_rules() {
+        // Mix of enabled and disabled - only enabled should be written
+        let layer_settings = LayerRulesSettings {
+            rules: vec![
+                LayerRule {
+                    enabled: true,
+                    name: "Active Layer".to_string(),
+                    ..Default::default()
+                },
+                LayerRule {
+                    enabled: false,
+                    name: "Hidden Layer".to_string(),
+                    ..Default::default()
+                },
+            ],
+            next_id: 2,
+        };
+
+        let layer_content = generate_layer_rules_kdl(&layer_settings);
+        assert!(layer_content.contains("Active Layer"));
+        assert!(!layer_content.contains("Hidden Layer"));
+
+        let window_settings = WindowRulesSettings {
+            rules: vec![
+                WindowRule {
+                    enabled: true,
+                    name: "Active Window".to_string(),
+                    ..Default::default()
+                },
+                WindowRule {
+                    enabled: false,
+                    name: "Hidden Window".to_string(),
+                    ..Default::default()
+                },
+            ],
+            next_id: 2,
+        };
+
+        let window_content = generate_window_rules_kdl(&window_settings, false);
+        assert!(window_content.contains("Active Window"));
+        assert!(!window_content.contains("Hidden Window"));
     }
 
     /// niri requires an explicit boolean argument for these properties; writing
