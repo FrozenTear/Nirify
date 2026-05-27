@@ -67,19 +67,15 @@ pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
     // Pre-allocate ~2KB for layer rules
     let mut content = String::with_capacity(2048);
     content.push_str("// Layer rules - managed by Nirify\n");
-    content.push_str("// Rules for layer-shell surfaces (panels, notifications, etc.)\n\n");
+    content.push_str("// Rules for layer-shell surfaces (panels, notifications, etc.)\n");
 
-    let active_rules: Vec<_> = settings.rules.iter().filter(|r| r.enabled).collect();
-    let disabled_count = settings.rules.iter().filter(|r| !r.enabled).count();
-
-    if disabled_count > 0 {
-        content.push_str(&format!(
-            "// Note: {} rule(s) are disabled in Nirify and omitted from this file (niri will not see them).\n\n",
-            disabled_count
-        ));
+    let has_disabled = settings.rules.iter().any(|r| !r.enabled);
+    if has_disabled {
+        content.push_str("// Note: Some rules below use the /- prefix (disabled via Nirify)\n");
     }
+    content.push_str("\n");
 
-    if active_rules.is_empty() {
+    if settings.rules.is_empty() {
         content.push_str("// No layer rules configured yet.\n");
         content.push_str("// Add rules through the UI or manually here.\n");
         content.push_str("// Example:\n");
@@ -88,8 +84,11 @@ pub fn generate_layer_rules_kdl(settings: &LayerRulesSettings) -> String {
         content.push_str("//     opacity 0.95\n");
         content.push_str("// }\n");
     } else {
-        for rule in &active_rules {
+        for rule in &settings.rules {
             content.push_str(&format!("// {}\n", rule.name));
+            if !rule.enabled {
+                content.push_str("/-");
+            }
             content.push_str("layer-rule {\n");
 
             // Match criteria
@@ -188,17 +187,13 @@ pub fn generate_window_rules_kdl(
         content.push_str("}\n\n");
     }
 
-    let active_rules: Vec<_> = settings.rules.iter().filter(|r| r.enabled).collect();
-    let disabled_count = settings.rules.iter().filter(|r| !r.enabled).count();
-
-    if disabled_count > 0 {
-        content.push_str(&format!(
-            "// Note: {} rule(s) are disabled in Nirify and omitted from this file (niri will not see them).\n\n",
-            disabled_count
-        ));
+    let has_disabled = settings.rules.iter().any(|r| !r.enabled);
+    if has_disabled {
+        content.push_str("// Note: Some rules below use the /- prefix (disabled via Nirify)\n");
     }
+    content.push_str("\n");
 
-    if active_rules.is_empty() && !float_settings_app {
+    if settings.rules.is_empty() && !float_settings_app {
         content.push_str("// No window rules configured yet.\n");
         content.push_str("// Add rules through the UI or manually here.\n");
         content.push_str("// Example:\n");
@@ -206,9 +201,12 @@ pub fn generate_window_rules_kdl(
         content.push_str("//     match app-id=\"firefox\"\n");
         content.push_str("//     open-maximized true\n");
         content.push_str("// }\n");
-    } else if !active_rules.is_empty() {
-        for rule in &active_rules {
+    } else {
+        for rule in &settings.rules {
             content.push_str(&format!("// {}\n", rule.name));
+            if !rule.enabled {
+                content.push_str("/-");
+            }
             content.push_str("window-rule {\n");
 
             // Match criteria (multiple matches supported - rule applies if ANY match)
