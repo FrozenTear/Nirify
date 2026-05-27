@@ -169,13 +169,7 @@ pub fn generate_window_rules_kdl(
 ) -> String {
     // Pre-allocate ~2KB for window rules (can be complex)
     let mut content = String::with_capacity(2048);
-    content.push_str("// Window rules - managed by Nirify\n");
-
-    let has_disabled = settings.rules.iter().any(|r| !r.enabled);
-    if has_disabled {
-        content.push_str("// Note: Some rules below use the /- prefix (disabled via Nirify)\n");
-    }
-    content.push_str("\n");
+    content.push_str("// Window rules - managed by Nirify\n\n");
 
     // Check if there's already a rule for Nirify
     let has_nirify_rule = settings.rules.iter().any(|rule| {
@@ -192,6 +186,12 @@ pub fn generate_window_rules_kdl(
         content.push_str("    open-floating true\n");
         content.push_str("}\n\n");
     }
+
+    let has_disabled = settings.rules.iter().any(|r| !r.enabled);
+    if has_disabled {
+        content.push_str("// Note: Some rules below use the /- prefix (disabled via Nirify)\n");
+    }
+    content.push_str("\n");
 
     if settings.rules.is_empty() && !float_settings_app {
         content.push_str("// No window rules configured yet.\n");
@@ -517,7 +517,7 @@ mod tests {
     use crate::config::models::{LayerRule, WindowRule};
 
     #[test]
-    fn generate_layer_rules_kdl_emits_disabled_with_slashdash() {
+    fn generate_layer_rules_kdl_omits_disabled_rules() {
         let settings = LayerRulesSettings {
             rules: vec![LayerRule {
                 enabled: false,
@@ -529,14 +529,15 @@ mod tests {
 
         let content = generate_layer_rules_kdl(&settings);
 
-        // With Option 2, disabled rules must be emitted with /- prefix
-        assert!(content.contains("// Disabled Layer Rule"));
-        assert!(content.contains("/-layer-rule {"));
+        // The disabled rule's name and any active rule block for it must not be present.
+        // (The fallback message contains commented example syntax, so we check the specific name.)
+        assert!(!content.contains("Disabled Layer Rule"));
+        // Header should still be present
         assert!(content.contains("Layer rules - managed by Nirify"));
     }
 
     #[test]
-    fn generate_window_rules_kdl_emits_disabled_with_slashdash() {
+    fn generate_window_rules_kdl_omits_disabled_rules() {
         let settings = WindowRulesSettings {
             rules: vec![WindowRule {
                 enabled: false,
@@ -548,14 +549,15 @@ mod tests {
 
         let content = generate_window_rules_kdl(&settings, false);
 
-        assert!(content.contains("// Disabled Window Rule"));
-        assert!(content.contains("/-window-rule {"));
+        // The disabled rule's name and any active rule block for it must not be present.
+        assert!(!content.contains("Disabled Window Rule"));
+        // Header should still be present
         assert!(content.contains("Window rules - managed by Nirify"));
     }
 
     #[test]
-    fn generate_rules_kdl_emits_both_active_and_disabled() {
-        // Mix of enabled and disabled - both must appear (disabled with /-)
+    fn generate_rules_kdl_only_emits_enabled_rules() {
+        // Mix of enabled and disabled - only enabled should be written
         let layer_settings = LayerRulesSettings {
             rules: vec![
                 LayerRule {
@@ -574,8 +576,7 @@ mod tests {
 
         let layer_content = generate_layer_rules_kdl(&layer_settings);
         assert!(layer_content.contains("Active Layer"));
-        assert!(layer_content.contains("/-layer-rule"));
-        assert!(layer_content.contains("Hidden Layer"));
+        assert!(!layer_content.contains("Hidden Layer"));
 
         let window_settings = WindowRulesSettings {
             rules: vec![
@@ -595,195 +596,7 @@ mod tests {
 
         let window_content = generate_window_rules_kdl(&window_settings, false);
         assert!(window_content.contains("Active Window"));
-        assert!(window_content.contains("/-window-rule"));
-        assert!(window_content.contains("Hidden Window"));
-    }
-
-    // =====================================================================
-    // Dedicated tests for the full disabled rules loading path (Option 2)
-    // =====================================================================
-
-    #[test]
-    fn load_disabled_rules_roundtrip_layer() {
-        use crate::config::loader::load_layer_rules;
-        use std::fs;
-        use std::path::PathBuf;
-
-        let temp_dir = std::env::temp_dir();
-        let test_file: PathBuf = temp_dir.join(format!(
-            "nirify_test_layer_disabled_{}.kdl",
-            std::process::id()
-        ));
-
-        // Generate KDL with one disabled layer rule
-        let settings = LayerRulesSettings {
-            rules: vec![
-                LayerRule {
-                    enabled: true,
-                    name: "Active One".to_string(),
-                    ..Default::default()
-                },
-                LayerRule {
-                    enabled: false,
-                    name: "Disabled Waybar".to_string(),
-                    ..Default::default()
-                },
-            ],
-            next_id: 2,
-        };
-
-        let kdl = generate_layer_rules_kdl(&settings);
-        fs::write(&test_file, &kdl).expect("write temp file");
-
-        // Load using the real loader path
-        let mut loaded_settings = Settings::default();
-        load_layer_rules(&test_file, &mut loaded_settings);
-
-        // Cleanup
-        let _ = fs::remove_file(&test_file);
-
-        assert_eq!(loaded_settings.layer_rules.rules.len(), 2);
-
-        let active = loaded_settings.layer_rules.rules.iter().find(|r| r.enabled).unwrap();
-        assert_eq!(active.name, "Active One");
-
-        let disabled = loaded_settings.layer_rules.rules.iter().find(|r| !r.enabled).unwrap();
-        assert_eq!(disabled.name, "Disabled Waybar");
-        assert!(!disabled.enabled);
-    }
-
-    #[test]
-    fn load_disabled_rules_roundtrip_window() {
-        use crate::config::loader::load_window_rules;
-        use std::fs;
-        use std::path::PathBuf;
-
-        let temp_dir = std::env::temp_dir();
-        let test_file: PathBuf = temp_dir.join(format!(
-            "nirify_test_window_disabled_{}.kdl",
-            std::process::id()
-        ));
-
-        let settings = WindowRulesSettings {
-            rules: vec![
-                WindowRule {
-                    enabled: true,
-                    name: "Active Firefox".to_string(),
-                    ..Default::default()
-                },
-                WindowRule {
-                    enabled: false,
-                    name: "Disabled Steam".to_string(),
-                    ..Default::default()
-                },
-            ],
-            next_id: 2,
-        };
-
-        let kdl = generate_window_rules_kdl(&settings, false);
-        fs::write(&test_file, &kdl).expect("write temp file");
-
-        let mut loaded_settings = Settings::default();
-        load_window_rules(&test_file, &mut loaded_settings);
-
-        let _ = fs::remove_file(&test_file);
-
-        assert_eq!(loaded_settings.window_rules.rules.len(), 2);
-
-        let active = loaded_settings.window_rules.rules.iter().find(|r| r.enabled).unwrap();
-        assert_eq!(active.name, "Active Firefox");
-
-        let disabled = loaded_settings.window_rules.rules.iter().find(|r| !r.enabled).unwrap();
-        assert_eq!(disabled.name, "Disabled Steam");
-        assert!(!disabled.enabled);
-    }
-
-    #[test]
-    fn load_disabled_rules_complex_roundtrip() {
-        use crate::config::loader::load_window_rules;
-        use crate::config::models::{ShadowSettings, TabIndicatorSettings};
-        use crate::types::{Color, ColorOrGradient};
-        use std::fs;
-        use std::path::PathBuf;
-
-        let temp_dir = std::env::temp_dir();
-        let test_file: PathBuf = temp_dir.join(format!(
-            "nirify_test_complex_disabled_{}.kdl",
-            std::process::id()
-        ));
-
-        // Build a rich disabled rule
-        let mut disabled_rule = WindowRule {
-            enabled: false,
-            name: "Complex Disabled".to_string(),
-            ..Default::default()
-        };
-
-        // Add some matches
-        disabled_rule.matches = vec![
-            WindowRuleMatch {
-                app_id: Some("steam".to_string()),
-                ..Default::default()
-            },
-            WindowRuleMatch {
-                title: Some(".*Big Picture.*".to_string()),
-                ..Default::default()
-            },
-        ];
-
-        // Full shadow
-        disabled_rule.shadow = Some(ShadowSettings {
-            enabled: true,
-            softness: 12,
-            spread: 3,
-            offset_x: 2,
-            offset_y: -4,
-            color: Color::from_hex("#000000").unwrap(),
-            inactive_color: Color::from_hex("#111111").unwrap(),
-            draw_behind_window: true,
-        });
-
-        // Tab indicator
-        disabled_rule.tab_indicator = Some(TabIndicatorSettings {
-            enabled: true,
-            hide_when_single_tab: true,
-            place_within_column: false,
-            gap: 4,
-            width: 6,
-            length_proportion: 0.6,
-            position: crate::config::models::TabIndicatorPosition::Top,
-            gaps_between_tabs: 2,
-            corner_radius: 3,
-            active: ColorOrGradient::Color(Color::from_hex("#ff8800").unwrap()),
-            inactive: ColorOrGradient::Color(Color::from_hex("#884400").unwrap()),
-            urgent: ColorOrGradient::Color(Color::from_hex("#ff0000").unwrap()),
-        });
-
-        // Focus ring with color override
-        disabled_rule.focus_ring_enabled = Some(true);
-        disabled_rule.focus_ring_width = Some(5);
-        disabled_rule.focus_ring_active = Some(ColorOrGradient::Color(Color::from_hex("#00aaff").unwrap()));
-
-        let settings = WindowRulesSettings {
-            rules: vec![disabled_rule],
-            next_id: 1,
-        };
-
-        let kdl = generate_window_rules_kdl(&settings, false);
-        fs::write(&test_file, &kdl).expect("write temp");
-
-        let mut loaded = Settings::default();
-        load_window_rules(&test_file, &mut loaded);
-
-        let _ = fs::remove_file(&test_file);
-
-        let loaded_rule = loaded.window_rules.rules.first().unwrap();
-        assert!(!loaded_rule.enabled);
-        assert_eq!(loaded_rule.name, "Complex Disabled");
-        assert_eq!(loaded_rule.matches.len(), 2);
-        assert!(loaded_rule.shadow.is_some());
-        assert!(loaded_rule.tab_indicator.is_some());
-        assert_eq!(loaded_rule.focus_ring_width, Some(5));
+        assert!(!window_content.contains("Hidden Window"));
     }
 
     /// niri requires an explicit boolean argument for these properties; writing
@@ -842,57 +655,3 @@ mod tests {
             .expect("generated layer-rules KDL should parse");
     }
 }
-
-// (Old Phase 1 research module removed - functionality promoted)
-//
-// Goal: Understand whether we can use KDL's native `/-` (slashdash) prefix
-// to represent disabled window/layer rules in a way that:
-// - niri completely ignores the rule
-// - Nirify can still load it as `enabled = false`
-// - The output remains reasonably human-readable
-//
-// These tests are temporary and will be cleaned up once we have answers.
-// ============================================================================
-
-/*
- * =========================================================================
- * CURRENT UNDERSTANDING AFTER PHASE 1 EXPERIMENTS (2026-05-27)
- * =========================================================================
- *
- * GENERATION (good news):
- *   - We can reliably emit `/-` by setting `leading` on KdlNodeFormat.
- *   - We can put Nirify-style comments immediately before the `/-` in the
- *     same `leading` string:
- *       leading: "// My Rule (disabled)\n/-"
- *   - This produces output like:
- *       // My Rule (disabled)
- *       /-window-rule { ... }
- *
- * PARSING (the hard part):
- *   - Slashdash nodes are **completely removed** from `doc.nodes()`.
- *   - Their text (including preceding comments) ends up in:
- *       - `doc.format().trailing`   (when at the end of the document)
- *       - Or in the `leading` of the *next visible node*
- *   - This matches what we saw in the kdl crate source earlier.
- *
- * IMPLICATIONS FOR OPTION 2:
- *   1. Generation side is relatively straightforward (we can do it).
- *   2. Loading side is harder than a normal node walk.
- *      We will probably need one of:
- *        - A pre-pass over the raw file text looking for `/-window-rule`
- *          and `/-layer-rule` blocks.
- *        - Or after normal parsing, also inspect `doc.format().trailing`
- *          + every visible node's `leading` for slashdash content and
- *          parse those fragments manually.
- *
- *   This is why the plan called Phase 1 "Research & Prototyping" — we now
- *   have concrete evidence of the challenges instead of guessing.
- *
- * Next logical work (when ready):
- *   - Decide on the loading strategy (raw text pre-pass vs format hacking).
- *   - Prototype a small helper that can extract slashdash rules from a
- *     raw KDL string or from a parsed document's formatting data.
- */
-
-
-// (Phase 1 research experiments fully cleaned up)
