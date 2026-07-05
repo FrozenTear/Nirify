@@ -10,6 +10,8 @@ use crate::theme::{fonts, neon};
 use crate::views;
 
 /// Rules screen with Window/Layer sub-tabs
+// View functions take borrowed state slices directly; a params struct adds no clarity.
+#[allow(clippy::too_many_arguments)]
 pub fn view<'a>(
     sub_tab: RulesSubTab,
     window_rules: &'a WindowRulesSettings,

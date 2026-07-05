@@ -46,11 +46,11 @@ pub fn view<'a>(settings: &'a Settings, ui: &'a UiState) -> Element<'a, Message>
         row![
             device_card(EditableDevice::Trackpoint, neon::SECONDARY, vec![
                 ("Accel", format!("{}", settings.trackpoint.accel_profile)),
-                ("Scroll", format!("{}", settings.trackpoint.scroll_method)),
+                ("Scroll", crate::types::ScrollMethodChoice(settings.trackpoint.scroll_method).to_string()),
             ]),
             device_card(EditableDevice::Trackball, neon::TERTIARY, vec![
                 ("Accel", format!("{}", settings.trackball.accel_profile)),
-                ("Scroll", format!("{}", settings.trackball.scroll_method)),
+                ("Scroll", crate::types::ScrollMethodChoice(settings.trackball.scroll_method).to_string()),
             ]),
             device_card(EditableDevice::Tablet, neon::PRIMARY, vec![
                 ("Output", if settings.tablet.map_to_output.is_empty() { "Auto".to_string() } else { settings.tablet.map_to_output.clone() }),
@@ -382,8 +382,10 @@ pub fn device_editor_modal<'a>(
     // Get the device view content from existing views
     let device_content: Element<'a, Message> = match device {
         EditableDevice::Keyboard => views::keyboard::view(&settings.keyboard),
-        EditableDevice::Mouse => views::mouse::view(&settings.mouse),
-        EditableDevice::Touchpad => views::touchpad::view(&settings.touchpad),
+        EditableDevice::Mouse => views::mouse::view(&settings.mouse, &ui.mouse_scroll_factor_text),
+        EditableDevice::Touchpad => {
+            views::touchpad::view(&settings.touchpad, &ui.touchpad_scroll_factor_text)
+        }
         EditableDevice::Trackpoint => views::trackpoint::view(&settings.trackpoint),
         EditableDevice::Trackball => views::trackball::view(&settings.trackball),
         EditableDevice::Tablet => {

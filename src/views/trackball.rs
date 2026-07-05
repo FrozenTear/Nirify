@@ -7,9 +7,37 @@ use super::widgets::{picker_row, toggle_row};
 use crate::config::models::TrackballSettings;
 use crate::messages::{Message, TrackballMessage};
 use crate::theme::{fonts, neon};
-use crate::types::{AccelProfile, ScrollMethod};
+use crate::types::{AccelProfile, ScrollMethod, ScrollMethodChoice};
 
 pub fn view(settings: &TrackballSettings) -> Element<'_, Message> {
+    let on_button = settings.scroll_method == Some(ScrollMethod::OnButtonDown);
+
+    // Scroll-button-lock and the scroll-button code only apply to on-button-down
+    // scrolling, so they are hidden for other methods.
+    let mut scroll_card = column![toggle_row(
+        "Natural scroll",
+        "Reverse scroll direction",
+        settings.natural_scroll,
+        |v| Message::Trackball(TrackballMessage::SetNaturalScroll(v))
+    )]
+    .spacing(0);
+    if on_button {
+        scroll_card = scroll_card.push(toggle_row(
+            "Scroll button lock",
+            "Lock scroll state",
+            settings.scroll_button_lock,
+            |v| Message::Trackball(TrackballMessage::SetScrollButtonLock(v)),
+        ));
+    }
+
+    let scroll_button_control: Element<'_, Message> = if on_button {
+        scroll_button_input(settings.scroll_button, |v| {
+            Message::Trackball(TrackballMessage::SetScrollButton(v))
+        })
+    } else {
+        Space::new().height(0).into()
+    };
+
     let content = column![
         // -- 2-COLUMN: SCROLLING | ACCELERATION --
         row![
@@ -17,37 +45,19 @@ pub fn view(settings: &TrackballSettings) -> Element<'_, Message> {
             column![
                 modal_section("\u{25ce}", "SCROLLING", neon::SECONDARY),
                 Space::new().height(4),
-                container(
-                    column![
-                        toggle_row(
-                            "Natural scroll",
-                            "Reverse scroll direction",
-                            settings.natural_scroll,
-                            |v| Message::Trackball(TrackballMessage::SetNaturalScroll(v))
-                        ),
-                        toggle_row(
-                            "Scroll button lock",
-                            "Lock scroll state",
-                            settings.scroll_button_lock,
-                            |v| Message::Trackball(TrackballMessage::SetScrollButtonLock(v))
-                        ),
-                    ]
-                    .spacing(0)
-                )
-                .padding(8)
-                .style(crate::theme::card_style),
+                container(scroll_card)
+                    .padding(8)
+                    .style(crate::theme::card_style),
                 Space::new().height(8),
                 picker_row(
                     "Scroll method",
                     "How scrolling is performed",
-                    ScrollMethod::all(),
-                    Some(settings.scroll_method),
-                    |v| Message::Trackball(TrackballMessage::SetScrollMethod(v))
+                    ScrollMethodChoice::all(),
+                    Some(ScrollMethodChoice(settings.scroll_method)),
+                    |v| Message::Trackball(TrackballMessage::SetScrollMethod(v.0))
                 ),
                 Space::new().height(8),
-                scroll_button_input(settings.scroll_button, |v| Message::Trackball(
-                    TrackballMessage::SetScrollButton(v)
-                )),
+                scroll_button_control,
             ]
             .spacing(6)
             .width(Length::FillPortion(1)),

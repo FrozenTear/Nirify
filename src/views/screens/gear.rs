@@ -13,6 +13,8 @@ use crate::views::status_bar::NiriStatus;
 use crate::views::tools::ToolsState;
 
 /// Gear screen with Tools/Preferences/ConfigEditor/Backups sub-tabs
+// View functions take borrowed state slices directly; a params struct adds no clarity.
+#[allow(clippy::too_many_arguments)]
 pub fn view<'a>(
     sub_tab: GearSubTab,
     tools_state: &'a ToolsState,

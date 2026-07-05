@@ -21,12 +21,30 @@ pub fn view<'a>(
             column![
                 modal_section("\u{25f0}", "OUTPUT MAPPING", neon::SECONDARY),
                 Space::new().height(4),
+                container(
+                    // `map-to-focused-window` is unreleased in niri; only the
+                    // focused-output mapping is exposed. A previously loaded
+                    // focused-window value is preserved on save (slashdashed).
+                    column![toggle_row(
+                        "Map to focused output",
+                        "Follow whichever monitor has focus",
+                        settings.map_to_focused_output,
+                        |v| Message::Tablet(TabletMessage::SetMapToFocusedOutput(v))
+                    ),]
+                    .spacing(0)
+                )
+                .padding(8)
+                .style(crate::theme::card_style),
+                Space::new().height(8),
                 styled_text_input(
                     "MAP TO OUTPUT",
                     "e.g., eDP-1, HDMI-A-1",
                     &map_to_output,
                     |v| Message::Tablet(TabletMessage::SetMapToOutput(v))
                 ),
+                text("Ignored while a focused-output/window mapping is enabled.")
+                    .size(10)
+                    .color(neon::OUTLINE_VARIANT),
                 Space::new().height(12),
                 modal_section("\u{2699}", "CALIBRATION", neon::TERTIARY),
                 Space::new().height(4),

@@ -3,38 +3,66 @@
 use iced::widget::{column, container, row, scrollable, text, text_input, Space};
 use iced::{Alignment, Element, Length};
 
-use super::widgets::{info_text, picker_row, toggle_row};
+use super::widgets::{picker_row, toggle_row};
 use crate::config::models::MouseSettings;
 use crate::messages::{Message, MouseMessage};
 use crate::theme::{fonts, neon};
-use crate::types::{AccelProfile, ScrollMethod};
+use crate::types::{AccelProfile, ScrollMethod, ScrollMethodChoice};
 
-pub fn view(settings: &MouseSettings) -> Element<'_, Message> {
+pub fn view<'a>(settings: &'a MouseSettings, scroll_factor_text: &'a str) -> Element<'a, Message> {
+    let on_button = settings.scroll_method == Some(ScrollMethod::OnButtonDown);
+
+    // Scrolling card: natural scroll always; scroll-button-lock only applies to
+    // on-button-down scrolling, so it is hidden for other methods.
+    let mut scroll_card = column![toggle_row(
+        "Natural scroll",
+        "Reverse scroll direction",
+        settings.natural_scroll,
+        |v| Message::Mouse(MouseMessage::ToggleNaturalScroll(v))
+    )]
+    .spacing(0);
+    if on_button {
+        scroll_card = scroll_card.push(toggle_row(
+            "Scroll button lock",
+            "Lock scroll state",
+            settings.scroll_button_lock,
+            |v| Message::Mouse(MouseMessage::ToggleScrollButtonLock(v)),
+        ));
+    }
+
+    // Scroll button code input: only meaningful for on-button-down scrolling.
+    let scroll_button_control: Element<'_, Message> = if on_button {
+        let sb_display = settings
+            .scroll_button
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        styled_text_input(
+            "SCROLL BUTTON",
+            "Button code (e.g., 274)",
+            &sb_display,
+            |s| {
+                if s.is_empty() {
+                    Message::Mouse(MouseMessage::SetScrollButton(None))
+                } else if let Ok(v) = s.parse::<i32>() {
+                    Message::Mouse(MouseMessage::SetScrollButton(Some(v)))
+                } else {
+                    Message::NoOp
+                }
+            },
+        )
+    } else {
+        Space::new().height(0).into()
+    };
+
     let content = column![
         // ── 2-COLUMN: SCROLLING | ACCELERATION ──
         row![
             column![
                 modal_section("◎", "SCROLLING", neon::SECONDARY),
                 Space::new().height(4),
-                container(
-                    column![
-                        toggle_row(
-                            "Natural scroll",
-                            "Reverse scroll direction",
-                            settings.natural_scroll,
-                            |v| Message::Mouse(MouseMessage::ToggleNaturalScroll(v))
-                        ),
-                        toggle_row(
-                            "Scroll button lock",
-                            "Lock scroll state",
-                            settings.scroll_button_lock,
-                            |v| Message::Mouse(MouseMessage::ToggleScrollButtonLock(v))
-                        ),
-                    ]
-                    .spacing(0)
-                )
-                .padding(8)
-                .style(crate::theme::card_style),
+                container(scroll_card)
+                    .padding(8)
+                    .style(crate::theme::card_style),
                 Space::new().height(8),
                 styled_slider(
                     "SCROLL FACTOR",
@@ -44,6 +72,7 @@ pub fn view(settings: &MouseSettings) -> Element<'_, Message> {
                     0.1,
                     |v| Message::Mouse(MouseMessage::SetScrollFactor(v))
                 ),
+                scroll_factor_input(scroll_factor_text),
                 styled_slider(
                     "HORIZ SCROLL",
                     &format!(
@@ -62,30 +91,11 @@ pub fn view(settings: &MouseSettings) -> Element<'_, Message> {
                 picker_row(
                     "Scroll method",
                     "How scrolling is performed",
-                    ScrollMethod::all(),
-                    Some(settings.scroll_method),
-                    |v| Message::Mouse(MouseMessage::SetScrollMethod(v))
+                    ScrollMethodChoice::all(),
+                    Some(ScrollMethodChoice(settings.scroll_method)),
+                    |v| Message::Mouse(MouseMessage::SetScrollMethod(v.0))
                 ),
-                {
-                    let sb_display = settings
-                        .scroll_button
-                        .map(|v| v.to_string())
-                        .unwrap_or_default();
-                    styled_text_input(
-                        "SCROLL BUTTON",
-                        "Button code (e.g., 274)",
-                        &sb_display,
-                        |s| {
-                            if s.is_empty() {
-                                Message::Mouse(MouseMessage::SetScrollButton(None))
-                            } else if let Ok(v) = s.parse::<i32>() {
-                                Message::Mouse(MouseMessage::SetScrollButton(Some(v)))
-                            } else {
-                                Message::NoOp
-                            }
-                        },
-                    )
-                },
+                scroll_button_control,
             ]
             .spacing(6)
             .width(Length::FillPortion(1)),
@@ -221,6 +231,27 @@ fn styled_text_input<'a>(
                 .color(neon::OUTLINE_VARIANT),
             text_input(placeholder, &v)
                 .on_input(on_change)
+                .padding(10)
+                .size(13),
+        ]
+        .spacing(4),
+    )
+    .padding(12)
+    .style(crate::theme::card_style)
+    .into()
+}
+
+fn scroll_factor_input<'a>(buffer: &str) -> Element<'a, Message> {
+    let v = buffer.to_string();
+    container(
+        column![
+            text("SCROLL FACTOR (exact, -100 to 100)")
+                .size(10)
+                .font(fonts::UI_FONT_SEMIBOLD)
+                .color(neon::OUTLINE_VARIANT),
+            text_input("e.g. -2 or 25", &v)
+                .on_input(|s| Message::Mouse(MouseMessage::SetScrollFactorText(s)))
+                .on_submit(Message::Mouse(MouseMessage::CommitScrollFactor))
                 .padding(10)
                 .size(13),
         ]

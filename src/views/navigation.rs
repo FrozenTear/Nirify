@@ -65,6 +65,7 @@ pub fn primary_nav<'a>(
                 text_input("Search settings...", search_query)
                     .id(search_input_id())
                     .on_input(Message::SearchQueryChanged)
+                    .on_submit(Message::SearchNavActivate)
                     .padding([6, 10])
                     .width(Length::Fixed(300.0))
             ]

@@ -7,9 +7,51 @@ use super::widgets::{picker_row, toggle_row};
 use crate::config::models::TouchpadSettings;
 use crate::messages::{Message, TouchpadMessage};
 use crate::theme::{fonts, neon};
-use crate::types::{AccelProfile, ClickMethod, ScrollMethod, TapButtonMap};
+use crate::types::{AccelProfile, ClickMethod, ScrollMethod, ScrollMethodChoice, TapButtonMap};
 
-pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
+pub fn view<'a>(
+    settings: &'a TouchpadSettings,
+    scroll_factor_text: &'a str,
+) -> Element<'a, Message> {
+    let on_button = settings.scroll_method == Some(ScrollMethod::OnButtonDown);
+
+    // Scrolling card: natural scroll always; scroll-button-lock only applies to
+    // on-button-down scrolling, so it is hidden for other methods.
+    let mut scroll_card = column![toggle_row(
+        "Natural scroll",
+        "Reverse direction (macOS-style)",
+        settings.natural_scroll,
+        |v| Message::Touchpad(TouchpadMessage::ToggleNaturalScroll(v))
+    )]
+    .spacing(0);
+    if on_button {
+        scroll_card = scroll_card.push(toggle_row(
+            "Scroll button lock",
+            "Lock scroll state",
+            settings.scroll_button_lock,
+            |v| Message::Touchpad(TouchpadMessage::ToggleScrollButtonLock(v)),
+        ));
+    }
+
+    // Scroll button code input: only meaningful for on-button-down scrolling.
+    let scroll_button_control: Element<'_, Message> = if on_button {
+        let sb = settings
+            .scroll_button
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        styled_text_input("SCROLL BUTTON", "Button code (e.g., 274)", &sb, |s| {
+            if s.is_empty() {
+                Message::Touchpad(TouchpadMessage::SetScrollButton(None))
+            } else if let Ok(v) = s.parse::<i32>() {
+                Message::Touchpad(TouchpadMessage::SetScrollButton(Some(v)))
+            } else {
+                Message::NoOp
+            }
+        })
+    } else {
+        Space::new().height(0).into()
+    };
+
     let content = column![
         // ── ROW 1: TAP & BEHAVIOR | SCROLLING ──
         row![
@@ -36,9 +78,12 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
                             settings.dwtp,
                             |v| Message::Touchpad(TouchpadMessage::ToggleDwtp(v))
                         ),
-                        toggle_row("Drag", "Tap-and-drag gesture", settings.drag, |v| {
-                            Message::Touchpad(TouchpadMessage::ToggleDrag(v))
-                        }),
+                        toggle_row(
+                            "Drag",
+                            "Tap-and-drag gesture (device default until changed)",
+                            settings.drag.unwrap_or(true),
+                            |v| Message::Touchpad(TouchpadMessage::ToggleDrag(v))
+                        ),
                         toggle_row(
                             "Drag lock",
                             "Lock drag until tapped again",
@@ -56,17 +101,9 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
             column![
                 modal_section("◎", "SCROLLING", neon::SECONDARY),
                 Space::new().height(4),
-                container(
-                    column![toggle_row(
-                        "Natural scroll",
-                        "Reverse direction (macOS-style)",
-                        settings.natural_scroll,
-                        |v| Message::Touchpad(TouchpadMessage::ToggleNaturalScroll(v))
-                    ),]
-                    .spacing(0)
-                )
-                .padding(8)
-                .style(crate::theme::card_style),
+                container(scroll_card)
+                    .padding(8)
+                    .style(crate::theme::card_style),
                 Space::new().height(4),
                 styled_slider(
                     "SCROLL FACTOR",
@@ -76,6 +113,7 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
                     0.1,
                     |v| Message::Touchpad(TouchpadMessage::SetScrollFactor(v))
                 ),
+                scroll_factor_input(scroll_factor_text),
                 styled_slider(
                     "HORIZ SCROLL",
                     &format!(
@@ -94,9 +132,9 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
                 picker_row(
                     "Scroll method",
                     "Two-finger, edge, or button",
-                    ScrollMethod::all(),
-                    Some(settings.scroll_method),
-                    |v| Message::Touchpad(TouchpadMessage::SetScrollMethod(v))
+                    ScrollMethodChoice::all(),
+                    Some(ScrollMethodChoice(settings.scroll_method)),
+                    |v| Message::Touchpad(TouchpadMessage::SetScrollMethod(v.0))
                 ),
             ]
             .spacing(6)
@@ -172,21 +210,7 @@ pub fn view(settings: &TouchpadSettings) -> Element<'_, Message> {
                 )
                 .padding(8)
                 .style(crate::theme::card_style),
-                {
-                    let sb = settings
-                        .scroll_button
-                        .map(|v| v.to_string())
-                        .unwrap_or_default();
-                    styled_text_input("SCROLL BUTTON", "Button code (e.g., 274)", &sb, |s| {
-                        if s.is_empty() {
-                            Message::Touchpad(TouchpadMessage::SetScrollButton(None))
-                        } else if let Ok(v) = s.parse::<i32>() {
-                            Message::Touchpad(TouchpadMessage::SetScrollButton(Some(v)))
-                        } else {
-                            Message::NoOp
-                        }
-                    })
-                },
+                scroll_button_control,
             ]
             .spacing(6)
             .width(Length::FillPortion(1)),
@@ -273,6 +297,27 @@ fn styled_text_input<'a>(
                 .color(neon::OUTLINE_VARIANT),
             text_input(placeholder, &v)
                 .on_input(on_change)
+                .padding(10)
+                .size(13),
+        ]
+        .spacing(4),
+    )
+    .padding(12)
+    .style(crate::theme::card_style)
+    .into()
+}
+
+fn scroll_factor_input<'a>(buffer: &str) -> Element<'a, Message> {
+    let v = buffer.to_string();
+    container(
+        column![
+            text("SCROLL FACTOR (exact, -100 to 100)")
+                .size(10)
+                .font(fonts::UI_FONT_SEMIBOLD)
+                .color(neon::OUTLINE_VARIANT),
+            text_input("e.g. -2 or 25", &v)
+                .on_input(|s| Message::Touchpad(TouchpadMessage::SetScrollFactorText(s)))
+                .on_submit(Message::Touchpad(TouchpadMessage::CommitScrollFactor))
                 .padding(10)
                 .size(13),
         ]

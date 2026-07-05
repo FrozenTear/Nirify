@@ -12,6 +12,77 @@ use crate::theme::{fonts, neon};
 const ANIMATION_TYPES: [&str; 5] = ["Default", "Off", "Spring", "Easing", "Custom Shader"];
 const ANIMATION_TYPES_NO_SHADER: [&str; 4] = ["Default", "Off", "Spring", "Easing"];
 
+/// Easing-curve labels, indexed to match `EasingCurve::to_index`.
+const CURVE_LABELS: [&str; 5] = [
+    "Ease Out Quad",
+    "Ease Out Cubic",
+    "Ease Out Expo",
+    "Linear",
+    "Cubic Bezier",
+];
+
+/// Map a curve label to its niri KDL keyword.
+fn curve_label_to_kdl(label: &str) -> &'static str {
+    match label {
+        "Ease Out Cubic" => "ease-out-cubic",
+        "Ease Out Expo" => "ease-out-expo",
+        "Linear" => "linear",
+        "Cubic Bezier" => "cubic-bezier",
+        _ => "ease-out-quad",
+    }
+}
+
+/// Cubic-bezier control-point editor (x1, y1, x2, y2).
+fn bezier_editor(name: &str, x1: f64, y1: f64, x2: f64, y2: f64) -> Element<'static, Message> {
+    let pts = [x1, y1, x2, y2];
+    let labels = ["X1", "Y1", "X2", "Y2"];
+
+    let mut fields = row![].spacing(6);
+    for (i, label) in labels.iter().enumerate() {
+        let name_owned = name.to_string();
+        let value = format!("{}", pts[i]);
+        let field = column![
+            text(*label)
+                .size(9)
+                .font(fonts::UI_FONT_SEMIBOLD)
+                .color(neon::OUTLINE_VARIANT),
+            iced::widget::text_input("0.0", &value)
+                .on_input(move |v| {
+                    let parsed = v.trim().parse::<f64>().unwrap_or(pts[i]);
+                    let mut p = pts;
+                    p[i] = parsed;
+                    Message::Animations(AnimationsMessage::SetAnimationBezier(
+                        name_owned.clone(),
+                        p[0],
+                        p[1],
+                        p[2],
+                        p[3],
+                    ))
+                })
+                .font(fonts::MONO_FONT)
+                .size(11)
+                .padding(6)
+                .width(Length::Fill),
+        ]
+        .spacing(2)
+        .width(Length::FillPortion(1));
+        fields = fields.push(field);
+    }
+
+    column![
+        text("CONTROL POINTS")
+            .size(10)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(neon::OUTLINE_VARIANT),
+        text("X values are clamped to 0.0–1.0 (time axis); Y is unbounded")
+            .size(9)
+            .color(neon::OUTLINE_VARIANT),
+        fields,
+    ]
+    .spacing(4)
+    .into()
+}
+
 /// Creates the animations settings view
 pub fn view(settings: &AnimationSettings) -> Element<'_, Message> {
     let slowdown_enabled = (settings.slowdown - 1.0).abs() > 0.01;
@@ -190,6 +261,7 @@ fn animation_card<'a>(
     match config.animation_type {
         AnimationType::Spring => {
             let name_dr = name.to_string();
+            let name_st = name.to_string();
             let name_ep = name.to_string();
             card_content = card_content
                 .push(
@@ -218,6 +290,35 @@ fn animation_card<'a>(
                                 )
                             }
                         )
+                        .width(Length::Fill),
+                    ]
+                    .spacing(4),
+                )
+                .push(
+                    column![
+                        row![
+                            text("STIFFNESS")
+                                .size(10)
+                                .font(fonts::UI_FONT_SEMIBOLD)
+                                .color(neon::OUTLINE_VARIANT),
+                            Space::new().width(Length::Fill),
+                            text(format!("{}", config.spring.stiffness))
+                                .size(11)
+                                .font(fonts::MONO_FONT)
+                                .color(neon::SECONDARY),
+                        ]
+                        .align_y(Alignment::Center),
+                        iced::widget::slider(
+                            50.0..=2000.0,
+                            config.spring.stiffness as f32,
+                            move |v| {
+                                Message::Animations(AnimationsMessage::SetAnimationSpringStiffness(
+                                    name_st.clone(),
+                                    v as i32,
+                                ))
+                            }
+                        )
+                        .step(50.0)
                         .width(Length::Fill),
                     ]
                     .spacing(4),
@@ -281,6 +382,33 @@ fn animation_card<'a>(
                 ]
                 .spacing(4),
             );
+
+            // Easing curve selector.
+            let name_curve = name.to_string();
+            let curve_index = config.easing.curve.to_index() as usize;
+            let selected_curve = CURVE_LABELS.get(curve_index).copied();
+            card_content = card_content.push(
+                row![
+                    text("CURVE")
+                        .size(10)
+                        .font(fonts::UI_FONT_SEMIBOLD)
+                        .color(neon::OUTLINE_VARIANT),
+                    Space::new().width(Length::Fill),
+                    pick_list(CURVE_LABELS.to_vec(), selected_curve, move |label: &str| {
+                        Message::Animations(AnimationsMessage::SetAnimationCurve(
+                            name_curve.clone(),
+                            curve_label_to_kdl(label).to_string(),
+                        ))
+                    })
+                    .width(Length::Fixed(150.0)),
+                ]
+                .align_y(Alignment::Center),
+            );
+
+            // Cubic-bezier control points editor.
+            if let Some((x1, y1, x2, y2)) = config.easing.curve.bezier_points() {
+                card_content = card_content.push(bezier_editor(name, x1, y1, x2, y2));
+            }
         }
         AnimationType::CustomShader if supports_shader => {
             let shader_code = config.custom_shader.clone().unwrap_or_default();

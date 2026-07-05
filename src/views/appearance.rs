@@ -1,6 +1,6 @@
 //! Appearance settings view — neon modal style
 
-use iced::widget::{column, container, row, scrollable, text, Space};
+use iced::widget::{column, container, row, scrollable, text, text_input, Space};
 use iced::{Alignment, Element, Length};
 
 use super::widgets::{gradient_picker, info_text, toggle_row};
@@ -36,7 +36,7 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
                     "RING WIDTH",
                     &format!("{:.0} px", settings.focus_ring_width),
                     1.0..=20.0,
-                    settings.focus_ring_width as f32,
+                    settings.focus_ring_width,
                     1.0,
                     |v| Message::Appearance(AppearanceMessage::SetFocusRingWidth(v)),
                 ),
@@ -90,7 +90,7 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
                     "BORDER THICKNESS",
                     &format!("{:.0} px", settings.border_thickness),
                     1.0..=20.0,
-                    settings.border_thickness as f32,
+                    settings.border_thickness,
                     1.0,
                     |v| Message::Appearance(AppearanceMessage::SetBorderThickness(v)),
                 ),
@@ -135,7 +135,7 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
                 "WINDOW GAPS",
                 &format!("{:.0} px", settings.gaps),
                 0.0..=64.0,
-                settings.gaps as f32,
+                settings.gaps,
                 1.0,
                 |v| Message::Appearance(AppearanceMessage::SetGaps(v)),
             ),
@@ -143,12 +143,18 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
                 "CORNER RADIUS",
                 &format!("{:.0} px", settings.corner_radius),
                 0.0..=32.0,
-                settings.corner_radius as f32,
+                settings.corner_radius,
                 1.0,
                 |v| Message::Appearance(AppearanceMessage::SetCornerRadius(v)),
             ),
         ]
         .spacing(16),
+        Space::new().height(20),
+        // ── WORKSPACE BACKGROUND (full width) ──
+        modal_section("\u{25A3}", "WORKSPACE BACKGROUND", neon::PRIMARY),
+        info_text("Solid color drawn behind windows on every workspace."),
+        Space::new().height(4),
+        background_color_section(settings),
     ]
     .spacing(0)
     .width(Length::Fill);
@@ -156,6 +162,59 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
     scrollable(container(content).padding(8).width(Length::Fill))
         .height(Length::Fill)
         .into()
+}
+
+/// Workspace background-color control — enable toggle + hex input.
+fn background_color_section(settings: &AppearanceSettings) -> Element<'_, Message> {
+    let enabled = settings.background_color.is_some();
+    let hex = settings
+        .background_color
+        .map(|c| c.to_hex())
+        .unwrap_or_else(|| "#000000".to_string());
+
+    let toggle = container(
+        column![toggle_row(
+            "Custom background color",
+            "Override niri's default workspace background",
+            enabled,
+            |v| Message::Appearance(AppearanceMessage::SetBackgroundColor(if v {
+                Some("#000000".to_string())
+            } else {
+                None
+            })),
+        ),]
+        .spacing(0),
+    )
+    .padding(8)
+    .style(crate::theme::card_style);
+
+    let mut section = column![toggle].spacing(6);
+
+    if enabled {
+        section = section.push(
+            container(
+                column![
+                    text("BACKGROUND COLOR")
+                        .size(10)
+                        .font(fonts::UI_FONT_SEMIBOLD)
+                        .color(neon::OUTLINE_VARIANT),
+                    text_input("#RRGGBB", &hex)
+                        .on_input(
+                            |s| Message::Appearance(AppearanceMessage::SetBackgroundColor(Some(s)))
+                        )
+                        .padding(6)
+                        .font(fonts::MONO_FONT)
+                        .size(12)
+                        .width(Length::Fill),
+                ]
+                .spacing(4),
+            )
+            .padding(12)
+            .style(crate::theme::card_style),
+        );
+    }
+
+    section.into()
 }
 
 /// Focus ring settings — toggle, width, active/inactive/urgent colors
@@ -179,7 +238,7 @@ pub fn focus_ring_section(settings: &AppearanceSettings) -> Element<'_, Message>
             "RING WIDTH",
             &format!("{:.0} px", settings.focus_ring_width),
             1.0..=20.0,
-            settings.focus_ring_width as f32,
+            settings.focus_ring_width,
             1.0,
             |v| Message::Appearance(AppearanceMessage::SetFocusRingWidth(v)),
         ),
@@ -234,7 +293,7 @@ pub fn border_section(settings: &AppearanceSettings) -> Element<'_, Message> {
             "BORDER THICKNESS",
             &format!("{:.0} px", settings.border_thickness),
             1.0..=20.0,
-            settings.border_thickness as f32,
+            settings.border_thickness,
             1.0,
             |v| Message::Appearance(AppearanceMessage::SetBorderThickness(v)),
         ),
@@ -277,7 +336,7 @@ pub fn gaps_section(settings: &AppearanceSettings) -> Element<'_, Message> {
             "WINDOW GAPS",
             &format!("{:.0} px", settings.gaps),
             0.0..=64.0,
-            settings.gaps as f32,
+            settings.gaps,
             1.0,
             |v| Message::Appearance(AppearanceMessage::SetGaps(v)),
         ),
@@ -285,7 +344,7 @@ pub fn gaps_section(settings: &AppearanceSettings) -> Element<'_, Message> {
             "CORNER RADIUS",
             &format!("{:.0} px", settings.corner_radius),
             0.0..=32.0,
-            settings.corner_radius as f32,
+            settings.corner_radius,
             1.0,
             |v| Message::Appearance(AppearanceMessage::SetCornerRadius(v)),
         ),

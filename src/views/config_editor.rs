@@ -181,7 +181,7 @@ pub fn view<'a>(
                     let filename = CONFIG_FILES[selected_idx];
                     container(
                         column![
-                            text(format!("{}", filename))
+                            text(filename.to_string())
                                 .size(11)
                                 .font(fonts::MONO_FONT)
                                 .color(neon::SECONDARY),
