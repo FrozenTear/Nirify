@@ -17,9 +17,10 @@ impl NiriVersion {
     ///
     /// Returns None if the version string cannot be parsed.
     pub fn parse(version_str: &str) -> Option<Self> {
-        // Version format: "25.08" or "25.08-123-gabcdef" (git describe format)
-        // Take the part before any dash
-        let version_part = version_str.split('-').next()?;
+        // Version formats seen in the wild: "25.08", "25.08-123-gabcdef"
+        // (git describe), and "26.04 (8ed0da4)" (niri IPC appends the commit).
+        // Take the numeric part before any dash, space, or parenthesis.
+        let version_part = version_str.split(['-', ' ', '(']).next()?;
 
         let mut parts = version_part.split('.');
         let major: u32 = parts.next()?.parse().ok()?;
@@ -183,6 +184,15 @@ mod tests {
         let v = NiriVersion::parse("25.08-123-g4310c20c").unwrap();
         assert_eq!(v.major, 25);
         assert_eq!(v.minor, 8);
+    }
+
+    #[test]
+    fn test_parse_ipc_version_with_commit() {
+        // Real string returned by `niri msg version` / the IPC Version request.
+        let v = NiriVersion::parse("26.04 (8ed0da4)").unwrap();
+        assert_eq!(v.major, 26);
+        assert_eq!(v.minor, 4);
+        assert!(FeatureCompat::from_version(Some(v)).blur);
     }
 
     #[test]
