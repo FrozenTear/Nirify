@@ -22,6 +22,7 @@ pub mod builder;
 
 mod appearance;
 mod behavior;
+mod blur;
 mod display;
 mod gestures;
 mod gradient;
@@ -38,6 +39,7 @@ mod workspaces;
 // Re-export public generators
 pub use appearance::generate_appearance_kdl;
 pub use behavior::{generate_behavior_kdl, generate_main_kdl};
+pub use blur::generate_blur_kdl;
 pub use display::{
     generate_animations_kdl, generate_cursor_kdl, generate_outputs_kdl, generate_overview_kdl,
 };
@@ -140,12 +142,37 @@ pub fn atomic_write(path: &Path, content: &str) -> anyhow::Result<()> {
 }
 
 /// Write content to a file using the specified strategy.
+///
+/// Before writing, the content is re-parsed as a KDL document. A parse failure
+/// indicates a generator bug (we produced KDL niri could not read) and aborts
+/// the write so we never overwrite a good file with broken output.
 fn write_config(path: &Path, content: &str, strategy: WriteStrategy) -> anyhow::Result<()> {
+    content
+        .parse::<kdl::KdlDocument>()
+        .map_err(|e| anyhow::anyhow!("BUG: generated invalid KDL for {:?}: {}", path, e))?;
     match strategy {
         WriteStrategy::Atomic => atomic_write(path, content),
         WriteStrategy::Direct => fs::write(path, content).map_err(Into::into),
     }
     .with_context(|| format!("Failed to write {:?}", path))
+}
+
+/// Write a category file, optionally snapshotting the existing file first.
+///
+/// When `do_backup` is true and the target already exists, the current bytes
+/// are copied to a timestamped `.bak` in `backup_dir` before the new content is
+/// written (both writes are atomic; the new content passes the KDL parse gate).
+fn write_category(
+    path: &Path,
+    content: &str,
+    strategy: WriteStrategy,
+    do_backup: bool,
+    backup_dir: &Path,
+) -> anyhow::Result<()> {
+    if do_backup && path.exists() {
+        return save_with_backup(path, content, backup_dir);
+    }
+    write_config(path, content, strategy)
 }
 
 /// Write all settings files using the specified strategy.
@@ -203,7 +230,7 @@ fn write_all_settings(
     )?;
     write_config(
         &paths.tablet_kdl,
-        &generate_tablet_kdl(&settings.tablet),
+        &generate_tablet_kdl(&settings.tablet, compat),
         strategy,
     )?;
     write_config(
@@ -256,7 +283,7 @@ fn write_all_settings(
     )?;
     write_config(
         &paths.layer_rules_kdl,
-        &generate_layer_rules_kdl(&settings.layer_rules),
+        &generate_layer_rules_kdl(&settings.layer_rules, compat),
         strategy,
     )?;
     write_config(
@@ -274,6 +301,7 @@ fn write_all_settings(
         &generate_window_rules_kdl(
             &settings.window_rules,
             settings.preferences.float_settings_app,
+            compat,
         ),
         strategy,
     )?;
@@ -303,6 +331,15 @@ fn write_all_settings(
         write_config(
             &paths.recent_windows_kdl,
             &generate_recent_windows_kdl(&settings.recent_windows),
+            strategy,
+        )?;
+    }
+
+    // Top-level blur requires niri 26.04+
+    if compat.blur {
+        write_config(
+            &paths.path_for(crate::config::registry::ConfigFile::Blur),
+            &generate_blur_kdl(&settings.blur),
             strategy,
         )?;
     }
@@ -345,6 +382,8 @@ pub fn save_settings(
 /// * `settings` - The settings to write
 /// * `dirty` - Set of categories that need saving
 /// * `compat` - Feature compatibility flags based on detected niri version
+/// * `backup_first` - Categories whose existing file should be snapshotted to a
+///   `.bak` before being overwritten (first-write-per-session backup policy)
 ///
 /// # Returns
 /// The number of files that were written.
@@ -353,6 +392,7 @@ pub fn save_dirty(
     settings: &Settings,
     dirty: &std::collections::HashSet<super::dirty::SettingsCategory>,
     compat: FeatureCompat,
+    backup_first: &std::collections::HashSet<super::dirty::SettingsCategory>,
 ) -> anyhow::Result<usize> {
     use super::dirty::SettingsCategory;
 
@@ -372,201 +412,130 @@ pub fn save_dirty(
         files_written += 1;
     }
 
+    // blur.kdl has no dedicated ConfigPaths field; resolve it via the registry.
+    // Bound outside the loop so the borrowed &Path lives for the whole match.
+    let blur_path = paths.path_for(crate::config::registry::ConfigFile::Blur);
+
     for category in dirty {
-        match category {
-            SettingsCategory::Appearance => {
+        // Compute the target path and generated content for this category.
+        // `continue` skips categories that must not be written for the detected
+        // niri version (they are not counted as written).
+        let (path, content): (&Path, String) = match category {
+            SettingsCategory::Appearance => (
+                &paths.appearance_kdl,
                 // Appearance includes some behavior settings (struts)
-                write_config(
-                    &paths.appearance_kdl,
-                    &generate_appearance_kdl(&settings.appearance, &settings.behavior),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Behavior => {
-                write_config(
-                    &paths.behavior_kdl,
-                    &generate_behavior_kdl(&settings.behavior),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Keyboard => {
-                write_config(
-                    &paths.keyboard_kdl,
-                    &generate_keyboard_kdl(&settings.keyboard),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Mouse => {
-                write_config(
-                    &paths.mouse_kdl,
-                    &generate_mouse_kdl(&settings.mouse),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Touchpad => {
-                write_config(
-                    &paths.touchpad_kdl,
-                    &generate_touchpad_kdl(&settings.touchpad),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Trackpoint => {
-                write_config(
-                    &paths.trackpoint_kdl,
-                    &generate_trackpoint_kdl(&settings.trackpoint),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Trackball => {
-                write_config(
-                    &paths.trackball_kdl,
-                    &generate_trackball_kdl(&settings.trackball),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Tablet => {
-                write_config(
-                    &paths.tablet_kdl,
-                    &generate_tablet_kdl(&settings.tablet),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Touch => {
-                write_config(
-                    &paths.touch_kdl,
-                    &generate_touch_kdl(&settings.touch),
-                    strategy,
-                )?;
-            }
+                generate_appearance_kdl(&settings.appearance, &settings.behavior),
+            ),
+            SettingsCategory::Behavior => (
+                &paths.behavior_kdl,
+                generate_behavior_kdl(&settings.behavior),
+            ),
+            SettingsCategory::Keyboard => (
+                &paths.keyboard_kdl,
+                generate_keyboard_kdl(&settings.keyboard),
+            ),
+            SettingsCategory::Mouse => (&paths.mouse_kdl, generate_mouse_kdl(&settings.mouse)),
+            SettingsCategory::Touchpad => (
+                &paths.touchpad_kdl,
+                generate_touchpad_kdl(&settings.touchpad),
+            ),
+            SettingsCategory::Trackpoint => (
+                &paths.trackpoint_kdl,
+                generate_trackpoint_kdl(&settings.trackpoint),
+            ),
+            SettingsCategory::Trackball => (
+                &paths.trackball_kdl,
+                generate_trackball_kdl(&settings.trackball),
+            ),
+            SettingsCategory::Tablet => (
+                &paths.tablet_kdl,
+                generate_tablet_kdl(&settings.tablet, compat),
+            ),
+            SettingsCategory::Touch => (&paths.touch_kdl, generate_touch_kdl(&settings.touch)),
             SettingsCategory::Outputs => {
-                write_config(
-                    &paths.outputs_kdl,
-                    &generate_outputs_kdl(&settings.outputs),
-                    strategy,
-                )?;
+                (&paths.outputs_kdl, generate_outputs_kdl(&settings.outputs))
             }
-            SettingsCategory::Animations => {
-                write_config(
-                    &paths.animations_kdl,
-                    &generate_animations_kdl(&settings.animations),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Cursor => {
-                write_config(
-                    &paths.cursor_kdl,
-                    &generate_cursor_kdl(&settings.cursor),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Overview => {
-                write_config(
-                    &paths.overview_kdl,
-                    &generate_overview_kdl(&settings.overview),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Workspaces => {
-                write_config(
-                    &paths.workspaces_kdl,
-                    &generate_workspaces_kdl(&settings.workspaces),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Keybindings => {
-                write_config(
-                    &paths.keybindings_kdl,
-                    &generate_keybindings_kdl(&settings.keybindings),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::LayoutExtras => {
-                write_config(
-                    &paths.layout_extras_kdl,
-                    &generate_layout_extras_kdl(&settings.layout_extras),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Gestures => {
-                write_config(
-                    &paths.gestures_kdl,
-                    &generate_gestures_kdl(&settings.gestures),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::LayerRules => {
-                write_config(
-                    &paths.layer_rules_kdl,
-                    &generate_layer_rules_kdl(&settings.layer_rules),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::WindowRules => {
-                write_config(
-                    &paths.window_rules_kdl,
-                    &generate_window_rules_kdl(
-                        &settings.window_rules,
-                        settings.preferences.float_settings_app,
-                    ),
-                    strategy,
-                )?;
-            }
+            SettingsCategory::Animations => (
+                &paths.animations_kdl,
+                generate_animations_kdl(&settings.animations),
+            ),
+            SettingsCategory::Cursor => (&paths.cursor_kdl, generate_cursor_kdl(&settings.cursor)),
+            SettingsCategory::Overview => (
+                &paths.overview_kdl,
+                generate_overview_kdl(&settings.overview),
+            ),
+            SettingsCategory::Workspaces => (
+                &paths.workspaces_kdl,
+                generate_workspaces_kdl(&settings.workspaces),
+            ),
+            SettingsCategory::Keybindings => (
+                &paths.keybindings_kdl,
+                generate_keybindings_kdl(&settings.keybindings),
+            ),
+            SettingsCategory::LayoutExtras => (
+                &paths.layout_extras_kdl,
+                generate_layout_extras_kdl(&settings.layout_extras),
+            ),
+            SettingsCategory::Gestures => (
+                &paths.gestures_kdl,
+                generate_gestures_kdl(&settings.gestures),
+            ),
+            SettingsCategory::LayerRules => (
+                &paths.layer_rules_kdl,
+                generate_layer_rules_kdl(&settings.layer_rules, compat),
+            ),
+            SettingsCategory::WindowRules => (
+                &paths.window_rules_kdl,
+                generate_window_rules_kdl(
+                    &settings.window_rules,
+                    settings.preferences.float_settings_app,
+                    compat,
+                ),
+            ),
             SettingsCategory::Miscellaneous => {
-                write_config(
-                    &paths.misc_kdl,
-                    &generate_misc_kdl(&settings.miscellaneous),
-                    strategy,
-                )?;
+                (&paths.misc_kdl, generate_misc_kdl(&settings.miscellaneous))
             }
             SettingsCategory::Startup => {
-                write_config(
-                    &paths.startup_kdl,
-                    &generate_startup_kdl(&settings.startup),
-                    strategy,
-                )?;
+                (&paths.startup_kdl, generate_startup_kdl(&settings.startup))
             }
-            SettingsCategory::Environment => {
-                write_config(
-                    &paths.environment_kdl,
-                    &generate_environment_kdl(&settings.environment),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::Debug => {
-                write_config(
-                    &paths.debug_kdl,
-                    &generate_debug_kdl(&settings.debug),
-                    strategy,
-                )?;
-            }
-            SettingsCategory::SwitchEvents => {
-                write_config(
-                    &paths.switch_events_kdl,
-                    &generate_switch_events_kdl(&settings.switch_events),
-                    strategy,
-                )?;
-            }
+            SettingsCategory::Environment => (
+                &paths.environment_kdl,
+                generate_environment_kdl(&settings.environment),
+            ),
+            SettingsCategory::Debug => (&paths.debug_kdl, generate_debug_kdl(&settings.debug)),
+            SettingsCategory::SwitchEvents => (
+                &paths.switch_events_kdl,
+                generate_switch_events_kdl(&settings.switch_events),
+            ),
             SettingsCategory::RecentWindows => {
                 // Recent windows requires niri 25.11+
                 if compat.recent_windows {
-                    write_config(
+                    (
                         &paths.recent_windows_kdl,
-                        &generate_recent_windows_kdl(&settings.recent_windows),
-                        strategy,
-                    )?;
+                        generate_recent_windows_kdl(&settings.recent_windows),
+                    )
                 } else {
                     // Skip writing this file, don't count as written
                     continue;
                 }
             }
-            SettingsCategory::Preferences => {
-                write_config(
-                    &paths.preferences_kdl,
-                    &generate_preferences_kdl(&settings.preferences),
-                    strategy,
-                )?;
+            SettingsCategory::Blur => {
+                // Top-level blur requires niri 26.04+
+                if compat.blur {
+                    (blur_path.as_path(), generate_blur_kdl(&settings.blur))
+                } else {
+                    // Skip writing this file, don't count as written
+                    continue;
+                }
             }
-        }
+            SettingsCategory::Preferences => (
+                &paths.preferences_kdl,
+                generate_preferences_kdl(&settings.preferences),
+            ),
+        };
+
+        let do_backup = backup_first.contains(category);
+        write_category(path, &content, strategy, do_backup, &paths.backup_dir)?;
         files_written += 1;
     }
 
@@ -591,6 +560,7 @@ pub fn save_dirty(
 /// - The backup directory cannot be written to
 /// - The target file cannot be written
 /// - The path has no valid filename
+/// - The new content fails the KDL parse gate (see [`write_config`])
 pub fn save_with_backup(path: &Path, content: &str, backup_dir: &Path) -> anyhow::Result<()> {
     // Atomically read existing content (combines exists check + read)
     if let Ok(existing_content) = fs::read(path) {
@@ -603,13 +573,14 @@ pub fn save_with_backup(path: &Path, content: &str, backup_dir: &Path) -> anyhow
         let backup_name = format!("{}.{}.bak", filename, timestamp);
         let backup_path = backup_dir.join(&backup_name);
 
-        // Use atomic_write for backup (not fs::copy which has TOCTOU)
+        // Snapshot existing bytes verbatim (no parse gate: preserve whatever was
+        // on disk, including hand edits or corrupt content).
         atomic_write(&backup_path, &String::from_utf8_lossy(&existing_content))
             .with_context(|| format!("Failed to create backup at {:?}", backup_path))?;
     }
 
-    // Use atomic_write instead of fs::write
-    atomic_write(path, content).with_context(|| format!("Failed to write config file {:?}", path))
+    // Final write goes through the parse gate + atomic write.
+    write_config(path, content, WriteStrategy::Atomic)
 }
 
 /// Initialize all configuration files with the provided settings.
@@ -639,6 +610,8 @@ pub fn initialize_config_files(
 }
 
 #[cfg(test)]
+// Test setup mutates a couple fields after default() for readability.
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
     use crate::config::models::{AppearanceSettings, BehaviorSettings};
@@ -652,16 +625,33 @@ mod tests {
         assert!(content.contains("include \"input/keyboard.kdl\""));
         assert!(content.contains("Nirify managed"));
         assert!(content.contains("include \"advanced/recent-windows.kdl\""));
+        assert!(content.contains("include \"blur.kdl\""));
     }
 
     #[test]
     fn test_generate_main_kdl_skips_recent_windows_when_disabled() {
         let compat = FeatureCompat {
             recent_windows: false,
+            background_effects: false,
+            blur: false,
+            map_to_focused_output: false,
         };
         let content = generate_main_kdl(compat);
         assert!(!content.contains("include \"advanced/recent-windows.kdl\""));
         assert!(content.contains("recent-windows.kdl requires niri 25.11+"));
+    }
+
+    #[test]
+    fn test_generate_main_kdl_skips_blur_when_disabled() {
+        let compat = FeatureCompat {
+            recent_windows: true,
+            background_effects: true,
+            blur: false,
+            map_to_focused_output: false,
+        };
+        let content = generate_main_kdl(compat);
+        assert!(!content.contains("include \"blur.kdl\""));
+        assert!(content.contains("blur.kdl requires niri 26.04+"));
     }
 
     #[test]
@@ -688,9 +678,10 @@ mod tests {
         let behavior = BehaviorSettings::default();
         let content = generate_appearance_kdl(&appearance, &behavior);
 
-        // When focus ring is disabled, we don't output the block at all
-        // (niri's default is no focus ring)
-        assert!(!content.contains("focus-ring {"));
+        // The focus-ring block is always emitted so the disabled state (and
+        // styling) round-trips and overrides niri's default (which is ON).
+        assert!(content.contains("focus-ring {"));
+        assert!(content.contains("off"));
     }
 
     #[test]
@@ -811,5 +802,80 @@ mod tests {
         let content = generate_overview_kdl(&overview);
 
         assert!(content.contains("backdrop-color \"#ff0000\""));
+    }
+
+    #[test]
+    fn write_config_rejects_invalid_generated_kdl() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.kdl");
+        let err = write_config(&path, "node {", WriteStrategy::Atomic).unwrap_err();
+        assert!(
+            err.to_string().contains("generated invalid KDL"),
+            "unexpected error: {}",
+            err
+        );
+        assert!(!path.exists(), "file must not be written on parse failure");
+    }
+
+    #[test]
+    fn save_dirty_backs_up_only_first_write() {
+        use crate::config::{ConfigPaths, Settings, SettingsCategory};
+        use std::collections::HashSet;
+
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+
+        let mut paths = ConfigPaths::default();
+        paths.managed_dir = base.to_path_buf();
+        paths.input_dir = base.join("input");
+        paths.advanced_dir = base.join("advanced");
+        paths.backup_dir = base.join("backups");
+        paths.main_kdl = base.join("main.kdl");
+        paths.appearance_kdl = base.join("appearance.kdl");
+
+        std::fs::create_dir_all(base).unwrap();
+        std::fs::write(&paths.appearance_kdl, "// sentinel\nlayout {\n}\n").unwrap();
+
+        let settings = Settings::default();
+        let compat = crate::version::FeatureCompat::from_version(None);
+
+        let mut dirty = HashSet::new();
+        dirty.insert(SettingsCategory::Appearance);
+        let mut backup_first = HashSet::new();
+        backup_first.insert(SettingsCategory::Appearance);
+
+        let count_baks = |backup_dir: &std::path::Path| -> usize {
+            std::fs::read_dir(backup_dir)
+                .map(|rd| {
+                    rd.flatten()
+                        .filter(|e| {
+                            let n = e.file_name();
+                            let n = n.to_string_lossy();
+                            n.starts_with("appearance.kdl.") && n.ends_with(".bak")
+                        })
+                        .count()
+                })
+                .unwrap_or(0)
+        };
+
+        save_dirty(&paths, &settings, &dirty, compat, &backup_first).unwrap();
+        assert_eq!(count_baks(&paths.backup_dir), 1);
+
+        // The single backup preserves the original sentinel content
+        let bak = std::fs::read_dir(&paths.backup_dir)
+            .unwrap()
+            .flatten()
+            .find(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with("appearance.kdl.")
+            })
+            .unwrap();
+        let content = std::fs::read_to_string(bak.path()).unwrap();
+        assert!(content.contains("sentinel"));
+
+        // Second save without backup_first must not add another .bak
+        save_dirty(&paths, &settings, &dirty, compat, &HashSet::new()).unwrap();
+        assert_eq!(count_baks(&paths.backup_dir), 1);
     }
 }

@@ -4,11 +4,11 @@
 
 use crate::types::{ColorOrGradient, ColorSpace, Gradient, GradientRelativeTo};
 
-/// Generate KDL for a gradient with a given variant name (e.g., "active", "inactive").
+/// Generate KDL for a gradient as a node with the given node name.
 ///
 /// Produces output like:
-/// `active-gradient from="#80c8ff" to="#bbddff" angle=45 relative-to="workspace-view" in="oklch shorter hue"`
-pub fn gradient_to_kdl(gradient: &Gradient, variant: &str) -> String {
+/// `gradient from="#80c8ff" to="#bbddff" angle=45 relative-to="workspace-view" in="oklch shorter hue"`
+pub fn gradient_node_to_kdl(gradient: &Gradient, node_name: &str) -> String {
     use std::fmt::Write;
 
     // Pre-allocate buffer - typical gradient is ~80-120 chars
@@ -19,8 +19,8 @@ pub fn gradient_to_kdl(gradient: &Gradient, variant: &str) -> String {
     // and always succeeds (may allocate but never returns Err)
     let _ = write!(
         output,
-        "{}-gradient from=\"{}\" to=\"{}\"",
-        variant,
+        "{} from=\"{}\" to=\"{}\"",
+        node_name,
         gradient.from.to_hex(),
         gradient.to.to_hex()
     );
@@ -55,6 +55,14 @@ pub fn gradient_to_kdl(gradient: &Gradient, variant: &str) -> String {
     }
 
     output
+}
+
+/// Generate KDL for a gradient with a given variant name (e.g., "active", "inactive").
+///
+/// Produces output like:
+/// `active-gradient from="#80c8ff" to="#bbddff" angle=45 relative-to="workspace-view" in="oklch shorter hue"`
+pub fn gradient_to_kdl(gradient: &Gradient, variant: &str) -> String {
+    gradient_node_to_kdl(gradient, &format!("{}-gradient", variant))
 }
 
 /// Generate KDL for a ColorOrGradient with a given variant name.

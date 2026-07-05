@@ -12,6 +12,7 @@ use crate::config::models::{
     TrackballSettings, TrackpointSettings,
 };
 use crate::types::{AccelProfile, ScrollMethod};
+use crate::version::FeatureCompat;
 
 /// Trait for pointer devices that share common settings (trackpoint, trackball).
 ///
@@ -25,11 +26,10 @@ pub trait PointerDeviceSettings {
     fn middle_emulation(&self) -> bool;
     fn accel_speed(&self) -> f64;
     fn accel_profile(&self) -> AccelProfile;
-    fn scroll_method(&self) -> ScrollMethod;
+    /// Scroll method (None = libinput device default; emitted only when Some)
+    fn scroll_method(&self) -> Option<ScrollMethod>;
     fn scroll_button(&self) -> Option<i32>;
     fn scroll_button_lock(&self) -> bool;
-    /// The default scroll method for this device type (used to determine whether to output scroll-method)
-    fn default_scroll_method(&self) -> ScrollMethod;
 }
 
 impl PointerDeviceSettings for TrackpointSettings {
@@ -51,7 +51,7 @@ impl PointerDeviceSettings for TrackpointSettings {
     fn accel_profile(&self) -> AccelProfile {
         self.accel_profile
     }
-    fn scroll_method(&self) -> ScrollMethod {
+    fn scroll_method(&self) -> Option<ScrollMethod> {
         self.scroll_method
     }
     fn scroll_button(&self) -> Option<i32> {
@@ -59,9 +59,6 @@ impl PointerDeviceSettings for TrackpointSettings {
     }
     fn scroll_button_lock(&self) -> bool {
         self.scroll_button_lock
-    }
-    fn default_scroll_method(&self) -> ScrollMethod {
-        ScrollMethod::OnButtonDown
     }
 }
 
@@ -84,7 +81,7 @@ impl PointerDeviceSettings for TrackballSettings {
     fn accel_profile(&self) -> AccelProfile {
         self.accel_profile
     }
-    fn scroll_method(&self) -> ScrollMethod {
+    fn scroll_method(&self) -> Option<ScrollMethod> {
         self.scroll_method
     }
     fn scroll_button(&self) -> Option<i32> {
@@ -92,9 +89,6 @@ impl PointerDeviceSettings for TrackballSettings {
     }
     fn scroll_button_lock(&self) -> bool {
         self.scroll_button_lock
-    }
-    fn default_scroll_method(&self) -> ScrollMethod {
-        ScrollMethod::OnButtonDown
     }
 }
 
@@ -155,11 +149,11 @@ fn generate_pointer_device_kdl(device_name: &str, settings: &impl PointerDeviceS
         ));
     }
 
-    // Scroll method (only output if different from device default)
-    if settings.scroll_method() != settings.default_scroll_method() {
+    // Scroll method: only output when explicitly set (None = libinput default)
+    if let Some(method) = settings.scroll_method() {
         content.push_str(&format!(
             "        scroll-method \"{}\"\n",
-            scroll_method_to_kdl(settings.scroll_method())
+            scroll_method_to_kdl(method)
         ));
     }
 
@@ -260,11 +254,11 @@ pub fn generate_mouse_kdl(settings: &MouseSettings) -> String {
         settings.scroll_factor_horizontal,
     );
 
-    // Only output scroll-method if it's not the default (no-scroll for mouse)
-    if !matches!(settings.scroll_method, ScrollMethod::NoScroll) {
+    // Scroll method: only output when explicitly set (None = libinput default)
+    if let Some(method) = settings.scroll_method {
         content.push_str(&format!(
             "        scroll-method \"{}\"\n",
-            scroll_method_to_kdl(settings.scroll_method)
+            scroll_method_to_kdl(method)
         ));
     }
 
@@ -303,8 +297,10 @@ pub fn generate_touchpad_kdl(settings: &TouchpadSettings) -> String {
     if settings.dwtp {
         content.push_str("        dwtp\n");
     }
-    // drag requires a boolean argument in niri
-    content.push_str(&format!("        drag {}\n", settings.drag));
+    // drag requires a boolean argument in niri; only emit when explicitly set
+    if let Some(drag) = settings.drag {
+        content.push_str(&format!("        drag {}\n", drag));
+    }
     if settings.drag_lock {
         content.push_str("        drag-lock\n");
     }
@@ -324,19 +320,27 @@ pub fn generate_touchpad_kdl(settings: &TouchpadSettings) -> String {
         settings.scroll_factor_horizontal,
     );
 
-    // Touchpad-specific enums
-    content.push_str(&format!(
-        "        tap-button-map \"{}\"\n",
-        tap_button_map_to_kdl(settings.tap_button_map)
-    ));
-    content.push_str(&format!(
-        "        click-method \"{}\"\n",
-        click_method_to_kdl(settings.click_method)
-    ));
-    content.push_str(&format!(
-        "        scroll-method \"{}\"\n",
-        scroll_method_to_kdl(settings.scroll_method)
-    ));
+    // Touchpad-specific enums: Nirify treats each enum's default as "unset" and
+    // only emits when the user chose a non-default value (behavior-neutral save).
+    if settings.tap_button_map != crate::types::TapButtonMap::default() {
+        content.push_str(&format!(
+            "        tap-button-map \"{}\"\n",
+            tap_button_map_to_kdl(settings.tap_button_map)
+        ));
+    }
+    if settings.click_method != crate::types::ClickMethod::default() {
+        content.push_str(&format!(
+            "        click-method \"{}\"\n",
+            click_method_to_kdl(settings.click_method)
+        ));
+    }
+    // Scroll method: only output when explicitly set (None = libinput default)
+    if let Some(method) = settings.scroll_method {
+        content.push_str(&format!(
+            "        scroll-method \"{}\"\n",
+            scroll_method_to_kdl(method)
+        ));
+    }
 
     // Scroll button for on-button-down scrolling
     if let Some(button) = settings.scroll_button {
@@ -372,8 +376,9 @@ trait MappedInputDevice {
     fn off(&self) -> bool;
     fn map_to_output(&self) -> &str;
     fn calibration_matrix(&self) -> Option<[f64; 6]>;
-    /// Device-specific properties to write after the common ones
-    fn write_specific(&self, content: &mut String);
+    /// Device-specific properties to write after the common ones.
+    /// `compat` gates version-dependent nodes (e.g. tablet map-to-focused-output).
+    fn write_specific(&self, content: &mut String, compat: FeatureCompat);
 }
 
 impl MappedInputDevice for TabletSettings {
@@ -392,8 +397,30 @@ impl MappedInputDevice for TabletSettings {
     fn calibration_matrix(&self) -> Option<[f64; 6]> {
         self.calibration_matrix
     }
-    fn write_specific(&self, content: &mut String) {
-        // Tablet-specific: left_handed
+    fn write_specific(&self, content: &mut String, compat: FeatureCompat) {
+        // Tablet-specific: focused-output/window mapping and left_handed.
+        //
+        // `map-to-focused-output` is Since niri 26.04, gated on its own dedicated
+        // compat flag (`map_to_focused_output`). When the running niri is too old
+        // (or unknown), the value is preserved slashdashed (`/-`) so it is not
+        // destroyed but also not applied.
+        if self.map_to_focused_output {
+            if compat.map_to_focused_output {
+                content.push_str("        map-to-focused-output\n");
+            } else {
+                content.push_str(
+                    "        // map-to-focused-output requires niri 26.04+ (preserved)\n",
+                );
+                content.push_str("        /-map-to-focused-output\n");
+            }
+        }
+        // `map-to-focused-window` is unreleased in niri ("Since: next release").
+        // Never emit it as an active node; preserve it slashdashed if set.
+        if self.map_to_focused_window {
+            content
+                .push_str("        // map-to-focused-window is unreleased in niri (preserved)\n");
+            content.push_str("        /-map-to-focused-window\n");
+        }
         if self.left_handed {
             content.push_str("        left-handed\n");
         }
@@ -416,13 +443,13 @@ impl MappedInputDevice for TouchSettings {
     fn calibration_matrix(&self) -> Option<[f64; 6]> {
         self.calibration_matrix
     }
-    fn write_specific(&self, _content: &mut String) {
+    fn write_specific(&self, _content: &mut String, _compat: FeatureCompat) {
         // Touch has no device-specific properties
     }
 }
 
 /// Generate KDL for a mapped input device (tablet or touch)
-fn generate_mapped_input_kdl(device: &impl MappedInputDevice) -> String {
+fn generate_mapped_input_kdl(device: &impl MappedInputDevice, compat: FeatureCompat) -> String {
     let name = device.device_name();
     let title = device.device_title();
     let mut content = String::with_capacity(256);
@@ -447,7 +474,7 @@ fn generate_mapped_input_kdl(device: &impl MappedInputDevice) -> String {
     }
 
     // Device-specific properties (e.g., tablet's left_handed)
-    device.write_specific(&mut content);
+    device.write_specific(&mut content, compat);
 
     // Calibration matrix (common but written after specific)
     if let Some(matrix) = device.calibration_matrix() {
@@ -461,12 +488,205 @@ fn generate_mapped_input_kdl(device: &impl MappedInputDevice) -> String {
     content
 }
 
-/// Generate tablet.kdl content
-pub fn generate_tablet_kdl(settings: &TabletSettings) -> String {
-    generate_mapped_input_kdl(settings)
+/// Generate tablet.kdl content.
+///
+/// `compat` gates version-dependent nodes: `map-to-focused-output` (niri 26.04+)
+/// is preserved slashdashed when unsupported, and the unreleased
+/// `map-to-focused-window` is always preserved slashdashed.
+pub fn generate_tablet_kdl(settings: &TabletSettings, compat: FeatureCompat) -> String {
+    generate_mapped_input_kdl(settings, compat)
 }
 
 /// Generate touch.kdl content
 pub fn generate_touch_kdl(settings: &TouchSettings) -> String {
-    generate_mapped_input_kdl(settings)
+    // Touch has no version-gated nodes; compat is irrelevant here.
+    generate_mapped_input_kdl(settings, FeatureCompat::all_enabled())
+}
+
+#[cfg(test)]
+// Test setup mutates a couple fields after default() for readability.
+#[allow(clippy::field_reassign_with_default)]
+mod tests {
+    use super::*;
+    use crate::config::loader::{
+        parse_mouse_from_children, parse_tablet_from_children, parse_touchpad_from_children,
+        parse_trackpoint_from_children,
+    };
+    use crate::config::models::Settings;
+    use crate::types::ScrollMethod;
+
+    /// Re-parse generated device KDL via the kdl crate, navigate `input > device`,
+    /// then run the loader's parse fn against the device children.
+    fn load_device(
+        kdl: &str,
+        device: &str,
+        parse: fn(&kdl::KdlDocument, &mut Settings),
+    ) -> Settings {
+        let doc: kdl::KdlDocument = kdl.parse().expect("generated input KDL must re-parse");
+        let mut settings = Settings::default();
+        if let Some(input) = doc.get("input").and_then(|n| n.children()) {
+            if let Some(dev) = input.get(device).and_then(|n| n.children()) {
+                parse(dev, &mut settings);
+            }
+        }
+        settings
+    }
+
+    #[test]
+    fn roundtrip_scroll_factor_uniform() {
+        let mut m = MouseSettings::default();
+        m.scroll_factor = 2.5;
+        m.scroll_factor_horizontal = None;
+        let kdl = generate_mouse_kdl(&m);
+        assert!(kdl.contains("scroll-factor 2.50"));
+        assert!(!kdl.contains('"'));
+        let loaded = load_device(&kdl, "mouse", parse_mouse_from_children);
+        assert_eq!(loaded.mouse.scroll_factor, 2.5);
+        assert_eq!(loaded.mouse.scroll_factor_horizontal, None);
+    }
+
+    #[test]
+    fn roundtrip_scroll_factor_split() {
+        let mut t = TouchpadSettings::default();
+        t.scroll_factor = 1.0;
+        t.scroll_factor_horizontal = Some(-1.5);
+        let kdl = generate_touchpad_kdl(&t);
+        assert!(kdl.contains("scroll-factor horizontal=-1.50 vertical=1.00"));
+        let loaded = load_device(&kdl, "touchpad", parse_touchpad_from_children);
+        assert_eq!(loaded.touchpad.scroll_factor, 1.0);
+        assert_eq!(loaded.touchpad.scroll_factor_horizontal, Some(-1.5));
+    }
+
+    #[test]
+    fn roundtrip_scroll_factor_uniform_negative() {
+        let mut m = MouseSettings::default();
+        m.scroll_factor = -1.0;
+        m.scroll_factor_horizontal = None;
+        let kdl = generate_mouse_kdl(&m);
+        assert!(kdl.contains("scroll-factor horizontal=-1.00 vertical=-1.00"));
+        let loaded = load_device(&kdl, "mouse", parse_mouse_from_children);
+        assert_eq!(loaded.mouse.scroll_factor, -1.0);
+        assert_eq!(loaded.mouse.scroll_factor_horizontal, None);
+    }
+
+    #[test]
+    fn scroll_factor_default_omitted() {
+        let m = MouseSettings::default();
+        let kdl = generate_mouse_kdl(&m);
+        assert!(!kdl.contains("scroll-factor"));
+    }
+
+    #[test]
+    fn legacy_scroll_factor_string_still_loads() {
+        let kdl =
+            "input {\n  mouse {\n    scroll-factor \"horizontal=2.00 vertical=1.00\"\n  }\n}\n";
+        let loaded = load_device(kdl, "mouse", parse_mouse_from_children);
+        assert_eq!(loaded.mouse.scroll_factor, 1.0);
+        assert_eq!(loaded.mouse.scroll_factor_horizontal, Some(2.0));
+    }
+
+    #[test]
+    fn roundtrip_mouse_no_scroll() {
+        let mut m = MouseSettings::default();
+        m.scroll_method = Some(ScrollMethod::NoScroll);
+        let kdl = generate_mouse_kdl(&m);
+        assert!(kdl.contains("scroll-method \"no-scroll\""));
+        let loaded = load_device(&kdl, "mouse", parse_mouse_from_children);
+        assert_eq!(loaded.mouse.scroll_method, Some(ScrollMethod::NoScroll));
+
+        // None => node absent => loads None.
+        let m2 = MouseSettings::default();
+        let kdl2 = generate_mouse_kdl(&m2);
+        assert!(!kdl2.contains("scroll-method"));
+        let loaded2 = load_device(&kdl2, "mouse", parse_mouse_from_children);
+        assert_eq!(loaded2.mouse.scroll_method, None);
+    }
+
+    #[test]
+    fn roundtrip_trackpoint_on_button_down() {
+        let mut tp = TrackpointSettings::default();
+        tp.scroll_method = Some(ScrollMethod::OnButtonDown);
+        let kdl = generate_trackpoint_kdl(&tp);
+        assert!(kdl.contains("scroll-method \"on-button-down\""));
+        let loaded = load_device(&kdl, "trackpoint", parse_trackpoint_from_children);
+        assert_eq!(
+            loaded.trackpoint.scroll_method,
+            Some(ScrollMethod::OnButtonDown)
+        );
+    }
+
+    #[test]
+    fn tablet_focused_output_active_when_supported() {
+        // niri 26.04+ (map_to_focused_output gate true): output mapping is emitted
+        // as a live node; the unreleased window mapping stays slashdashed.
+        let mut t = TabletSettings::default();
+        t.map_to_focused_output = true;
+        t.map_to_focused_window = true;
+        let kdl = generate_tablet_kdl(&t, crate::version::FeatureCompat::all_enabled());
+        // Must re-parse via the kdl crate.
+        let _doc: kdl::KdlDocument = kdl.parse().expect("tablet KDL must re-parse");
+        assert!(kdl.contains("        map-to-focused-output\n"));
+        assert!(!kdl.contains("/-map-to-focused-output"));
+        assert!(kdl.contains("/-map-to-focused-window"));
+        // Parser (live nodes only) sees the active output mapping.
+        let loaded = load_device(&kdl, "tablet", parse_tablet_from_children);
+        assert!(loaded.tablet.map_to_focused_output);
+        assert!(!loaded.tablet.map_to_focused_window);
+    }
+
+    #[test]
+    fn tablet_gated_flags_preserved_via_slashdash() {
+        use crate::config::loader::load_tablet;
+        // Unknown/old niri (compat default = all false): both mappings are
+        // preserved slashdashed, and the file loader reads them back (P1).
+        let mut t = TabletSettings::default();
+        t.map_to_focused_output = true;
+        t.map_to_focused_window = true;
+        let kdl = generate_tablet_kdl(&t, crate::version::FeatureCompat::default());
+        let _doc: kdl::KdlDocument = kdl.parse().expect("tablet KDL must re-parse");
+        assert!(kdl.contains("/-map-to-focused-output"));
+        assert!(kdl.contains("/-map-to-focused-window"));
+
+        // Live-node parser cannot see slashdashed nodes.
+        let live = load_device(&kdl, "tablet", parse_tablet_from_children);
+        assert!(!live.tablet.map_to_focused_output);
+        assert!(!live.tablet.map_to_focused_window);
+
+        // File loader restores them from the raw slashdash text.
+        let path = std::env::temp_dir().join(format!(
+            "nirify_tablet_slashdash_{}.kdl",
+            std::process::id()
+        ));
+        std::fs::write(&path, &kdl).unwrap();
+        let mut settings = Settings::default();
+        load_tablet(&path, &mut settings);
+        let _ = std::fs::remove_file(&path);
+        assert!(settings.tablet.map_to_focused_output);
+        assert!(settings.tablet.map_to_focused_window);
+    }
+
+    #[test]
+    fn touchpad_default_save_is_neutral() {
+        let kdl = generate_touchpad_kdl(&TouchpadSettings::default());
+        // Must re-parse.
+        let _doc: kdl::KdlDocument = kdl.parse().expect("touchpad KDL must re-parse");
+        for node in [
+            "tap",
+            "natural-scroll",
+            "dwt",
+            "drag",
+            "scroll-method",
+            "tap-button-map",
+            "click-method",
+            "accel-speed",
+            "accel-profile",
+            "scroll-factor",
+        ] {
+            assert!(
+                !kdl.contains(node),
+                "default touchpad save should not emit `{}`",
+                node
+            );
+        }
+    }
 }

@@ -86,7 +86,15 @@ pub fn generate_environment_kdl(settings: &EnvironmentSettings) -> String {
                     // Validate environment variable name follows POSIX conventions
                     // Must start with letter or underscore, contain only alphanumeric and underscore
                     if is_valid_env_var_name(&var.name) {
-                        b.field_string(&var.name, &var.value);
+                        match &var.value {
+                            // `null` unsets the variable for spawned processes
+                            None => {
+                                b.raw(&format!("{} null", var.name));
+                            }
+                            Some(v) => {
+                                b.field_string(&var.name, v);
+                            }
+                        }
                     } else {
                         warn!(
                             "Skipping invalid environment variable name: {:?} (must match [A-Za-z_][A-Za-z0-9_]*)",
@@ -377,4 +385,57 @@ pub fn generate_recent_windows_kdl(settings: &RecentWindowsSettings) -> String {
     });
 
     kdl.build()
+}
+
+#[cfg(test)]
+mod environment_tests {
+    use super::*;
+    use crate::config::models::{EnvironmentVariable, Settings};
+
+    #[test]
+    fn test_environment_null_round_trip() {
+        let settings = EnvironmentSettings {
+            variables: vec![
+                EnvironmentVariable {
+                    id: 0,
+                    name: "DISPLAY".into(),
+                    value: None,
+                },
+                EnvironmentVariable {
+                    id: 1,
+                    name: "QT_QPA_PLATFORM".into(),
+                    value: Some("wayland".into()),
+                },
+                EnvironmentVariable {
+                    id: 2,
+                    name: "EMPTY".into(),
+                    value: Some(String::new()),
+                },
+            ],
+            next_id: 3,
+        };
+
+        let kdl = generate_environment_kdl(&settings);
+        let doc: kdl::KdlDocument = kdl.parse().expect("environment KDL must re-parse");
+        assert!(kdl.contains("DISPLAY null"), "{kdl}");
+        assert!(kdl.contains("QT_QPA_PLATFORM \"wayland\""), "{kdl}");
+        assert!(kdl.contains("EMPTY \"\""), "{kdl}");
+
+        let mut loaded = Settings::default();
+        crate::config::loader::parse_environment_from_doc(&doc, &mut loaded);
+        let vars: Vec<(&str, Option<&str>)> = loaded
+            .environment
+            .variables
+            .iter()
+            .map(|v| (v.name.as_str(), v.value.as_deref()))
+            .collect();
+        assert_eq!(
+            vars,
+            vec![
+                ("DISPLAY", None),
+                ("QT_QPA_PLATFORM", Some("wayland")),
+                ("EMPTY", Some("")),
+            ]
+        );
+    }
 }

@@ -33,27 +33,31 @@ pub fn generate_appearance_kdl(
         let gaps = settings.gaps.round() as i32;
         b.raw(&format!("gaps {}", gaps));
 
-        // Focus ring
-        if settings.focus_ring_enabled {
-            b.newline();
-            b.block("focus-ring", |fr| {
-                fr.field_f32_as_int("width", settings.focus_ring_width);
-                fr.field_color_or_gradient("active", &settings.focus_ring_active);
-                fr.field_color_or_gradient("inactive", &settings.focus_ring_inactive);
-                fr.field_color_or_gradient("urgent", &settings.focus_ring_urgent);
+        // Focus ring - always emitted with an explicit on/off flag so the
+        // enabled state (and styling) round-trips and overrides the user's
+        // main config via niri's merge_on_off.
+        b.newline();
+        b.block("focus-ring", |fr| {
+            fr.flag(if settings.focus_ring_enabled {
+                "on"
+            } else {
+                "off"
             });
-        }
+            fr.field_f32_as_int("width", settings.focus_ring_width);
+            fr.field_color_or_gradient("active", &settings.focus_ring_active);
+            fr.field_color_or_gradient("inactive", &settings.focus_ring_inactive);
+            fr.field_color_or_gradient("urgent", &settings.focus_ring_urgent);
+        });
 
-        // Border
-        if settings.border_enabled {
-            b.newline();
-            b.block("border", |br| {
-                br.field_f32_as_int("width", settings.border_thickness);
-                br.field_color_or_gradient("active", &settings.border_active);
-                br.field_color_or_gradient("inactive", &settings.border_inactive);
-                br.field_color_or_gradient("urgent", &settings.border_urgent);
-            });
-        }
+        // Border - same BorderRule grammar, always emitted with explicit on/off.
+        b.newline();
+        b.block("border", |br| {
+            br.flag(if settings.border_enabled { "on" } else { "off" });
+            br.field_f32_as_int("width", settings.border_thickness);
+            br.field_color_or_gradient("active", &settings.border_active);
+            br.field_color_or_gradient("inactive", &settings.border_inactive);
+            br.field_color_or_gradient("urgent", &settings.border_urgent);
+        });
 
         // Background color
         if let Some(ref bg) = settings.background_color {
@@ -62,10 +66,10 @@ pub fn generate_appearance_kdl(
         }
 
         // Struts (from behavior settings)
-        let has_struts = behavior.strut_left > 0.0
-            || behavior.strut_right > 0.0
-            || behavior.strut_top > 0.0
-            || behavior.strut_bottom > 0.0;
+        let has_struts = behavior.strut_left != 0.0
+            || behavior.strut_right != 0.0
+            || behavior.strut_top != 0.0
+            || behavior.strut_bottom != 0.0;
         if has_struts {
             b.newline();
             b.block("struts", |s| {
@@ -116,6 +120,10 @@ pub fn generate_appearance_kdl(
                     behavior.default_column_width_fixed.round() as i32
                 ));
             }
+            // Empty block: niri lets each new window choose its own initial width.
+            ColumnWidthType::Auto => {
+                b.raw("default-column-width {}");
+            }
         }
     });
 
@@ -128,4 +136,125 @@ pub fn generate_appearance_kdl(
     }
 
     kdl.build()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::loader::parse_layout_children;
+    use crate::config::models::Settings;
+    use crate::types::{Color, ColorOrGradient};
+    use kdl::KdlDocument;
+    use std::str::FromStr;
+
+    fn reparse_layout(kdl: &str) -> Settings {
+        let doc = KdlDocument::from_str(kdl).expect("generated KDL must parse");
+        let layout = doc
+            .get("layout")
+            .and_then(|n| n.children())
+            .expect("layout block");
+        let mut settings = Settings::default();
+        parse_layout_children(layout, &mut settings);
+        settings
+    }
+
+    #[test]
+    fn focus_ring_off_roundtrip() {
+        let mut src = Settings::default();
+        src.appearance.focus_ring_enabled = false;
+        src.appearance.focus_ring_width = 6.0;
+        src.appearance.focus_ring_active =
+            ColorOrGradient::Color(Color::from_hex("#112233").unwrap());
+
+        let kdl = generate_appearance_kdl(&src.appearance, &src.behavior);
+        assert!(kdl.contains("focus-ring {"));
+        assert!(kdl.contains("off"));
+
+        let dst = reparse_layout(&kdl);
+        assert!(!dst.appearance.focus_ring_enabled);
+        assert_eq!(dst.appearance.focus_ring_width, 6.0);
+        assert_eq!(
+            dst.appearance.focus_ring_active,
+            ColorOrGradient::Color(Color::from_hex("#112233").unwrap())
+        );
+    }
+
+    #[test]
+    fn border_off_block_emitted() {
+        let mut src = Settings::default();
+        src.appearance.border_enabled = false;
+        src.appearance.border_thickness = 3.0;
+        src.appearance.border_active = ColorOrGradient::Color(Color::from_hex("#445566").unwrap());
+
+        let kdl = generate_appearance_kdl(&src.appearance, &src.behavior);
+        assert!(kdl.contains("border {"));
+        assert!(kdl.contains("off"));
+
+        let dst = reparse_layout(&kdl);
+        assert!(!dst.appearance.border_enabled);
+        assert_eq!(dst.appearance.border_thickness, 3.0);
+        assert_eq!(
+            dst.appearance.border_active,
+            ColorOrGradient::Color(Color::from_hex("#445566").unwrap())
+        );
+    }
+
+    #[test]
+    fn negative_struts_roundtrip() {
+        let mut src = Settings::default();
+        src.behavior.strut_left = -64.0;
+        src.behavior.strut_top = 12.0;
+
+        let kdl = generate_appearance_kdl(&src.appearance, &src.behavior);
+        assert!(kdl.contains("struts {"));
+        assert!(kdl.contains("left -64"));
+        assert!(kdl.contains("top 12"));
+
+        let dst = reparse_layout(&kdl);
+        assert_eq!(dst.behavior.strut_left, -64.0);
+        assert_eq!(dst.behavior.strut_top, 12.0);
+
+        // Absent when all four struts are zero (niri default).
+        let zero = Settings::default();
+        let kdl0 = generate_appearance_kdl(&zero.appearance, &zero.behavior);
+        assert!(!kdl0.contains("struts {"));
+    }
+
+    #[test]
+    fn default_column_width_auto_roundtrip() {
+        let mut src = Settings::default();
+        src.behavior.default_column_width_type = ColumnWidthType::Auto;
+
+        let kdl = generate_appearance_kdl(&src.appearance, &src.behavior);
+        assert!(kdl.contains("default-column-width {}"));
+        assert!(!kdl.contains("proportion"));
+        assert!(KdlDocument::from_str(&kdl).is_ok());
+
+        let dst = reparse_layout(&kdl);
+        assert_eq!(
+            dst.behavior.default_column_width_type,
+            ColumnWidthType::Auto
+        );
+    }
+
+    #[test]
+    fn appearance_kdl_reparses() {
+        let defaults = Settings::default();
+        assert!(KdlDocument::from_str(&generate_appearance_kdl(
+            &defaults.appearance,
+            &defaults.behavior
+        ))
+        .is_ok());
+
+        let mut variant = Settings::default();
+        variant.appearance.focus_ring_enabled = false;
+        variant.appearance.border_enabled = false;
+        variant.behavior.strut_left = -64.0;
+        variant.behavior.strut_bottom = -10.0;
+        assert!(KdlDocument::from_str(&generate_appearance_kdl(
+            &variant.appearance,
+            &variant.behavior
+        ))
+        .is_ok());
+    }
 }

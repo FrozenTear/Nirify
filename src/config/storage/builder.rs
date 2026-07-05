@@ -151,6 +151,35 @@ impl KdlBuilder {
         self
     }
 
+    /// Add an f64 float field (with sufficient precision to round-trip)
+    ///
+    /// Formats directly from f64 (never routes through f32) so small values like
+    /// `0.02` serialize exactly as `0.02` rather than an f32 artifact.
+    pub fn field_f64(&mut self, name: &str, value: f64) -> &mut Self {
+        // Non-finite floats (NaN / ±inf) have no valid KDL representation and would
+        // otherwise serialize as `NaN`/`inf`, corrupting the whole config file.
+        // Fall back to 0.0 (the neutral default for every field routed through here).
+        let value = if value.is_finite() { value } else { 0.0 };
+        self.content.push_str(&self.indent());
+        self.content.push_str(name);
+        self.content.push(' ');
+        // Use integer if it's a whole number within i64 range, otherwise float format
+        if value.is_finite()
+            && value.fract() == 0.0
+            && value >= i64::MIN as f64
+            && value <= i64::MAX as f64
+        {
+            self.content.push_str(&(value as i64).to_string());
+        } else {
+            // Use enough decimal places for f64 precision, trim trailing zeros
+            let formatted = format!("{:.10}", value);
+            let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
+            self.content.push_str(trimmed);
+        }
+        self.content.push('\n');
+        self
+    }
+
     /// Add a float field only if it differs from default
     pub fn field_f32_if_not(&mut self, name: &str, value: f32, default: f32) -> &mut Self {
         if (value - default).abs() > f32::EPSILON {
@@ -405,6 +434,25 @@ mod tests {
         assert!(output.contains("scale 1.333333")); // Full precision preserved
         assert!(output.contains("epsilon 0.0001")); // Small values preserved
         assert!(output.contains("whole 2")); // Whole numbers as integers
+    }
+
+    #[test]
+    fn test_field_f64_non_finite_is_sanitized() {
+        // NaN / ±inf have no valid KDL representation; they must fall back to 0
+        // and the output must stay parseable rather than emitting `NaN`/`inf`.
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut kdl = KdlBuilder::new();
+            kdl.field_f64("value", bad);
+            let output = kdl.build();
+            assert!(
+                !output.contains("NaN") && !output.contains("inf"),
+                "non-finite leaked into output: {output:?}"
+            );
+            assert!(output.contains("value 0"));
+            output
+                .parse::<kdl::KdlDocument>()
+                .expect("sanitized KDL should parse");
+        }
     }
 
     #[test]
