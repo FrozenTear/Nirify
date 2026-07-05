@@ -1,25 +1,26 @@
 //! Window and layer rules loader
 //!
-//! Handles window rules and layer rules parsing.
-//!
-//! Uses generic `load_rules` helper to eliminate boilerplate between
-//! window rules and layer rules loaders.
+//! Handles window rules and layer rules parsing, including persistent disabled
+//! rules (`/-` slashdash) via the string-aware `preprocess_disabled_rules` pass:
+//! disabled nodes are renamed so the kdl crate parses them as real nodes, which
+//! preserves document order and is immune to braces inside strings/comments.
 
-use super::helpers::{extract_slashdash_rule_blocks, parse_color, read_kdl_file, read_raw_file};
+use super::helpers::{
+    parse_color, preprocess_disabled_rules, read_raw_file, unslashdash_gated_content,
+};
 use crate::config::models::{
-    BlockOutFrom, FloatingPosition, LayerRule, LayerRuleMatch, OpenBehavior, PositionRelativeTo,
-    Settings, ShadowSettings, TabIndicatorSettings, WindowRule, WindowRuleMatch,
+    BackgroundEffectSettings, BlockOutFrom, CornerRadiusValue, FloatingPosition, LayerKind,
+    LayerRule, LayerRuleMatch, PopupsSettings, PositionRelativeTo, RuleDefaultSize, Settings,
+    ShadowSettings, TabIndicatorOverride, WindowRule, WindowRuleMatch,
 };
 use crate::config::parser::{get_f64, get_i64, get_string, has_flag, parse_document};
 use crate::config::validation::validate_regex_pattern;
-use crate::types::{Color, ColorOrGradient};
+use crate::types::ColorOrGradient;
 use kdl::{KdlDocument, KdlNode};
 use log::{debug, warn};
 use std::path::Path;
 
-/// Safely convert i64 to i32 with bounds checking
-///
-/// Returns None and logs a warning if the value is out of i32 range.
+/// Safely convert i64 to i32 with bounds checking.
 fn safe_i64_to_i32(value: i64, context: &str) -> Option<i32> {
     if value >= i32::MIN as i64 && value <= i32::MAX as i64 {
         Some(value as i32)
@@ -29,9 +30,7 @@ fn safe_i64_to_i32(value: i64, context: &str) -> Option<i32> {
     }
 }
 
-/// Safely convert f64 opacity to f32 with range validation
-///
-/// Clamps to valid opacity range (0.0-1.0) and warns if out of range.
+/// Clamp opacity into 0.0..=1.0.
 fn safe_opacity_to_f32(value: f64, context: &str) -> f32 {
     if !(0.0..=1.0).contains(&value) {
         warn!(
@@ -42,17 +41,12 @@ fn safe_opacity_to_f32(value: f64, context: &str) -> f32 {
     (value.clamp(0.0, 1.0)) as f32
 }
 
-/// Extract rule name from leading comment
-///
-/// Looks for a comment like "// Rule Name\n" before the node.
-/// Returns None if no valid name comment found.
+/// Extract rule name from a leading `// Rule Name` comment.
 pub fn extract_name_from_leading_comment(node: &KdlNode) -> Option<String> {
     let format = node.format()?;
     let leading = &format.leading;
-    // Look for "// " pattern in the leading content
     if let Some(start) = leading.rfind("// ") {
         let after_comment = &leading[start + 3..];
-        // Find end of line or end of string
         let name = if let Some(newline) = after_comment.find('\n') {
             after_comment[..newline].trim()
         } else {
@@ -65,7 +59,24 @@ pub fn extract_name_from_leading_comment(node: &KdlNode) -> Option<String> {
     None
 }
 
-/// Check if a node has a flag as entry (e.g., `shadow { on }`)
+// ── small entry helpers ─────────────────────────────────────────────────────
+
+/// Read the first positional entry of a node as a bool; a bare node → true.
+fn node_bool(node: &KdlNode) -> bool {
+    for entry in node.entries() {
+        if entry.name().is_none() {
+            if let Some(b) = entry.value().as_bool() {
+                return b;
+            }
+        }
+    }
+    true
+}
+
+/// Check if a node has a flag as a positional string entry (e.g. `shadow { on }`).
+///
+/// Retained as a shared helper for other loaders (e.g. system.rs); the rules
+/// loader itself now uses child-node flag checks.
 pub fn has_flag_in_node(node: &kdl::KdlNode, flag: &str) -> bool {
     for entry in node.entries() {
         if entry.name().is_none() {
@@ -79,10 +90,241 @@ pub fn has_flag_in_node(node: &kdl::KdlNode, flag: &str) -> bool {
     false
 }
 
-/// Trait for rule types that have an ID and name.
-///
-/// Both LayerRule and WindowRule implement this trait to enable
-/// generic rule loading.
+/// Read a `key value` numeric child as i32 (accepts int or float, rounds).
+fn get_rounded_i32(children: &KdlDocument, key: &str) -> Option<i32> {
+    get_f64(children, &[key]).map(|v| v.round() as i32)
+}
+
+/// Convert a KDL entry value to f32 (int or float).
+fn entry_to_f32(entry: &kdl::KdlEntry) -> Option<f32> {
+    entry
+        .value()
+        .as_float()
+        .map(|f| f as f32)
+        .or_else(|| entry.value().as_integer().map(|i| i as f32))
+}
+
+/// Convert a KDL entry value to i32 (int or rounded float).
+fn entry_to_i32(entry: &kdl::KdlEntry) -> Option<i32> {
+    if let Some(i) = entry.value().as_integer() {
+        safe_i64_to_i32(i as i64, "entry")
+    } else {
+        entry.value().as_float().map(|f| f.round() as i32)
+    }
+}
+
+// ── shared block parsers ────────────────────────────────────────────────────
+
+/// Parse a `geometry-corner-radius` node (1 uniform value, or 4 per-corner).
+fn parse_corner_radius(node: &KdlNode) -> Option<CornerRadiusValue> {
+    let vals: Vec<f32> = node
+        .entries()
+        .iter()
+        .filter(|e| e.name().is_none())
+        .filter_map(entry_to_f32)
+        .collect();
+    match vals.len() {
+        1 => Some(CornerRadiusValue::uniform(vals[0])),
+        4 => Some(CornerRadiusValue {
+            top_left: vals[0],
+            top_right: vals[1],
+            bottom_right: vals[2],
+            bottom_left: vals[3],
+        }),
+        other => {
+            warn!(
+                "geometry-corner-radius expects 1 or 4 values, got {}; ignoring",
+                other
+            );
+            None
+        }
+    }
+}
+
+/// Parse a `default-column-width` / `default-window-height` node.
+fn parse_default_size(node: &KdlNode) -> Option<RuleDefaultSize> {
+    match node.children() {
+        None => Some(RuleDefaultSize::Natural),
+        Some(ch) => {
+            if let Some(v) = get_i64(ch, &["fixed"]) {
+                return safe_i64_to_i32(v, "default size fixed").map(RuleDefaultSize::Fixed);
+            }
+            if let Some(v) = get_f64(ch, &["proportion"]) {
+                return Some(RuleDefaultSize::Proportion(v as f32));
+            }
+            // Empty `{}` block → natural sizing.
+            Some(RuleDefaultSize::Natural)
+        }
+    }
+}
+
+/// Parse a `shadow { ... }` node. Shared by window and layer rules.
+fn parse_shadow_rule(shadow_node: &KdlNode) -> Option<ShadowSettings> {
+    let mut shadow = ShadowSettings::default();
+    let mut enabled = true;
+
+    if let Some(ch) = shadow_node.children() {
+        // `off` child disables; `on` (or any config) enables.
+        if ch.get("off").is_some() {
+            enabled = false;
+        } else if ch.get("on").is_some() {
+            enabled = true;
+        }
+        if let Some(v) = get_rounded_i32(ch, "softness") {
+            shadow.softness = v;
+        }
+        if let Some(v) = get_rounded_i32(ch, "spread") {
+            shadow.spread = v;
+        }
+        if let Some(offset_node) = ch.get("offset") {
+            for entry in offset_node.entries() {
+                if let Some(name) = entry.name() {
+                    if let Some(v) = entry_to_i32(entry) {
+                        match name.value() {
+                            "x" => shadow.offset_x = v,
+                            "y" => shadow.offset_y = v,
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(s) = get_string(ch, &["color"]) {
+            if let Some(c) = parse_color(&s) {
+                shadow.color = c;
+            }
+        }
+        if let Some(s) = get_string(ch, &["inactive-color"]) {
+            if let Some(c) = parse_color(&s) {
+                shadow.inactive_color = c;
+            }
+        }
+        if has_flag(ch, &["draw-behind-window"]) {
+            shadow.draw_behind_window = true;
+        }
+    }
+
+    shadow.enabled = enabled;
+    Some(shadow)
+}
+
+/// Parse a `background-effect { ... }` node (Since 26.04).
+fn parse_background_effect(node: &KdlNode) -> Option<BackgroundEffectSettings> {
+    let ch = node.children()?;
+    let mut be = BackgroundEffectSettings::default();
+    if let Some(n) = ch.get("xray") {
+        be.xray = Some(node_bool(n));
+    }
+    if let Some(n) = ch.get("blur") {
+        be.blur = Some(node_bool(n));
+    }
+    if let Some(v) = get_f64(ch, &["noise"]) {
+        be.noise = Some(v as f32);
+    }
+    if let Some(v) = get_f64(ch, &["saturation"]) {
+        be.saturation = Some(v as f32);
+    }
+    if be.is_empty() {
+        None
+    } else {
+        Some(be)
+    }
+}
+
+/// Parse a `popups { ... }` node (Since 26.04).
+fn parse_popups(node: &KdlNode) -> Option<PopupsSettings> {
+    let ch = node.children()?;
+    let mut p = PopupsSettings::default();
+    if let Some(v) = get_f64(ch, &["opacity"]) {
+        p.opacity = Some(safe_opacity_to_f32(v, "popups opacity"));
+    }
+    if let Some(gcr) = ch.get("geometry-corner-radius") {
+        p.geometry_corner_radius = parse_corner_radius(gcr);
+    }
+    if let Some(be) = ch.get("background-effect") {
+        p.background_effect = parse_background_effect(be);
+    }
+    if p.is_empty() {
+        None
+    } else {
+        Some(p)
+    }
+}
+
+/// Warn (once) if focus-ring/border/tab-indicator gradient children are present.
+fn warn_gradients(ch: &KdlDocument, context: &str) {
+    if ch.get("active-gradient").is_some()
+        || ch.get("inactive-gradient").is_some()
+        || ch.get("urgent-gradient").is_some()
+    {
+        warn!(
+            "{} gradient children are preserved by niri but not editable in Nirify \
+             and will be dropped if this rule is re-saved",
+            context
+        );
+    }
+}
+
+// ── match parsers ───────────────────────────────────────────────────────────
+
+fn parse_layer_match(node: &KdlNode, context: &str) -> LayerRuleMatch {
+    let mut m = LayerRuleMatch::default();
+    for entry in node.entries() {
+        if let Some(name) = entry.name() {
+            match name.value() {
+                "namespace" => {
+                    if let Some(s) = entry.value().as_string() {
+                        m.namespace = validate_regex_pattern(s, context);
+                    }
+                }
+                "at-startup" => {
+                    if let Some(b) = entry.value().as_bool() {
+                        m.at_startup = Some(b);
+                    }
+                }
+                "layer" => {
+                    if let Some(s) = entry.value().as_string() {
+                        m.layer = LayerKind::from_kdl(s);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    m
+}
+
+fn parse_window_match(node: &KdlNode, context: &str) -> WindowRuleMatch {
+    let mut m = WindowRuleMatch::default();
+    for entry in node.entries() {
+        if let Some(name) = entry.name() {
+            match name.value() {
+                "app-id" => {
+                    if let Some(v) = entry.value().as_string() {
+                        m.app_id = validate_regex_pattern(v, context);
+                    }
+                }
+                "title" => {
+                    if let Some(v) = entry.value().as_string() {
+                        m.title = validate_regex_pattern(v, context);
+                    }
+                }
+                "is-floating" => m.is_floating = entry.value().as_bool(),
+                "is-active" => m.is_active = entry.value().as_bool(),
+                "is-focused" => m.is_focused = entry.value().as_bool(),
+                "is-active-in-column" => m.is_active_in_column = entry.value().as_bool(),
+                "is-window-cast-target" => m.is_window_cast_target = entry.value().as_bool(),
+                "is-urgent" => m.is_urgent = entry.value().as_bool(),
+                "at-startup" => m.at_startup = entry.value().as_bool(),
+                _ => {}
+            }
+        }
+    }
+    m
+}
+
+// ── generic load pipeline ───────────────────────────────────────────────────
+
 trait RuleWithId {
     fn set_id(&mut self, id: u32);
     fn set_name(&mut self, name: String);
@@ -113,16 +355,7 @@ impl RuleWithId for WindowRule {
     }
 }
 
-/// Generic helper for loading rules from a KDL file.
-///
-/// Handles the common pattern shared by layer rules and window rules:
-/// 1. Reading the KDL file
-/// 2. Iterating over nodes matching `rule_node_name`
-/// 3. Creating rule instances with sequential IDs
-/// 4. Calling the rule-specific parser
-/// 5. Collecting into the rules vector
-///
-/// Returns the loaded rules and the next available ID.
+/// Load rules (enabled and disabled) from a KDL file, preserving document order.
 fn load_rules<R, F>(
     path: &Path,
     rule_node_name: &str,
@@ -133,102 +366,67 @@ where
     R: Default + RuleWithId,
     F: Fn(&KdlDocument, &mut R),
 {
-    let Some(doc) = read_kdl_file(path) else {
+    let Some(raw) = read_raw_file(path) else {
         return (Vec::new(), 0);
     };
 
+    // Legacy detection: old bare `off` at rule level (Option 1 era).
+    let legacy_a = format!("{} {{\n    off", rule_node_name);
+    let legacy_b = format!("{}{{off", rule_node_name);
+    if raw.contains(&legacy_a) || raw.contains(&legacy_b) {
+        warn!(
+            "Legacy disabled {} syntax detected in {:?}. The old bare 'off' format \
+             is no longer supported; re-save from Nirify to migrate to /- syntax.",
+            rule_node_name, path
+        );
+    }
+
+    // First un-slashdash any version-gated content the generator preserved via `/-`
+    // (P1), then rewrite disabled top-level rules so the kdl crate parses both back.
+    let processed = preprocess_disabled_rules(&unslashdash_gated_content(&raw), &[rule_node_name]);
+    let doc = match parse_document(&processed) {
+        Ok(doc) => doc,
+        Err(e) => {
+            warn!(
+                "Failed to parse {:?} ({}): loading no {}s",
+                path, e, rule_node_name
+            );
+            return (Vec::new(), 0);
+        }
+    };
+
+    let disabled_name = format!("nirify-disabled-{}", rule_node_name);
     let mut rules = Vec::new();
     let mut next_id = 0u32;
 
     for node in doc.nodes() {
-        if node.name().value() == rule_node_name {
-            let mut rule = R::default();
-            rule.set_id(next_id);
-
-            // Try to extract name from leading comment (format: "// Rule Name\n")
-            let name = extract_name_from_leading_comment(node)
-                .unwrap_or_else(|| format!("{} {}", name_prefix, next_id + 1));
-            rule.set_name(name);
-
-            if let Some(children) = node.children() {
-                parser(children, &mut rule);
-            }
-
-            rules.push(rule);
-            next_id += 1;
-        }
-    }
-
-    debug!(
-        "Loaded {} {} from {:?}",
-        rules.len(),
-        rule_node_name.replace('-', " ") + "s",
-        path
-    );
-
-    (rules, next_id)
-}
-
-/// Loads disabled (slashdash-elided) rules by scanning raw text and reusing
-/// the existing child parsers on the extracted inner content.
-///
-/// This is the key piece for Option 2 persistent disabled rule support.
-fn load_disabled_rules_from_raw<R, F>(
-    raw_text: &str,
-    disabled_kind: &str,
-    name_prefix: &str,
-    parser: F,
-    starting_next_id: u32,
-) -> (Vec<R>, u32)
-where
-    R: Default + RuleWithId,
-    F: Fn(&KdlDocument, &mut R),
-{
-    let blocks = extract_slashdash_rule_blocks(raw_text);
-    let mut rules = Vec::new();
-    let mut next_id = starting_next_id;
-
-    for slash in blocks {
-        if slash.kind != disabled_kind {
+        let nm = node.name().value();
+        let enabled = if nm == rule_node_name {
+            true
+        } else if nm == disabled_name {
+            false
+        } else {
             continue;
-        }
+        };
 
         let mut rule = R::default();
         rule.set_id(next_id);
-
-        let name = slash.name.clone().unwrap_or_else(|| {
-            format!("{} {}", name_prefix, next_id + 1)
-        });
+        let name = extract_name_from_leading_comment(node)
+            .unwrap_or_else(|| format!("{} {}", name_prefix, next_id + 1));
         rule.set_name(name);
 
-        // Parse the inner content as child nodes
-        let inner = slash.inner_content.trim();
-        if !inner.is_empty() {
-            let wrapped = format!("_dummy_ {{\n{}\n}}", inner);
-            match parse_document(&wrapped) {
-                Ok(doc) => {
-                    if let Some(dummy) = doc.get("_dummy_") {
-                        if let Some(children) = dummy.children() {
-                            parser(children, &mut rule);
-                        }
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to parse inner content of disabled {} rule (id {}): {}. \
-                         The rule will be loaded as disabled with defaulted fields.",
-                        disabled_kind, next_id, e
-                    );
-                }
-            }
+        if let Some(children) = node.children() {
+            parser(children, &mut rule);
         }
-
-        rule.set_enabled(false);
+        if !enabled {
+            rule.set_enabled(false);
+        }
 
         rules.push(rule);
         next_id += 1;
     }
 
+    debug!("Loaded {} {}s from {:?}", rules.len(), rule_node_name, path);
     (rules, next_id)
 }
 
@@ -236,47 +434,27 @@ where
 // LAYER RULES
 // ============================================================================
 
-/// Parse layer rule node children into a LayerRule
-///
-/// Shared parsing logic used by both file loader and import.
+/// Parse layer rule node children into a LayerRule.
 pub fn parse_layer_rule_node_children(children: &KdlDocument, rule: &mut LayerRule) {
     rule.enabled = !has_flag(children, &["off"]);
 
-    // Parse matches
     rule.matches.clear();
-    for match_node in children.nodes() {
-        if match_node.name().value() == "match" {
-            let mut m = LayerRuleMatch::default();
-
-            // Check entries for named arguments
-            for entry in match_node.entries() {
-                if let Some(name) = entry.name() {
-                    match name.value() {
-                        "namespace" => {
-                            if let Some(s) = entry.value().as_string() {
-                                m.namespace = validate_regex_pattern(s, "layer rule namespace");
-                            }
-                        }
-                        "at-startup" => {
-                            if let Some(b) = entry.value().as_bool() {
-                                m.at_startup = Some(b);
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            rule.matches.push(m);
+    rule.excludes.clear();
+    for node in children.nodes() {
+        match node.name().value() {
+            "match" => rule
+                .matches
+                .push(parse_layer_match(node, "layer rule namespace")),
+            "exclude" => rule
+                .excludes
+                .push(parse_layer_match(node, "layer rule exclude namespace")),
+            _ => {}
         }
     }
-
-    // Ensure at least one match exists
     if rule.matches.is_empty() {
         rule.matches.push(LayerRuleMatch::default());
     }
 
-    // block-out-from
     if let Some(bof) = get_string(children, &["block-out-from"]) {
         rule.block_out_from = match bof.as_str() {
             "screencast" => Some(BlockOutFrom::Screencast),
@@ -285,125 +463,40 @@ pub fn parse_layer_rule_node_children(children: &KdlDocument, rule: &mut LayerRu
         };
     }
 
-    // opacity
     if let Some(v) = get_f64(children, &["opacity"]) {
         rule.opacity = Some(safe_opacity_to_f32(v, "layer rule opacity"));
     }
 
-    // geometry-corner-radius
-    if let Some(v) = get_i64(children, &["geometry-corner-radius"]) {
-        rule.geometry_corner_radius = safe_i64_to_i32(v, "geometry-corner-radius");
+    if let Some(gcr) = children.get("geometry-corner-radius") {
+        rule.geometry_corner_radius = parse_corner_radius(gcr);
     }
 
-    // place-within-backdrop
     if has_flag(children, &["place-within-backdrop"]) {
         rule.place_within_backdrop = true;
     }
-
-    // baba-is-float
     if has_flag(children, &["baba-is-float"]) {
         rule.baba_is_float = true;
     }
 
-    // shadow (complex nested block)
     if let Some(shadow_node) = children.get("shadow") {
-        if has_flag_in_node(shadow_node, "on") {
-            let mut shadow = ShadowSettings {
-                enabled: true,
-                ..Default::default()
-            };
-
-            if let Some(shadow_children) = shadow_node.children() {
-                if let Some(v) = get_i64(shadow_children, &["softness"]) {
-                    if let Some(safe_v) = safe_i64_to_i32(v, "shadow softness") {
-                        shadow.softness = safe_v;
-                    }
-                }
-                if let Some(v) = get_i64(shadow_children, &["spread"]) {
-                    if let Some(safe_v) = safe_i64_to_i32(v, "shadow spread") {
-                        shadow.spread = safe_v;
-                    }
-                }
-                // Parse offset x=... y=... as named entries
-                if let Some(offset_node) = shadow_children.get("offset") {
-                    for entry in offset_node.entries() {
-                        if let Some(name) = entry.name() {
-                            if let Some(val) = entry.value().as_integer() {
-                                let val_i64 = val as i64;
-                                match name.value() {
-                                    "x" => {
-                                        if let Some(safe_v) =
-                                            safe_i64_to_i32(val_i64, "shadow offset x")
-                                        {
-                                            shadow.offset_x = safe_v;
-                                        }
-                                    }
-                                    "y" => {
-                                        if let Some(safe_v) =
-                                            safe_i64_to_i32(val_i64, "shadow offset y")
-                                        {
-                                            shadow.offset_y = safe_v;
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                }
-                if let Some(s) = get_string(shadow_children, &["color"]) {
-                    if let Some(c) = Color::from_hex(&s) {
-                        shadow.color = c;
-                    }
-                }
-                if let Some(s) = get_string(shadow_children, &["inactive-color"]) {
-                    if let Some(c) = Color::from_hex(&s) {
-                        shadow.inactive_color = c;
-                    }
-                }
-                if has_flag(shadow_children, &["draw-behind-window"]) {
-                    shadow.draw_behind_window = true;
-                }
-            }
-
-            rule.shadow = Some(shadow);
-        }
+        rule.shadow = parse_shadow_rule(shadow_node);
+    }
+    if let Some(be) = children.get("background-effect") {
+        rule.background_effect = parse_background_effect(be);
+    }
+    if let Some(popups) = children.get("popups") {
+        rule.popups = parse_popups(popups);
     }
 }
 
-/// Load layer rules from KDL file
+/// Load layer rules from KDL file.
 pub fn load_layer_rules(path: &Path, settings: &mut Settings) {
-    // Pass 1: visible/active rules
-    let (mut rules, mut next_id) = load_rules(
+    let (rules, next_id) = load_rules(
         path,
         "layer-rule",
         "Layer Rule",
         parse_layer_rule_node_children,
     );
-
-    // Pass 2: disabled (slashdash) rules via raw text
-    if let Some(raw) = read_raw_file(path) {
-        // Legacy detection: old bare "off" at rule level (from Option 1 era)
-        if raw.contains("layer-rule {\n    off") || raw.contains("layer-rule{off") {
-            warn!(
-                "Legacy disabled layer rule syntax detected in {:?}. \
-                 The old bare 'off' format is no longer supported. \
-                 Please re-save the rules from Nirify to migrate to /- syntax.",
-                path
-            );
-        }
-
-        let (disabled, new_next) = load_disabled_rules_from_raw(
-            &raw,
-            "layer-rule",
-            "Layer Rule",
-            parse_layer_rule_node_children,
-            next_id,
-        );
-        rules.extend(disabled);
-        next_id = new_next;
-    }
-
     settings.layer_rules.rules = rules;
     settings.layer_rules.next_id = next_id;
 }
@@ -412,192 +505,70 @@ pub fn load_layer_rules(path: &Path, settings: &mut Settings) {
 // WINDOW RULES
 // ============================================================================
 
-/// Parse window rule node children into a WindowRule
-///
-/// Shared parsing logic used by both file loader and import.
-pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut WindowRule) {
-    rule.enabled = !has_flag(wr_children, &["off"]);
+/// Parse window rule node children into a WindowRule.
+pub fn parse_window_rule_node_children(children: &KdlDocument, rule: &mut WindowRule) {
+    rule.enabled = !has_flag(children, &["off"]);
     rule.matches.clear();
     rule.excludes.clear();
 
-    // Parse match criteria
-    for child in wr_children.nodes() {
-        if child.name().value() == "match" {
-            let mut m = WindowRuleMatch::default();
-            for entry in child.entries() {
-                if let Some(name) = entry.name() {
-                    match name.value() {
-                        "app-id" => {
-                            if let Some(v) = entry.value().as_string() {
-                                m.app_id = validate_regex_pattern(v, "window rule app-id");
-                            }
-                        }
-                        "title" => {
-                            if let Some(v) = entry.value().as_string() {
-                                m.title = validate_regex_pattern(v, "window rule title");
-                            }
-                        }
-                        "is-floating" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_floating = Some(v);
-                            }
-                        }
-                        "is-active" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_active = Some(v);
-                            }
-                        }
-                        "is-focused" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_focused = Some(v);
-                            }
-                        }
-                        "is-active-in-column" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_active_in_column = Some(v);
-                            }
-                        }
-                        "is-window-cast-target" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_window_cast_target = Some(v);
-                            }
-                        }
-                        "is-urgent" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_urgent = Some(v);
-                            }
-                        }
-                        "at-startup" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.at_startup = Some(v);
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            rule.matches.push(m);
-        } else if child.name().value() == "exclude" {
-            // Parse exclude criteria (same structure as match)
-            let mut m = WindowRuleMatch::default();
-            for entry in child.entries() {
-                if let Some(name) = entry.name() {
-                    match name.value() {
-                        "app-id" => {
-                            if let Some(v) = entry.value().as_string() {
-                                m.app_id = validate_regex_pattern(v, "window rule exclude app-id");
-                            }
-                        }
-                        "title" => {
-                            if let Some(v) = entry.value().as_string() {
-                                m.title = validate_regex_pattern(v, "window rule exclude title");
-                            }
-                        }
-                        "is-floating" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_floating = Some(v);
-                            }
-                        }
-                        "is-active" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_active = Some(v);
-                            }
-                        }
-                        "is-focused" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_focused = Some(v);
-                            }
-                        }
-                        "is-active-in-column" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_active_in_column = Some(v);
-                            }
-                        }
-                        "is-window-cast-target" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_window_cast_target = Some(v);
-                            }
-                        }
-                        "is-urgent" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.is_urgent = Some(v);
-                            }
-                        }
-                        "at-startup" => {
-                            if let Some(v) = entry.value().as_bool() {
-                                m.at_startup = Some(v);
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            rule.excludes.push(m);
+    for node in children.nodes() {
+        match node.name().value() {
+            "match" => rule
+                .matches
+                .push(parse_window_match(node, "window rule app-id/title")),
+            "exclude" => rule
+                .excludes
+                .push(parse_window_match(node, "window rule exclude app-id/title")),
+            _ => {}
         }
     }
-
-    // If no matches were parsed, add a default empty match
     if rule.matches.is_empty() {
         rule.matches.push(WindowRuleMatch::default());
     }
 
-    // Open behavior
-    if has_flag(wr_children, &["open-maximized"]) {
-        rule.open_behavior = OpenBehavior::Maximized;
-    } else if has_flag(wr_children, &["open-fullscreen"]) {
-        rule.open_behavior = OpenBehavior::Fullscreen;
-    } else if has_flag(wr_children, &["open-floating"]) {
-        rule.open_behavior = OpenBehavior::Floating;
-    }
+    // Opening behaviour — each independent; a bool arg is expected, bare → true.
+    rule.open_maximized = children.get("open-maximized").map(node_bool);
+    rule.open_maximized_to_edges = children.get("open-maximized-to-edges").map(node_bool);
+    rule.open_fullscreen = children.get("open-fullscreen").map(node_bool);
+    rule.open_floating = children.get("open-floating").map(node_bool);
+    rule.open_focused = children.get("open-focused").map(node_bool);
 
-    // Default floating position
-    if let Some(dfp) = wr_children.get("default-floating-position") {
-        let mut x = 0i32;
-        let mut y = 0i32;
-        let mut relative_to = PositionRelativeTo::TopLeft;
-
+    if let Some(dfp) = children.get("default-floating-position") {
+        let mut pos = FloatingPosition::default();
         for entry in dfp.entries() {
             if let Some(name) = entry.name() {
                 match name.value() {
                     "x" => {
-                        if let Some(v) = entry.value().as_integer() {
-                            if let Some(safe_v) = safe_i64_to_i32(v as i64, "floating position x") {
-                                x = safe_v;
-                            }
+                        if let Some(v) = entry_to_i32(entry) {
+                            pos.x = v;
                         }
                     }
                     "y" => {
-                        if let Some(v) = entry.value().as_integer() {
-                            if let Some(safe_v) = safe_i64_to_i32(v as i64, "floating position y") {
-                                y = safe_v;
-                            }
+                        if let Some(v) = entry_to_i32(entry) {
+                            pos.y = v;
                         }
                     }
                     "relative-to" => {
                         if let Some(s) = entry.value().as_string() {
-                            relative_to = PositionRelativeTo::from_kdl(s);
+                            pos.relative_to = PositionRelativeTo::from_kdl(s);
                         }
                     }
                     _ => {}
                 }
             }
         }
-
-        rule.default_floating_position = Some(FloatingPosition { x, y, relative_to });
+        rule.default_floating_position = Some(pos);
     }
 
-    // Opacity
-    if let Some(v) = get_f64(wr_children, &["opacity"]) {
+    if let Some(v) = get_f64(children, &["opacity"]) {
         rule.opacity = Some(safe_opacity_to_f32(v, "window rule opacity"));
     }
 
-    // Corner radius
-    if let Some(v) = get_i64(wr_children, &["geometry-corner-radius"]) {
-        rule.corner_radius = safe_i64_to_i32(v, "window geometry-corner-radius");
+    if let Some(gcr) = children.get("geometry-corner-radius") {
+        rule.corner_radius = parse_corner_radius(gcr);
     }
 
-    // Clip to geometry
-    if let Some(ctg) = wr_children.get("clip-to-geometry") {
+    if let Some(ctg) = children.get("clip-to-geometry") {
         if let Some(entry) = ctg.entries().first() {
             if let Some(b) = entry.value().as_bool() {
                 rule.clip_to_geometry = Some(b);
@@ -605,157 +576,114 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
         }
     }
 
-    // Block screencast
-    if let Some(bof) = wr_children.get("block-out-from") {
-        for entry in bof.entries() {
-            if entry.value().as_string() == Some("screencast") {
-                rule.block_out_from_screencast = true;
-            }
-        }
+    if let Some(bof) = get_string(children, &["block-out-from"]) {
+        rule.block_out_from = match bof.as_str() {
+            "screencast" => Some(BlockOutFrom::Screencast),
+            "screen-capture" => Some(BlockOutFrom::ScreenCapture),
+            _ => None,
+        };
     }
 
-    // Open on output
-    if let Some(v) = get_string(wr_children, &["open-on-output"]) {
+    if let Some(v) = get_string(children, &["open-on-output"]) {
         rule.open_on_output = Some(v);
     }
-
-    // Open on workspace
-    if let Some(v) = get_string(wr_children, &["open-on-workspace"]) {
+    if let Some(v) = get_string(children, &["open-on-workspace"]) {
         rule.open_on_workspace = Some(v);
     }
 
-    // Open focused
-    if let Some(node) = wr_children.get("open-focused") {
-        if let Some(entry) = node.entries().first() {
-            if let Some(val) = entry.value().as_bool() {
-                rule.open_focused = Some(val);
-            }
-        }
+    if let Some(dcw) = children.get("default-column-width") {
+        rule.default_column_width = parse_default_size(dcw);
+    }
+    if let Some(dwh) = children.get("default-window-height") {
+        rule.default_window_height = parse_default_size(dwh);
     }
 
-    // Default column width
-    if let Some(dcw) = wr_children.get("default-column-width") {
-        if let Some(dcw_children) = dcw.children() {
-            if let Some(v) = get_f64(dcw_children, &["proportion"]) {
-                rule.default_column_width = Some(v as f32);
-            }
-        }
-    }
-
-    // Default window height
-    if let Some(dwh) = wr_children.get("default-window-height") {
-        if let Some(dwh_children) = dwh.children() {
-            if let Some(v) = get_f64(dwh_children, &["proportion"]) {
-                rule.default_window_height = Some(v as f32);
-            }
-        }
-    }
-
-    // Open maximized to edges
-    if has_flag(wr_children, &["open-maximized-to-edges"]) {
-        rule.open_maximized_to_edges = Some(true);
-    }
-
-    // Scroll factor
-    if let Some(v) = get_f64(wr_children, &["scroll-factor"]) {
+    if let Some(v) = get_f64(children, &["scroll-factor"]) {
         rule.scroll_factor = Some(v);
     }
 
-    // Draw border with background
-    if has_flag(wr_children, &["draw-border-with-background"]) {
-        rule.draw_border_with_background = Some(true);
+    if let Some(node) = children.get("draw-border-with-background") {
+        rule.draw_border_with_background = Some(node_bool(node));
     }
 
-    // Size constraints
-    if let Some(v) = get_i64(wr_children, &["min-width"]) {
+    if let Some(v) = get_i64(children, &["min-width"]) {
         rule.min_width = safe_i64_to_i32(v, "min-width");
     }
-    if let Some(v) = get_i64(wr_children, &["max-width"]) {
+    if let Some(v) = get_i64(children, &["max-width"]) {
         rule.max_width = safe_i64_to_i32(v, "max-width");
     }
-    if let Some(v) = get_i64(wr_children, &["min-height"]) {
+    if let Some(v) = get_i64(children, &["min-height"]) {
         rule.min_height = safe_i64_to_i32(v, "min-height");
     }
-    if let Some(v) = get_i64(wr_children, &["max-height"]) {
+    if let Some(v) = get_i64(children, &["max-height"]) {
         rule.max_height = safe_i64_to_i32(v, "max-height");
     }
 
-    // Focus ring overrides
-    if let Some(fr) = wr_children.get("focus-ring") {
-        if let Some(fr_children) = fr.children() {
-            if has_flag(fr_children, &["off"]) {
+    // Focus ring overrides.
+    if let Some(fr) = children.get("focus-ring") {
+        if let Some(ch) = fr.children() {
+            if has_flag(ch, &["off"]) {
                 rule.focus_ring_enabled = Some(false);
-            } else if has_flag(fr_children, &["on"]) {
+            } else if has_flag(ch, &["on"]) {
                 rule.focus_ring_enabled = Some(true);
             }
-            if let Some(v) = get_i64(fr_children, &["width"]) {
+            if let Some(v) = get_i64(ch, &["width"]) {
                 rule.focus_ring_width = safe_i64_to_i32(v, "focus-ring width");
             }
-            if let Some(hex) = get_string(fr_children, &["active-color"]) {
+            if let Some(hex) = get_string(ch, &["active-color"]) {
                 if let Some(c) = parse_color(&hex) {
                     rule.focus_ring_active = Some(ColorOrGradient::Color(c));
                 }
             }
-            if let Some(hex) = get_string(fr_children, &["inactive-color"]) {
+            if let Some(hex) = get_string(ch, &["inactive-color"]) {
                 if let Some(c) = parse_color(&hex) {
                     rule.focus_ring_inactive = Some(ColorOrGradient::Color(c));
                 }
             }
-            if let Some(hex) = get_string(fr_children, &["urgent-color"]) {
+            if let Some(hex) = get_string(ch, &["urgent-color"]) {
                 if let Some(c) = parse_color(&hex) {
                     rule.focus_ring_urgent = Some(ColorOrGradient::Color(c));
                 }
             }
+            warn_gradients(ch, "focus-ring");
         }
     }
 
-    // Border overrides
-    if let Some(border) = wr_children.get("border") {
-        if let Some(border_children) = border.children() {
-            if has_flag(border_children, &["off"]) {
+    // Border overrides.
+    if let Some(border) = children.get("border") {
+        if let Some(ch) = border.children() {
+            if has_flag(ch, &["off"]) {
                 rule.border_enabled = Some(false);
-            } else if has_flag(border_children, &["on"]) {
+            } else if has_flag(ch, &["on"]) {
                 rule.border_enabled = Some(true);
             }
-            if let Some(v) = get_i64(border_children, &["width"]) {
+            if let Some(v) = get_i64(ch, &["width"]) {
                 rule.border_width = safe_i64_to_i32(v, "border width");
             }
-            if let Some(hex) = get_string(border_children, &["active-color"]) {
+            if let Some(hex) = get_string(ch, &["active-color"]) {
                 if let Some(c) = parse_color(&hex) {
                     rule.border_active = Some(ColorOrGradient::Color(c));
                 }
             }
-            if let Some(hex) = get_string(border_children, &["inactive-color"]) {
+            if let Some(hex) = get_string(ch, &["inactive-color"]) {
                 if let Some(c) = parse_color(&hex) {
                     rule.border_inactive = Some(ColorOrGradient::Color(c));
                 }
             }
-            if let Some(hex) = get_string(border_children, &["urgent-color"]) {
+            if let Some(hex) = get_string(ch, &["urgent-color"]) {
                 if let Some(c) = parse_color(&hex) {
                     rule.border_urgent = Some(ColorOrGradient::Color(c));
                 }
             }
+            warn_gradients(ch, "border");
         }
     }
 
-    // Variable refresh rate (per-window VRR)
-    if let Some(vrr) = wr_children.get("variable-refresh-rate") {
-        if has_flag_in_node(vrr, "on") {
-            rule.variable_refresh_rate = Some(true);
-        } else if has_flag_in_node(vrr, "off") {
-            rule.variable_refresh_rate = Some(false);
-        } else {
-            // Check for boolean value
-            if let Some(entry) = vrr.entries().first() {
-                if let Some(b) = entry.value().as_bool() {
-                    rule.variable_refresh_rate = Some(b);
-                }
-            }
-        }
+    if let Some(vrr) = children.get("variable-refresh-rate") {
+        rule.variable_refresh_rate = Some(node_bool(vrr));
     }
 
-    // Default column display (Normal/Tabbed)
-    if let Some(v) = get_string(wr_children, &["default-column-display"]) {
+    if let Some(v) = get_string(children, &["default-column-display"]) {
         use crate::config::models::DefaultColumnDisplay;
         rule.default_column_display = Some(match v.as_str() {
             "tabbed" => DefaultColumnDisplay::Tabbed,
@@ -763,13 +691,11 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
         });
     }
 
-    // Tiled state (niri expects a boolean argument: `tiled-state true`)
-    if let Some(ts) = wr_children.get("tiled-state") {
+    if let Some(ts) = children.get("tiled-state") {
         if let Some(entry) = ts.entries().first() {
             if let Some(b) = entry.value().as_bool() {
                 rule.tiled_state = Some(b);
             } else if entry.value().as_string() == Some("tiled") {
-                // Backwards-compat with older Nirify output
                 rule.tiled_state = Some(true);
             } else if entry.value().as_string() == Some("floating") {
                 rule.tiled_state = Some(false);
@@ -777,151 +703,51 @@ pub fn parse_window_rule_node_children(wr_children: &KdlDocument, rule: &mut Win
         }
     }
 
-    // Baba is float (animated floating effect)
-    if has_flag(wr_children, &["baba-is-float"]) {
+    if has_flag(children, &["baba-is-float"]) {
         rule.baba_is_float = Some(true);
     }
 
-    // Per-window shadow settings
-    if let Some(shadow_node) = wr_children.get("shadow") {
-        // Check for simple on/off
-        if has_flag_in_node(shadow_node, "off") {
-            rule.shadow = Some(ShadowSettings {
-                enabled: false,
-                ..Default::default()
-            });
-        } else if has_flag_in_node(shadow_node, "on") {
-            rule.shadow = Some(ShadowSettings::default());
-        } else if let Some(shadow_children) = shadow_node.children() {
-            // Full shadow configuration
-            let mut shadow = ShadowSettings::default();
-            if has_flag(shadow_children, &["off"]) {
-                shadow.enabled = false;
-            }
-            if let Some(v) = get_i64(shadow_children, &["softness"]) {
-                shadow.softness = v as i32;
-            }
-            if let Some(v) = get_i64(shadow_children, &["spread"]) {
-                shadow.spread = v as i32;
-            }
-            if let Some(v) = get_i64(shadow_children, &["offset-x"]) {
-                shadow.offset_x = v as i32;
-            }
-            if let Some(v) = get_i64(shadow_children, &["offset-y"]) {
-                shadow.offset_y = v as i32;
-            }
-            if has_flag(shadow_children, &["draw-behind-window"]) {
-                shadow.draw_behind_window = true;
-            }
-            if let Some(hex) = get_string(shadow_children, &["color"]) {
+    if let Some(shadow_node) = children.get("shadow") {
+        rule.shadow = parse_shadow_rule(shadow_node);
+    }
+
+    // Tab indicator: colours only (niri's TabIndicatorRule has no on/off/etc.).
+    if let Some(ti_node) = children.get("tab-indicator") {
+        if let Some(ch) = ti_node.children() {
+            let mut ti = TabIndicatorOverride::default();
+            if let Some(hex) = get_string(ch, &["active-color"]) {
                 if let Some(c) = parse_color(&hex) {
-                    shadow.color = c;
+                    ti.active = Some(ColorOrGradient::Color(c));
                 }
             }
-            if let Some(hex) = get_string(shadow_children, &["inactive-color"]) {
+            if let Some(hex) = get_string(ch, &["inactive-color"]) {
                 if let Some(c) = parse_color(&hex) {
-                    shadow.inactive_color = c;
+                    ti.inactive = Some(ColorOrGradient::Color(c));
                 }
             }
-            rule.shadow = Some(shadow);
+            if let Some(hex) = get_string(ch, &["urgent-color"]) {
+                if let Some(c) = parse_color(&hex) {
+                    ti.urgent = Some(ColorOrGradient::Color(c));
+                }
+            }
+            warn_gradients(ch, "tab-indicator");
+            if !ti.is_empty() {
+                rule.tab_indicator = Some(ti);
+            }
         }
     }
 
-    // Per-window tab-indicator settings
-    if let Some(ti_node) = wr_children.get("tab-indicator") {
-        use crate::config::models::TabIndicatorPosition;
-        // Check for simple on/off
-        if has_flag_in_node(ti_node, "off") {
-            rule.tab_indicator = Some(TabIndicatorSettings {
-                enabled: false,
-                ..Default::default()
-            });
-        } else if has_flag_in_node(ti_node, "on") {
-            rule.tab_indicator = Some(TabIndicatorSettings::default());
-        } else if let Some(ti_children) = ti_node.children() {
-            // Full tab-indicator configuration
-            let mut ti = TabIndicatorSettings::default();
-            if has_flag(ti_children, &["off"]) {
-                ti.enabled = false;
-            }
-            if has_flag(ti_children, &["hide-when-single-tab"]) {
-                ti.hide_when_single_tab = true;
-            }
-            if has_flag(ti_children, &["place-within-column"]) {
-                ti.place_within_column = true;
-            }
-            if let Some(v) = get_i64(ti_children, &["gap"]) {
-                ti.gap = v as i32;
-            }
-            if let Some(v) = get_i64(ti_children, &["width"]) {
-                ti.width = v as i32;
-            }
-            if let Some(v) = get_f64(ti_children, &["length"]) {
-                ti.length_proportion = v as f32;
-            }
-            if let Some(pos) = get_string(ti_children, &["position"]) {
-                ti.position = match pos.as_str() {
-                    "right" => TabIndicatorPosition::Right,
-                    "top" => TabIndicatorPosition::Top,
-                    "bottom" => TabIndicatorPosition::Bottom,
-                    _ => TabIndicatorPosition::Left,
-                };
-            }
-            if let Some(v) = get_i64(ti_children, &["gaps-between-tabs"]) {
-                ti.gaps_between_tabs = v as i32;
-            }
-            if let Some(v) = get_i64(ti_children, &["corner-radius"]) {
-                ti.corner_radius = v as i32;
-            }
-            if let Some(hex) = get_string(ti_children, &["active-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    ti.active = ColorOrGradient::Color(c);
-                }
-            }
-            if let Some(hex) = get_string(ti_children, &["inactive-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    ti.inactive = ColorOrGradient::Color(c);
-                }
-            }
-            if let Some(hex) = get_string(ti_children, &["urgent-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    ti.urgent = ColorOrGradient::Color(c);
-                }
-            }
-            rule.tab_indicator = Some(ti);
-        }
+    if let Some(be) = children.get("background-effect") {
+        rule.background_effect = parse_background_effect(be);
+    }
+    if let Some(popups) = children.get("popups") {
+        rule.popups = parse_popups(popups);
     }
 }
 
-/// Load window rules from KDL file
+/// Load window rules from KDL file.
 pub fn load_window_rules(path: &Path, settings: &mut Settings) {
-    // Pass 1: visible/active rules
-    let (mut rules, mut next_id) =
-        load_rules(path, "window-rule", "Rule", parse_window_rule_node_children);
-
-    // Pass 2: disabled (slashdash) rules via raw text
-    if let Some(raw) = read_raw_file(path) {
-        // Legacy detection: old bare "off" at rule level (from Option 1 era)
-        if raw.contains("window-rule {\n    off") || raw.contains("window-rule{off") {
-            warn!(
-                "Legacy disabled window rule syntax detected in {:?}. \
-                 The old bare 'off' format is no longer supported. \
-                 Please re-save the rules from Nirify to migrate to /- syntax.",
-                path
-            );
-        }
-
-        let (disabled, new_next) = load_disabled_rules_from_raw(
-            &raw,
-            "window-rule",
-            "Rule",
-            parse_window_rule_node_children,
-            next_id,
-        );
-        rules.extend(disabled);
-        next_id = new_next;
-    }
-
+    let (rules, next_id) = load_rules(path, "window-rule", "Rule", parse_window_rule_node_children);
     settings.window_rules.rules = rules;
     settings.window_rules.next_id = next_id;
 }
@@ -929,16 +755,13 @@ pub fn load_window_rules(path: &Path, settings: &mut Settings) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::parser::parse_document;
 
     #[test]
     fn parse_layer_rule_node_children_reads_off_flag() {
         let document = parse_document("layer-rule {\n    off\n}\n").unwrap();
         let children = document.get("layer-rule").unwrap().children().unwrap();
         let mut rule = LayerRule::default();
-
         parse_layer_rule_node_children(children, &mut rule);
-
         assert!(!rule.enabled);
     }
 
@@ -947,9 +770,29 @@ mod tests {
         let document = parse_document("window-rule {\n    off\n}\n").unwrap();
         let children = document.get("window-rule").unwrap().children().unwrap();
         let mut rule = WindowRule::default();
-
         parse_window_rule_node_children(children, &mut rule);
-
         assert!(!rule.enabled);
+    }
+
+    #[test]
+    fn lone_brace_regex_preserved_on_load() {
+        let document = parse_document("window-rule {\n    match title=\"foo}bar\"\n}\n").unwrap();
+        let children = document.get("window-rule").unwrap().children().unwrap();
+        let mut rule = WindowRule::default();
+        parse_window_rule_node_children(children, &mut rule);
+        assert_eq!(rule.matches[0].title.as_deref(), Some("foo}bar"));
+    }
+
+    #[test]
+    fn open_behavior_reads_false() {
+        let document =
+            parse_document("window-rule {\n    open-fullscreen false\n    open-floating true\n}\n")
+                .unwrap();
+        let children = document.get("window-rule").unwrap().children().unwrap();
+        let mut rule = WindowRule::default();
+        parse_window_rule_node_children(children, &mut rule);
+        assert_eq!(rule.open_fullscreen, Some(false));
+        assert_eq!(rule.open_floating, Some(true));
+        assert_eq!(rule.open_maximized, None);
     }
 }

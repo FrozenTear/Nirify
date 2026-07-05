@@ -49,8 +49,16 @@ pub fn parse_behavior_from_doc(doc: &KdlDocument, settings: &mut Settings) {
     if has_flag(doc, &["prefer-no-csd"]) {
         settings.miscellaneous.prefer_no_csd = true;
     }
-    if let Some(sp) = get_string(doc, &["screenshot-path"]) {
-        settings.miscellaneous.screenshot_path = sp;
+    if let Some(sp_node) = doc.get("screenshot-path") {
+        if let Some(entry) = sp_node.entries().iter().find(|e| e.name().is_none()) {
+            if entry.value().is_null() {
+                settings.miscellaneous.screenshot_path =
+                    crate::config::models::ScreenshotPathConfig::Disabled;
+            } else if let Some(s) = entry.value().as_string() {
+                settings.miscellaneous.screenshot_path =
+                    crate::config::models::ScreenshotPathConfig::Custom(s.to_string());
+            }
+        }
     }
 }
 
@@ -94,21 +102,30 @@ fn parse_input_behavior_settings(doc: &KdlDocument, settings: &mut Settings) {
         }
     }
 
-    // Warp mouse to focus
+    // Warp mouse to focus. The node's mere presence means warping is on; a
+    // `mode` property refines it. Bare node = Enabled (minimal-movement warp).
     if let Some(wmtf) = doc.get("warp-mouse-to-focus") {
+        let mut mode = WarpMouseMode::Enabled;
         for entry in wmtf.entries() {
             if let Some(name) = entry.name() {
                 if name.value() == "mode" {
                     if let Some(val) = entry.value().as_string() {
-                        settings.behavior.warp_mouse_to_focus = match val {
+                        mode = match val {
                             "center-xy" => WarpMouseMode::CenterXY,
                             "center-xy-always" => WarpMouseMode::CenterXYAlways,
-                            _ => WarpMouseMode::Off,
+                            other => {
+                                log::warn!(
+                                    "Unknown warp-mouse-to-focus mode \"{}\"; treating as enabled",
+                                    other
+                                );
+                                WarpMouseMode::Enabled
+                            }
                         };
                     }
                 }
             }
         }
+        settings.behavior.warp_mouse_to_focus = mode;
     }
 
     // Workspace auto back and forth

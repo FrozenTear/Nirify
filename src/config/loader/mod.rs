@@ -36,6 +36,7 @@ pub mod macros;
 
 mod appearance;
 mod behavior;
+mod blur;
 mod display;
 mod gestures;
 mod gradient;
@@ -54,6 +55,7 @@ mod workspaces;
 // Re-export loaders for internal use
 pub use appearance::{load_appearance, parse_appearance_from_doc, parse_layout_children};
 pub use behavior::{load_behavior, parse_behavior_from_doc};
+pub use blur::{load_blur, parse_blur_from_doc};
 pub use display::{
     load_animations, load_cursor, load_outputs, load_overview, parse_animations_from_children,
     parse_cursor_from_children, parse_layout_override, parse_output_node_children,
@@ -539,6 +541,18 @@ pub fn load_settings_with_result(paths: &ConfigPaths) -> LoadResult {
         parse_preferences_from_doc,
         &mut result.settings
     );
+
+    // Top-level blur (niri 26.04+). Loaded unconditionally: if the file exists
+    // (written when niri was newer, or hand-made), its state must not be lost.
+    {
+        let blur_path = paths.path_for(crate::config::registry::ConfigFile::Blur);
+        load_and_track!(
+            &blur_path,
+            "blur.kdl",
+            parse_blur_from_doc,
+            &mut result.settings
+        );
+    }
 
     // Validate and clamp all values to valid ranges
     result.settings.validate();

@@ -3,7 +3,9 @@
 //! Handles prefer-no-csd, screenshot-path, clipboard, hotkey overlay, etc.
 
 use super::helpers::read_kdl_file;
-use crate::config::models::{Settings, XWaylandSatelliteConfig};
+use crate::config::models::{
+    ScreenshotPathConfig, Settings, SpawnShCommand, XWaylandSatelliteConfig,
+};
 use crate::config::parser::{get_string, has_flag};
 use kdl::KdlDocument;
 use log::debug;
@@ -17,8 +19,15 @@ pub fn parse_misc_from_doc(doc: &KdlDocument, settings: &mut Settings) {
         settings.miscellaneous.prefer_no_csd = true;
     }
 
-    if let Some(v) = get_string(doc, &["screenshot-path"]) {
-        settings.miscellaneous.screenshot_path = v;
+    if let Some(sp_node) = doc.get("screenshot-path") {
+        if let Some(entry) = sp_node.entries().iter().find(|e| e.name().is_none()) {
+            if entry.value().is_null() {
+                settings.miscellaneous.screenshot_path = ScreenshotPathConfig::Disabled;
+            } else if let Some(s) = entry.value().as_string() {
+                settings.miscellaneous.screenshot_path =
+                    ScreenshotPathConfig::Custom(s.to_string());
+            }
+        }
     }
 
     // Clipboard
@@ -51,20 +60,52 @@ pub fn parse_misc_from_doc(doc: &KdlDocument, settings: &mut Settings) {
         }
     }
 
-    // Spawn command through shell at startup (v25.08+)
-    if let Some(v) = get_string(doc, &["spawn-sh-at-startup"]) {
-        settings.miscellaneous.spawn_sh_at_startup = v;
+    // Spawn commands through shell at startup (v25.08+); collect all nodes
+    settings.miscellaneous.spawn_sh_at_startup.clear();
+    let mut spawn_id = 0u32;
+    for node in doc
+        .nodes()
+        .iter()
+        .filter(|n| n.name().value() == "spawn-sh-at-startup")
+    {
+        if let Some(cmd) = node
+            .entries()
+            .iter()
+            .find(|e| e.name().is_none())
+            .and_then(|e| e.value().as_string())
+        {
+            settings
+                .miscellaneous
+                .spawn_sh_at_startup
+                .push(SpawnShCommand {
+                    id: spawn_id,
+                    command: cmd.to_string(),
+                });
+            spawn_id += 1;
+        }
     }
+    settings.miscellaneous.spawn_sh_next_id = spawn_id;
 
     // XWayland satellite (v25.08+)
     if let Some(xws) = doc.get("xwayland-satellite") {
-        // Check if it has children (block form: xwayland-satellite { off })
+        // Block form: xwayland-satellite { off } / { path "..." } / { on }
         if let Some(xws_children) = xws.children() {
             if has_flag(xws_children, &["off"]) {
+                if get_string(xws_children, &["path"]).is_some() {
+                    debug!(
+                        "xwayland-satellite has both `off` and `path`; dropping path (model is single-valued)"
+                    );
+                }
                 settings.miscellaneous.xwayland_satellite = XWaylandSatelliteConfig::Off;
+            } else if let Some(path) = get_string(xws_children, &["path"]) {
+                settings.miscellaneous.xwayland_satellite =
+                    XWaylandSatelliteConfig::CustomPath(path);
+            } else {
+                // Empty block or `on` child → default behavior
+                settings.miscellaneous.xwayland_satellite = XWaylandSatelliteConfig::Default;
             }
         } else if let Some(path_entry) = xws.entries().first() {
-            // String form: xwayland-satellite "/path/to/binary"
+            // Legacy string form: xwayland-satellite "/path/to/binary" (migration)
             if let Some(path) = path_entry.value().as_string() {
                 settings.miscellaneous.xwayland_satellite =
                     XWaylandSatelliteConfig::CustomPath(path.to_string());

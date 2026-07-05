@@ -5,7 +5,9 @@
 //! Supports following include directives within the niri config directory.
 
 use super::helpers::read_kdl_file;
-use crate::config::models::{KeybindAction, Keybinding, KeybindingsSettings};
+use crate::config::models::{
+    ActionNode, ActionValue, HotkeyOverlayTitle, KeybindAction, Keybinding, KeybindingsSettings,
+};
 use crate::config::parser::parse_document;
 use kdl::{KdlDocument, KdlNode};
 use log::debug;
@@ -161,7 +163,6 @@ fn parse_binds_block(
     }
 }
 
-/// Parse a single keybinding node
 fn parse_single_binding(node: &KdlNode, id_counter: &mut u32) -> Option<Keybinding> {
     let key_combo = node.name().value().to_string();
 
@@ -173,26 +174,30 @@ fn parse_single_binding(node: &KdlNode, id_counter: &mut u32) -> Option<Keybindi
     let mut binding = Keybinding {
         id: *id_counter,
         key_combo,
-        hotkey_overlay_title: None,
-        allow_when_locked: false,
-        cooldown_ms: None,
-        repeat: false,
-        action: KeybindAction::NiriAction(String::new()),
+        ..Default::default()
     };
     *id_counter += 1;
 
-    // Parse properties from entries
+    // Parse properties from entries (niri defaults: repeat=true, allow-inhibiting=true)
     for entry in node.entries() {
         if let Some(name) = entry.name() {
             match name.value() {
                 "hotkey-overlay-title" => {
-                    if let Some(title) = entry.value().as_string() {
-                        binding.hotkey_overlay_title = Some(title.to_string());
+                    if matches!(entry.value(), kdl::KdlValue::Null) {
+                        binding.hotkey_overlay_title = HotkeyOverlayTitle::Hidden;
+                    } else if let Some(title) = entry.value().as_string() {
+                        binding.hotkey_overlay_title =
+                            HotkeyOverlayTitle::Custom(title.to_string());
                     }
                 }
                 "allow-when-locked" => {
                     if let Some(val) = entry.value().as_bool() {
                         binding.allow_when_locked = val;
+                    }
+                }
+                "allow-inhibiting" => {
+                    if let Some(val) = entry.value().as_bool() {
+                        binding.allow_inhibiting = val;
                     }
                 }
                 "cooldown-ms" => {
@@ -210,7 +215,7 @@ fn parse_single_binding(node: &KdlNode, id_counter: &mut u32) -> Option<Keybindi
         }
     }
 
-    // Parse action from children
+    // Parse action from children (exactly one action node per bind)
     if let Some(children) = node.children() {
         binding.action = parse_action(children);
     }
@@ -218,11 +223,10 @@ fn parse_single_binding(node: &KdlNode, id_counter: &mut u32) -> Option<Keybindi
     Some(binding)
 }
 
-/// Parse the action from a binding's children
 fn parse_action(doc: &KdlDocument) -> KeybindAction {
     // Get the first action node (only one action per binding)
     let Some(node) = doc.nodes().first() else {
-        return KeybindAction::NiriAction("(unknown)".to_string());
+        return KeybindAction::NiriAction(ActionNode::bare("(unknown)"));
     };
 
     let action_name = node.name().value();
@@ -237,49 +241,51 @@ fn parse_action(doc: &KdlDocument) -> KeybindAction {
         return KeybindAction::Spawn(args);
     }
 
-    // For other niri actions, check if there are arguments
-    let args: Vec<String> = node
-        .entries()
-        .iter()
-        .filter_map(|e| {
-            // Get string or integer arguments
-            e.value()
-                .as_string()
-                .map(|s| s.to_string())
-                .or_else(|| e.value().as_integer().map(|i| i.to_string()))
-        })
-        .collect();
+    if action_name == "spawn-sh" {
+        let cmd = node
+            .entries()
+            .iter()
+            .find_map(|e| e.value().as_string().map(|s| s.to_string()))
+            .unwrap_or_default();
+        return KeybindAction::SpawnSh(cmd);
+    }
 
-    // Also check for children that might be action arguments
-    // Niri uses several formats:
-    // - focus-workspace { "1"; }          -> child node name IS the argument
-    // - focus-workspace { reference "name"; } -> child has name and value
-    if let Some(children) = node.children() {
-        let mut child_args: Vec<String> = Vec::new();
-        for child_node in children.nodes() {
-            let child_name = child_node.name().value();
-            // Check if child has entries (e.g., reference "name")
-            if let Some(entry) = child_node.entries().first() {
-                if let Some(s) = entry.value().as_string() {
-                    // Format: child-name "value"
-                    child_args.push(format!("{}: {}", child_name, s));
-                } else if let Some(i) = entry.value().as_integer() {
-                    child_args.push(format!("{}: {}", child_name, i));
-                }
-            } else {
-                // The child node name itself is the argument (e.g., "1" in focus-workspace { "1"; })
-                child_args.push(child_name.to_string());
-            }
-        }
-        if !child_args.is_empty() {
-            return KeybindAction::NiriActionWithArgs(action_name.to_string(), child_args);
+    // Generic lossless capture: positional args + named props, preserving types.
+    let mut action = ActionNode::bare(action_name);
+    for entry in node.entries() {
+        let value = kdl_to_action_value(entry.value());
+        if let Some(name) = entry.name() {
+            action.props.push((name.value().to_string(), value));
+        } else {
+            action.args.push(value);
         }
     }
 
-    if args.is_empty() {
-        KeybindAction::NiriAction(action_name.to_string())
+    // Action nodes have no children in niri's grammar; ignore any (log a warning).
+    if node.children().is_some() {
+        log::warn!(
+            "Ignoring unexpected child nodes on action '{}' (not valid niri grammar)",
+            action_name
+        );
+    }
+
+    KeybindAction::NiriAction(action)
+}
+
+/// Convert a KDL value into a lossless `ActionValue`.
+fn kdl_to_action_value(value: &kdl::KdlValue) -> ActionValue {
+    if matches!(value, kdl::KdlValue::Null) {
+        ActionValue::Null
+    } else if let Some(b) = value.as_bool() {
+        ActionValue::Bool(b)
+    } else if let Some(i) = value.as_integer() {
+        ActionValue::Int(i as i64)
+    } else if let Some(f) = value.as_float() {
+        ActionValue::Float(f)
+    } else if let Some(s) = value.as_string() {
+        ActionValue::Str(s.to_string())
     } else {
-        KeybindAction::NiriActionWithArgs(action_name.to_string(), args)
+        ActionValue::Null
     }
 }
 
@@ -308,7 +314,7 @@ binds {
         assert_eq!(bindings[0].key_combo, "Mod+Space");
         assert_eq!(
             bindings[0].hotkey_overlay_title,
-            Some("App Launcher".to_string())
+            HotkeyOverlayTitle::Custom("App Launcher".to_string())
         );
         assert!(
             matches!(&bindings[0].action, KeybindAction::Spawn(args) if args == &["dmenu_run"])
@@ -359,7 +365,51 @@ binds {
         assert_eq!(bindings.len(), 1);
         assert_eq!(bindings[0].key_combo, "Mod+Q");
         assert!(
-            matches!(&bindings[0].action, KeybindAction::NiriAction(action) if action == "close-window")
+            matches!(&bindings[0].action, KeybindAction::NiriAction(node) if node.name == "close-window" && node.args.is_empty() && node.props.is_empty())
         );
+        // niri defaults preserved
+        assert!(bindings[0].repeat);
+        assert!(bindings[0].allow_inhibiting);
+    }
+
+    #[test]
+    fn test_parse_action_with_args_and_props() {
+        let content = r#"
+binds {
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { move-column-to-workspace-down focus=false; }
+    Mod+3 { set-column-width "+10%"; }
+}
+"#;
+        let doc = parse_document(content).unwrap();
+        let binds_doc = doc.get("binds").unwrap().children().unwrap();
+        let mut bindings = Vec::new();
+        let mut id = 0;
+        parse_binds_block(binds_doc, &mut bindings, &mut id);
+
+        assert_eq!(bindings.len(), 3);
+        match &bindings[0].action {
+            KeybindAction::NiriAction(node) => {
+                assert_eq!(node.name, "focus-workspace");
+                assert_eq!(node.args, vec![ActionValue::Int(1)]);
+            }
+            other => panic!("expected NiriAction, got {other:?}"),
+        }
+        match &bindings[1].action {
+            KeybindAction::NiriAction(node) => {
+                assert_eq!(node.name, "move-column-to-workspace-down");
+                assert_eq!(
+                    node.props,
+                    vec![("focus".to_string(), ActionValue::Bool(false))]
+                );
+            }
+            other => panic!("expected NiriAction, got {other:?}"),
+        }
+        match &bindings[2].action {
+            KeybindAction::NiriAction(node) => {
+                assert_eq!(node.args, vec![ActionValue::Str("+10%".to_string())]);
+            }
+            other => panic!("expected NiriAction, got {other:?}"),
+        }
     }
 }
