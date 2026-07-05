@@ -46,6 +46,8 @@ pub enum SettingsCategory {
     Cursor,
     /// overview.kdl - overview mode settings
     Overview,
+    /// blur.kdl - top-level background blur (niri 26.04+)
+    Blur,
     /// workspaces.kdl - named workspaces
     Workspaces,
     /// keybindings.kdl - keyboard shortcuts
@@ -91,6 +93,7 @@ impl SettingsCategory {
             SettingsCategory::Animations,
             SettingsCategory::Cursor,
             SettingsCategory::Overview,
+            SettingsCategory::Blur,
             SettingsCategory::Workspaces,
             SettingsCategory::Keybindings,
             SettingsCategory::LayoutExtras,
@@ -123,6 +126,7 @@ impl SettingsCategory {
             SettingsCategory::Animations => "Animations",
             SettingsCategory::Cursor => "Cursor",
             SettingsCategory::Overview => "Overview",
+            SettingsCategory::Blur => "Blur",
             SettingsCategory::Workspaces => "Workspaces",
             SettingsCategory::Keybindings => "Keybindings",
             SettingsCategory::LayoutExtras => "Layout Extras",
@@ -137,6 +141,43 @@ impl SettingsCategory {
             SettingsCategory::RecentWindows => "Recent Windows",
             SettingsCategory::Preferences => "Preferences",
         }
+    }
+
+    /// Map a relative KDL file name (as used by `load_settings_with_result`'s
+    /// `track()` calls) to the category whose save writes that file.
+    ///
+    /// Returns `None` for names that no single category owns.
+    pub fn from_relative_path(p: &str) -> Option<Self> {
+        Some(match p {
+            "keybindings.kdl" => SettingsCategory::Keybindings,
+            "appearance.kdl" => SettingsCategory::Appearance,
+            "behavior.kdl" => SettingsCategory::Behavior,
+            "input/keyboard.kdl" => SettingsCategory::Keyboard,
+            "input/mouse.kdl" => SettingsCategory::Mouse,
+            "input/touchpad.kdl" => SettingsCategory::Touchpad,
+            "input/trackpoint.kdl" => SettingsCategory::Trackpoint,
+            "input/trackball.kdl" => SettingsCategory::Trackball,
+            "input/tablet.kdl" => SettingsCategory::Tablet,
+            "input/touch.kdl" => SettingsCategory::Touch,
+            "animations.kdl" => SettingsCategory::Animations,
+            "cursor.kdl" => SettingsCategory::Cursor,
+            "overview.kdl" => SettingsCategory::Overview,
+            "blur.kdl" => SettingsCategory::Blur,
+            "outputs.kdl" => SettingsCategory::Outputs,
+            "advanced/layout-extras.kdl" => SettingsCategory::LayoutExtras,
+            "advanced/gestures.kdl" => SettingsCategory::Gestures,
+            "advanced/misc.kdl" => SettingsCategory::Miscellaneous,
+            "workspaces.kdl" => SettingsCategory::Workspaces,
+            "advanced/layer-rules.kdl" => SettingsCategory::LayerRules,
+            "advanced/window-rules.kdl" => SettingsCategory::WindowRules,
+            "advanced/startup.kdl" => SettingsCategory::Startup,
+            "advanced/environment.kdl" => SettingsCategory::Environment,
+            "advanced/debug.kdl" => SettingsCategory::Debug,
+            "advanced/switch-events.kdl" => SettingsCategory::SwitchEvents,
+            "advanced/recent-windows.kdl" => SettingsCategory::RecentWindows,
+            "advanced/preferences.kdl" => SettingsCategory::Preferences,
+            _ => return None,
+        })
     }
 }
 
@@ -221,6 +262,27 @@ impl DirtyTracker {
                 std::mem::take(&mut *poisoned.into_inner())
             }
         }
+    }
+
+    /// Take and clear all dirty categories except those in `excluded`.
+    ///
+    /// Returns the set of categories that were dirty and not excluded, and
+    /// clears exactly those from the tracker. Excluded categories that were
+    /// dirty remain marked. Used to keep load-blocked categories from being
+    /// written to disk while still allowing them to accumulate edits.
+    pub fn take_except(&self, excluded: &HashSet<SettingsCategory>) -> HashSet<SettingsCategory> {
+        let mut set = match self.dirty.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                log::warn!("DirtyTracker mutex was poisoned in take_except, recovering");
+                poisoned.into_inner()
+            }
+        };
+        let taken: HashSet<SettingsCategory> = set.difference(excluded).copied().collect();
+        for c in &taken {
+            set.remove(c);
+        }
+        taken
     }
 
     /// Check if any category is dirty
@@ -339,7 +401,67 @@ mod tests {
 
     #[test]
     fn test_category_all_count() {
-        // Ensure we have all 26 categories
-        assert_eq!(SettingsCategory::all().len(), 26);
+        // Ensure we have all 27 categories
+        assert_eq!(SettingsCategory::all().len(), 27);
+    }
+
+    #[test]
+    fn take_except_leaves_excluded_marked() {
+        let tracker = DirtyTracker::new();
+        tracker.mark(SettingsCategory::Appearance);
+        tracker.mark(SettingsCategory::Mouse);
+
+        let mut excluded = HashSet::new();
+        excluded.insert(SettingsCategory::Mouse);
+
+        let taken = tracker.take_except(&excluded);
+        assert_eq!(taken.len(), 1);
+        assert!(taken.contains(&SettingsCategory::Appearance));
+
+        // Mouse stays marked
+        assert!(tracker.is_dirty());
+        assert!(tracker.peek().contains(&SettingsCategory::Mouse));
+        assert!(!tracker.peek().contains(&SettingsCategory::Appearance));
+    }
+
+    #[test]
+    fn from_relative_path_covers_all_tracked_files() {
+        let tracked = [
+            "keybindings.kdl",
+            "appearance.kdl",
+            "behavior.kdl",
+            "input/keyboard.kdl",
+            "input/mouse.kdl",
+            "input/touchpad.kdl",
+            "input/trackpoint.kdl",
+            "input/trackball.kdl",
+            "input/tablet.kdl",
+            "input/touch.kdl",
+            "animations.kdl",
+            "cursor.kdl",
+            "overview.kdl",
+            "blur.kdl",
+            "outputs.kdl",
+            "advanced/layout-extras.kdl",
+            "advanced/gestures.kdl",
+            "advanced/misc.kdl",
+            "workspaces.kdl",
+            "advanced/layer-rules.kdl",
+            "advanced/window-rules.kdl",
+            "advanced/startup.kdl",
+            "advanced/environment.kdl",
+            "advanced/debug.kdl",
+            "advanced/switch-events.kdl",
+            "advanced/recent-windows.kdl",
+            "advanced/preferences.kdl",
+        ];
+        for name in tracked {
+            assert!(
+                SettingsCategory::from_relative_path(name).is_some(),
+                "expected Some for {}",
+                name
+            );
+        }
+        assert!(SettingsCategory::from_relative_path("bogus.kdl").is_none());
     }
 }
