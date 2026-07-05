@@ -64,19 +64,21 @@ pub struct ShadowSettings {
     pub draw_behind_window: bool,
     pub color: Color,
     pub inactive_color: Color,
+    pub use_inactive_color: bool,
 }
 
 impl Default for ShadowSettings {
     fn default() -> Self {
         Self {
-            enabled: true,
+            enabled: false,
             softness: 30,
             spread: 5,
             offset_x: 0,
             offset_y: 5,
             draw_behind_window: false,
-            color: Color::from_hex("#00000070").unwrap_or_default(),
+            color: Color::from_hex("#00000077").unwrap_or_default(),
             inactive_color: Color::from_hex("#00000050").unwrap_or_default(),
+            use_inactive_color: false,
         }
     }
 }
@@ -118,6 +120,9 @@ pub struct TabIndicatorSettings {
     pub active: ColorOrGradient,
     pub inactive: ColorOrGradient,
     pub urgent: ColorOrGradient,
+    pub use_active_color: bool,
+    pub use_inactive_color: bool,
+    pub use_urgent_color: bool,
 }
 
 impl Default for TabIndicatorSettings {
@@ -128,13 +133,16 @@ impl Default for TabIndicatorSettings {
             place_within_column: false,
             gap: 5,
             width: 4,
-            length_proportion: 1.0,
+            length_proportion: 0.5,
             position: TabIndicatorPosition::Left,
-            gaps_between_tabs: 2,
-            corner_radius: 8,
+            gaps_between_tabs: 0,
+            corner_radius: 0,
             active: ColorOrGradient::Color(Color::from_hex("#7fc8ff").unwrap_or_default()),
             inactive: ColorOrGradient::Color(Color::from_hex("#505050").unwrap_or_default()),
-            urgent: ColorOrGradient::Color(Color::from_hex("#eb6f92").unwrap_or_default()),
+            urgent: ColorOrGradient::Color(Color::from_hex("#9b0000").unwrap_or_default()),
+            use_active_color: false,
+            use_inactive_color: false,
+            use_urgent_color: false,
         }
     }
 }
@@ -150,7 +158,7 @@ impl Default for InsertHintSettings {
     fn default() -> Self {
         Self {
             enabled: true,
-            color: ColorOrGradient::Color(Color::from_hex("#ffc87f80").unwrap_or_default()),
+            color: ColorOrGradient::Color(Color::from_hex("#7fc8ff80").unwrap_or_default()),
         }
     }
 }
@@ -242,10 +250,14 @@ pub struct LayoutOverride {
     // === Column/Window Behavior ===
     /// Center focused column override
     pub center_focused_column: Option<CenterFocusedColumn>,
-    /// Always center single column override
+    /// Always center single column override (supports explicit `false`)
     pub always_center_single_column: Option<bool>,
+    /// Empty workspace above first override
+    pub empty_workspace_above_first: Option<bool>,
     /// Default column display mode override (normal/tabbed)
     pub default_column_display: Option<DefaultColumnDisplay>,
+    /// Workspace background color override
+    pub background_color: Option<Color>,
 
     // === Default Sizing ===
     /// Default column width as proportion (0.0-1.0)
@@ -266,6 +278,8 @@ pub struct LayoutOverride {
     pub focus_ring_active: Option<ColorOrGradient>,
     /// Focus ring inactive color override
     pub focus_ring_inactive: Option<ColorOrGradient>,
+    /// Focus ring urgent color override
+    pub focus_ring_urgent: Option<ColorOrGradient>,
 
     // === Border ===
     /// Border enabled override (false = off)
@@ -276,6 +290,8 @@ pub struct LayoutOverride {
     pub border_active: Option<ColorOrGradient>,
     /// Border inactive color override
     pub border_inactive: Option<ColorOrGradient>,
+    /// Border urgent color override
+    pub border_urgent: Option<ColorOrGradient>,
 
     // === Shadow ===
     /// Shadow enabled override (false = off)
@@ -290,6 +306,25 @@ pub struct LayoutOverride {
     pub shadow_offset_y: Option<i32>,
     /// Shadow color override
     pub shadow_color: Option<Color>,
+    /// Shadow inactive color override
+    pub shadow_inactive_color: Option<Color>,
+    /// Shadow draw-behind-window override
+    pub shadow_draw_behind_window: Option<bool>,
+
+    // === Tab Indicator ===
+    /// Tab indicator sub-block override (reuses the global tab-indicator struct).
+    /// `Some` means a `tab-indicator { ... }` block was present and must round-trip.
+    pub tab_indicator: Option<TabIndicatorSettings>,
+
+    // === Insert Hint ===
+    /// Insert hint sub-block override (reuses the global insert-hint struct).
+    /// `Some` means an `insert-hint { ... }` block was present and must round-trip.
+    pub insert_hint: Option<InsertHintSettings>,
+
+    // === Default Column Width (auto) ===
+    /// Empty `default-column-width {}` override: windows pick their own width.
+    /// Preserved so the node is not dropped on the next save.
+    pub default_column_width_auto: Option<bool>,
 }
 
 // has_any() is now derived via #[derive(HasAny)]

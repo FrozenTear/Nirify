@@ -119,6 +119,40 @@ impl AnimationId {
     }
 }
 
+impl AnimationId {
+    /// niri's built-in default config for this animation (kind + prefilled params).
+    ///
+    /// Returns an `AnimationType::Default` config whose `spring`/`easing` fields are
+    /// prefilled with niri's per-animation defaults, so that toggling an animation to
+    /// Spring/Easing starts from the correct values rather than the generic defaults.
+    pub fn niri_default_config(&self) -> SingleAnimationConfig {
+        let spring = |damping_ratio: f64, stiffness: i32, epsilon: f64| SpringParams {
+            damping_ratio,
+            stiffness,
+            epsilon,
+        };
+        let easing = |duration_ms: i32, curve: EasingCurve| EasingParams { duration_ms, curve };
+        let mut cfg = SingleAnimationConfig {
+            animation_type: AnimationType::Default,
+            ..Default::default()
+        };
+        match self {
+            Self::WorkspaceSwitch => cfg.spring = spring(1.0, 1000, 0.0001),
+            Self::WindowOpen => cfg.easing = easing(150, EasingCurve::EaseOutExpo),
+            Self::WindowClose => cfg.easing = easing(150, EasingCurve::EaseOutQuad),
+            Self::HorizontalViewMovement => cfg.spring = spring(1.0, 800, 0.0001),
+            Self::WindowMovement => cfg.spring = spring(1.0, 800, 0.0001),
+            Self::WindowResize => cfg.spring = spring(1.0, 800, 0.0001),
+            Self::ConfigNotification => cfg.spring = spring(0.6, 1000, 0.001),
+            Self::ExitConfirmation => cfg.spring = spring(0.6, 500, 0.01),
+            Self::ScreenshotUi => cfg.easing = easing(200, EasingCurve::EaseOutQuad),
+            Self::Overview => cfg.spring = spring(1.0, 800, 0.0001),
+            Self::RecentWindows => cfg.spring = spring(1.0, 800, 0.001),
+        }
+        cfg
+    }
+}
+
 /// Easing curve type
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum EasingCurve {
@@ -254,7 +288,7 @@ pub struct SingleAnimationConfig {
 }
 
 /// Per-animation configuration for all niri animations
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PerAnimationSettings {
     /// Workspace switch animation (default: spring)
     pub workspace_switch: SingleAnimationConfig,
@@ -280,6 +314,24 @@ pub struct PerAnimationSettings {
     pub recent_windows_close: SingleAnimationConfig,
 }
 
+impl Default for PerAnimationSettings {
+    fn default() -> Self {
+        Self {
+            workspace_switch: AnimationId::WorkspaceSwitch.niri_default_config(),
+            window_open: AnimationId::WindowOpen.niri_default_config(),
+            window_close: AnimationId::WindowClose.niri_default_config(),
+            horizontal_view_movement: AnimationId::HorizontalViewMovement.niri_default_config(),
+            window_movement: AnimationId::WindowMovement.niri_default_config(),
+            window_resize: AnimationId::WindowResize.niri_default_config(),
+            config_notification_open_close: AnimationId::ConfigNotification.niri_default_config(),
+            exit_confirmation_open_close: AnimationId::ExitConfirmation.niri_default_config(),
+            screenshot_ui_open: AnimationId::ScreenshotUi.niri_default_config(),
+            overview_open_close: AnimationId::Overview.niri_default_config(),
+            recent_windows_close: AnimationId::RecentWindows.niri_default_config(),
+        }
+    }
+}
+
 /// Animation settings
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnimationSettings {
@@ -296,5 +348,64 @@ impl Default for AnimationSettings {
             slowdown: 1.0,
             per_animation: PerAnimationSettings::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn per_animation_niri_defaults() {
+        let p = PerAnimationSettings::default();
+
+        // All animations default to niri's own default kind.
+        assert_eq!(p.workspace_switch.animation_type, AnimationType::Default);
+        assert_eq!(p.window_open.animation_type, AnimationType::Default);
+
+        // Spring-default animations carry niri's per-animation spring params.
+        assert_eq!(p.workspace_switch.spring.stiffness, 1000);
+        assert_eq!(p.workspace_switch.spring.damping_ratio, 1.0);
+        assert_eq!(p.workspace_switch.spring.epsilon, 0.0001);
+
+        assert_eq!(
+            p.horizontal_view_movement.spring,
+            SpringParams {
+                damping_ratio: 1.0,
+                stiffness: 800,
+                epsilon: 0.0001,
+            }
+        );
+        assert_eq!(
+            p.config_notification_open_close.spring,
+            SpringParams {
+                damping_ratio: 0.6,
+                stiffness: 1000,
+                epsilon: 0.001,
+            }
+        );
+        assert_eq!(
+            p.exit_confirmation_open_close.spring,
+            SpringParams {
+                damping_ratio: 0.6,
+                stiffness: 500,
+                epsilon: 0.01,
+            }
+        );
+        assert_eq!(
+            p.recent_windows_close.spring,
+            SpringParams {
+                damping_ratio: 1.0,
+                stiffness: 800,
+                epsilon: 0.001,
+            }
+        );
+
+        // Easing-default animations carry niri's per-animation easing params.
+        assert_eq!(p.window_open.easing.duration_ms, 150);
+        assert_eq!(p.window_open.easing.curve, EasingCurve::EaseOutExpo);
+        assert_eq!(p.window_close.easing.curve, EasingCurve::EaseOutQuad);
+        assert_eq!(p.screenshot_ui_open.easing.duration_ms, 200);
+        assert_eq!(p.screenshot_ui_open.easing.curve, EasingCurve::EaseOutQuad);
     }
 }

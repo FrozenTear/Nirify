@@ -50,7 +50,7 @@ impl Default for AppearanceSettings {
                 Color::from_hex(DEFAULT_FOCUS_RING_INACTIVE_COLOR).unwrap_or_default(),
             ),
             focus_ring_urgent: ColorOrGradient::Color(
-                Color::from_hex("#eb6f92").unwrap_or_default(), // Rose Pine urgent
+                Color::from_hex("#9b0000").unwrap_or_default(), // niri urgent default
             ),
             border_enabled: false,
             border_thickness: DEFAULT_BORDER_WIDTH as f32,
@@ -60,7 +60,7 @@ impl Default for AppearanceSettings {
             border_inactive: ColorOrGradient::Color(
                 Color::from_hex(DEFAULT_BORDER_INACTIVE_COLOR).unwrap_or_default(),
             ),
-            border_urgent: ColorOrGradient::Color(Color::from_hex("#eb6f92").unwrap_or_default()),
+            border_urgent: ColorOrGradient::Color(Color::from_hex("#9b0000").unwrap_or_default()),
             gaps: DEFAULT_GAP_SIZE as f32,
             corner_radius: DEFAULT_CORNER_RADIUS,
             background_color: None,

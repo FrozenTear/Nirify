@@ -1,6 +1,6 @@
 //! Behavior settings (focus, workspace layout, struts, modifier keys)
 
-use crate::constants::{DEFAULT_COLUMN_FIXED, DEFAULT_COLUMN_PROPORTION, STRUT_SIZE_MIN};
+use crate::constants::{DEFAULT_COLUMN_FIXED, DEFAULT_COLUMN_PROPORTION};
 use crate::types::{CenterFocusedColumn, ModKey, WarpMouseMode};
 use nirify_macros::SlintIndex;
 
@@ -48,6 +48,8 @@ pub enum ColumnWidthType {
     #[slint_index(default)]
     Proportion,
     Fixed,
+    /// Empty `default-column-width {}` — new windows pick their own initial width.
+    Auto,
 }
 
 impl std::fmt::Display for ColumnWidthType {
@@ -55,13 +57,14 @@ impl std::fmt::Display for ColumnWidthType {
         match self {
             Self::Proportion => write!(f, "Proportion"),
             Self::Fixed => write!(f, "Fixed"),
+            Self::Auto => write!(f, "Automatic"),
         }
     }
 }
 
 impl ColumnWidthType {
     pub fn all() -> &'static [Self] {
-        &[Self::Proportion, Self::Fixed]
+        &[Self::Proportion, Self::Fixed, Self::Auto]
     }
 }
 
@@ -77,10 +80,10 @@ impl Default for BehaviorSettings {
             default_column_width_type: ColumnWidthType::Proportion,
             default_column_width_proportion: DEFAULT_COLUMN_PROPORTION,
             default_column_width_fixed: DEFAULT_COLUMN_FIXED,
-            strut_left: STRUT_SIZE_MIN,
-            strut_right: STRUT_SIZE_MIN,
-            strut_top: STRUT_SIZE_MIN,
-            strut_bottom: STRUT_SIZE_MIN,
+            strut_left: 0.0,
+            strut_right: 0.0,
+            strut_top: 0.0,
+            strut_bottom: 0.0,
             mod_key: ModKey::default(),
             mod_key_nested: None,
             workspace_auto_back_and_forth: false,

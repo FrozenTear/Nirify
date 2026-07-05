@@ -41,8 +41,8 @@ pub struct EnvironmentVariable {
     pub id: u32,
     /// Variable name
     pub name: String,
-    /// Variable value
-    pub value: String,
+    /// Variable value; `None` unsets the variable (writes `null`)
+    pub value: Option<String>,
 }
 
 /// Environment settings
