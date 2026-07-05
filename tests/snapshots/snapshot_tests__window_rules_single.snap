@@ -4,6 +4,7 @@ expression: kdl
 ---
 // Window rules - managed by Nirify
 
+
 // Firefox Floating
 window-rule {
     match app-id="firefox"

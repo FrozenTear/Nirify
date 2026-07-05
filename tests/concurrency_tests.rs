@@ -246,8 +246,14 @@ fn test_concurrent_save_same_file() {
                 dirty.insert(SettingsCategory::Appearance);
 
                 // This should not corrupt files due to atomic writes
-                save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled())
-                    .expect("Save failed");
+                save_dirty(
+                    &paths,
+                    &settings,
+                    &dirty,
+                    FeatureCompat::all_enabled(),
+                    &std::collections::HashSet::new(),
+                )
+                .expect("Save failed");
             })
         })
         .collect();

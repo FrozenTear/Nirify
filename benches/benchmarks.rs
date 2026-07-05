@@ -198,6 +198,7 @@ fn bench_save_load(c: &mut Criterion) {
                 black_box(&settings),
                 black_box(&dirty),
                 FeatureCompat::all_enabled(),
+                &std::collections::HashSet::new(),
             )
             .unwrap()
         })
@@ -221,6 +222,7 @@ fn bench_save_load(c: &mut Criterion) {
                 black_box(&settings),
                 black_box(&dirty),
                 FeatureCompat::all_enabled(),
+                &std::collections::HashSet::new(),
             )
             .unwrap()
         })

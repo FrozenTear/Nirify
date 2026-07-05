@@ -138,8 +138,8 @@ fn test_dirty_tracker_thread_safety() {
 fn test_all_categories_count() {
     assert_eq!(
         SettingsCategory::all().len(),
-        26,
-        "Expected 26 settings categories (including Preferences)"
+        27,
+        "Expected 27 settings categories (including Preferences and Blur)"
     );
 }
 

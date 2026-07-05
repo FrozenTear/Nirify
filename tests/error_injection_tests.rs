@@ -363,7 +363,10 @@ screenshot-path "{}"
     .unwrap();
 
     let loaded = load_settings(&paths);
-    assert_eq!(loaded.miscellaneous.screenshot_path, long_path);
+    assert_eq!(
+        loaded.miscellaneous.screenshot_path,
+        nirify::config::models::ScreenshotPathConfig::Custom(long_path)
+    );
 }
 
 #[test]

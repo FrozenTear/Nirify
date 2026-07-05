@@ -8,15 +8,20 @@ layout {
     gaps 16
 
     focus-ring {
+        on
         width 4
         active-color "#7fc8ff"
         inactive-color "#505050"
-        urgent-color "#eb6f92"
+        urgent-color "#9b0000"
+    }
+
+    border {
+        off
+        width 4
+        active-color "#ffc87f"
+        inactive-color "#505050"
+        urgent-color "#9b0000"
     }
 
     default-column-width { proportion 0.50; }
-}
-
-window-rule {
-    geometry-corner-radius 12
 }
