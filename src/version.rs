@@ -64,6 +64,12 @@ impl Ord for NiriVersion {
 pub enum NiriFeature {
     /// Recent windows (Alt-Tab) switcher configuration
     RecentWindows,
+    /// Background effects & popup rules (blur/xray) for window & layer rules
+    BackgroundEffects,
+    /// Top-level background blur section (niri 26.04+)
+    Blur,
+    /// Tablet `map-to-focused-output` node (niri 26.04+)
+    TabletMapToFocusedOutput,
 }
 
 impl NiriFeature {
@@ -74,6 +80,18 @@ impl NiriFeature {
                 major: 25,
                 minor: 11,
             },
+            Self::BackgroundEffects => NiriVersion {
+                major: 26,
+                minor: 4,
+            },
+            Self::Blur => NiriVersion {
+                major: 26,
+                minor: 4,
+            },
+            Self::TabletMapToFocusedOutput => NiriVersion {
+                major: 26,
+                minor: 4,
+            },
         }
     }
 
@@ -81,6 +99,9 @@ impl NiriFeature {
     pub fn display_name(&self) -> &'static str {
         match self {
             Self::RecentWindows => "Recent Windows (Alt-Tab) Switcher",
+            Self::BackgroundEffects => "Background effects & popup rules (blur/xray)",
+            Self::Blur => "Background Blur",
+            Self::TabletMapToFocusedOutput => "Tablet map-to-focused-output",
         }
     }
 
@@ -92,7 +113,12 @@ impl NiriFeature {
 
 /// Check which features are unsupported by the given version
 pub fn get_unsupported_features(version: NiriVersion) -> Vec<NiriFeature> {
-    let all_features = [NiriFeature::RecentWindows];
+    let all_features = [
+        NiriFeature::RecentWindows,
+        NiriFeature::BackgroundEffects,
+        NiriFeature::Blur,
+        NiriFeature::TabletMapToFocusedOutput,
+    ];
 
     all_features
         .into_iter()
@@ -101,9 +127,13 @@ pub fn get_unsupported_features(version: NiriVersion) -> Vec<NiriFeature> {
 }
 
 /// Feature compatibility context for config generation
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FeatureCompat {
     pub recent_windows: bool,
+    pub background_effects: bool,
+    pub blur: bool,
+    /// Tablet `map-to-focused-output` node (niri 26.04+)
+    pub map_to_focused_output: bool,
 }
 
 impl FeatureCompat {
@@ -112,10 +142,16 @@ impl FeatureCompat {
         match version {
             Some(v) => Self {
                 recent_windows: NiriFeature::RecentWindows.is_supported_by(v),
+                background_effects: NiriFeature::BackgroundEffects.is_supported_by(v),
+                blur: NiriFeature::Blur.is_supported_by(v),
+                map_to_focused_output: NiriFeature::TabletMapToFocusedOutput.is_supported_by(v),
             },
             // If we can't detect version, be conservative and disable new features
             None => Self {
                 recent_windows: false,
+                background_effects: false,
+                blur: false,
+                map_to_focused_output: false,
             },
         }
     }
@@ -124,6 +160,9 @@ impl FeatureCompat {
     pub fn all_enabled() -> Self {
         Self {
             recent_windows: true,
+            background_effects: true,
+            blur: true,
+            map_to_focused_output: true,
         }
     }
 }
@@ -191,6 +230,14 @@ mod tests {
 
         assert!(!NiriFeature::RecentWindows.is_supported_by(v25_08));
         assert!(NiriFeature::RecentWindows.is_supported_by(v25_11));
+
+        // Blur requires 26.04
+        let v26_04 = NiriVersion {
+            major: 26,
+            minor: 4,
+        };
+        assert!(!NiriFeature::Blur.is_supported_by(v25_11));
+        assert!(NiriFeature::Blur.is_supported_by(v26_04));
     }
 
     #[test]
@@ -207,7 +254,15 @@ mod tests {
             minor: 11,
         };
         let unsupported = get_unsupported_features(v25_11);
-        assert!(unsupported.is_empty());
+        assert!(!unsupported.contains(&NiriFeature::RecentWindows));
+        // Background effects require 26.04, so still unsupported on 25.11.
+        assert!(unsupported.contains(&NiriFeature::BackgroundEffects));
+
+        let v26_04 = NiriVersion {
+            major: 26,
+            minor: 4,
+        };
+        assert!(get_unsupported_features(v26_04).is_empty());
     }
 
     #[test]

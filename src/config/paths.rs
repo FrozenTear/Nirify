@@ -74,37 +74,37 @@ impl ConfigPaths {
         let advanced_dir = managed_dir.join("advanced");
         let backup_dir = niri_dir.join(".nirify-backups");
 
-        // Build paths - using references to avoid clones
+        // Build per-category paths via the ConfigFile registry (single source of truth)
         let main_kdl = managed_dir.join("main.kdl");
-        let appearance_kdl = managed_dir.join("appearance.kdl");
-        let behavior_kdl = managed_dir.join("behavior.kdl");
-        let outputs_kdl = managed_dir.join("outputs.kdl");
-        let animations_kdl = managed_dir.join("animations.kdl");
-        let cursor_kdl = managed_dir.join("cursor.kdl");
-        let overview_kdl = managed_dir.join("overview.kdl");
+        let appearance_kdl = ConfigFile::Appearance.full_path(&managed_dir);
+        let behavior_kdl = ConfigFile::Behavior.full_path(&managed_dir);
+        let outputs_kdl = ConfigFile::Outputs.full_path(&managed_dir);
+        let animations_kdl = ConfigFile::Animations.full_path(&managed_dir);
+        let cursor_kdl = ConfigFile::Cursor.full_path(&managed_dir);
+        let overview_kdl = ConfigFile::Overview.full_path(&managed_dir);
 
-        let keyboard_kdl = input_dir.join("keyboard.kdl");
-        let mouse_kdl = input_dir.join("mouse.kdl");
-        let touchpad_kdl = input_dir.join("touchpad.kdl");
-        let trackpoint_kdl = input_dir.join("trackpoint.kdl");
-        let trackball_kdl = input_dir.join("trackball.kdl");
-        let tablet_kdl = input_dir.join("tablet.kdl");
-        let touch_kdl = input_dir.join("touch.kdl");
+        let keyboard_kdl = ConfigFile::Keyboard.full_path(&managed_dir);
+        let mouse_kdl = ConfigFile::Mouse.full_path(&managed_dir);
+        let touchpad_kdl = ConfigFile::Touchpad.full_path(&managed_dir);
+        let trackpoint_kdl = ConfigFile::Trackpoint.full_path(&managed_dir);
+        let trackball_kdl = ConfigFile::Trackball.full_path(&managed_dir);
+        let tablet_kdl = ConfigFile::Tablet.full_path(&managed_dir);
+        let touch_kdl = ConfigFile::Touch.full_path(&managed_dir);
 
-        let workspaces_kdl = managed_dir.join("workspaces.kdl");
-        let keybindings_kdl = managed_dir.join("keybindings.kdl");
+        let workspaces_kdl = ConfigFile::Workspaces.full_path(&managed_dir);
+        let keybindings_kdl = ConfigFile::Keybindings.full_path(&managed_dir);
 
-        let layout_extras_kdl = advanced_dir.join("layout-extras.kdl");
-        let gestures_kdl = advanced_dir.join("gestures.kdl");
-        let layer_rules_kdl = advanced_dir.join("layer-rules.kdl");
-        let window_rules_kdl = advanced_dir.join("window-rules.kdl");
-        let misc_kdl = advanced_dir.join("misc.kdl");
-        let startup_kdl = advanced_dir.join("startup.kdl");
-        let environment_kdl = advanced_dir.join("environment.kdl");
-        let debug_kdl = advanced_dir.join("debug.kdl");
-        let switch_events_kdl = advanced_dir.join("switch-events.kdl");
-        let recent_windows_kdl = advanced_dir.join("recent-windows.kdl");
-        let preferences_kdl = advanced_dir.join("preferences.kdl");
+        let layout_extras_kdl = ConfigFile::LayoutExtras.full_path(&managed_dir);
+        let gestures_kdl = ConfigFile::Gestures.full_path(&managed_dir);
+        let layer_rules_kdl = ConfigFile::LayerRules.full_path(&managed_dir);
+        let window_rules_kdl = ConfigFile::WindowRules.full_path(&managed_dir);
+        let misc_kdl = ConfigFile::Misc.full_path(&managed_dir);
+        let startup_kdl = ConfigFile::Startup.full_path(&managed_dir);
+        let environment_kdl = ConfigFile::Environment.full_path(&managed_dir);
+        let debug_kdl = ConfigFile::Debug.full_path(&managed_dir);
+        let switch_events_kdl = ConfigFile::SwitchEvents.full_path(&managed_dir);
+        let recent_windows_kdl = ConfigFile::RecentWindows.full_path(&managed_dir);
+        let preferences_kdl = ConfigFile::Preferences.full_path(&managed_dir);
 
         Ok(Self {
             niri_config: niri_dir.join("config.kdl"),
@@ -377,46 +377,57 @@ impl ConfigPaths {
         Ok(())
     }
 
-    /// Clean up old backups, keeping only the most recent N backups
+    /// Clean up old backups, keeping only the most recent N backups per file group.
     ///
-    /// This prevents backup directory from growing indefinitely.
-    /// Defaults to keeping the 10 most recent backups.
+    /// Backups are grouped by the file they back up (the filename up to and
+    /// including the first `.kdl`), so `config.kdl.backup-*` and per-category
+    /// `<name>.kdl.*.bak` files are pruned independently. This prevents the
+    /// backup directory from growing indefinitely.
     pub fn cleanup_old_backups(&self, keep_count: usize) -> Result<usize, ConfigError> {
+        use std::collections::HashMap;
         use std::fs;
 
         if !self.backup_dir.exists() {
             return Ok(0);
         }
 
-        // Collect all backup files with their modification times
-        let mut backups: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
+        // Group backup files by the file they back up.
+        let mut groups: HashMap<String, Vec<(PathBuf, std::time::SystemTime)>> = HashMap::new();
 
         let entries = fs::read_dir(&self.backup_dir)?;
         for entry in entries.flatten() {
             let path = entry.path();
             if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                // Only consider backup files
-                if filename.starts_with("config.kdl.backup") {
-                    if let Ok(metadata) = fs::metadata(&path) {
-                        if let Ok(modified) = metadata.modified() {
-                            backups.push((path, modified));
-                        }
+                // Only consider backup files (main-config backups and category .bak)
+                let is_backup =
+                    filename.starts_with("config.kdl.backup") || filename.ends_with(".bak");
+                if !is_backup {
+                    continue;
+                }
+                if let Ok(metadata) = fs::metadata(&path) {
+                    if let Ok(modified) = metadata.modified() {
+                        // Group key = filename up to and including the first ".kdl"
+                        let key = match filename.find(".kdl") {
+                            Some(i) => filename[..i + 4].to_string(),
+                            None => filename.to_string(),
+                        };
+                        groups.entry(key).or_default().push((path, modified));
                     }
                 }
             }
         }
 
-        // Sort by modification time (newest first)
-        backups.sort_by(|a, b| b.1.cmp(&a.1));
-
-        // Delete backups beyond the keep count
+        // Within each group, keep the newest `keep_count` and delete the rest.
         let mut deleted = 0;
-        for (path, _) in backups.into_iter().skip(keep_count) {
-            if let Err(e) = fs::remove_file(&path) {
-                log::warn!("Failed to delete old backup {:?}: {}", path, e);
-            } else {
-                log::debug!("Deleted old backup: {:?}", path);
-                deleted += 1;
+        for (_key, mut backups) in groups {
+            backups.sort_by_key(|b| std::cmp::Reverse(b.1));
+            for (path, _) in backups.into_iter().skip(keep_count) {
+                if let Err(e) = fs::remove_file(&path) {
+                    log::warn!("Failed to delete old backup {:?}: {}", path, e);
+                } else {
+                    log::debug!("Deleted old backup: {:?}", path);
+                    deleted += 1;
+                }
             }
         }
 
@@ -489,8 +500,23 @@ impl Default for ConfigPaths {
 }
 
 #[cfg(test)]
+// Test setup mutates a couple fields after default() for readability.
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_path_for_matches_registry_for_all_files() {
+        let paths = ConfigPaths::default();
+        for file in ConfigFile::ALL {
+            assert_eq!(
+                paths.path_for(*file),
+                file.full_path(&paths.managed_dir),
+                "path mismatch for {:?}",
+                file
+            );
+        }
+    }
 
     #[test]
     fn test_config_paths_creation() {
@@ -607,5 +633,47 @@ another-node { baz 42 }
 
         // No backup should be created
         assert!(!paths.backup_dir.exists());
+    }
+
+    #[test]
+    fn cleanup_prunes_per_file_group() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let mut paths = ConfigPaths::default();
+        paths.backup_dir = temp_dir.path().join("backups");
+        std::fs::create_dir_all(&paths.backup_dir).unwrap();
+
+        for i in 0..3 {
+            std::fs::write(
+                paths
+                    .backup_dir
+                    .join(format!("appearance.kdl.2026-07-04T12-00-0{}.000000.bak", i)),
+                "x",
+            )
+            .unwrap();
+            std::fs::write(
+                paths
+                    .backup_dir
+                    .join(format!("config.kdl.backup-2026070412000{}", i)),
+                "y",
+            )
+            .unwrap();
+        }
+
+        let deleted = paths.cleanup_old_backups(2).unwrap();
+        assert_eq!(deleted, 2);
+
+        let count = |prefix: &str, suffix: &str| {
+            std::fs::read_dir(&paths.backup_dir)
+                .unwrap()
+                .flatten()
+                .filter(|e| {
+                    let n = e.file_name();
+                    let n = n.to_string_lossy();
+                    n.starts_with(prefix) && n.ends_with(suffix)
+                })
+                .count()
+        };
+        assert_eq!(count("appearance.kdl.", ".bak"), 2);
+        assert_eq!(count("config.kdl.backup", ""), 2);
     }
 }

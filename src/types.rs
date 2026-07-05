@@ -242,6 +242,34 @@ impl ScrollMethod {
     }
 }
 
+/// Display wrapper for an optional scroll method, used in pick_list UIs.
+///
+/// `None` means "use the libinput device default" (no `scroll-method` node
+/// is emitted); `Some(m)` selects an explicit method.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScrollMethodChoice(pub Option<ScrollMethod>);
+
+impl std::fmt::Display for ScrollMethodChoice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            None => write!(f, "Default (device)"),
+            Some(m) => write!(f, "{}", m),
+        }
+    }
+}
+
+impl ScrollMethodChoice {
+    pub fn all() -> &'static [Self] {
+        &[
+            Self(None),
+            Self(Some(ScrollMethod::TwoFinger)),
+            Self(Some(ScrollMethod::Edge)),
+            Self(Some(ScrollMethod::OnButtonDown)),
+            Self(Some(ScrollMethod::NoScroll)),
+        ]
+    }
+}
+
 /// Click method for touchpad tap-to-click behavior.
 ///
 /// Determines how multi-finger taps are interpreted as mouse button clicks.
@@ -278,6 +306,8 @@ pub enum WarpMouseMode {
     /// Never warp the mouse (default)
     #[default]
     Off,
+    /// Warp without a mode — moves the cursor just enough to be inside the window
+    Enabled,
     /// Warp to window center when focus changes via keyboard
     CenterXY,
     /// Always warp to window center on any focus change
@@ -288,6 +318,7 @@ impl std::fmt::Display for WarpMouseMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Off => write!(f, "Off"),
+            Self::Enabled => write!(f, "On (minimal movement)"),
             Self::CenterXY => write!(f, "Center (Keyboard Only)"),
             Self::CenterXYAlways => write!(f, "Center (Always)"),
         }
@@ -296,7 +327,12 @@ impl std::fmt::Display for WarpMouseMode {
 
 impl WarpMouseMode {
     pub fn all() -> &'static [Self] {
-        &[Self::Off, Self::CenterXY, Self::CenterXYAlways]
+        &[
+            Self::Off,
+            Self::Enabled,
+            Self::CenterXY,
+            Self::CenterXYAlways,
+        ]
     }
 }
 
@@ -747,8 +783,8 @@ pub trait PointerDeviceSettings {
     fn accel_profile(&self) -> AccelProfile;
     fn set_accel_profile(&mut self, value: AccelProfile);
 
-    fn scroll_method(&self) -> ScrollMethod;
-    fn set_scroll_method(&mut self, value: ScrollMethod);
+    fn scroll_method(&self) -> Option<ScrollMethod>;
+    fn set_scroll_method(&mut self, value: Option<ScrollMethod>);
 
     fn scroll_button(&self) -> Option<i32>;
     fn set_scroll_button(&mut self, value: Option<i32>);

@@ -17,7 +17,7 @@ pub const DEFAULT_GAP_SIZE: i32 = 16;
 pub const DEFAULT_FOCUS_RING_WIDTH: i32 = 4;
 
 /// Default border width
-pub const DEFAULT_BORDER_WIDTH: i32 = 2;
+pub const DEFAULT_BORDER_WIDTH: i32 = 4;
 
 /// Default focus ring color (blue)
 pub const DEFAULT_FOCUS_RING_COLOR: &str = "#7fc8ff";
@@ -52,8 +52,8 @@ pub const COLUMN_FIXED_MIN: f32 = 200.0;
 pub const COLUMN_FIXED_MAX: f32 = 4000.0;
 
 /// Strut size range (pixels)
-pub const STRUT_SIZE_MIN: f32 = 0.0;
-pub const STRUT_SIZE_MAX: f32 = 500.0;
+pub const STRUT_SIZE_MIN: f32 = -65535.0;
+pub const STRUT_SIZE_MAX: f32 = 65535.0;
 
 // Default values for settings
 
@@ -61,10 +61,10 @@ pub const STRUT_SIZE_MAX: f32 = 500.0;
 pub const DEFAULT_FOCUS_RING_INACTIVE_COLOR: &str = "#505050";
 
 /// Default inactive border color (gray)
-pub const DEFAULT_BORDER_INACTIVE_COLOR: &str = "#808080";
+pub const DEFAULT_BORDER_INACTIVE_COLOR: &str = "#505050";
 
 /// Default corner radius (pixels)
-pub const DEFAULT_CORNER_RADIUS: f32 = 12.0;
+pub const DEFAULT_CORNER_RADIUS: f32 = 0.0;
 
 /// Default column width proportion (50%)
 pub const DEFAULT_COLUMN_PROPORTION: f32 = 0.5;
@@ -112,9 +112,9 @@ pub const REPEAT_RATE_MAX: i32 = 100;
 pub const ACCEL_SPEED_MIN: f64 = -1.0;
 pub const ACCEL_SPEED_MAX: f64 = 1.0;
 
-/// Scroll factor range
-pub const SCROLL_FACTOR_MIN: f64 = 0.1;
-pub const SCROLL_FACTOR_MAX: f64 = 10.0;
+/// Scroll factor range (niri accepts -100..100 per-axis; negative inverts)
+pub const SCROLL_FACTOR_MIN: f64 = -100.0;
+pub const SCROLL_FACTOR_MAX: f64 = 100.0;
 
 // UI index constants for ComboBox selections
 
@@ -131,12 +131,12 @@ pub const COLUMN_WIDTH_TYPE_FIXED: i32 = 1;
 /// Spring damping ratio range (0.1-3.0 for UI, but niri supports higher)
 /// 1.0 = critically damped (no bounce), <1.0 = underdamped (bouncy)
 pub const DAMPING_RATIO_MIN: f64 = 0.1;
-pub const DAMPING_RATIO_MAX: f64 = 3.0;
+pub const DAMPING_RATIO_MAX: f64 = 10.0;
 pub const DAMPING_RATIO_DEFAULT: f64 = 1.0;
 
 /// Spring stiffness range (higher = faster/stiffer)
-pub const STIFFNESS_MIN: i32 = 50;
-pub const STIFFNESS_MAX: i32 = 2000;
+pub const STIFFNESS_MIN: i32 = 1;
+pub const STIFFNESS_MAX: i32 = 10000;
 pub const STIFFNESS_DEFAULT: i32 = 800;
 
 /// Spring epsilon range (animation end threshold, lower = smoother ending)
@@ -146,7 +146,7 @@ pub const EPSILON_DEFAULT: f64 = 0.0001;
 
 /// Easing duration range (milliseconds)
 pub const EASING_DURATION_MIN: i32 = 50;
-pub const EASING_DURATION_MAX: i32 = 1000;
+pub const EASING_DURATION_MAX: i32 = 5000;
 pub const EASING_DURATION_DEFAULT: i32 = 150;
 
 // Animation type and easing curve indices are now derived via SlintIndex
