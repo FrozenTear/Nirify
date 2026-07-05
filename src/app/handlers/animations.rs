@@ -2,8 +2,22 @@
 
 use crate::config::models::{AnimationId, AnimationType, EasingCurve};
 use crate::config::SettingsCategory;
+use crate::constants::{
+    DAMPING_RATIO_MAX, DAMPING_RATIO_MIN, EASING_DURATION_MAX, EASING_DURATION_MIN, EPSILON_MAX,
+    EPSILON_MIN, STIFFNESS_MAX, STIFFNESS_MIN,
+};
 use crate::messages::{AnimationsMessage, Message};
 use iced::Task;
+
+/// Clamp a cubic-bezier X control point to niri's valid range.
+///
+/// niri decodes bezier X coordinates as `FloatOrInt<0, 1>` (the X axis is a
+/// time frame and cannot be negative or larger than 1) and hard-errors on
+/// out-of-range values, so an unclamped X would make Nirify emit a config niri
+/// rejects. Y coordinates are unbounded in niri and are not clamped.
+fn clamp_bezier_x(v: f64) -> f64 {
+    v.clamp(0.0, 1.0)
+}
 
 impl super::super::App {
     /// Updates animation settings
@@ -29,7 +43,7 @@ impl super::super::App {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
                     let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
                     anim_config.animation_type = if enabled {
-                        AnimationType::Spring // Default to spring when enabled
+                        AnimationType::Default // niri's per-animation default when enabled
                     } else {
                         AnimationType::Off
                     };
@@ -38,25 +52,54 @@ impl super::super::App {
             AnimationsMessage::SetAnimationDuration(name, duration) => {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
                     let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
-                    anim_config.easing.duration_ms = duration.clamp(50, 5000);
+                    anim_config.easing.duration_ms =
+                        duration.clamp(EASING_DURATION_MIN, EASING_DURATION_MAX);
                 }
             }
             AnimationsMessage::SetAnimationCurve(name, curve_name) => {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
                     let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
-                    anim_config.easing.curve = EasingCurve::from_kdl(&curve_name);
+                    // `cubic-bezier` isn't a named preset; seed default control
+                    // points so the per-point editor can refine them.
+                    anim_config.easing.curve = if curve_name == "cubic-bezier" {
+                        EasingCurve::from_index(4)
+                    } else {
+                        EasingCurve::from_kdl(&curve_name)
+                    };
+                }
+            }
+            AnimationsMessage::SetAnimationBezier(name, x1, y1, x2, y2) => {
+                if let Some(anim_id) = Self::parse_animation_name(&name) {
+                    let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
+                    // niri decodes the X control points as FloatOrInt<0, 1> (the X
+                    // axis is a time frame, so it cannot be negative or exceed 1) and
+                    // hard-errors otherwise. Clamp X here so we never emit a config
+                    // niri rejects. Y is unbounded in niri (FloatOrInt<i32::MIN, i32::MAX>).
+                    anim_config.easing.curve = EasingCurve::CubicBezier {
+                        x1: clamp_bezier_x(x1),
+                        y1,
+                        x2: clamp_bezier_x(x2),
+                        y2,
+                    };
                 }
             }
             AnimationsMessage::SetAnimationSpringDampingRatio(name, ratio) => {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
                     let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
-                    anim_config.spring.damping_ratio = ratio.clamp(0.1, 2.0) as f64;
+                    anim_config.spring.damping_ratio =
+                        (ratio as f64).clamp(DAMPING_RATIO_MIN, DAMPING_RATIO_MAX);
+                }
+            }
+            AnimationsMessage::SetAnimationSpringStiffness(name, stiffness) => {
+                if let Some(anim_id) = Self::parse_animation_name(&name) {
+                    let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
+                    anim_config.spring.stiffness = stiffness.clamp(STIFFNESS_MIN, STIFFNESS_MAX);
                 }
             }
             AnimationsMessage::SetAnimationSpringEpsilon(name, epsilon) => {
                 if let Some(anim_id) = Self::parse_animation_name(&name) {
                     let anim_config = anim_id.get_mut(&mut self.settings.animations.per_animation);
-                    anim_config.spring.epsilon = epsilon.clamp(0.0001, 1.0) as f64;
+                    anim_config.spring.epsilon = (epsilon as f64).clamp(EPSILON_MIN, EPSILON_MAX);
                 }
             }
             AnimationsMessage::SetAnimationType(name, type_index) => {
@@ -137,5 +180,22 @@ impl super::super::App {
             "recent_windows" | "recent-windows" => Some(AnimationId::RecentWindows),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clamp_bezier_x;
+
+    #[test]
+    fn bezier_x_clamped_to_niri_range() {
+        // Out-of-range X control points are clamped into niri's FloatOrInt<0, 1>
+        // range so we never emit a cubic-bezier niri would reject.
+        assert_eq!(clamp_bezier_x(2.0), 1.0);
+        assert_eq!(clamp_bezier_x(-0.5), 0.0);
+        // In-range values pass through unchanged.
+        assert_eq!(clamp_bezier_x(0.0), 0.0);
+        assert_eq!(clamp_bezier_x(1.0), 1.0);
+        assert!((clamp_bezier_x(0.42) - 0.42).abs() < f64::EPSILON);
     }
 }

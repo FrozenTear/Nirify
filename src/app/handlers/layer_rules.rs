@@ -135,6 +135,57 @@ impl super::super::App {
                 }
             }
 
+            M::SetMatchLayer(rule_id, match_idx, value) => {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
+                    if let Some(match_data) = rule.matches.get_mut(match_idx) {
+                        match_data.layer = value;
+                    }
+                }
+            }
+
+            M::AddExclude(rule_id) => {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
+                    rule.excludes
+                        .push(crate::config::models::LayerRuleMatch::default());
+                }
+            }
+
+            M::RemoveExclude(rule_id, exclude_idx) => {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
+                    if exclude_idx < rule.excludes.len() {
+                        rule.excludes.remove(exclude_idx);
+                    }
+                }
+            }
+
+            M::SetExcludeNamespace(rule_id, exclude_idx, namespace) => {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
+                    if let Some(ex) = rule.excludes.get_mut(exclude_idx) {
+                        ex.namespace = if namespace.is_empty() {
+                            None
+                        } else {
+                            Some(namespace)
+                        };
+                    }
+                }
+            }
+
+            M::SetExcludeAtStartup(rule_id, exclude_idx, value) => {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
+                    if let Some(ex) = rule.excludes.get_mut(exclude_idx) {
+                        ex.at_startup = value;
+                    }
+                }
+            }
+
+            M::SetExcludeLayer(rule_id, exclude_idx, value) => {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
+                    if let Some(ex) = rule.excludes.get_mut(exclude_idx) {
+                        ex.layer = value;
+                    }
+                }
+            }
+
             M::SetBlockOutFrom(rule_id, value) => {
                 if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     rule.block_out_from = value;
@@ -168,6 +219,18 @@ impl super::super::App {
             M::SetShadow(rule_id, value) => {
                 if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
                     rule.shadow = value;
+                }
+            }
+
+            M::SetBackgroundEffect(rule_id, value) => {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
+                    rule.background_effect = value;
+                }
+            }
+
+            M::SetPopups(rule_id, value) => {
+                if let Some(rule) = self.settings.layer_rules.find_mut(rule_id) {
+                    rule.popups = value;
                 }
             }
 

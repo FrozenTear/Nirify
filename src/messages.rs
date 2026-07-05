@@ -34,6 +34,7 @@
 
 use iced::widget::text_editor;
 
+use crate::config::models::{ActionCategory, HotkeyOverlayTitle};
 use crate::config::ColumnWidthType;
 use crate::types::{
     AccelProfile, CenterFocusedColumn, ClickMethod, ModKey, ScrollMethod, TapButtonMap,
@@ -42,6 +43,8 @@ use crate::types::{
 use crate::views::widgets::GradientPickerMessage;
 
 /// Root message enum - all possible application events
+// Boxing large variants would ripple through every handler/view; churn outweighs the win.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum Message {
     /// No-op message (used when text parse fails in slider inputs)
@@ -98,6 +101,7 @@ pub enum Message {
     // System Configuration
     // ═══════════════════════════════════════════════════════════════════════════
     Overview(OverviewMessage),
+    Blur(BlurMessage),
     Outputs(OutputsMessage),
     Miscellaneous(MiscellaneousMessage),
     Environment(EnvironmentMessage),
@@ -156,8 +160,10 @@ pub enum Message {
     /// Async niri status check completed
     NiriStatusChecked(bool),
     ClearToast,
-    /// No-op message (for optional callbacks that don't need action)
-    None,
+    /// Dismiss the persistent error banner (any kind)
+    DismissErrorBanner,
+    /// Overwrite load-blocked categories with current in-memory values
+    OverwriteFailedCategories,
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Redesign Navigation
@@ -184,6 +190,26 @@ pub enum Message {
     SetRulesSubTab(RulesSubTab),
     /// Change sub-tab within the Gear screen
     SetGearSubTab(GearSubTab),
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // UX safety (revert countdown, search nav, wizard skip)
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// 1-second tick while a revert countdown is pending
+    RevertTick,
+    /// Keep the risky change (dismiss the revert countdown)
+    RevertKeep,
+    /// Revert the risky change now (also used on timeout / Escape)
+    RevertNow,
+    /// Move search selection up
+    SearchNavUp,
+    /// Move search selection down
+    SearchNavDown,
+    /// Activate the currently selected search result (Enter)
+    SearchNavActivate,
+    /// Escape pressed: close the topmost overlay layer
+    EscapePressed,
+    /// User acknowledged skipping first-run setup
+    WizardSkipConfirmed,
 }
 
 /// Page navigation enum
@@ -202,6 +228,7 @@ pub enum Page {
     Touch,
     Animations,
     Cursor,
+    Blur,
     LayoutExtras,
     Gestures,
     Workspaces,
@@ -222,6 +249,44 @@ pub enum Page {
 }
 
 impl Page {
+    /// Every page variant, in declaration order.
+    ///
+    /// Used to drive the search index so that adding a `Page` variant forces a
+    /// corresponding search entry (see `crate::search::page_entries`, which has
+    /// a wildcard-free match). Bump `search::tests` count when editing this.
+    pub const ALL: &'static [Page] = &[
+        Page::Overview,
+        Page::Appearance,
+        Page::Behavior,
+        Page::Keyboard,
+        Page::Mouse,
+        Page::Touchpad,
+        Page::Trackpoint,
+        Page::Trackball,
+        Page::Tablet,
+        Page::Touch,
+        Page::Animations,
+        Page::Cursor,
+        Page::Blur,
+        Page::LayoutExtras,
+        Page::Gestures,
+        Page::Workspaces,
+        Page::WindowRules,
+        Page::LayerRules,
+        Page::Keybindings,
+        Page::Outputs,
+        Page::Miscellaneous,
+        Page::Startup,
+        Page::Environment,
+        Page::Debug,
+        Page::SwitchEvents,
+        Page::RecentWindows,
+        Page::Tools,
+        Page::Preferences,
+        Page::ConfigEditor,
+        Page::Backups,
+    ];
+
     /// Returns the display name for the page
     pub fn name(&self) -> &'static str {
         match self {
@@ -237,6 +302,7 @@ impl Page {
             Page::Touch => "Touch",
             Page::Animations => "Animations",
             Page::Cursor => "Cursor",
+            Page::Blur => "Blur",
             Page::LayoutExtras => "Layout Extras",
             Page::Gestures => "Gestures",
             Page::Workspaces => "Workspaces",
@@ -270,7 +336,7 @@ impl Page {
             | Page::Trackball
             | Page::Tablet
             | Page::Touch => PageCategory::Input,
-            Page::Animations | Page::Cursor => PageCategory::Visual,
+            Page::Animations | Page::Cursor | Page::Blur => PageCategory::Visual,
             Page::LayoutExtras | Page::Workspaces => PageCategory::Layout,
             Page::WindowRules | Page::LayerRules => PageCategory::Rules,
             Page::Keybindings | Page::Gestures => PageCategory::Input,
@@ -344,7 +410,7 @@ impl Screen {
     pub fn from_page(page: Page) -> Screen {
         match page {
             Page::Overview => Screen::Dashboard,
-            Page::Appearance | Page::Animations | Page::Cursor => Screen::Visuals,
+            Page::Appearance | Page::Animations | Page::Cursor | Page::Blur => Screen::Visuals,
             Page::Behavior | Page::LayoutExtras | Page::Workspaces => Screen::Layout,
             Page::Keyboard
             | Page::Mouse
@@ -531,6 +597,7 @@ pub enum EditableSection {
     ModifierKeys,
     Animations,
     Cursor,
+    Blur,
     // System
     StartupPrograms,
     EnvironmentVars,
@@ -556,6 +623,7 @@ impl EditableSection {
             Self::ModifierKeys => "Modifier Keys",
             Self::Animations => "Animations",
             Self::Cursor => "Cursor",
+            Self::Blur => "Background Blur",
             Self::StartupPrograms => "Startup Programs",
             Self::EnvironmentVars => "Environment Variables",
             Self::Miscellaneous => "Miscellaneous",
@@ -580,6 +648,7 @@ impl EditableSection {
             Self::ModifierKeys => "⌥",
             Self::Animations => "◈",
             Self::Cursor => "↗",
+            Self::Blur => "◍",
             Self::StartupPrograms => "⚡",
             Self::EnvironmentVars => "⚙",
             Self::Miscellaneous => "⬡",
@@ -596,6 +665,7 @@ impl EditableSection {
             | Self::CenteringDynamics
             | Self::FocusRing
             | Self::Animations
+            | Self::Blur
             | Self::StartupPrograms => neon::PRIMARY,
             Self::ColumnManager
             | Self::TabIndicator
@@ -755,7 +825,12 @@ pub enum MouseMessage {
     SetAccelProfile(AccelProfile),
     SetScrollFactor(f32),
     SetScrollFactorHorizontal(Option<f32>),
-    SetScrollMethod(ScrollMethod),
+    /// Live text of the exact scroll-factor entry (buffered so intermediate
+    /// strings like "-", "1." and "" survive re-render).
+    SetScrollFactorText(String),
+    /// Commit/clamp the buffered scroll-factor entry (on submit/blur).
+    CommitScrollFactor,
+    SetScrollMethod(Option<ScrollMethod>),
     SetScrollButton(Option<i32>),
     ToggleLeftHanded(bool),
     ToggleMiddleEmulation(bool),
@@ -775,8 +850,14 @@ pub enum TouchpadMessage {
     SetAccelProfile(AccelProfile),
     SetScrollFactor(f32),
     SetScrollFactorHorizontal(Option<f32>),
-    SetScrollMethod(ScrollMethod),
+    /// Live text of the exact scroll-factor entry (buffered so intermediate
+    /// strings like "-", "1." and "" survive re-render).
+    SetScrollFactorText(String),
+    /// Commit/clamp the buffered scroll-factor entry (on submit/blur).
+    CommitScrollFactor,
+    SetScrollMethod(Option<ScrollMethod>),
     SetScrollButton(Option<i32>),
+    ToggleScrollButtonLock(bool),
     SetClickMethod(ClickMethod),
     SetTapButtonMap(TapButtonMap),
     ToggleLeftHanded(bool),
@@ -798,7 +879,9 @@ pub enum AnimationsMessage {
     SetAnimationEnabled(String, bool), // (animation_name, enabled)
     SetAnimationDuration(String, i32), // (animation_name, duration_ms)
     SetAnimationCurve(String, String), // (animation_name, curve_name)
+    SetAnimationBezier(String, f64, f64, f64, f64), // (animation_name, x1, y1, x2, y2)
     SetAnimationSpringDampingRatio(String, f32),
+    SetAnimationSpringStiffness(String, i32),
     SetAnimationSpringEpsilon(String, f32),
 
     // Animation type selection (Default, Off, Spring, Easing, CustomShader)
@@ -828,6 +911,9 @@ pub enum WorkspacesMessage {
     UpdateWorkspaceOutput(usize, Option<String>),
     MoveWorkspaceUp(usize),
     MoveWorkspaceDown(usize),
+    /// Replace a workspace's entire layout override (None removes it).
+    /// Boxed to keep the message enum small (LayoutOverride is large).
+    SetLayoutOverride(usize, Option<Box<crate::config::models::LayoutOverride>>),
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -881,16 +967,18 @@ pub enum WindowRulesMessage {
     SetExcludeIsUrgent(u32, usize, Option<bool>),           // (rule_id, exclude_index, value)
     SetExcludeAtStartup(u32, usize, Option<bool>),          // (rule_id, exclude_index, value)
 
-    // Opening behavior
-    SetOpenBehavior(u32, crate::config::models::OpenBehavior),
+    // Opening behavior (each independent tri-state; None = don't emit)
+    SetOpenMaximized(u32, Option<bool>),
+    SetOpenFullscreen(u32, Option<bool>),
+    SetOpenFloating(u32, Option<bool>),
     SetOpenFocused(u32, Option<bool>),
     SetOpenOnOutput(u32, Option<String>),
     SetOpenOnWorkspace(u32, Option<String>),
-    SetBlockScreencast(u32, bool),
+    SetBlockOutFrom(u32, Option<crate::config::models::BlockOutFrom>),
 
     // Sizing
-    SetDefaultColumnWidth(u32, Option<f32>),
-    SetDefaultWindowHeight(u32, Option<f32>),
+    SetDefaultColumnWidth(u32, Option<crate::config::models::RuleDefaultSize>),
+    SetDefaultWindowHeight(u32, Option<crate::config::models::RuleDefaultSize>),
     SetMinWidth(u32, Option<i32>),
     SetMaxWidth(u32, Option<i32>),
     SetMinHeight(u32, Option<i32>),
@@ -902,7 +990,7 @@ pub enum WindowRulesMessage {
     SetBorderEnabled(u32, Option<bool>),
     SetBorderWidth(u32, Option<i32>),
     SetOpacity(u32, Option<f32>),
-    SetCornerRadius(u32, Option<i32>),
+    SetCornerRadius(u32, Option<crate::config::models::CornerRadiusValue>),
     SetClipToGeometry(u32, Option<bool>),
     SetDrawBorderWithBackground(u32, Option<bool>),
 
@@ -921,7 +1009,9 @@ pub enum WindowRulesMessage {
 
     // Complex struct overrides
     SetShadow(u32, Option<crate::config::models::ShadowSettings>),
-    SetTabIndicator(u32, Option<crate::config::models::TabIndicatorSettings>),
+    SetTabIndicator(u32, Option<crate::config::models::TabIndicatorOverride>),
+    SetBackgroundEffect(u32, Option<crate::config::models::BackgroundEffectSettings>),
+    SetPopups(u32, Option<crate::config::models::PopupsSettings>),
     SetDefaultFloatingPosition(u32, Option<crate::config::models::FloatingPosition>),
 
     // Advanced
@@ -960,16 +1050,26 @@ pub enum LayerRulesMessage {
     RemoveMatch(u32, usize), // (rule_id, match_index)
     SetMatchNamespace(u32, usize, String),
     SetMatchAtStartup(u32, usize, Option<bool>),
+    SetMatchLayer(u32, usize, Option<crate::config::models::LayerKind>),
+
+    // Exclude criteria
+    AddExclude(u32),
+    RemoveExclude(u32, usize), // (rule_id, exclude_index)
+    SetExcludeNamespace(u32, usize, String),
+    SetExcludeAtStartup(u32, usize, Option<bool>),
+    SetExcludeLayer(u32, usize, Option<crate::config::models::LayerKind>),
 
     // Properties
     SetBlockOutFrom(u32, Option<crate::config::models::BlockOutFrom>),
     SetOpacity(u32, Option<f32>),
-    SetCornerRadius(u32, Option<i32>),
+    SetCornerRadius(u32, Option<crate::config::models::CornerRadiusValue>),
     SetPlaceWithinBackdrop(u32, bool),
     SetBabaIsFloat(u32, bool),
 
     // Shadow (nested)
     SetShadow(u32, Option<crate::config::models::ShadowSettings>),
+    SetBackgroundEffect(u32, Option<crate::config::models::BackgroundEffectSettings>),
+    SetPopups(u32, Option<crate::config::models::PopupsSettings>),
 
     // UI state
     ToggleSection(u32, String),
@@ -983,6 +1083,8 @@ pub enum LayerRulesMessage {
 /// Outputs (displays) settings messages
 ///
 /// Manages monitors: resolution, scale, position, VRR, hot corners
+// Boxing large variants would ripple through every handler/view; churn outweighs the win.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum OutputsMessage {
     // List management
@@ -999,9 +1101,12 @@ pub enum OutputsMessage {
     SetModeline(usize, Option<String>),
     SetPositionX(usize, i32),
     SetPositionY(usize, i32),
+    /// true = automatic placement (position None); false = explicit (Some)
+    SetPositionAuto(usize, bool),
     SetTransform(usize, crate::types::Transform),
     SetVrr(usize, crate::types::VrrMode),
     SetFocusAtStartup(usize, bool),
+    SetBackgroundColor(usize, Option<crate::types::Color>),
     SetBackdropColor(usize, Option<crate::types::Color>),
 
     // Hot corners
@@ -1035,14 +1140,26 @@ pub enum KeybindingsMessage {
     CancelKeyCapture,
 
     // Action
+    SelectActionCategory(usize, ActionCategory),
     UpdateAction(usize, String),
     SetCommand(usize, String),
+    SetSpawnShCommand(usize, String),
+    SetCustomActionText(usize, String),
+
+    // Typed action arguments
+    SetActionArgText(usize, String),
+    SetActionFocusFlag(usize, bool),
+    SetActionSkipConfirmation(usize, bool),
+    SetActionDelayMs(usize, Option<u16>),
+    SetActionWriteToDisk(usize, bool),
+    SetActionShowPointer(usize, bool),
 
     // Advanced options
     SetAllowWhenLocked(usize, bool),
+    SetAllowInhibiting(usize, bool),
     SetRepeat(usize, bool),
     SetCooldown(usize, Option<i32>),
-    SetHotkeyOverlayTitle(usize, Option<String>),
+    SetHotkeyOverlayTitle(usize, HotkeyOverlayTitle),
 
     // UI state
     ToggleSection(String),
@@ -1098,12 +1215,14 @@ pub enum DebugMessage {
 #[derive(Debug, Clone)]
 pub enum MiscellaneousMessage {
     SetPreferNoCsd(bool),
-    SetScreenshotPath(String),
+    SetScreenshotPath(crate::config::models::ScreenshotPathConfig),
     SetDisablePrimaryClipboard(bool),
     SetHotkeyOverlaySkipAtStartup(bool),
     SetHotkeyOverlayHideNotBound(bool),
     SetConfigNotificationDisableFailed(bool),
-    SetSpawnShAtStartup(String),
+    AddSpawnShAtStartup,
+    RemoveSpawnShAtStartup(u32),
+    SetSpawnShAtStartup(u32, String),
     SetXWaylandSatellite(crate::config::models::XWaylandSatelliteConfig),
 }
 
@@ -1137,6 +1256,8 @@ pub enum EnvironmentMessage {
     RemoveVariable(u32), // Variable ID
     SetVariableName(u32, String),
     SetVariableValue(u32, String),
+    /// true = unset the variable (value None); false = set to empty string
+    SetVariableUnset(u32, bool),
 }
 
 /// Switch events settings messages
@@ -1146,6 +1267,16 @@ pub enum SwitchEventsMessage {
     SetLidOpenCommand(String),
     SetTabletModeOnCommand(String),
     SetTabletModeOffCommand(String),
+}
+
+/// Top-level background blur messages (niri 26.04+)
+#[derive(Debug, Clone)]
+pub enum BlurMessage {
+    SetEnabled(bool),
+    SetPasses(i32),
+    SetOffset(f64),
+    SetNoise(f64),
+    SetSaturation(f64),
 }
 
 /// Recent windows settings messages
@@ -1183,7 +1314,7 @@ pub enum TrackpointMessage {
     SetNaturalScroll(bool),
     SetAccelSpeed(f32),
     SetAccelProfile(AccelProfile),
-    SetScrollMethod(ScrollMethod),
+    SetScrollMethod(Option<ScrollMethod>),
     SetLeftHanded(bool),
     SetMiddleEmulation(bool),
     SetScrollButtonLock(bool),
@@ -1197,7 +1328,7 @@ pub enum TrackballMessage {
     SetNaturalScroll(bool),
     SetAccelSpeed(f32),
     SetAccelProfile(AccelProfile),
-    SetScrollMethod(ScrollMethod),
+    SetScrollMethod(Option<ScrollMethod>),
     SetLeftHanded(bool),
     SetMiddleEmulation(bool),
     SetScrollButtonLock(bool),
@@ -1209,6 +1340,8 @@ pub enum TrackballMessage {
 pub enum TabletMessage {
     SetOff(bool),
     SetLeftHanded(bool),
+    SetMapToFocusedOutput(bool),
+    SetMapToFocusedWindow(bool),
     SetMapToOutput(String),
     SetCalibrationMatrix(Option<[f64; 6]>),
     // Calibration matrix individual value changes
@@ -1278,6 +1411,12 @@ pub enum LayoutExtrasMessage {
     SetTabIndicatorActiveColor(String),
     SetTabIndicatorInactiveColor(String),
     SetTabIndicatorUrgentColor(String),
+
+    // Custom-color opt-ins: when off, niri falls back to focus-ring colors
+    SetShadowUseInactiveColor(bool),
+    SetTabIndicatorUseActiveColor(bool),
+    SetTabIndicatorUseInactiveColor(bool),
+    SetTabIndicatorUseUrgentColor(bool),
 
     // Insert hint
     SetInsertHintEnabled(bool),
@@ -1382,8 +1521,17 @@ pub enum BackupsMessage {
     RestoreBackup(usize),
     /// Show restore confirmation dialog
     ConfirmRestore(usize),
-    /// Restore completed
-    RestoreCompleted(Result<(), String>),
+    /// Restore completed (Ok carries which target was restored)
+    RestoreCompleted(Result<RestoredTarget, String>),
+}
+
+/// Which config file a restore operation targeted.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RestoredTarget {
+    /// The user's main niri config.kdl
+    NiriConfig,
+    /// A managed category file under the niri-settings directory
+    Managed,
 }
 
 /// Entry in the backups list
@@ -1448,6 +1596,10 @@ pub enum DialogState {
         before: String,
         after: String,
     },
+    /// Apply-then-confirm countdown after a risky live-applied change.
+    RevertCountdown {
+        description: String,
+    },
 }
 
 /// First-run wizard steps
@@ -1458,14 +1610,28 @@ pub enum WizardStep {
     ImportResults,
     Consolidation,
     Complete,
+    /// Confirmation shown when the user tries to skip setup before the
+    /// niri include line is present.
+    SkipWarning,
 }
 
 /// Actions that can be confirmed
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConfirmAction {
-    DeleteRule(u32), // Rule ID
+    /// Delete a window rule by its rule id
+    DeleteWindowRule(u32),
+    /// Delete a layer rule by its rule id
+    DeleteLayerRule(u32),
+    /// Delete a keybinding by its index in keybindings.bindings
+    DeleteKeybinding(usize),
+    /// Delete an output by its index in outputs.outputs
+    DeleteOutput(usize),
+    /// Delete a workspace by its index in workspaces.workspaces
+    DeleteWorkspace(usize),
     ResetSettings,
     ClearAllKeybindings,
+    /// Restore a backup by its index in the backups list
+    RestoreBackup(usize),
 }
 
 /// Consolidation suggestion for rules

@@ -13,6 +13,8 @@ impl super::super::App {
         match msg {
             TabletMessage::SetOff(v) => tablet.off = v,
             TabletMessage::SetLeftHanded(v) => tablet.left_handed = v,
+            TabletMessage::SetMapToFocusedOutput(v) => tablet.map_to_focused_output = v,
+            TabletMessage::SetMapToFocusedWindow(v) => tablet.map_to_focused_window = v,
             TabletMessage::SetMapToOutput(v) => tablet.map_to_output = v,
             TabletMessage::SetCalibrationMatrix(v) => {
                 tablet.calibration_matrix = v;

@@ -268,9 +268,21 @@ impl super::super::App {
                 }
             }
 
-            M::SetOpenBehavior(id, behavior) => {
+            M::SetOpenMaximized(id, value) => {
                 if let Some(rule) = self.settings.window_rules.find_mut(id) {
-                    rule.open_behavior = behavior;
+                    rule.open_maximized = value;
+                }
+            }
+
+            M::SetOpenFullscreen(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.open_fullscreen = value;
+                }
+            }
+
+            M::SetOpenFloating(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.open_floating = value;
                 }
             }
 
@@ -292,9 +304,9 @@ impl super::super::App {
                 }
             }
 
-            M::SetBlockScreencast(id, value) => {
+            M::SetBlockOutFrom(id, value) => {
                 if let Some(rule) = self.settings.window_rules.find_mut(id) {
-                    rule.block_out_from_screencast = value;
+                    rule.block_out_from = value;
                 }
             }
 
@@ -312,25 +324,25 @@ impl super::super::App {
 
             M::SetMinWidth(id, value) => {
                 if let Some(rule) = self.settings.window_rules.find_mut(id) {
-                    rule.min_width = value;
+                    rule.min_width = value.map(|v| v.clamp(0, 65535));
                 }
             }
 
             M::SetMaxWidth(id, value) => {
                 if let Some(rule) = self.settings.window_rules.find_mut(id) {
-                    rule.max_width = value;
+                    rule.max_width = value.map(|v| v.clamp(0, 65535));
                 }
             }
 
             M::SetMinHeight(id, value) => {
                 if let Some(rule) = self.settings.window_rules.find_mut(id) {
-                    rule.min_height = value;
+                    rule.min_height = value.map(|v| v.clamp(0, 65535));
                 }
             }
 
             M::SetMaxHeight(id, value) => {
                 if let Some(rule) = self.settings.window_rules.find_mut(id) {
-                    rule.max_height = value;
+                    rule.max_height = value.map(|v| v.clamp(0, 65535));
                 }
             }
 
@@ -421,6 +433,18 @@ impl super::super::App {
             M::SetTabIndicator(id, value) => {
                 if let Some(rule) = self.settings.window_rules.find_mut(id) {
                     rule.tab_indicator = value;
+                }
+            }
+
+            M::SetBackgroundEffect(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.background_effect = value;
+                }
+            }
+
+            M::SetPopups(id, value) => {
+                if let Some(rule) = self.settings.window_rules.find_mut(id) {
+                    rule.popups = value;
                 }
             }
 

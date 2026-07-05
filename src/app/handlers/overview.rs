@@ -11,7 +11,10 @@ impl super::super::App {
     pub(in crate::app) fn update_overview(&mut self, msg: M) -> Task<Message> {
         match msg {
             M::SetZoom(zoom) => {
-                self.settings.overview.zoom = zoom.clamp(0.1, 2.0);
+                self.settings.overview.zoom = zoom.clamp(
+                    crate::constants::OVERVIEW_ZOOM_MIN,
+                    crate::constants::OVERVIEW_ZOOM_MAX,
+                );
                 log::info!("Set overview zoom to {:.2}", zoom);
             }
 
