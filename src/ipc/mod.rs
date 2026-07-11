@@ -155,7 +155,7 @@ mod test_helpers {
     ) -> Result<T, (Option<serde_json::Value>, Option<serde_json::Error>)> {
         // First try to parse as an Ok response
         match serde_json::from_str::<NiriOkResponse<T>>(response) {
-            Ok(ok_resp) => return Ok(ok_resp.ok),
+            Ok(ok_resp) => Ok(ok_resp.ok),
             Err(ok_err) => {
                 // Then try to parse as an Err response
                 if let Ok(err_resp) = serde_json::from_str::<NiriErrResponse>(response) {
@@ -1252,7 +1252,7 @@ mod tests {
         ]}}"#;
 
         // Test using the parse_niri_response helper
-        let result = parse_niri_response::<WindowsResponse>(&json);
+        let result = parse_niri_response::<WindowsResponse>(json);
         assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
         let windows = result.unwrap().windows;
         assert_eq!(windows.len(), 2);

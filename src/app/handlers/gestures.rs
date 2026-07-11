@@ -11,11 +11,29 @@ impl super::super::App {
 
         match msg {
             // Hot corners
-            GesturesMessage::SetHotCornersEnabled(v) => gestures.hot_corners.enabled = v,
-            GesturesMessage::SetHotCornerTopLeft(v) => gestures.hot_corners.top_left = v,
-            GesturesMessage::SetHotCornerTopRight(v) => gestures.hot_corners.top_right = v,
-            GesturesMessage::SetHotCornerBottomLeft(v) => gestures.hot_corners.bottom_left = v,
-            GesturesMessage::SetHotCornerBottomRight(v) => gestures.hot_corners.bottom_right = v,
+            GesturesMessage::SetHotCornersEnabled(v) => {
+                gestures.hot_corners.enabled = v;
+                // niri needs at least one corner when enabled; default to top-left.
+                if v && !hot_corners_any_selected(&gestures.hot_corners) {
+                    gestures.hot_corners.top_left = true;
+                }
+            }
+            GesturesMessage::SetHotCornerTopLeft(v) => {
+                gestures.hot_corners.top_left = v;
+                sync_hot_corners_enabled(&mut gestures.hot_corners);
+            }
+            GesturesMessage::SetHotCornerTopRight(v) => {
+                gestures.hot_corners.top_right = v;
+                sync_hot_corners_enabled(&mut gestures.hot_corners);
+            }
+            GesturesMessage::SetHotCornerBottomLeft(v) => {
+                gestures.hot_corners.bottom_left = v;
+                sync_hot_corners_enabled(&mut gestures.hot_corners);
+            }
+            GesturesMessage::SetHotCornerBottomRight(v) => {
+                gestures.hot_corners.bottom_right = v;
+                sync_hot_corners_enabled(&mut gestures.hot_corners);
+            }
 
             // DnD edge view scroll
             GesturesMessage::SetDndScrollEnabled(v) => gestures.dnd_edge_view_scroll.enabled = v,
@@ -48,4 +66,15 @@ impl super::super::App {
         self.mark_changed();
         Task::none()
     }
+}
+
+/// Returns true if any hot corner is selected.
+fn hot_corners_any_selected(hc: &crate::config::models::HotCorners) -> bool {
+    hc.top_left || hc.top_right || hc.bottom_left || hc.bottom_right
+}
+
+/// Keeps "enabled with zero corners" unrepresentable: unchecking the last
+/// selected corner disables hot corners entirely.
+fn sync_hot_corners_enabled(hc: &mut crate::config::models::HotCorners) {
+    hc.enabled = hot_corners_any_selected(hc);
 }

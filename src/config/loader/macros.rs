@@ -180,9 +180,8 @@ macro_rules! load_optional_enum {
 macro_rules! load_color {
     ($doc:expr, $target:expr, [$($path:expr),+]) => {{
         use $crate::config::parser::get_string;
-        use $crate::types::Color;
         if let Some(hex) = get_string($doc, &[$($path),+]) {
-            if let Some(color) = Color::from_hex(&hex) {
+            if let Some(color) = $crate::config::loader::helpers::parse_color(&hex) {
                 $target = color;
             }
         }

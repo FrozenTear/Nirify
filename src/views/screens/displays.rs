@@ -526,8 +526,8 @@ fn calculate_canvas_size(outputs: &OutputSettings, available: &[FullOutputInfo])
             MonitorRect {
                 index: idx,
                 name: output.name.clone(),
-                x: output.position_x,
-                y: output.position_y,
+                x: output.position.map(|p| p.0).unwrap_or(0),
+                y: output.position.map(|p| p.1).unwrap_or(0),
                 width,
                 height,
                 enabled: output.enabled,
@@ -560,8 +560,8 @@ fn collect_monitors(outputs: &OutputSettings, available: &[FullOutputInfo]) -> V
             MonitorRect {
                 index: idx,
                 name: output.name.clone(),
-                x: output.position_x,
-                y: output.position_y,
+                x: output.position.map(|p| p.0).unwrap_or(0),
+                y: output.position.map(|p| p.1).unwrap_or(0),
                 width,
                 height,
                 enabled: output.enabled,
@@ -859,13 +859,13 @@ mod tests {
                 OutputConfig {
                     name: "DP-1".to_string(),
                     mode: "1920x1080@60.00".to_string(),
-                    position_x: -1920,
+                    position: Some((-1920, 0)),
                     ..Default::default()
                 },
                 OutputConfig {
                     name: "HDMI-A-1".to_string(),
                     mode: "1920x1080@60.00".to_string(),
-                    position_x: 0,
+                    position: Some((0, 0)),
                     ..Default::default()
                 },
             ],

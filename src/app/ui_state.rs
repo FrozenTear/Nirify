@@ -16,6 +16,45 @@ use crate::messages::{DialogState, GearSubTab, InputSubTab, Page, RulesSubTab, S
 use crate::version::{FeatureCompat, NiriVersion};
 use crate::views;
 
+/// Kind of persistent error banner currently shown.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ErrorBannerKind {
+    /// A debounced/exit save failed
+    SaveFailed,
+    /// Save is paused because settings failed validation
+    ValidationBlocked,
+    /// One or more config files could not be read at startup
+    LoadFailed,
+    /// niri rejected the reloaded configuration
+    NiriRejected,
+}
+
+/// Persistent, dismissible error banner state (rendered at the top of the UI).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ErrorBanner {
+    pub kind: ErrorBannerKind,
+    pub title: String,
+    pub details: Vec<String>,
+}
+
+/// A snapshot of a settings category taken before a risky live-applied change,
+/// so it can be restored if the user does not confirm within the countdown.
+#[derive(Debug, Clone)]
+pub enum RevertSnapshot {
+    Outputs(crate::config::models::OutputSettings),
+    Keybindings(crate::config::models::KeybindingsSettings),
+}
+
+/// State for the apply-then-confirm revert countdown.
+#[derive(Debug, Clone)]
+pub struct PendingRevert {
+    pub snapshot: RevertSnapshot,
+    /// Seconds remaining before automatic revert (starts at 15).
+    pub seconds_left: u8,
+    /// Human-readable description of what changed.
+    pub description: String,
+}
+
 /// UI-only state that doesn't affect saved settings
 #[derive(Default)]
 pub struct UiState {
@@ -116,8 +155,18 @@ pub struct UiState {
     pub keybinding_sections_expanded: HashMap<String, bool>,
     /// Which keybinding is currently capturing key input
     pub key_capture_active: Option<usize>,
+    /// Active key-capture conflict: (binding idx, combo, conflicting binding name)
+    pub keybinding_capture_conflict: Option<(usize, String, String)>,
     /// Search filter for keybindings table
     pub keybindings_search: String,
+
+    // Scroll-factor exact-entry text buffers (keep intermediate strings like
+    // "-", "1." and "" from vanishing on re-render; committed to the model on
+    // successful parse and clamped on submit).
+    /// Buffered text for the mouse exact scroll-factor entry
+    pub mouse_scroll_factor_text: String,
+    /// Buffered text for the touchpad exact scroll-factor entry
+    pub touchpad_scroll_factor_text: String,
 
     // Calibration matrix caches
     /// Cached formatted values for tablet calibration matrix
@@ -134,10 +183,17 @@ pub struct UiState {
     pub config_editor_content: text_editor::Content,
     /// State for the Backups page
     pub backups_state: views::backups::BackupsState,
-    /// Pending restore index (for confirmation dialog)
-    pub pending_restore_idx: Option<usize>,
+    /// Persistent error banner (save/validation/load/niri failures)
+    pub error_banner: Option<ErrorBanner>,
     /// Consolidation suggestions for the first-run wizard
     pub wizard_suggestions: Vec<crate::messages::ConsolidationSuggestion>,
+    /// Pending apply-then-confirm revert (risky output/keybinding change)
+    pub pending_revert: Option<PendingRevert>,
+    /// Currently highlighted index in the search results list
+    pub search_selected_index: usize,
+    /// Whether the niri config include line is present.
+    /// `None` = config.kdl unreadable / unknown (no niri config on this machine).
+    pub include_line_present: Option<bool>,
 }
 
 impl UiState {

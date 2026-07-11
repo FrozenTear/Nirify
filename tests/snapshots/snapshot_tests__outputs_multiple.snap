@@ -7,6 +7,7 @@ expression: kdl
 output "DP-1" {
     scale 2.00
     mode "3840x2160@60"
+    position x=0 y=0
 }
 
 output "HDMI-A-1" {

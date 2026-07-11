@@ -1,6 +1,6 @@
 //! Environment settings view — neon modal style
 
-use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
+use iced::widget::{button, checkbox, column, container, row, scrollable, text, text_input, Space};
 use iced::{Alignment, Element, Length};
 
 use super::widgets::info_text;
@@ -52,7 +52,8 @@ pub fn view_section(settings: &EnvironmentSettings) -> Element<'static, Message>
         for var in &variables {
             let var_id = var.id;
             let var_name = var.name.clone();
-            let var_value = var.value.clone();
+            let is_unset = var.value.is_none();
+            let display_value = var.value.clone().unwrap_or_default();
 
             left_col = left_col.push(
                 container(
@@ -88,18 +89,41 @@ pub fn view_section(settings: &EnvironmentSettings) -> Element<'static, Message>
                             ]
                             .spacing(4),
                             column![
-                                text("VALUE")
-                                    .size(10)
-                                    .font(fonts::UI_FONT_SEMIBOLD)
-                                    .color(neon::OUTLINE_VARIANT),
-                                text_input("value", &var_value)
-                                    .on_input(move |s| Message::Environment(
-                                        EnvironmentMessage::SetVariableValue(var_id, s)
-                                    ))
-                                    .padding(8)
-                                    .font(fonts::MONO_FONT)
-                                    .size(12)
-                                    .width(Length::Fill),
+                                row![
+                                    text("VALUE")
+                                        .size(10)
+                                        .font(fonts::UI_FONT_SEMIBOLD)
+                                        .color(neon::OUTLINE_VARIANT),
+                                    Space::new().width(Length::Fill),
+                                    checkbox(is_unset)
+                                        .on_toggle(move |v| Message::Environment(
+                                            EnvironmentMessage::SetVariableUnset(var_id, v)
+                                        ))
+                                        .size(14),
+                                    Space::new().width(4),
+                                    text("Unset").size(10).color(neon::OUTLINE_VARIANT),
+                                ]
+                                .align_y(Alignment::Center),
+                                if is_unset {
+                                    text("Unset removes this variable from spawned processes")
+                                        .size(10)
+                                        .color(neon::OUTLINE_VARIANT)
+                                        .into()
+                                } else {
+                                    let el: Element<'static, Message> =
+                                        text_input("value", &display_value)
+                                            .on_input(move |s| {
+                                                Message::Environment(
+                                                    EnvironmentMessage::SetVariableValue(var_id, s),
+                                                )
+                                            })
+                                            .padding(8)
+                                            .font(fonts::MONO_FONT)
+                                            .size(12)
+                                            .width(Length::Fill)
+                                            .into();
+                                    el
+                                },
                             ]
                             .spacing(4)
                             .width(Length::Fill),

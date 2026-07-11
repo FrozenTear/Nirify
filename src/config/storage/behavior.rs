@@ -6,65 +6,29 @@ use super::builder::KdlBuilder;
 use crate::config::models::BehaviorSettings;
 use crate::version::FeatureCompat;
 
-/// Generate the main.kdl content that includes all other configuration files.
-///
-/// This creates the entry point KDL file that uses `include` directives to
-/// pull in all the individual settings files. The generated file should not
-/// be edited manually as changes will be overwritten.
-///
-/// # Arguments
-/// * `compat` - Feature compatibility flags based on detected niri version
-///
-/// # Returns
-/// A string containing the complete main.kdl content with include directives.
 pub fn generate_main_kdl(compat: FeatureCompat) -> String {
+    use crate::config::registry::ConfigFile;
+
     let mut kdl = KdlBuilder::with_header("Nirify managed configuration");
     kdl.comment("Do not edit manually - changes will be overwritten");
     kdl.newline();
 
-    kdl.comment("Core settings");
-    kdl.field_string("include", "appearance.kdl");
-    kdl.field_string("include", "behavior.kdl");
-    kdl.field_string("include", "input/keyboard.kdl");
-    kdl.field_string("include", "input/mouse.kdl");
-    kdl.field_string("include", "input/touchpad.kdl");
-    kdl.field_string("include", "input/trackpoint.kdl");
-    kdl.field_string("include", "input/trackball.kdl");
-    kdl.field_string("include", "input/tablet.kdl");
-    kdl.field_string("include", "input/touch.kdl");
-    kdl.newline();
-
-    kdl.comment("Display & visual");
-    kdl.field_string("include", "outputs.kdl");
-    kdl.field_string("include", "animations.kdl");
-    kdl.field_string("include", "cursor.kdl");
-    kdl.field_string("include", "overview.kdl");
-    kdl.newline();
-
-    kdl.comment("Workspaces");
-    kdl.field_string("include", "workspaces.kdl");
-    kdl.newline();
-
-    kdl.comment("Keybindings");
-    kdl.field_string("include", "keybindings.kdl");
-    kdl.newline();
-
-    kdl.comment("Advanced settings");
-    kdl.field_string("include", "advanced/layout-extras.kdl");
-    kdl.field_string("include", "advanced/gestures.kdl");
-    kdl.field_string("include", "advanced/layer-rules.kdl");
-    kdl.field_string("include", "advanced/misc.kdl");
-    kdl.field_string("include", "advanced/window-rules.kdl");
-    kdl.field_string("include", "advanced/startup.kdl");
-    kdl.field_string("include", "advanced/environment.kdl");
-    kdl.field_string("include", "advanced/debug.kdl");
-    kdl.field_string("include", "advanced/switch-events.kdl");
-
-    // Recent windows requires niri 25.11+
-    if compat.recent_windows {
-        kdl.field_string("include", "advanced/recent-windows.kdl");
-    } else {
-        kdl.comment("recent-windows.kdl requires niri 25.11+ (skipped)");
+    kdl.comment("Included settings files");
+    for file in ConfigFile::ALL {
+        if !file.included_in_main() {
+            continue;
+        }
+        if file.requires_recent_windows() && !compat.recent_windows {
+            // Recent windows requires niri 25.11+
+            kdl.comment("recent-windows.kdl requires niri 25.11+ (skipped)");
+            continue;
+        }
+        if file.requires_blur() && !compat.blur {
+            // Top-level blur requires niri 26.04+
+            kdl.comment("blur.kdl requires niri 26.04+ (skipped)");
+            continue;
+        }
+        kdl.field_string("include", file.relative_path());
     }
 
     kdl.build()
@@ -117,9 +81,11 @@ pub fn generate_behavior_kdl(settings: &BehaviorSettings) -> String {
             // Focus follows mouse
             if settings.focus_follows_mouse {
                 if let Some(max_scroll) = settings.focus_follows_mouse_max_scroll_amount {
+                    // niri's Percent parses an f64 before '%', so fractional
+                    // values like 12.5% are valid; preserve them.
                     b.raw(&format!(
                         "focus-follows-mouse max-scroll-amount=\"{}%\"",
-                        max_scroll as i32
+                        max_scroll
                     ));
                 } else {
                     b.flag("focus-follows-mouse");
@@ -129,6 +95,10 @@ pub fn generate_behavior_kdl(settings: &BehaviorSettings) -> String {
             // Warp mouse to focus
             match settings.warp_mouse_to_focus {
                 crate::types::WarpMouseMode::Off => {}
+                crate::types::WarpMouseMode::Enabled => {
+                    // Bare flag = warp with no mode (minimal cursor movement).
+                    b.flag("warp-mouse-to-focus");
+                }
                 crate::types::WarpMouseMode::CenterXY => {
                     b.raw("warp-mouse-to-focus mode=\"center-xy\"");
                 }
@@ -147,4 +117,82 @@ pub fn generate_behavior_kdl(settings: &BehaviorSettings) -> String {
     // prefer_no_csd, screenshot_path, and hotkey_overlay_skip_at_startup
     // are in misc.kdl (MiscSettings)
     kdl.build()
+}
+
+#[cfg(test)]
+// Test setup mutates a couple fields after default() for readability.
+#[allow(clippy::field_reassign_with_default)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_main_kdl_excludes_preferences() {
+        let content = generate_main_kdl(FeatureCompat::all_enabled());
+        // main.kdl must re-parse as valid KDL
+        let _doc: kdl::KdlDocument = content.parse().expect("main.kdl should parse");
+        assert!(
+            !content.contains("preferences.kdl"),
+            "main.kdl must not include preferences.kdl"
+        );
+        assert!(
+            content.contains("advanced/recent-windows.kdl"),
+            "main.kdl should include recent-windows.kdl when enabled"
+        );
+    }
+
+    #[test]
+    fn test_main_kdl_skips_recent_windows_when_unsupported() {
+        let compat = FeatureCompat {
+            recent_windows: false,
+            ..Default::default()
+        };
+        let content = generate_main_kdl(compat);
+        assert!(!content.contains("recent-windows.kdl\""));
+    }
+
+    fn roundtrip_behavior(settings: &BehaviorSettings) -> crate::config::models::Settings {
+        let kdl = generate_behavior_kdl(settings);
+        let doc: kdl::KdlDocument = kdl.parse().expect("generated behavior KDL must re-parse");
+        let mut loaded = crate::config::models::Settings::default();
+        crate::config::loader::parse_behavior_from_doc(&doc, &mut loaded);
+        loaded
+    }
+
+    #[test]
+    fn warp_mouse_modeless_roundtrip() {
+        let mut settings = BehaviorSettings::default();
+        settings.warp_mouse_to_focus = crate::types::WarpMouseMode::Enabled;
+        let kdl = generate_behavior_kdl(&settings);
+        assert!(kdl.contains("warp-mouse-to-focus"));
+        assert!(!kdl.contains("mode="));
+        let loaded = roundtrip_behavior(&settings);
+        assert_eq!(
+            loaded.behavior.warp_mouse_to_focus,
+            crate::types::WarpMouseMode::Enabled
+        );
+
+        // Existing mode variants still roundtrip.
+        for mode in [
+            crate::types::WarpMouseMode::CenterXY,
+            crate::types::WarpMouseMode::CenterXYAlways,
+        ] {
+            let mut s = BehaviorSettings::default();
+            s.warp_mouse_to_focus = mode;
+            assert_eq!(roundtrip_behavior(&s).behavior.warp_mouse_to_focus, mode);
+        }
+    }
+
+    #[test]
+    fn ffm_fractional_percent_roundtrip() {
+        let mut settings = BehaviorSettings::default();
+        settings.focus_follows_mouse = true;
+        settings.focus_follows_mouse_max_scroll_amount = Some(12.5);
+        let kdl = generate_behavior_kdl(&settings);
+        assert!(kdl.contains("max-scroll-amount=\"12.5%\""));
+        let loaded = roundtrip_behavior(&settings);
+        assert_eq!(
+            loaded.behavior.focus_follows_mouse_max_scroll_amount,
+            Some(12.5)
+        );
+    }
 }

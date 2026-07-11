@@ -24,78 +24,19 @@ pub fn validate_string(s: &str) -> String {
     }
 }
 
-/// Validate a regex pattern for obvious errors
+/// Validate a regex pattern, warning (never dropping) on syntax errors.
 ///
-/// Performs basic validation without requiring the regex crate:
-/// - Checks for balanced parentheses, brackets, and braces
-/// - Detects unterminated escape sequences
-/// - Warns about patterns that may cause issues
-///
-/// Returns the pattern as-is (niri will do final validation), but logs warnings
-/// for problematic patterns that could crash niri at runtime.
+/// The loader assigns the returned value directly, so returning `None` would be
+/// silent data loss. niri does the authoritative validation; here we only log a
+/// warning when `regex_syntax` rejects the pattern. Strict blocking validation
+/// lives in `validate_settings`.
 pub fn validate_regex_pattern(pattern: &str, context: &str) -> Option<String> {
-    if pattern.is_empty() {
-        return Some(pattern.to_string());
-    }
-
-    // Check for balanced brackets/parens
-    let mut paren_depth = 0i32;
-    let mut bracket_depth = 0i32;
-    let mut brace_depth = 0i32;
-    let mut in_escape = false;
-    let mut in_char_class = false;
-
-    for c in pattern.chars() {
-        if in_escape {
-            in_escape = false;
-            continue;
-        }
-
-        match c {
-            '\\' => in_escape = true,
-            '[' if !in_char_class => {
-                in_char_class = true;
-                bracket_depth += 1;
-            }
-            ']' if in_char_class => {
-                in_char_class = false;
-                bracket_depth -= 1;
-            }
-            '(' if !in_char_class => paren_depth += 1,
-            ')' if !in_char_class => paren_depth -= 1,
-            '{' if !in_char_class => brace_depth += 1,
-            '}' if !in_char_class => brace_depth -= 1,
-            _ => {}
-        }
-
-        // Negative depth means closing without opening
-        if paren_depth < 0 || bracket_depth < 0 || brace_depth < 0 {
-            warn!(
-                "Invalid regex pattern for {}: unmatched closing bracket in {:?}",
-                context, pattern
-            );
-            return None;
-        }
-    }
-
-    // Check for unterminated escape at end
-    if in_escape {
+    if let Err(e) = validate_regex_strict(pattern) {
         warn!(
-            "Invalid regex pattern for {}: unterminated escape sequence in {:?}",
-            context, pattern
+            "Regex pattern for {} may be invalid ({:?}): {}",
+            context, pattern, e
         );
-        return None;
     }
-
-    // Check for unclosed groups
-    if paren_depth != 0 || bracket_depth != 0 || brace_depth != 0 {
-        warn!(
-            "Invalid regex pattern for {}: unbalanced brackets in {:?} (parens={}, brackets={}, braces={})",
-            context, pattern, paren_depth, bracket_depth, brace_depth
-        );
-        return None;
-    }
-
     Some(pattern.to_string())
 }
 
@@ -169,18 +110,36 @@ fn validate_regex_strict(pattern: &str) -> Result<(), String> {
 fn validate_window_rule(rule: &WindowRule, result: &mut ValidationResult) {
     let rule_name = format!("WindowRule[{}]", rule.id);
 
-    for (idx, m) in rule.matches.iter().enumerate() {
-        let match_prefix = format!("{}.match[{}]", rule_name, idx);
+    // Strict regex validation gates saving; skip disabled rules (slashdashed on
+    // disk, never parsed by niri) so a bad regex in one can't block every save (P3).
+    if rule.enabled {
+        for (idx, m) in rule.matches.iter().enumerate() {
+            let match_prefix = format!("{}.match[{}]", rule_name, idx);
 
-        // Validate regex patterns with strict parser
-        if let Some(ref pattern) = m.app_id {
-            if let Err(e) = validate_regex_strict(pattern) {
-                result.add_error("WindowRules", &format!("{}.app_id", match_prefix), &e);
+            if let Some(ref pattern) = m.app_id {
+                if let Err(e) = validate_regex_strict(pattern) {
+                    result.add_error("WindowRules", &format!("{}.app_id", match_prefix), &e);
+                }
+            }
+            if let Some(ref pattern) = m.title {
+                if let Err(e) = validate_regex_strict(pattern) {
+                    result.add_error("WindowRules", &format!("{}.title", match_prefix), &e);
+                }
             }
         }
-        if let Some(ref pattern) = m.title {
-            if let Err(e) = validate_regex_strict(pattern) {
-                result.add_error("WindowRules", &format!("{}.title", match_prefix), &e);
+        // Excludes are emitted to niri too, so a bad exclude regex is equally fatal.
+        for (idx, e) in rule.excludes.iter().enumerate() {
+            let exclude_prefix = format!("{}.exclude[{}]", rule_name, idx);
+
+            if let Some(ref pattern) = e.app_id {
+                if let Err(err) = validate_regex_strict(pattern) {
+                    result.add_error("WindowRules", &format!("{}.app_id", exclude_prefix), &err);
+                }
+            }
+            if let Some(ref pattern) = e.title {
+                if let Err(err) = validate_regex_strict(pattern) {
+                    result.add_error("WindowRules", &format!("{}.title", exclude_prefix), &err);
+                }
             }
         }
     }
@@ -201,13 +160,25 @@ fn validate_window_rule(rule: &WindowRule, result: &mut ValidationResult) {
 fn validate_layer_rule(rule: &LayerRule, result: &mut ValidationResult) {
     let rule_name = format!("LayerRule[{}]", rule.id);
 
-    for (idx, m) in rule.matches.iter().enumerate() {
-        let match_prefix = format!("{}.match[{}]", rule_name, idx);
+    // Skip disabled rules from the save-gating strict regex check (P3).
+    if rule.enabled {
+        for (idx, m) in rule.matches.iter().enumerate() {
+            let match_prefix = format!("{}.match[{}]", rule_name, idx);
 
-        // Validate namespace regex with strict parser
-        if let Some(ref pattern) = m.namespace {
-            if let Err(e) = validate_regex_strict(pattern) {
-                result.add_error("LayerRules", &format!("{}.namespace", match_prefix), &e);
+            if let Some(ref pattern) = m.namespace {
+                if let Err(e) = validate_regex_strict(pattern) {
+                    result.add_error("LayerRules", &format!("{}.namespace", match_prefix), &e);
+                }
+            }
+        }
+        // Excludes are emitted to niri too; validate their regexes as well.
+        for (idx, e) in rule.excludes.iter().enumerate() {
+            let exclude_prefix = format!("{}.exclude[{}]", rule_name, idx);
+
+            if let Some(ref pattern) = e.namespace {
+                if let Err(err) = validate_regex_strict(pattern) {
+                    result.add_error("LayerRules", &format!("{}.namespace", exclude_prefix), &err);
+                }
             }
         }
     }
@@ -328,9 +299,73 @@ mod tests {
     }
 
     #[test]
+    fn validate_regex_pattern_never_drops_valid_lone_brace() {
+        // Rust regex accepts a lone `}` as a literal; the pattern must survive.
+        assert_eq!(
+            validate_regex_pattern("foo}bar", "test"),
+            Some("foo}bar".to_string())
+        );
+        assert_eq!(
+            validate_regex_pattern("^\\{", "test"),
+            Some("^\\{".to_string())
+        );
+        // Even a genuinely invalid pattern is preserved (warned, not dropped).
+        assert_eq!(
+            validate_regex_pattern("(unclosed", "test"),
+            Some("(unclosed".to_string())
+        );
+    }
+
+    #[test]
     fn test_validate_empty_settings() {
         let settings = Settings::default();
         let result = validate_settings(&settings);
         assert!(result.is_valid());
+    }
+
+    #[test]
+    fn enabled_rule_with_bad_exclude_regex_fails_but_disabled_passes() {
+        use crate::config::models::{LayerRuleMatch, WindowRuleMatch};
+
+        let mut wr = WindowRule {
+            enabled: true,
+            ..Default::default()
+        };
+        wr.excludes.push(WindowRuleMatch {
+            app_id: Some("[invalid(regex".to_string()),
+            ..Default::default()
+        });
+        let mut r = ValidationResult::default();
+        validate_window_rule(&wr, &mut r);
+        assert!(
+            !r.errors.is_empty(),
+            "enabled rule with bad exclude regex must gate the save"
+        );
+
+        wr.enabled = false;
+        let mut r2 = ValidationResult::default();
+        validate_window_rule(&wr, &mut r2);
+        assert!(
+            r2.errors.is_empty(),
+            "disabled rule is slashdashed on disk and must not gate the save"
+        );
+
+        // Same behaviour for layer rules.
+        let mut lr = LayerRule {
+            enabled: true,
+            ..Default::default()
+        };
+        lr.excludes.push(LayerRuleMatch {
+            namespace: Some("(unclosed".to_string()),
+            ..Default::default()
+        });
+        let mut r3 = ValidationResult::default();
+        validate_layer_rule(&lr, &mut r3);
+        assert!(!r3.errors.is_empty(), "bad layer exclude regex must error");
+
+        lr.enabled = false;
+        let mut r4 = ValidationResult::default();
+        validate_layer_rule(&lr, &mut r4);
+        assert!(r4.errors.is_empty(), "disabled layer rule must not gate");
     }
 }

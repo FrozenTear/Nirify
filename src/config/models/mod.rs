@@ -6,6 +6,7 @@
 mod animation;
 mod appearance;
 mod behavior;
+mod blur;
 mod debug;
 mod gestures;
 mod input;
@@ -24,6 +25,7 @@ mod workspaces;
 pub use animation::*;
 pub use appearance::*;
 pub use behavior::*;
+pub use blur::*;
 pub use debug::*;
 pub use gestures::*;
 pub use input::*;
@@ -55,6 +57,8 @@ use crate::constants::{
 pub struct Settings {
     pub appearance: AppearanceSettings,
     pub behavior: BehaviorSettings,
+    /// Top-level background blur (niri 26.04+)
+    pub blur: BlurSettings,
     pub keyboard: KeyboardSettings,
     pub mouse: MouseSettings,
     pub touchpad: TouchpadSettings,
@@ -136,6 +140,14 @@ impl Settings {
             CORNER_RADIUS_MAX,
             "corner_radius"
         );
+
+        // Blur (niri 26.04+). `f64::clamp` returns NaN for a NaN input, so guard
+        // against non-finite values (which would serialize as invalid KDL) first.
+        let finite = |v: f64| if v.is_finite() { v } else { 0.0 };
+        self.blur.passes = self.blur.passes.clamp(0, 255);
+        self.blur.offset = finite(self.blur.offset).clamp(0.0, 100.0);
+        self.blur.noise = finite(self.blur.noise).clamp(0.0, 1000.0);
+        self.blur.saturation = finite(self.blur.saturation).clamp(0.0, 1000.0);
 
         // Behavior - struts
         clamp_and_log!(
@@ -273,33 +285,39 @@ impl Settings {
                 }
                 rule.opacity = Some(clamped);
             }
-            if let Some(radius) = rule.corner_radius {
-                let clamped = radius.clamp(CORNER_RADIUS_MIN as i32, CORNER_RADIUS_MAX as i32);
-                if radius != clamped {
+            if let Some(mut radius) = rule.corner_radius {
+                let lo = CORNER_RADIUS_MIN;
+                let hi = CORNER_RADIUS_MAX;
+                radius.top_left = radius.top_left.clamp(lo, hi);
+                radius.top_right = radius.top_right.clamp(lo, hi);
+                radius.bottom_right = radius.bottom_right.clamp(lo, hi);
+                radius.bottom_left = radius.bottom_left.clamp(lo, hi);
+                if Some(radius) != rule.corner_radius {
                     log::debug!(
-                        "Clamped window_rule[{}].corner_radius from {} to {} (range: {}..={})",
+                        "Clamped window_rule[{}].corner_radius corners into {}..={}",
                         i,
-                        radius,
-                        clamped,
                         CORNER_RADIUS_MIN,
                         CORNER_RADIUS_MAX
                     );
                 }
-                rule.corner_radius = Some(clamped);
+                rule.corner_radius = Some(radius);
             }
-            if let Some(width) = rule.default_column_width {
-                let clamped = width.clamp(COLUMN_PROPORTION_MIN, COLUMN_PROPORTION_MAX);
-                if width != clamped {
+            if let Some(crate::config::models::RuleDefaultSize::Proportion(p)) =
+                rule.default_column_width
+            {
+                let clamped = p.clamp(COLUMN_PROPORTION_MIN, COLUMN_PROPORTION_MAX);
+                if p != clamped {
                     log::debug!(
-                        "Clamped window_rule[{}].default_column_width from {} to {} (range: {}..={})",
+                        "Clamped window_rule[{}].default_column_width proportion from {} to {} (range: {}..={})",
                         i,
-                        width,
+                        p,
                         clamped,
                         COLUMN_PROPORTION_MIN,
                         COLUMN_PROPORTION_MAX
                     );
                 }
-                rule.default_column_width = Some(clamped);
+                rule.default_column_width =
+                    Some(crate::config::models::RuleDefaultSize::Proportion(clamped));
             }
         }
     }

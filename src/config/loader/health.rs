@@ -211,14 +211,14 @@ pub fn ensure_required_files_exist(
 ) -> anyhow::Result<Vec<String>> {
     use super::super::registry::ConfigFile;
     use super::super::storage::{
-        generate_animations_kdl, generate_appearance_kdl, generate_behavior_kdl,
+        generate_animations_kdl, generate_appearance_kdl, generate_behavior_kdl, generate_blur_kdl,
         generate_cursor_kdl, generate_debug_kdl, generate_environment_kdl, generate_gestures_kdl,
         generate_keybindings_kdl, generate_keyboard_kdl, generate_layer_rules_kdl,
         generate_layout_extras_kdl, generate_misc_kdl, generate_mouse_kdl, generate_outputs_kdl,
-        generate_overview_kdl, generate_recent_windows_kdl, generate_startup_kdl,
-        generate_switch_events_kdl, generate_tablet_kdl, generate_touch_kdl, generate_touchpad_kdl,
-        generate_trackball_kdl, generate_trackpoint_kdl, generate_window_rules_kdl,
-        generate_workspaces_kdl,
+        generate_overview_kdl, generate_preferences_kdl, generate_recent_windows_kdl,
+        generate_startup_kdl, generate_switch_events_kdl, generate_tablet_kdl, generate_touch_kdl,
+        generate_touchpad_kdl, generate_trackball_kdl, generate_trackpoint_kdl,
+        generate_window_rules_kdl, generate_workspaces_kdl,
     };
 
     // Ensure directories exist first
@@ -241,7 +241,7 @@ pub fn ensure_required_files_exist(
                 ConfigFile::Touchpad => generate_touchpad_kdl(&settings.touchpad),
                 ConfigFile::Trackpoint => generate_trackpoint_kdl(&settings.trackpoint),
                 ConfigFile::Trackball => generate_trackball_kdl(&settings.trackball),
-                ConfigFile::Tablet => generate_tablet_kdl(&settings.tablet),
+                ConfigFile::Tablet => generate_tablet_kdl(&settings.tablet, compat),
                 ConfigFile::Touch => generate_touch_kdl(&settings.touch),
                 ConfigFile::Outputs => generate_outputs_kdl(&settings.outputs),
                 ConfigFile::Animations => generate_animations_kdl(&settings.animations),
@@ -251,10 +251,11 @@ pub fn ensure_required_files_exist(
                 ConfigFile::Keybindings => generate_keybindings_kdl(&settings.keybindings),
                 ConfigFile::LayoutExtras => generate_layout_extras_kdl(&settings.layout_extras),
                 ConfigFile::Gestures => generate_gestures_kdl(&settings.gestures),
-                ConfigFile::LayerRules => generate_layer_rules_kdl(&settings.layer_rules),
+                ConfigFile::LayerRules => generate_layer_rules_kdl(&settings.layer_rules, compat),
                 ConfigFile::WindowRules => generate_window_rules_kdl(
                     &settings.window_rules,
                     settings.preferences.float_settings_app,
+                    compat,
                 ),
                 ConfigFile::Misc => generate_misc_kdl(&settings.miscellaneous),
                 ConfigFile::Startup => generate_startup_kdl(&settings.startup),
@@ -268,6 +269,14 @@ pub fn ensure_required_files_exist(
                     }
                     generate_recent_windows_kdl(&settings.recent_windows)
                 }
+                ConfigFile::Blur => {
+                    // Top-level blur requires niri 26.04+
+                    if !compat.blur {
+                        continue;
+                    }
+                    generate_blur_kdl(&settings.blur)
+                }
+                ConfigFile::Preferences => generate_preferences_kdl(&settings.preferences),
             };
 
             atomic_write(&path, &content)?;

@@ -6,9 +6,8 @@
 use iced::widget::{button, column, container, row, scrollable, text, Column, Space};
 use iced::{Alignment, Element, Length};
 
-use super::widgets::*;
 use crate::ipc::{FullOutputInfo, WindowInfo, WorkspaceInfo};
-use crate::messages::{Message, ToolsMessage};
+use crate::messages::{DialogState, Message, ToolsMessage, WizardStep};
 use crate::theme::{fonts, neon};
 
 /// State for the tools page (cached IPC data)
@@ -128,6 +127,16 @@ pub fn view(state: &ToolsState, niri_connected: bool) -> Element<'_, Message> {
     .padding([8, 14])
     .style(neon_btn)
     .on_press(Message::AnalyzeConsolidation);
+    let setup_btn = button(
+        text("Run Setup Wizard")
+            .size(12)
+            .font(fonts::UI_FONT_MEDIUM),
+    )
+    .padding([8, 14])
+    .style(neon_btn)
+    .on_press(Message::ShowDialog(DialogState::FirstRunWizard {
+        step: WizardStep::Welcome,
+    }));
 
     if niri_connected && !state.reloading {
         reload_btn = reload_btn.on_press(Message::Tools(ToolsMessage::ReloadConfig));
@@ -276,7 +285,7 @@ pub fn view(state: &ToolsState, niri_connected: bool) -> Element<'_, Message> {
                     column![
                         row![reload_btn, validate_btn].spacing(8),
                         Space::new().height(6),
-                        row![consolidate_btn].spacing(8),
+                        row![consolidate_btn, setup_btn].spacing(8),
                     ]
                     .spacing(0)
                 )

@@ -9,12 +9,126 @@ use std::collections::HashMap;
 
 use super::widgets::*;
 use crate::config::models::{
-    DefaultColumnDisplay, FloatingPosition, OpenBehavior, PositionRelativeTo, WindowRule,
-    WindowRulesSettings,
+    BackgroundEffectSettings, BlockOutFrom, CornerRadiusValue, DefaultColumnDisplay,
+    FloatingPosition, PopupsSettings, PositionRelativeTo, RuleDefaultSize, ShadowSettings,
+    WindowRule, WindowRulesSettings,
 };
 use crate::messages::{Message, RulesFilter, WindowRulesMessage};
 use crate::theme::{fonts, neon};
 use crate::types::{Color as NiriColor, ColorOrGradient};
+
+/// Display wrapper for a tri-state (Default / Force on / Force off) picker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TriState {
+    Default,
+    On,
+    Off,
+}
+
+impl TriState {
+    const ALL: [TriState; 3] = [TriState::Default, TriState::On, TriState::Off];
+    fn from_opt(v: Option<bool>) -> Self {
+        match v {
+            None => TriState::Default,
+            Some(true) => TriState::On,
+            Some(false) => TriState::Off,
+        }
+    }
+    fn to_opt(self) -> Option<bool> {
+        match self {
+            TriState::Default => None,
+            TriState::On => Some(true),
+            TriState::Off => Some(false),
+        }
+    }
+}
+
+impl std::fmt::Display for TriState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TriState::Default => write!(f, "Default"),
+            TriState::On => write!(f, "Force on"),
+            TriState::Off => write!(f, "Force off"),
+        }
+    }
+}
+
+/// Display wrapper for the block-out-from picker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BlockOutChoice {
+    None,
+    Screencast,
+    ScreenCapture,
+}
+
+impl BlockOutChoice {
+    const ALL: [BlockOutChoice; 3] = [
+        BlockOutChoice::None,
+        BlockOutChoice::Screencast,
+        BlockOutChoice::ScreenCapture,
+    ];
+    fn from_opt(v: Option<BlockOutFrom>) -> Self {
+        match v {
+            None => BlockOutChoice::None,
+            Some(BlockOutFrom::Screencast) => BlockOutChoice::Screencast,
+            Some(BlockOutFrom::ScreenCapture) => BlockOutChoice::ScreenCapture,
+        }
+    }
+    fn to_opt(self) -> Option<BlockOutFrom> {
+        match self {
+            BlockOutChoice::None => None,
+            BlockOutChoice::Screencast => Some(BlockOutFrom::Screencast),
+            BlockOutChoice::ScreenCapture => Some(BlockOutFrom::ScreenCapture),
+        }
+    }
+}
+
+impl std::fmt::Display for BlockOutChoice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlockOutChoice::None => write!(f, "Off"),
+            BlockOutChoice::Screencast => write!(f, "Screencast"),
+            BlockOutChoice::ScreenCapture => write!(f, "Screen capture"),
+        }
+    }
+}
+
+/// Display wrapper for the default-size mode picker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SizeMode {
+    Unset,
+    Natural,
+    Proportion,
+    Fixed,
+}
+
+impl SizeMode {
+    const ALL: [SizeMode; 4] = [
+        SizeMode::Unset,
+        SizeMode::Natural,
+        SizeMode::Proportion,
+        SizeMode::Fixed,
+    ];
+    fn of(v: &Option<RuleDefaultSize>) -> Self {
+        match v {
+            None => SizeMode::Unset,
+            Some(RuleDefaultSize::Natural) => SizeMode::Natural,
+            Some(RuleDefaultSize::Proportion(_)) => SizeMode::Proportion,
+            Some(RuleDefaultSize::Fixed(_)) => SizeMode::Fixed,
+        }
+    }
+}
+
+impl std::fmt::Display for SizeMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SizeMode::Unset => write!(f, "Unset"),
+            SizeMode::Natural => write!(f, "Natural"),
+            SizeMode::Proportion => write!(f, "Proportion"),
+            SizeMode::Fixed => write!(f, "Fixed px"),
+        }
+    }
+}
 
 const RULE_CARD_HEIGHT: f32 = 320.0;
 const RULE_CARD_SECTION_HEIGHT: f32 = 68.0;
@@ -203,17 +317,14 @@ fn rule_card(rule: &WindowRule) -> Element<'_, Message> {
 
     // Effect pills with icons
     let mut effect_pills: Vec<(String, iced::Color)> = Vec::new();
-    match rule.open_behavior {
-        OpenBehavior::Floating => {
-            effect_pills.push(("◇ Always Float".to_string(), neon::TERTIARY));
-        }
-        OpenBehavior::Maximized => {
-            effect_pills.push(("⊞ Maximize".to_string(), neon::TERTIARY));
-        }
-        OpenBehavior::Fullscreen => {
-            effect_pills.push(("⊡ Fullscreen".to_string(), neon::TERTIARY));
-        }
-        OpenBehavior::Normal => {}
+    if rule.open_floating == Some(true) {
+        effect_pills.push(("◇ Always Float".to_string(), neon::TERTIARY));
+    }
+    if rule.open_maximized == Some(true) {
+        effect_pills.push(("⊞ Maximize".to_string(), neon::TERTIARY));
+    }
+    if rule.open_fullscreen == Some(true) {
+        effect_pills.push(("⊡ Fullscreen".to_string(), neon::TERTIARY));
     }
     if let Some(ref ws) = rule.open_on_workspace {
         effect_pills.push((format!("▤ WS {}", truncate_str(ws, 12)), neon::SECONDARY));
@@ -221,7 +332,7 @@ fn rule_card(rule: &WindowRule) -> Element<'_, Message> {
     if let Some(opacity) = rule.opacity {
         effect_pills.push((format!("◉ Opacity {:.2}", opacity), neon::PRIMARY));
     }
-    if rule.block_out_from_screencast {
+    if rule.block_out_from.is_some() {
         effect_pills.push(("⊘ Block Capture".to_string(), neon::ERROR));
     }
 
@@ -272,7 +383,19 @@ fn rule_card(rule: &WindowRule) -> Element<'_, Message> {
                 ]
                 .spacing(4)
             )
-            .on_press(Message::WindowRules(WindowRulesMessage::DeleteRule(id)))
+            .on_press(Message::ShowDialog(crate::messages::DialogState::Confirm {
+                title: "Delete window rule?".to_string(),
+                message: format!(
+                    "Delete the rule \"{}\"? This cannot be undone.",
+                    if rule.name.is_empty() {
+                        "Untitled rule"
+                    } else {
+                        rule.name.as_str()
+                    }
+                ),
+                confirm_label: "Delete".to_string(),
+                on_confirm: crate::messages::ConfirmAction::DeleteWindowRule(id),
+            }))
             .padding([6, 12])
             .style(ghost_button_style),
         ],
@@ -325,6 +448,7 @@ pub fn editor_modal<'a>(
     _sections_expanded: &'a HashMap<(u32, String), bool>,
     regex_errors: &'a HashMap<(u32, String), String>,
     available_workspaces: &'a [String],
+    supports_background_effects: bool,
 ) -> Element<'a, Message> {
     let id = rule.id;
 
@@ -633,81 +757,102 @@ pub fn editor_modal<'a>(
     editor = editor.push(Space::new().height(20));
 
     // ── ROW 1: OPENING BEHAVIOR | PLACEMENT ──
-    editor = editor.push(
-        row![
-            column![
-                modal_section_header("⚙", "OPENING BEHAVIOR", neon::TERTIARY),
-                container(
-                    column![
-                        picker_row(
-                            "Open as",
-                            "How the window should open",
-                            OpenBehavior::all(),
-                            Some(rule.open_behavior),
-                            move |value| Message::WindowRules(WindowRulesMessage::SetOpenBehavior(
-                                id, value
-                            )),
-                        ),
-                        optional_bool_picker(
-                            "Open focused",
-                            "Focus window when it opens",
-                            rule.open_focused,
-                            move |value| Message::WindowRules(WindowRulesMessage::SetOpenFocused(
-                                id, value
-                            )),
-                        ),
-                        optional_bool_picker(
-                            "Maximize to edges",
-                            "Maximize to screen edges (v25.11+)",
-                            rule.open_maximized_to_edges,
-                            move |value| Message::WindowRules(
-                                WindowRulesMessage::SetOpenMaximizedToEdges(id, value)
+    editor =
+        editor.push(
+            row![
+                column![
+                    modal_section_header("⚙", "OPENING BEHAVIOR", neon::TERTIARY),
+                    container(
+                        column![
+                            picker_row(
+                                "Maximized",
+                                "Open maximized within the column",
+                                &TriState::ALL,
+                                Some(TriState::from_opt(rule.open_maximized)),
+                                move |value| Message::WindowRules(
+                                    WindowRulesMessage::SetOpenMaximized(id, value.to_opt())
+                                ),
                             ),
-                        ),
-                        toggle_row(
-                            "Block from screencast",
-                            "Hide in screen recordings",
-                            rule.block_out_from_screencast,
-                            move |value| Message::WindowRules(
-                                WindowRulesMessage::SetBlockScreencast(id, value)
+                            picker_row(
+                                "Fullscreen",
+                                "Open fullscreen",
+                                &TriState::ALL,
+                                Some(TriState::from_opt(rule.open_fullscreen)),
+                                move |value| Message::WindowRules(
+                                    WindowRulesMessage::SetOpenFullscreen(id, value.to_opt())
+                                ),
                             ),
-                        ),
-                    ]
-                    .spacing(0)
-                )
-                .padding(8)
-                .style(crate::theme::card_style),
+                            picker_row(
+                                "Floating",
+                                "Open as a floating window",
+                                &TriState::ALL,
+                                Some(TriState::from_opt(rule.open_floating)),
+                                move |value| Message::WindowRules(
+                                    WindowRulesMessage::SetOpenFloating(id, value.to_opt())
+                                ),
+                            ),
+                            picker_row(
+                                "Maximize to edges",
+                                "Maximize to screen edges (v25.11+)",
+                                &TriState::ALL,
+                                Some(TriState::from_opt(rule.open_maximized_to_edges)),
+                                move |value| Message::WindowRules(
+                                    WindowRulesMessage::SetOpenMaximizedToEdges(id, value.to_opt())
+                                ),
+                            ),
+                            optional_bool_picker(
+                                "Open focused",
+                                "Focus window when it opens",
+                                rule.open_focused,
+                                move |value| Message::WindowRules(
+                                    WindowRulesMessage::SetOpenFocused(id, value)
+                                ),
+                            ),
+                            picker_row(
+                                "Block out from",
+                                "Hide in screencasts / captures",
+                                &BlockOutChoice::ALL,
+                                Some(BlockOutChoice::from_opt(rule.block_out_from)),
+                                move |value| Message::WindowRules(
+                                    WindowRulesMessage::SetBlockOutFrom(id, value.to_opt())
+                                ),
+                            ),
+                        ]
+                        .spacing(0)
+                    )
+                    .padding(8)
+                    .style(crate::theme::card_style),
+                ]
+                .spacing(8)
+                .width(Length::FillPortion(1)),
+                column![
+                    modal_section_header("▦", "PLACEMENT", neon::PRIMARY),
+                    text_input_row(
+                        "Open on output",
+                        "Output name (e.g., HDMI-1)",
+                        rule.open_on_output.as_deref().unwrap_or(""),
+                        move |value| Message::WindowRules(WindowRulesMessage::SetOpenOnOutput(
+                            id,
+                            if value.is_empty() { None } else { Some(value) }
+                        )),
+                    ),
+                    text_input_with_suggestions(
+                        "Open on workspace",
+                        "Workspace name",
+                        rule.open_on_workspace.as_deref().unwrap_or(""),
+                        available_workspaces,
+                        move |value| Message::WindowRules(WindowRulesMessage::SetOpenOnWorkspace(
+                            id,
+                            if value.is_empty() { None } else { Some(value) }
+                        )),
+                    ),
+                ]
+                .spacing(8)
+                .width(Length::FillPortion(1)),
             ]
-            .spacing(8)
-            .width(Length::FillPortion(1)),
-            column![
-                modal_section_header("▦", "PLACEMENT", neon::PRIMARY),
-                text_input_row(
-                    "Open on output",
-                    "Output name (e.g., HDMI-1)",
-                    rule.open_on_output.as_deref().unwrap_or(""),
-                    move |value| Message::WindowRules(WindowRulesMessage::SetOpenOnOutput(
-                        id,
-                        if value.is_empty() { None } else { Some(value) }
-                    )),
-                ),
-                text_input_with_suggestions(
-                    "Open on workspace",
-                    "Workspace name",
-                    rule.open_on_workspace.as_deref().unwrap_or(""),
-                    available_workspaces,
-                    move |value| Message::WindowRules(WindowRulesMessage::SetOpenOnWorkspace(
-                        id,
-                        if value.is_empty() { None } else { Some(value) }
-                    )),
-                ),
-            ]
-            .spacing(8)
-            .width(Length::FillPortion(1)),
-        ]
-        .spacing(32)
-        .align_y(Alignment::Start),
-    );
+            .spacing(32)
+            .align_y(Alignment::Start),
+        );
 
     editor = editor.push(Space::new().height(20));
 
@@ -728,43 +873,12 @@ pub fn editor_modal<'a>(
                     0.01,
                     move |v| Message::WindowRules(WindowRulesMessage::SetOpacity(id, Some(v))),
                 ),
-                row![
-                    styled_slider(
-                        "COLUMN WIDTH",
-                        &format!("{:.0}%", rule.default_column_width.unwrap_or(0.5) * 100.0),
-                        move |s| s.replace('%', "").parse::<f32>().ok().map(|v| {
-                            Message::WindowRules(WindowRulesMessage::SetDefaultColumnWidth(
-                                id,
-                                Some((v / 100.0).clamp(0.1, 1.0)),
-                            ))
-                        }),
-                        0.1..=1.0,
-                        rule.default_column_width.unwrap_or(0.5),
-                        0.01,
-                        move |v| Message::WindowRules(WindowRulesMessage::SetDefaultColumnWidth(
-                            id,
-                            Some(v)
-                        )),
-                    ),
-                    styled_slider(
-                        "WINDOW HEIGHT",
-                        &format!("{:.0}%", rule.default_window_height.unwrap_or(0.5) * 100.0),
-                        move |s| s.replace('%', "").parse::<f32>().ok().map(|v| {
-                            Message::WindowRules(WindowRulesMessage::SetDefaultWindowHeight(
-                                id,
-                                Some((v / 100.0).clamp(0.1, 1.0)),
-                            ))
-                        }),
-                        0.1..=1.0,
-                        rule.default_window_height.unwrap_or(0.5),
-                        0.01,
-                        move |v| Message::WindowRules(WindowRulesMessage::SetDefaultWindowHeight(
-                            id,
-                            Some(v)
-                        )),
-                    ),
-                ]
-                .spacing(8),
+                default_size_editor("COLUMN WIDTH", id, &rule.default_column_width, |id, v| {
+                    Message::WindowRules(WindowRulesMessage::SetDefaultColumnWidth(id, v))
+                }),
+                default_size_editor("WINDOW HEIGHT", id, &rule.default_window_height, |id, v| {
+                    Message::WindowRules(WindowRulesMessage::SetDefaultWindowHeight(id, v))
+                }),
                 row![
                     styled_slider_int(
                         "MIN WIDTH",
@@ -878,22 +992,9 @@ pub fn editor_modal<'a>(
                 .style(crate::theme::card_style),
                 Space::new().height(8),
                 row![
-                    styled_slider_int(
-                        "CORNER RADIUS",
-                        &format!("{}px", rule.corner_radius.unwrap_or(0)),
-                        move |s| s.replace("px", "").parse::<i32>().ok().map(|v| {
-                            Message::WindowRules(WindowRulesMessage::SetCornerRadius(
-                                id,
-                                Some(v.clamp(0, 32)),
-                            ))
-                        }),
-                        0..=32,
-                        rule.corner_radius.unwrap_or(0),
-                        move |v| Message::WindowRules(WindowRulesMessage::SetCornerRadius(
-                            id,
-                            Some(v)
-                        )),
-                    ),
+                    corner_radius_editor("CORNER RADIUS", id, &rule.corner_radius, |id, v| {
+                        Message::WindowRules(WindowRulesMessage::SetCornerRadius(id, v))
+                    }),
                     styled_slider_int(
                         "FOCUS RING W",
                         &format!("{}px", rule.focus_ring_width.unwrap_or(0)),
@@ -977,97 +1078,273 @@ pub fn editor_modal<'a>(
 
     // ── ROW 3: ADVANCED | KDL PREVIEW ──
     let kdl_preview = rule_to_kdl_preview(rule);
-    editor = editor.push(row![
-        column![
-            modal_section_header("⬡", "ADVANCED", neon::OUTLINE),
-            container(column![
-                optional_bool_picker("Variable refresh rate", "Enable VRR/FreeSync",
-                    rule.variable_refresh_rate,
-                    move |value| Message::WindowRules(WindowRulesMessage::SetVariableRefreshRate(id, value)),
-                ),
-                optional_bool_picker("Floating animation", "baba-is-float effect",
-                    rule.baba_is_float,
-                    move |value| Message::WindowRules(WindowRulesMessage::SetBabaIsFloat(id, value)),
-                ),
-                optional_bool_picker("Tiled state", "Mark as tiled (X11 compat)",
-                    rule.tiled_state,
-                    move |value| Message::WindowRules(WindowRulesMessage::SetTiledState(id, value)),
-                ),
-                picker_row("Column display", "Default display mode",
-                    &[DefaultColumnDisplay::Normal, DefaultColumnDisplay::Tabbed],
-                    rule.default_column_display,
-                    move |value| Message::WindowRules(WindowRulesMessage::SetDefaultColumnDisplay(id, Some(value))),
-                ),
-            ].spacing(0)).padding(8).style(crate::theme::card_style),
-            Space::new().height(8),
-            // Floating position
-            modal_section_header("◇", "FLOATING POSITION", neon::TERTIARY),
-            {
-                let pos = rule.default_floating_position.clone().unwrap_or(FloatingPosition { x: 0, y: 0, relative_to: PositionRelativeTo::TopLeft });
-                container(column![
-                    row![
+    editor = editor.push(
+        row![
+            column![
+                modal_section_header("⬡", "ADVANCED", neon::OUTLINE),
+                container(
+                    column![
+                        optional_bool_picker(
+                            "Variable refresh rate",
+                            "Enable VRR/FreeSync",
+                            rule.variable_refresh_rate,
+                            move |value| Message::WindowRules(
+                                WindowRulesMessage::SetVariableRefreshRate(id, value)
+                            ),
+                        ),
+                        optional_bool_picker(
+                            "Floating animation",
+                            "baba-is-float effect",
+                            rule.baba_is_float,
+                            move |value| Message::WindowRules(WindowRulesMessage::SetBabaIsFloat(
+                                id, value
+                            )),
+                        ),
+                        optional_bool_picker(
+                            "Tiled state",
+                            "Mark as tiled (X11 compat)",
+                            rule.tiled_state,
+                            move |value| Message::WindowRules(WindowRulesMessage::SetTiledState(
+                                id, value
+                            )),
+                        ),
+                        picker_row(
+                            "Column display",
+                            "Default display mode",
+                            &[DefaultColumnDisplay::Normal, DefaultColumnDisplay::Tabbed],
+                            rule.default_column_display,
+                            move |value| Message::WindowRules(
+                                WindowRulesMessage::SetDefaultColumnDisplay(id, Some(value))
+                            ),
+                        ),
+                    ]
+                    .spacing(0)
+                )
+                .padding(8)
+                .style(crate::theme::card_style),
+                Space::new().height(8),
+                // Floating position
+                modal_section_header("◇", "FLOATING POSITION", neon::TERTIARY),
+                {
+                    let pos = rule
+                        .default_floating_position
+                        .clone()
+                        .unwrap_or(FloatingPosition {
+                            x: 0,
+                            y: 0,
+                            relative_to: PositionRelativeTo::TopLeft,
+                        });
+                    container(
                         column![
-                            text("X").size(10).font(fonts::UI_FONT_SEMIBOLD).color(neon::OUTLINE_VARIANT),
-                            text_input("0", &format!("{}", pos.x))
-                                .on_input(move |s| {
-                                    if let Ok(x) = s.parse::<i32>() {
-                                        let mut p = rule.default_floating_position.clone().unwrap_or(FloatingPosition { x: 0, y: 0, relative_to: PositionRelativeTo::TopLeft });
-                                        p.x = x;
-                                        Message::WindowRules(WindowRulesMessage::SetDefaultFloatingPosition(id, Some(p)))
-                                    } else { Message::NoOp }
-                                })
-                                .padding(8).size(12),
-                        ].spacing(4).width(Length::FillPortion(1)),
-                        column![
-                            text("Y").size(10).font(fonts::UI_FONT_SEMIBOLD).color(neon::OUTLINE_VARIANT),
-                            text_input("0", &format!("{}", pos.y))
-                                .on_input(move |s| {
-                                    if let Ok(y) = s.parse::<i32>() {
-                                        let mut p = rule.default_floating_position.clone().unwrap_or(FloatingPosition { x: 0, y: 0, relative_to: PositionRelativeTo::TopLeft });
-                                        p.y = y;
-                                        Message::WindowRules(WindowRulesMessage::SetDefaultFloatingPosition(id, Some(p)))
-                                    } else { Message::NoOp }
-                                })
-                                .padding(8).size(12),
-                        ].spacing(4).width(Length::FillPortion(1)),
-                    ].spacing(8),
-                    picker_row("Relative to", "Anchor point",
-                        PositionRelativeTo::all(),
-                        Some(pos.relative_to),
-                        move |value| {
-                            let mut p = rule.default_floating_position.clone().unwrap_or(FloatingPosition { x: 0, y: 0, relative_to: PositionRelativeTo::TopLeft });
-                            p.relative_to = value;
-                            Message::WindowRules(WindowRulesMessage::SetDefaultFloatingPosition(id, Some(p)))
+                            row![
+                                column![
+                                    text("X")
+                                        .size(10)
+                                        .font(fonts::UI_FONT_SEMIBOLD)
+                                        .color(neon::OUTLINE_VARIANT),
+                                    text_input("0", &format!("{}", pos.x))
+                                        .on_input(move |s| {
+                                            if let Ok(x) = s.parse::<i32>() {
+                                                let mut p = rule
+                                                    .default_floating_position
+                                                    .clone()
+                                                    .unwrap_or(FloatingPosition {
+                                                        x: 0,
+                                                        y: 0,
+                                                        relative_to: PositionRelativeTo::TopLeft,
+                                                    });
+                                                p.x = x;
+                                                Message::WindowRules(
+                                                    WindowRulesMessage::SetDefaultFloatingPosition(
+                                                        id,
+                                                        Some(p),
+                                                    ),
+                                                )
+                                            } else {
+                                                Message::NoOp
+                                            }
+                                        })
+                                        .padding(8)
+                                        .size(12),
+                                ]
+                                .spacing(4)
+                                .width(Length::FillPortion(1)),
+                                column![
+                                    text("Y")
+                                        .size(10)
+                                        .font(fonts::UI_FONT_SEMIBOLD)
+                                        .color(neon::OUTLINE_VARIANT),
+                                    text_input("0", &format!("{}", pos.y))
+                                        .on_input(move |s| {
+                                            if let Ok(y) = s.parse::<i32>() {
+                                                let mut p = rule
+                                                    .default_floating_position
+                                                    .clone()
+                                                    .unwrap_or(FloatingPosition {
+                                                        x: 0,
+                                                        y: 0,
+                                                        relative_to: PositionRelativeTo::TopLeft,
+                                                    });
+                                                p.y = y;
+                                                Message::WindowRules(
+                                                    WindowRulesMessage::SetDefaultFloatingPosition(
+                                                        id,
+                                                        Some(p),
+                                                    ),
+                                                )
+                                            } else {
+                                                Message::NoOp
+                                            }
+                                        })
+                                        .padding(8)
+                                        .size(12),
+                                ]
+                                .spacing(4)
+                                .width(Length::FillPortion(1)),
+                            ]
+                            .spacing(8),
+                            picker_row(
+                                "Relative to",
+                                "Anchor point",
+                                PositionRelativeTo::all(),
+                                Some(pos.relative_to),
+                                move |value| {
+                                    let mut p = rule.default_floating_position.clone().unwrap_or(
+                                        FloatingPosition {
+                                            x: 0,
+                                            y: 0,
+                                            relative_to: PositionRelativeTo::TopLeft,
+                                        },
+                                    );
+                                    p.relative_to = value;
+                                    Message::WindowRules(
+                                        WindowRulesMessage::SetDefaultFloatingPosition(id, Some(p)),
+                                    )
+                                },
+                            ),
+                        ]
+                        .spacing(8),
+                    )
+                    .padding(8)
+                    .style(crate::theme::card_style)
+                },
+                Space::new().height(8),
+                modal_section_header("◌", "SHADOW", neon::TERTIARY),
+                shadow_editor(id, &rule.shadow, |id, v| Message::WindowRules(
+                    WindowRulesMessage::SetShadow(id, v)
+                ),),
+            ]
+            .spacing(8)
+            .width(Length::FillPortion(1)),
+            column![
+                row![
+                    text("CUSTOM KDL BLOCK")
+                        .size(10)
+                        .font(fonts::UI_FONT_SEMIBOLD)
+                        .color(neon::OUTLINE_VARIANT),
+                    Space::new().width(Length::Fill),
+                    text("Live Preview").size(10).color(neon::SECONDARY),
+                ]
+                .padding([10, 0]),
+                container(
+                    scrollable(
+                        text(kdl_preview)
+                            .size(12)
+                            .font(fonts::MONO_FONT)
+                            .color(neon::ON_SURFACE_VARIANT),
+                    )
+                    .height(Length::Fixed(160.0)),
+                )
+                .padding(16)
+                .width(Length::Fill)
+                .style(|_: &iced::Theme| container::Style {
+                    background: Some(iced::Background::Color(neon::SURFACE_LOW)),
+                    border: iced::Border {
+                        color: iced::Color {
+                            a: 0.15,
+                            ..neon::OUTLINE_VARIANT
+                        },
+                        width: 1.0,
+                        radius: 12.0.into(),
+                    },
+                    ..Default::default()
+                }),
+            ]
+            .spacing(0)
+            .width(Length::FillPortion(1)),
+        ]
+        .spacing(32)
+        .align_y(Alignment::Start),
+    );
+
+    // ── TAB INDICATOR COLOURS ──
+    editor = editor.push(Space::new().height(20));
+    editor = editor.push(modal_section_header(
+        "▤",
+        "TAB INDICATOR COLOURS",
+        neon::SECONDARY,
+    ));
+    {
+        let ti = rule.tab_indicator.clone().unwrap_or_default();
+        let ti_a = ti.clone();
+        let ti_i = ti.clone();
+        let ti_u = ti.clone();
+        editor = editor.push(
+            container(
+                column![
+                    color_picker_row(
+                        "Active",
+                        "Active tab colour",
+                        &color_or_gradient_to_niri(ti.active.as_ref()),
+                        move |hex| {
+                            let mut new = ti_a.clone();
+                            new.active = Some(ColorOrGradient::Color(hex_to_niri_color(&hex)));
+                            Message::WindowRules(WindowRulesMessage::SetTabIndicator(id, Some(new)))
                         },
                     ),
-                ].spacing(8)).padding(8).style(crate::theme::card_style)
-            },
-            Space::new().height(8),
-            info_text("Per-window shadow, tab indicator, and urgent color overrides can be configured via KDL. See the live preview for the full config block."),
-        ].spacing(8).width(Length::FillPortion(1)),
-
-        column![
-            row![
-                text("CUSTOM KDL BLOCK").size(10).font(fonts::UI_FONT_SEMIBOLD).color(neon::OUTLINE_VARIANT),
-                Space::new().width(Length::Fill),
-                text("Live Preview").size(10).color(neon::SECONDARY),
-            ].padding([10, 0]),
-            container(
-                scrollable(
-                    text(kdl_preview).size(12).font(fonts::MONO_FONT).color(neon::ON_SURFACE_VARIANT),
-                ).height(Length::Fixed(160.0)),
+                    color_picker_row(
+                        "Inactive",
+                        "Inactive tab colour",
+                        &color_or_gradient_to_niri(ti.inactive.as_ref()),
+                        move |hex| {
+                            let mut new = ti_i.clone();
+                            new.inactive = Some(ColorOrGradient::Color(hex_to_niri_color(&hex)));
+                            Message::WindowRules(WindowRulesMessage::SetTabIndicator(id, Some(new)))
+                        },
+                    ),
+                    color_picker_row(
+                        "Urgent",
+                        "Urgent tab colour",
+                        &color_or_gradient_to_niri(ti.urgent.as_ref()),
+                        move |hex| {
+                            let mut new = ti_u.clone();
+                            new.urgent = Some(ColorOrGradient::Color(hex_to_niri_color(&hex)));
+                            Message::WindowRules(WindowRulesMessage::SetTabIndicator(id, Some(new)))
+                        },
+                    ),
+                ]
+                .spacing(0),
             )
-            .padding(16).width(Length::Fill)
-            .style(|_: &iced::Theme| container::Style {
-                background: Some(iced::Background::Color(neon::SURFACE_LOW)),
-                border: iced::Border {
-                    color: iced::Color { a: 0.15, ..neon::OUTLINE_VARIANT },
-                    width: 1.0, radius: 12.0.into(),
-                },
-                ..Default::default()
-            }),
-        ].spacing(0).width(Length::FillPortion(1)),
-    ].spacing(32).align_y(Alignment::Start));
+            .padding(8)
+            .style(crate::theme::card_style),
+        );
+    }
+
+    // ── BACKGROUND EFFECT & POPUPS (niri 26.04) ──
+    editor = editor.push(Space::new().height(20));
+    editor = editor.push(modal_section_header(
+        "✦",
+        "BACKGROUND EFFECT & POPUPS",
+        neon::TERTIARY,
+    ));
+    editor = editor.push(background_effect_editor(
+        id,
+        &rule.background_effect,
+        &rule.popups,
+        supports_background_effects,
+        |id, v| Message::WindowRules(WindowRulesMessage::SetBackgroundEffect(id, v)),
+        |id, v| Message::WindowRules(WindowRulesMessage::SetPopups(id, v)),
+    ));
 
     // ── Footer ──
     editor = editor.push(Space::new().height(20));
@@ -1179,7 +1456,7 @@ fn rule_to_kdl_preview(rule: &WindowRule) -> String {
     } else {
         &rule.name
     };
-    lines.push(format!("window-rule {{"));
+    lines.push("window-rule {".to_string());
 
     for m in &rule.matches {
         let mut parts = Vec::new();
@@ -1207,11 +1484,14 @@ fn rule_to_kdl_preview(rule: &WindowRule) -> String {
         }
     }
 
-    match rule.open_behavior {
-        OpenBehavior::Floating => lines.push("    open-floating true".to_string()),
-        OpenBehavior::Maximized => lines.push("    open-maximized true".to_string()),
-        OpenBehavior::Fullscreen => lines.push("    open-fullscreen true".to_string()),
-        OpenBehavior::Normal => {}
+    if let Some(v) = rule.open_maximized {
+        lines.push(format!("    open-maximized {}", v));
+    }
+    if let Some(v) = rule.open_fullscreen {
+        lines.push(format!("    open-fullscreen {}", v));
+    }
+    if let Some(v) = rule.open_floating {
+        lines.push(format!("    open-floating {}", v));
     }
     if let Some(focused) = rule.open_focused {
         lines.push(format!("    open-focused {}", focused));
@@ -1222,29 +1502,64 @@ fn rule_to_kdl_preview(rule: &WindowRule) -> String {
     if let Some(ref ws) = rule.open_on_workspace {
         lines.push(format!("    open-on-workspace \"{}\"", ws));
     }
-    if rule.block_out_from_screencast {
-        lines.push("    block-out-from \"screencast\"".to_string());
+    if let Some(bof) = rule.block_out_from {
+        let s = match bof {
+            BlockOutFrom::Screencast => "screencast",
+            BlockOutFrom::ScreenCapture => "screen-capture",
+        };
+        lines.push(format!("    block-out-from \"{}\"", s));
     }
-    if let Some(width) = rule.default_column_width {
-        lines.push(format!("    default-column-width {:.2}", width));
+    if let Some(ref width) = rule.default_column_width {
+        lines.push(format!("    default-column-width {}", size_preview(width)));
     }
-    if let Some(height) = rule.default_window_height {
-        lines.push(format!("    default-window-height {:.2}", height));
+    if let Some(ref height) = rule.default_window_height {
+        lines.push(format!(
+            "    default-window-height {}",
+            size_preview(height)
+        ));
     }
     if let Some(opacity) = rule.opacity {
         lines.push(format!("    opacity {:.2}", opacity));
     }
-    if let Some(radius) = rule.corner_radius {
-        lines.push(format!("    geometry-corner-radius {}", radius));
+    if let Some(ref cr) = rule.corner_radius {
+        lines.push(format!("    geometry-corner-radius {}", corner_preview(cr)));
     }
     if let Some(clip) = rule.clip_to_geometry {
         lines.push(format!("    clip-to-geometry {}", clip));
     }
-    if let Some(focus_ring) = rule.focus_ring_enabled {
-        lines.push(format!("    focus-ring {{ off {}; }}", !focus_ring));
+    // One focus-ring block combining presence + width, mirroring the generator.
+    {
+        let mut parts = Vec::new();
+        if let Some(focus_ring) = rule.focus_ring_enabled {
+            parts.push(if focus_ring {
+                "on".to_string()
+            } else {
+                "off".to_string()
+            });
+        }
+        if let Some(fw) = rule.focus_ring_width {
+            parts.push(format!("width {}", fw));
+        }
+        if !parts.is_empty() {
+            lines.push(format!("    focus-ring {{ {}; }}", parts.join("; ")));
+        }
     }
-    if let Some(border) = rule.border_enabled {
-        lines.push(format!("    border {{ off {}; }}", !border));
+    // One border block combining presence + width, mirroring the generator.
+    {
+        let mut parts = Vec::new();
+        if let Some(border) = rule.border_enabled {
+            parts.push(if border {
+                "on".to_string()
+            } else {
+                "off".to_string()
+            });
+        }
+        if let Some(bw) = rule.border_width {
+            parts.push(format!("width {}", bw));
+        }
+        if !parts.is_empty() {
+            lines.push(format!("    border {{ {}; }}", parts.join("; ")));
+        }
     }
     if let Some(min_w) = rule.min_width {
         lines.push(format!("    min-width {}", min_w));
@@ -1261,12 +1576,6 @@ fn rule_to_kdl_preview(rule: &WindowRule) -> String {
     if let Some(scroll) = rule.scroll_factor {
         lines.push(format!("    scroll-factor {:.1}", scroll));
     }
-    if let Some(fw) = rule.focus_ring_width {
-        lines.push(format!("    focus-ring {{ width {}; }}", fw));
-    }
-    if let Some(bw) = rule.border_width {
-        lines.push(format!("    border {{ width {}; }}", bw));
-    }
     if let Some(edges) = rule.open_maximized_to_edges {
         lines.push(format!("    open-maximized-to-edges {}", edges));
     }
@@ -1278,6 +1587,38 @@ fn rule_to_kdl_preview(rule: &WindowRule) -> String {
     }
     if let Some(baba) = rule.baba_is_float {
         lines.push(format!("    baba-is-float {}", baba));
+    }
+    if let Some(ref ti) = rule.tab_indicator {
+        if !ti.is_empty() {
+            lines.push("    tab-indicator {".to_string());
+            if ti.active.is_some() {
+                lines.push("        active-color \"…\"".to_string());
+            }
+            if ti.inactive.is_some() {
+                lines.push("        inactive-color \"…\"".to_string());
+            }
+            if ti.urgent.is_some() {
+                lines.push("        urgent-color \"…\"".to_string());
+            }
+            lines.push("    }".to_string());
+        }
+    }
+    if let Some(ref sh) = rule.shadow {
+        if sh.enabled {
+            lines.push("    shadow { on … }".to_string());
+        } else {
+            lines.push("    shadow { off }".to_string());
+        }
+    }
+    if let Some(ref be) = rule.background_effect {
+        if !be.is_empty() {
+            lines.push("    background-effect { … }".to_string());
+        }
+    }
+    if let Some(ref p) = rule.popups {
+        if !p.is_empty() {
+            lines.push("    popups { … }".to_string());
+        }
     }
 
     lines.push("}".to_string());
@@ -1723,8 +2064,8 @@ fn truncate_str(s: &str, max_len: usize) -> String {
 /// Extract NiriColor from ColorOrGradient (uses first color of gradient)
 fn color_or_gradient_to_niri(cog: Option<&ColorOrGradient>) -> NiriColor {
     match cog {
-        Some(ColorOrGradient::Color(c)) => c.clone(),
-        Some(ColorOrGradient::Gradient(g)) => g.from.clone(),
+        Some(ColorOrGradient::Color(c)) => *c,
+        Some(ColorOrGradient::Gradient(g)) => g.from,
         None => NiriColor {
             r: 128,
             g: 128,
@@ -1755,25 +2096,502 @@ fn hex_to_niri_color(hex: &str) -> NiriColor {
     NiriColor { r, g, b, a }
 }
 
-// Implement Display for OpenBehavior to use with picker_row
-impl std::fmt::Display for OpenBehavior {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OpenBehavior::Normal => write!(f, "Normal"),
-            OpenBehavior::Maximized => write!(f, "Maximized"),
-            OpenBehavior::Fullscreen => write!(f, "Fullscreen"),
-            OpenBehavior::Floating => write!(f, "Floating"),
-        }
+/// Preview string for a RuleDefaultSize.
+fn size_preview(size: &RuleDefaultSize) -> String {
+    match size {
+        RuleDefaultSize::Natural => "{}".to_string(),
+        RuleDefaultSize::Proportion(p) => format!("{{ proportion {}; }}", p),
+        RuleDefaultSize::Fixed(n) => format!("{{ fixed {}; }}", n),
     }
 }
 
-impl OpenBehavior {
-    pub fn all() -> &'static [OpenBehavior] {
-        &[
-            OpenBehavior::Normal,
-            OpenBehavior::Maximized,
-            OpenBehavior::Fullscreen,
-            OpenBehavior::Floating,
-        ]
+/// Preview string for a CornerRadiusValue.
+fn corner_preview(cr: &CornerRadiusValue) -> String {
+    if cr.is_uniform() {
+        format!("{}", cr.top_left)
+    } else {
+        format!(
+            "{} {} {} {}",
+            cr.top_left, cr.top_right, cr.bottom_right, cr.bottom_left
+        )
     }
+}
+
+/// Editor card for a `RuleDefaultSize` (Unset / Natural / Proportion / Fixed px).
+fn default_size_editor<'a>(
+    label: &'a str,
+    id: u32,
+    value: &Option<RuleDefaultSize>,
+    on_change: impl Fn(u32, Option<RuleDefaultSize>) -> Message + Copy + 'a,
+) -> Element<'a, Message> {
+    let mode = SizeMode::of(value);
+    let mut col = column![picker_row(
+        label,
+        "Default size mode",
+        &SizeMode::ALL,
+        Some(mode),
+        move |m| {
+            let new = match m {
+                SizeMode::Unset => None,
+                SizeMode::Natural => Some(RuleDefaultSize::Natural),
+                SizeMode::Proportion => Some(RuleDefaultSize::Proportion(0.5)),
+                SizeMode::Fixed => Some(RuleDefaultSize::Fixed(800)),
+            };
+            on_change(id, new)
+        },
+    )]
+    .spacing(4);
+
+    match value {
+        Some(RuleDefaultSize::Proportion(p)) => {
+            let p = *p;
+            col = col.push(styled_slider(
+                "PROPORTION",
+                &format!("{:.2}", p),
+                move |s| {
+                    s.parse::<f32>().ok().map(|v| {
+                        on_change(id, Some(RuleDefaultSize::Proportion(v.clamp(0.1, 1.0))))
+                    })
+                },
+                0.1..=1.0,
+                p,
+                0.01,
+                move |v| on_change(id, Some(RuleDefaultSize::Proportion(v))),
+            ));
+        }
+        Some(RuleDefaultSize::Fixed(n)) => {
+            let n = *n;
+            col = col.push(styled_slider_int(
+                "FIXED PX",
+                &format!("{}", n),
+                move |s| {
+                    s.parse::<i32>()
+                        .ok()
+                        .map(|v| on_change(id, Some(RuleDefaultSize::Fixed(v.clamp(1, 10000)))))
+                },
+                1..=10000,
+                n,
+                move |v| on_change(id, Some(RuleDefaultSize::Fixed(v))),
+            ));
+        }
+        _ => {}
+    }
+    container(col).padding(4).width(Length::Fill).into()
+}
+
+/// Editor card for a `CornerRadiusValue`: uniform slider + per-corner inputs.
+pub(crate) fn corner_radius_editor<'a>(
+    label: &'a str,
+    id: u32,
+    value: &Option<CornerRadiusValue>,
+    on_change: impl Fn(u32, Option<CornerRadiusValue>) -> Message + Copy + 'a,
+) -> Element<'a, Message> {
+    let cr = value.unwrap_or_default();
+    let uniform = cr.top_left;
+    let corner_input =
+        move |field_label: &'static str, cur: f32, set: fn(&mut CornerRadiusValue, f32)| {
+            let base = cr;
+            column![
+                text(field_label)
+                    .size(9)
+                    .font(fonts::UI_FONT_SEMIBOLD)
+                    .color(neon::OUTLINE_VARIANT),
+                text_input("0", &format!("{}", cur))
+                    .on_input(move |s| {
+                        if let Ok(v) = s.parse::<f32>() {
+                            let mut new = base;
+                            set(&mut new, v.max(0.0));
+                            on_change(id, Some(new))
+                        } else {
+                            Message::NoOp
+                        }
+                    })
+                    .padding(6)
+                    .size(11),
+            ]
+            .spacing(2)
+            .width(Length::FillPortion(1))
+        };
+    container(
+        column![
+            styled_slider_int(
+                label,
+                &format!("{}px", uniform as i32),
+                move |s| {
+                    s.replace("px", "").parse::<i32>().ok().map(|v| {
+                        on_change(id, Some(CornerRadiusValue::uniform(v.clamp(0, 64) as f32)))
+                    })
+                },
+                0..=64,
+                uniform as i32,
+                move |v| on_change(id, Some(CornerRadiusValue::uniform(v as f32))),
+            ),
+            row![
+                corner_input("TL", cr.top_left, |c, v| c.top_left = v),
+                corner_input("TR", cr.top_right, |c, v| c.top_right = v),
+                corner_input("BR", cr.bottom_right, |c, v| c.bottom_right = v),
+                corner_input("BL", cr.bottom_left, |c, v| c.bottom_left = v),
+            ]
+            .spacing(4),
+        ]
+        .spacing(4),
+    )
+    .width(Length::FillPortion(1))
+    .into()
+}
+
+/// Editor card for an optional `ShadowSettings` override (window & layer rules).
+///
+/// Tri-state presence: Default = no override (None), Force on = `Some { enabled:
+/// true }`, Force off = `Some { enabled: false }` (emits `shadow { off }`).
+/// When forced on, the softness/spread/offset/colour/draw-behind controls show.
+pub(crate) fn shadow_editor<'a>(
+    id: u32,
+    shadow: &Option<ShadowSettings>,
+    on_change: impl Fn(u32, Option<ShadowSettings>) -> Message + Copy + 'a,
+) -> Element<'a, Message> {
+    let state = match shadow {
+        None => TriState::Default,
+        Some(s) if s.enabled => TriState::On,
+        Some(_) => TriState::Off,
+    };
+    let base = shadow.clone().unwrap_or_default();
+    let base_p = base.clone();
+    let mut col = column![picker_row(
+        "Shadow",
+        "Drop-shadow override for matching windows",
+        &TriState::ALL,
+        Some(state),
+        move |v| {
+            let new = match v {
+                TriState::Default => None,
+                TriState::On => {
+                    let mut s = base_p.clone();
+                    s.enabled = true;
+                    Some(s)
+                }
+                TriState::Off => {
+                    let mut s = base_p.clone();
+                    s.enabled = false;
+                    Some(s)
+                }
+            };
+            on_change(id, new)
+        },
+    )]
+    .spacing(0);
+
+    if state == TriState::On {
+        let int_slider = move |label: &'a str,
+                               cur: i32,
+                               range: std::ops::RangeInclusive<i32>,
+                               set: fn(&mut ShadowSettings, i32),
+                               base: ShadowSettings| {
+            let b_t = base.clone();
+            let b_s = base;
+            styled_slider_int(
+                label,
+                &format!("{}", cur),
+                move |txt| {
+                    txt.parse::<i32>().ok().map(|v| {
+                        let mut s = b_t.clone();
+                        set(&mut s, v);
+                        on_change(id, Some(s))
+                    })
+                },
+                range,
+                cur,
+                move |v| {
+                    let mut s = b_s.clone();
+                    set(&mut s, v);
+                    on_change(id, Some(s))
+                },
+            )
+        };
+        let s = base.clone();
+        let b_col = base.clone();
+        let b_ic = base.clone();
+        let b_dbw = base.clone();
+        col = col.push(
+            container(
+                column![
+                    int_slider(
+                        "SOFTNESS",
+                        s.softness,
+                        0..=100,
+                        |s, v| s.softness = v.clamp(0, 1024),
+                        base.clone()
+                    ),
+                    int_slider(
+                        "SPREAD",
+                        s.spread,
+                        -64..=64,
+                        |s, v| s.spread = v.clamp(-1024, 1024),
+                        base.clone()
+                    ),
+                    row![
+                        int_slider(
+                            "OFFSET X",
+                            s.offset_x,
+                            -128..=128,
+                            |s, v| s.offset_x = v,
+                            base.clone()
+                        ),
+                        int_slider(
+                            "OFFSET Y",
+                            s.offset_y,
+                            -128..=128,
+                            |s, v| s.offset_y = v,
+                            base.clone()
+                        ),
+                    ]
+                    .spacing(8),
+                    color_picker_row(
+                        "Shadow colour",
+                        "Active-window shadow",
+                        &s.color,
+                        move |hex| {
+                            let mut ns = b_col.clone();
+                            ns.color = hex_to_niri_color(&hex);
+                            on_change(id, Some(ns))
+                        }
+                    ),
+                    color_picker_row(
+                        "Inactive colour",
+                        "Inactive-window shadow",
+                        &s.inactive_color,
+                        move |hex| {
+                            let mut ns = b_ic.clone();
+                            ns.inactive_color = hex_to_niri_color(&hex);
+                            on_change(id, Some(ns))
+                        },
+                    ),
+                    toggle_row(
+                        "Draw behind window",
+                        "Render the shadow behind the window surface",
+                        s.draw_behind_window,
+                        move |on| {
+                            let mut ns = b_dbw.clone();
+                            ns.draw_behind_window = on;
+                            on_change(id, Some(ns))
+                        },
+                    ),
+                ]
+                .spacing(4),
+            )
+            .padding(8)
+            .style(crate::theme::card_style),
+        );
+    }
+
+    container(col)
+        .padding(8)
+        .style(crate::theme::card_style)
+        .into()
+}
+
+/// Render the xray / blur / noise / saturation controls for a
+/// `BackgroundEffectSettings`. Shared between the top-level rule effect and the
+/// nested popups effect.
+pub(crate) fn bg_effect_controls<'a>(
+    be: BackgroundEffectSettings,
+    on_change: impl Fn(BackgroundEffectSettings) -> Message + Clone + 'a,
+) -> Element<'a, Message> {
+    let oc_x = on_change.clone();
+    let oc_b = on_change.clone();
+    let oc_nt = on_change.clone();
+    let oc_ns = on_change.clone();
+    let oc_st = on_change.clone();
+    let oc_ss = on_change;
+    column![
+        picker_row(
+            "Background xray",
+            "See through to the wallpaper",
+            &TriState::ALL,
+            Some(TriState::from_opt(be.xray)),
+            move |v| {
+                let mut new = be;
+                new.xray = v.to_opt();
+                oc_x(new)
+            },
+        ),
+        picker_row(
+            "Background blur",
+            "Blur behind the surface",
+            &TriState::ALL,
+            Some(TriState::from_opt(be.blur)),
+            move |v| {
+                let mut new = be;
+                new.blur = v.to_opt();
+                oc_b(new)
+            },
+        ),
+        styled_slider(
+            "NOISE",
+            &be.noise.map(|n| format!("{:.2}", n)).unwrap_or_default(),
+            move |s| {
+                if s.trim().is_empty() {
+                    let mut new = be;
+                    new.noise = None;
+                    Some(oc_nt(new))
+                } else {
+                    s.parse::<f32>().ok().map(|v| {
+                        let mut new = be;
+                        new.noise = Some(v.max(0.0));
+                        oc_nt(new)
+                    })
+                }
+            },
+            0.0..=1.0,
+            be.noise.unwrap_or(0.0),
+            0.01,
+            move |v| {
+                let mut new = be;
+                new.noise = Some(v);
+                oc_ns(new)
+            },
+        ),
+        styled_slider(
+            "SATURATION",
+            &be.saturation
+                .map(|n| format!("{:.2}", n))
+                .unwrap_or_default(),
+            move |s| {
+                if s.trim().is_empty() {
+                    let mut new = be;
+                    new.saturation = None;
+                    Some(oc_st(new))
+                } else {
+                    s.parse::<f32>().ok().map(|v| {
+                        let mut new = be;
+                        new.saturation = Some(v.max(0.0));
+                        oc_st(new)
+                    })
+                }
+            },
+            0.0..=2.0,
+            be.saturation.unwrap_or(1.0),
+            0.05,
+            move |v| {
+                let mut new = be;
+                new.saturation = Some(v);
+                oc_ss(new)
+            },
+        ),
+    ]
+    .spacing(0)
+    .into()
+}
+
+/// Editor for the niri 26.04 background-effect + popups blocks (gated).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn background_effect_editor<'a>(
+    id: u32,
+    background_effect: &Option<BackgroundEffectSettings>,
+    popups: &Option<PopupsSettings>,
+    supported: bool,
+    on_bg: impl Fn(u32, Option<BackgroundEffectSettings>) -> Message + Copy + 'a,
+    on_popups: impl Fn(u32, Option<PopupsSettings>) -> Message + Copy + 'a,
+) -> Element<'a, Message> {
+    if !supported {
+        return container(info_text("Requires niri 26.04"))
+            .padding(8)
+            .style(crate::theme::card_style)
+            .into();
+    }
+    let be = (*background_effect).unwrap_or_default();
+    let popups_present = popups.as_ref().map(|p| !p.is_empty()).unwrap_or(false);
+
+    let mut col = column![
+        bg_effect_controls(be, move |new| on_bg(
+            id,
+            if new.is_empty() { None } else { Some(new) }
+        )),
+        toggle_row(
+            "Popup overrides",
+            "Override opacity / corners / effects for popups",
+            popups_present,
+            move |on| {
+                let new = if on {
+                    Some(PopupsSettings {
+                        opacity: Some(1.0),
+                        ..Default::default()
+                    })
+                } else {
+                    None
+                };
+                on_popups(id, new)
+            },
+        ),
+    ]
+    .spacing(0);
+
+    if popups_present {
+        let p = popups.clone().unwrap_or_default();
+        let p_op = p.clone();
+        let p_op2 = p.clone();
+        let p_cr = p.clone();
+        let p_cr2 = p.clone();
+        let p_be = p.clone();
+        let cur_op = p.opacity.unwrap_or(1.0);
+        let cur_cr = p
+            .geometry_corner_radius
+            .map(|c| c.top_left as i32)
+            .unwrap_or(0);
+        col = col.push(
+            container(
+                column![
+                    styled_slider(
+                        "POPUP OPACITY",
+                        &format!("{:.2}", cur_op),
+                        move |s| s.parse::<f32>().ok().map(|v| {
+                            let mut np = p_op.clone();
+                            np.opacity = Some(v.clamp(0.0, 1.0));
+                            on_popups(id, Some(np))
+                        }),
+                        0.0..=1.0,
+                        cur_op,
+                        0.01,
+                        move |v| {
+                            let mut np = p_op2.clone();
+                            np.opacity = Some(v);
+                            on_popups(id, Some(np))
+                        },
+                    ),
+                    styled_slider_int(
+                        "POPUP CORNER RADIUS",
+                        &format!("{}px", cur_cr),
+                        move |s| {
+                            s.replace("px", "").parse::<i32>().ok().map(|v| {
+                                let mut np = p_cr.clone();
+                                np.geometry_corner_radius =
+                                    Some(CornerRadiusValue::uniform(v.clamp(0, 64) as f32));
+                                on_popups(id, Some(np))
+                            })
+                        },
+                        0..=64,
+                        cur_cr,
+                        move |v| {
+                            let mut np = p_cr2.clone();
+                            np.geometry_corner_radius = Some(CornerRadiusValue::uniform(v as f32));
+                            on_popups(id, Some(np))
+                        },
+                    ),
+                    bg_effect_controls(p.background_effect.unwrap_or_default(), move |new| {
+                        let mut np = p_be.clone();
+                        np.background_effect = if new.is_empty() { None } else { Some(new) };
+                        on_popups(id, Some(np))
+                    }),
+                ]
+                .spacing(4),
+            )
+            .padding(8)
+            .style(crate::theme::card_style),
+        );
+    }
+
+    container(col)
+        .padding(8)
+        .style(crate::theme::card_style)
+        .into()
 }

@@ -201,15 +201,17 @@ fn create_merged_regex(patterns: &[String]) -> String {
 /// Key for grouping window rules by their effect (non-match settings)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct WindowRuleEffectKey {
-    open_behavior: u8,
+    open_maximized: Option<bool>,
+    open_fullscreen: Option<bool>,
+    open_floating: Option<bool>,
     opacity: Option<u32>, // f32 as bits for hashing
-    block_out_from_screencast: bool,
-    corner_radius: Option<i32>,
+    block_out_from: Option<u8>,
+    corner_radius: Option<[u32; 4]>,
     open_focused: Option<bool>,
     open_on_output: Option<String>,
     open_on_workspace: Option<String>,
-    default_column_width: Option<u32>,
-    default_window_height: Option<u32>,
+    default_column_width: Option<u64>,
+    default_window_height: Option<u64>,
     open_maximized_to_edges: Option<bool>,
     scroll_factor: Option<u64>,
     draw_border_with_background: Option<bool>,
@@ -219,18 +221,40 @@ struct WindowRuleEffectKey {
     max_height: Option<i32>,
 }
 
+/// Encode a `CornerRadiusValue` into a hashable array of f32 bits.
+fn corner_bits(cr: &crate::config::models::CornerRadiusValue) -> [u32; 4] {
+    [
+        cr.top_left.to_bits(),
+        cr.top_right.to_bits(),
+        cr.bottom_right.to_bits(),
+        cr.bottom_left.to_bits(),
+    ]
+}
+
+/// Encode a `RuleDefaultSize` into a hashable u64 (tag in high bits, value in low).
+fn size_bits(size: &crate::config::models::RuleDefaultSize) -> u64 {
+    use crate::config::models::RuleDefaultSize::*;
+    match size {
+        Natural => 0,
+        Proportion(p) => (1u64 << 32) | p.to_bits() as u64,
+        Fixed(n) => (2u64 << 32) | (*n as u32 as u64),
+    }
+}
+
 impl From<&WindowRule> for WindowRuleEffectKey {
     fn from(rule: &WindowRule) -> Self {
         Self {
-            open_behavior: rule.open_behavior as u8,
+            open_maximized: rule.open_maximized,
+            open_fullscreen: rule.open_fullscreen,
+            open_floating: rule.open_floating,
             opacity: rule.opacity.map(|f| f.to_bits()),
-            block_out_from_screencast: rule.block_out_from_screencast,
-            corner_radius: rule.corner_radius,
+            block_out_from: rule.block_out_from.map(|b| b as u8),
+            corner_radius: rule.corner_radius.as_ref().map(corner_bits),
             open_focused: rule.open_focused,
             open_on_output: rule.open_on_output.clone(),
             open_on_workspace: rule.open_on_workspace.clone(),
-            default_column_width: rule.default_column_width.map(|f| f.to_bits()),
-            default_window_height: rule.default_window_height.map(|f| f.to_bits()),
+            default_column_width: rule.default_column_width.as_ref().map(size_bits),
+            default_window_height: rule.default_window_height.as_ref().map(size_bits),
             open_maximized_to_edges: rule.open_maximized_to_edges,
             scroll_factor: rule.scroll_factor.map(|f| f.to_bits()),
             draw_border_with_background: rule.draw_border_with_background,
@@ -247,14 +271,14 @@ impl WindowRuleEffectKey {
     fn describe(&self) -> String {
         let mut parts = Vec::new();
 
-        if self.open_behavior != 0 {
-            let behavior = match self.open_behavior {
-                1 => "open-maximized",
-                2 => "open-fullscreen",
-                3 => "open-floating",
-                _ => "normal",
-            };
-            parts.push(behavior.to_string());
+        if self.open_maximized == Some(true) {
+            parts.push("open-maximized".to_string());
+        }
+        if self.open_fullscreen == Some(true) {
+            parts.push("open-fullscreen".to_string());
+        }
+        if self.open_floating == Some(true) {
+            parts.push("open-floating".to_string());
         }
 
         if let Some(bits) = self.opacity {
@@ -262,12 +286,12 @@ impl WindowRuleEffectKey {
             parts.push(format!("opacity {:.2}", opacity));
         }
 
-        if self.block_out_from_screencast {
+        if self.block_out_from.is_some() {
             parts.push("block-out-from".to_string());
         }
 
         if let Some(radius) = self.corner_radius {
-            parts.push(format!("corner-radius {}", radius));
+            parts.push(format!("corner-radius {}", f32::from_bits(radius[0])));
         }
 
         if let Some(ref output) = self.open_on_output {
@@ -291,7 +315,7 @@ impl WindowRuleEffectKey {
 struct LayerRuleEffectKey {
     block_out_from: Option<u8>,
     opacity: Option<u32>,
-    geometry_corner_radius: Option<i32>,
+    geometry_corner_radius: Option<[u32; 4]>,
     place_within_backdrop: bool,
     baba_is_float: bool,
 }
@@ -301,7 +325,7 @@ impl From<&LayerRule> for LayerRuleEffectKey {
         Self {
             block_out_from: rule.block_out_from.map(|b| b as u8),
             opacity: rule.opacity.map(|f| f.to_bits()),
-            geometry_corner_radius: rule.geometry_corner_radius,
+            geometry_corner_radius: rule.geometry_corner_radius.as_ref().map(corner_bits),
             place_within_backdrop: rule.place_within_backdrop,
             baba_is_float: rule.baba_is_float,
         }
@@ -322,7 +346,7 @@ impl LayerRuleEffectKey {
         }
 
         if let Some(radius) = self.geometry_corner_radius {
-            parts.push(format!("corner-radius {}", radius));
+            parts.push(format!("corner-radius {}", f32::from_bits(radius[0])));
         }
 
         if self.place_within_backdrop {

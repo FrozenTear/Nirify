@@ -42,11 +42,13 @@ pub struct OutputConfig {
     pub mode_custom: bool,
     /// Custom modeline string (v25.11+) - WARNING: can damage monitors
     pub modeline: Option<String>,
-    pub position_x: i32,
-    pub position_y: i32,
+    /// Explicit position; `None` means automatic placement by niri
+    pub position: Option<(i32, i32)>,
     pub transform: Transform,
     pub vrr: VrrMode,
     pub focus_at_startup: bool,
+    /// Per-output solid background color behind windows (niri Since 0.1.8)
+    pub background_color: Option<Color>,
     pub backdrop_color: Option<Color>,
     /// Per-output hot corners (v25.11+)
     pub hot_corners: Option<OutputHotCorners>,
@@ -63,11 +65,11 @@ impl Default for OutputConfig {
             mode: String::new(),
             mode_custom: false,
             modeline: None,
-            position_x: 0,
-            position_y: 0,
+            position: None,
             transform: Transform::Normal,
             vrr: VrrMode::Off,
             focus_at_startup: false,
+            background_color: None,
             backdrop_color: None,
             hot_corners: None,
             layout_override: None,

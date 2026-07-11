@@ -244,7 +244,7 @@ fn mode_row<'a>(
             .iter()
             .find(|m| {
                 m.starts_with(current_mode)
-                    || current_mode.starts_with(&m.split(" (").next().unwrap_or(""))
+                    || current_mode.starts_with(m.split(" (").next().unwrap_or(""))
             })
             .cloned();
 
@@ -389,24 +389,39 @@ pub fn output_detail_view<'a>(
             column![
                 modal_section("⊞", "POSITION", neon::TERTIARY),
                 Space::new().height(4),
-                slider_row_int(
-                    "Position X",
-                    "Horizontal position",
-                    output.position_x,
-                    -8192,
-                    8192,
-                    "px",
-                    move |v| Message::Outputs(OutputsMessage::SetPositionX(idx, v))
+                toggle_row(
+                    "Automatic position",
+                    "Let niri place this output automatically",
+                    output.position.is_none(),
+                    move |v| Message::Outputs(OutputsMessage::SetPositionAuto(idx, v))
                 ),
-                slider_row_int(
-                    "Position Y",
-                    "Vertical position",
-                    output.position_y,
-                    -8192,
-                    8192,
-                    "px",
-                    move |v| Message::Outputs(OutputsMessage::SetPositionY(idx, v))
-                ),
+                if let Some((px, py)) = output.position {
+                    Element::from(
+                        column![
+                            slider_row_int(
+                                "Position X",
+                                "Horizontal position",
+                                px,
+                                -8192,
+                                8192,
+                                "px",
+                                move |v| Message::Outputs(OutputsMessage::SetPositionX(idx, v))
+                            ),
+                            slider_row_int(
+                                "Position Y",
+                                "Vertical position",
+                                py,
+                                -8192,
+                                8192,
+                                "px",
+                                move |v| Message::Outputs(OutputsMessage::SetPositionY(idx, v))
+                            ),
+                        ]
+                        .spacing(6),
+                    )
+                } else {
+                    spacer(0.0)
+                },
             ]
             .spacing(6)
             .width(Length::FillPortion(1)),
@@ -478,6 +493,22 @@ pub fn output_detail_view<'a>(
         container(
             column![
                 toggle_row(
+                    "Custom mode",
+                    "Use a resolution not advertised by the display",
+                    output.mode_custom,
+                    move |v| Message::Outputs(OutputsMessage::SetModeCustom(idx, v))
+                ),
+                if output.mode_custom {
+                    text_input_row(
+                        "Custom resolution",
+                        "Format: WxH@R (e.g. 1920x1080@60)",
+                        mode_str,
+                        move |v| Message::Outputs(OutputsMessage::SetMode(idx, v)),
+                    )
+                } else {
+                    spacer(0.0)
+                },
+                toggle_row(
                     "Custom modeline",
                     "DANGEROUS: Custom display timing",
                     output.modeline.is_some(),
@@ -505,6 +536,31 @@ pub fn output_detail_view<'a>(
         .padding(8)
         .style(crate::theme::card_style),
     ];
+
+    // ── COLORS ──
+    content = content.push(Space::new().height(20));
+    content = content.push(modal_section("◑", "COLORS", neon::PRIMARY));
+    content = content.push(
+        container(
+            column![
+                optional_color_row(
+                    "Background color",
+                    "Solid color shown behind windows on this output",
+                    output.background_color.as_ref(),
+                    move |c| Message::Outputs(OutputsMessage::SetBackgroundColor(idx, c)),
+                ),
+                optional_color_row(
+                    "Backdrop color",
+                    "Color shown in the overview / between workspaces",
+                    output.backdrop_color.as_ref(),
+                    move |c| Message::Outputs(OutputsMessage::SetBackdropColor(idx, c)),
+                ),
+            ]
+            .spacing(4),
+        )
+        .padding(8)
+        .style(crate::theme::card_style),
+    );
 
     // ── LAYOUT OVERRIDE ──
     content = content.push(Space::new().height(20));
@@ -914,7 +970,7 @@ fn optional_color_row<'a>(
                 if let Some(c) = Color::from_hex(&hex) {
                     on_change_input(Some(c))
                 } else {
-                    Message::None
+                    Message::NoOp
                 }
             })
             .padding(8)
@@ -990,7 +1046,7 @@ fn optional_color_or_gradient_row<'a>(
                 if let Some(c) = Color::from_hex(&hex) {
                     on_change_input(Some(ColorOrGradient::Color(c)))
                 } else {
-                    Message::None
+                    Message::NoOp
                 }
             })
             .padding(8)

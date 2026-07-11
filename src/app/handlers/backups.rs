@@ -1,8 +1,10 @@
 //! Backups message handler
 
-use crate::messages::{BackupEntry, BackupsMessage, DialogState, Message};
+use crate::config::registry::ConfigFile;
+use crate::config::ConfigPaths;
+use crate::messages::{BackupEntry, BackupsMessage, DialogState, Message, RestoredTarget};
 use iced::Task;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 impl super::super::App {
     /// Updates backups state
@@ -68,20 +70,19 @@ impl super::super::App {
 
             BackupsMessage::ConfirmRestore(idx) => {
                 if let Some(backup) = self.ui.backups_state.backups.get(idx) {
-                    // Show confirmation dialog
+                    // Show confirmation dialog; the actual restore runs on confirm.
                     self.ui.dialog_state = DialogState::Confirm {
                         title: "Restore Backup".to_string(),
                         message: format!(
                             "Are you sure you want to restore '{}'?\n\n\
-                             This will overwrite your current config.kdl file. \
-                             A backup of your current config will be created first.",
+                             This overwrites the corresponding config file. A backup of \
+                             the current file is created first, and any unsaved changes \
+                             will be reloaded from disk.",
                             backup.filename
                         ),
                         confirm_label: "Restore".to_string(),
-                        on_confirm: crate::messages::ConfirmAction::ResetSettings, // We'll handle this specially
+                        on_confirm: crate::messages::ConfirmAction::RestoreBackup(idx),
                     };
-                    // Store the index for later
-                    self.ui.pending_restore_idx = Some(idx);
                 }
                 Task::none()
             }
@@ -91,14 +92,24 @@ impl super::super::App {
                 self.ui.backups_state.status_message = Some("Restoring...".to_string());
 
                 if let Some(backup) = self.ui.backups_state.backups.get(idx) {
+                    let filename = backup.filename.clone();
                     let backup_path = backup.path.clone();
-                    let config_path = self.paths.niri_config.clone();
                     let backup_dir = self.paths.backup_dir.clone();
 
-                    Task::perform(
-                        async move { restore_backup(&backup_path, &config_path, &backup_dir) },
-                        |result| Message::Backups(BackupsMessage::RestoreCompleted(result)),
-                    )
+                    match resolve_restore_target(&filename, &self.paths) {
+                        Some((target_path, target)) => Task::perform(
+                            async move {
+                                restore_backup(&backup_path, &target_path, target, &backup_dir)
+                            },
+                            |result| Message::Backups(BackupsMessage::RestoreCompleted(result)),
+                        ),
+                        None => {
+                            self.ui.backups_state.restoring = false;
+                            self.ui.backups_state.status_message =
+                                Some(format!("Cannot determine restore target for {}", filename));
+                            Task::none()
+                        }
+                    }
                 } else {
                     self.ui.backups_state.restoring = false;
                     self.ui.backups_state.status_message =
@@ -110,22 +121,85 @@ impl super::super::App {
             BackupsMessage::RestoreCompleted(result) => {
                 self.ui.backups_state.restoring = false;
                 match result {
-                    Ok(()) => {
+                    Ok(target) => {
                         self.ui.backups_state.status_message =
                             Some("Backup restored successfully!".to_string());
-                        self.ui.toast =
-                            Some("Backup restored! Restart Nirify to see changes.".to_string());
-                        self.ui.toast_shown_at = Some(std::time::Instant::now());
+                        match target {
+                            RestoredTarget::Managed => {
+                                // Reload settings fresh from disk and drop all in-memory
+                                // dirty/backup bookkeeping (restore is explicit). Rebuild the
+                                // blocked set from files that failed to read so a restore that
+                                // reintroduces an unreadable file re-pauses saving that
+                                // category (mirrors App::new), rather than clearing wholesale.
+                                let load_result =
+                                    crate::config::load_settings_with_result(&self.paths);
+                                self.settings = load_result.settings;
+                                self.save.dirty_tracker = crate::config::DirtyTracker::new();
+                                self.save.blocked = load_result
+                                    .failed_files
+                                    .iter()
+                                    .filter_map(|f| {
+                                        crate::config::SettingsCategory::from_relative_path(f)
+                                    })
+                                    .collect();
+                                self.save.in_flight.clear();
+                                self.save.backed_up.clear();
+                                self.save.last_change_time = None;
+                                self.save.last_failure_time = None;
+                                self.ui.error_banner = None;
+                                self.ui.tablet_calibration_cache =
+                                    crate::views::widgets::format_matrix_values(
+                                        self.settings.tablet.calibration_matrix,
+                                    );
+                                self.ui.touch_calibration_cache =
+                                    crate::views::widgets::format_matrix_values(
+                                        self.settings.touch.calibration_matrix,
+                                    );
+                                self.ui.mouse_scroll_factor_text =
+                                    format!("{}", self.settings.mouse.scroll_factor);
+                                self.ui.touchpad_scroll_factor_text =
+                                    format!("{}", self.settings.touchpad.scroll_factor);
+                                self.ui.toast = Some("Backup restored".to_string());
+                                self.ui.toast_shown_at = Some(std::time::Instant::now());
+                                self.reload_niri_config_task()
+                            }
+                            RestoredTarget::NiriConfig => {
+                                self.ui.toast = Some(
+                                    "Backup restored! Restart Nirify to see changes.".to_string(),
+                                );
+                                self.ui.toast_shown_at = Some(std::time::Instant::now());
+                                self.reload_niri_config_task()
+                            }
+                        }
                     }
                     Err(e) => {
                         self.ui.backups_state.status_message =
                             Some(format!("Failed to restore: {}", e));
+                        Task::none()
                     }
                 }
-                Task::none()
             }
         }
     }
+}
+
+/// Determine which file a backup should be restored to, and whether it is the
+/// user's main niri config or a managed category file.
+///
+/// Returns `None` when the target cannot be resolved (never falls back to
+/// overwriting the main config for a non-`config.kdl` backup).
+fn resolve_restore_target(
+    filename: &str,
+    paths: &ConfigPaths,
+) -> Option<(PathBuf, RestoredTarget)> {
+    if filename.starts_with("config.kdl.backup-") {
+        return Some((paths.niri_config.clone(), RestoredTarget::NiriConfig));
+    }
+
+    // Category backups look like "<name>.kdl.<timestamp>.bak"
+    let base = &filename[..filename.find(".kdl")? + 4];
+    let cf = ConfigFile::from_file_name(base)?;
+    Some((cf.full_path(&paths.managed_dir), RestoredTarget::Managed))
 }
 
 /// List all backups in the backup directory
@@ -142,14 +216,18 @@ fn list_backups(backup_dir: &std::path::Path) -> Result<Vec<BackupEntry>, String
     for entry in read_dir.flatten() {
         let path = entry.path();
         if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-            // Only include backup files (config.kdl.backup-*)
-            if filename.starts_with("config.kdl.backup-") || filename.contains(".backup-") {
+            // Include main-config backups (config.kdl.backup-*) and per-category
+            // backups (<name>.kdl.<ts>.bak).
+            if filename.starts_with("config.kdl.backup-")
+                || filename.contains(".backup-")
+                || filename.ends_with(".bak")
+            {
                 let metadata = std::fs::metadata(&path).ok();
 
                 let date = metadata
                     .as_ref()
                     .and_then(|m| m.modified().ok())
-                    .map(|t| format_system_time(t))
+                    .map(format_system_time)
                     .unwrap_or_else(|| extract_timestamp_from_filename(filename));
 
                 let size = metadata
@@ -236,12 +314,17 @@ fn format_file_size(bytes: u64) -> String {
     }
 }
 
-/// Restore a backup to the main config file
+/// Restore a backup to the resolved target file.
+///
+/// Before overwriting, the current target file (if present) is snapshotted:
+/// the main config uses the `config.kdl.backup-<ts>` scheme, managed files use
+/// the `<filename>.<ts>.bak` scheme (matching `save_with_backup`).
 fn restore_backup(
-    backup_path: &PathBuf,
-    config_path: &std::path::Path,
-    backup_dir: &std::path::Path,
-) -> Result<(), String> {
+    backup_path: &Path,
+    target_path: &Path,
+    target: RestoredTarget,
+    backup_dir: &Path,
+) -> Result<RestoredTarget, String> {
     use chrono::Local;
 
     // Read backup content first (validates it exists and is readable)
@@ -253,14 +336,25 @@ fn restore_backup(
         return Err(format!("Backup contains invalid KDL: {}", e));
     }
 
-    // Create a backup of the current config (read first to avoid TOCTOU)
-    if config_path.exists() {
-        let current_content = std::fs::read_to_string(config_path)
+    // Create a backup of the current target file (read first to avoid TOCTOU)
+    if target_path.exists() {
+        let current_content = std::fs::read_to_string(target_path)
             .map_err(|e| format!("Failed to read current config: {}", e))?;
 
-        // Use microsecond precision to avoid timestamp collisions
-        let timestamp = Local::now().format("%Y%m%dT%H%M%S%.6f");
-        let current_backup_name = format!("config.kdl.backup-{}", timestamp);
+        let current_backup_name = match target {
+            RestoredTarget::NiriConfig => {
+                let timestamp = Local::now().format("%Y%m%dT%H%M%S%.6f");
+                format!("config.kdl.backup-{}", timestamp)
+            }
+            RestoredTarget::Managed => {
+                let fname = target_path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("config.kdl");
+                let timestamp = Local::now().format("%Y-%m-%dT%H-%M-%S%.6f");
+                format!("{}.{}.bak", fname, timestamp)
+            }
+        };
         let current_backup_path = backup_dir.join(current_backup_name);
 
         // Ensure backup directory exists
@@ -274,16 +368,59 @@ fn restore_backup(
             .map_err(|e| format!("Failed to backup current config: {}", e))?;
 
         log::info!(
-            "Created backup of current config: {}",
+            "Created backup of current file: {}",
             current_backup_path.display()
         );
     }
 
-    // Write to config file using atomic write (safe against crashes)
-    crate::config::atomic_write(config_path, &backup_content)
+    // Write to target file using atomic write (safe against crashes)
+    crate::config::atomic_write(target_path, &backup_content)
         .map_err(|e| format!("Failed to write config file: {}", e))?;
 
-    log::info!("Restored backup from: {}", backup_path.display());
+    log::info!(
+        "Restored backup from {} to {}",
+        backup_path.display(),
+        target_path.display()
+    );
 
-    Ok(())
+    Ok(target)
+}
+
+#[cfg(test)]
+// Test setup mutates a couple fields after default() for readability.
+#[allow(clippy::field_reassign_with_default)]
+mod tests {
+    use super::*;
+
+    fn test_paths() -> ConfigPaths {
+        let mut p = ConfigPaths::default();
+        p.niri_config = PathBuf::from("/tmp/nirify-test/config.kdl");
+        p.managed_dir = PathBuf::from("/tmp/nirify-test/managed");
+        p
+    }
+
+    #[test]
+    fn resolve_restore_target_config_kdl() {
+        let paths = test_paths();
+        let (path, target) =
+            resolve_restore_target("config.kdl.backup-20260704T120000.000000", &paths).unwrap();
+        assert_eq!(path, paths.niri_config);
+        assert_eq!(target, RestoredTarget::NiriConfig);
+    }
+
+    #[test]
+    fn resolve_restore_target_category_bak() {
+        let paths = test_paths();
+        let (path, target) =
+            resolve_restore_target("appearance.kdl.2026-07-04T12-00-00.123456.bak", &paths)
+                .unwrap();
+        assert_eq!(path, paths.managed_dir.join("appearance.kdl"));
+        assert_eq!(target, RestoredTarget::Managed);
+    }
+
+    #[test]
+    fn resolve_restore_target_unknown_is_none() {
+        let paths = test_paths();
+        assert!(resolve_restore_target("garbage.txt.bak", &paths).is_none());
+    }
 }

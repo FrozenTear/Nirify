@@ -14,7 +14,7 @@
 use super::super::parser::{get_f64, get_i64, get_string, has_flag};
 use super::helpers::{
     parse_accel_profile, parse_click_method, parse_scroll_method, parse_tap_button_map,
-    read_kdl_file,
+    read_kdl_file, slashdash_node_present,
 };
 use crate::config::models::Settings;
 use crate::types::PointerDeviceSettings;
@@ -60,8 +60,7 @@ where
 ///
 /// Shared parsing logic used by both file loader and import.
 pub fn parse_keyboard_from_children(kbd_children: &KdlDocument, settings: &mut Settings) {
-    // Off directive - disables the keyboard entirely
-    settings.keyboard.off = has_flag(kbd_children, &["off"]);
+    // Note: niri's Keyboard has no `off` field; keyboards cannot be disabled.
 
     // XKB settings
     if let Some(xkb) = kbd_children.get("xkb") {
@@ -163,36 +162,69 @@ pub fn parse_mouse_from_children(m_children: &KdlDocument, settings: &mut Settin
     );
 }
 
-/// Parse scroll-factor which can be either a single f64 or a string "horizontal=X vertical=Y"
+/// Parse `scroll-factor`, accepting all niri-native forms plus the legacy
+/// Nirify quoted-string form.
+///
+/// niri accepts:
+///   * `scroll-factor 2.0`            (bare base argument, 0..100)
+///   * `scroll-factor horizontal=H vertical=V` (properties, each -100..100)
+///   * `scroll-factor 2 vertical=-1`  (mixed: base + property override)
+///
+/// Legacy Nirify files wrote `scroll-factor "horizontal=X vertical=Y"` (a
+/// quoted string). We still parse that so those files load once and get
+/// rewritten in the correct form on next save.
 fn parse_scroll_factor(children: &KdlDocument, vertical: &mut f64, horizontal: &mut Option<f64>) {
-    // First try to get as a string (for split format)
-    if let Some(s) = get_string(children, &["scroll-factor"]) {
-        // Parse "horizontal=X vertical=Y" format
-        let mut h_val: Option<f64> = None;
-        let mut v_val: Option<f64> = None;
+    let Some(node) = children.get("scroll-factor") else {
+        return;
+    };
 
-        for part in s.split_whitespace() {
-            if let Some(val_str) = part.strip_prefix("horizontal=") {
-                h_val = val_str.parse().ok();
-            } else if let Some(val_str) = part.strip_prefix("vertical=") {
-                v_val = val_str.parse().ok();
-            }
-        }
+    let mut base: Option<f64> = None;
+    let mut h_prop: Option<f64> = None;
+    let mut v_prop: Option<f64> = None;
 
-        if let Some(v) = v_val {
-            *vertical = v;
-        }
-        if let Some(h) = h_val {
-            // Only set horizontal if it differs from vertical
-            if h_val != v_val {
-                *horizontal = Some(h);
+    for entry in node.entries() {
+        // float-or-int reader for a single entry value
+        let as_num = |e: &kdl::KdlEntry| -> Option<f64> {
+            e.value()
+                .as_float()
+                .or_else(|| e.value().as_integer().map(|i| i as f64))
+        };
+
+        match entry.name().map(|n| n.value()) {
+            None => {
+                // Positional entry. Could be the numeric base, or the legacy
+                // quoted "horizontal=X vertical=Y" string.
+                if let Some(n) = as_num(entry) {
+                    base = Some(n);
+                } else if let Some(s) = entry.value().as_string() {
+                    log::warn!("Migrating legacy quoted scroll-factor string \"{}\"", s);
+                    for part in s.split_whitespace() {
+                        if let Some(val) = part.strip_prefix("horizontal=") {
+                            h_prop = val.parse().ok();
+                        } else if let Some(val) = part.strip_prefix("vertical=") {
+                            v_prop = val.parse().ok();
+                        }
+                    }
+                }
             }
+            Some("horizontal") => h_prop = as_num(entry),
+            Some("vertical") => v_prop = as_num(entry),
+            Some(_) => {}
         }
-    } else if let Some(v) = get_f64(children, &["scroll-factor"]) {
-        // Single value: applies to both directions
-        *vertical = v;
-        *horizontal = None;
     }
+
+    // Nothing usable found.
+    if base.is_none() && h_prop.is_none() && v_prop.is_none() {
+        return;
+    }
+
+    // Mirror niri's ScrollFactor::h_v_factors: base fills in any missing axis.
+    let bv = base.unwrap_or(1.0);
+    let h = h_prop.unwrap_or(bv);
+    let v = v_prop.unwrap_or(bv);
+
+    *vertical = v;
+    *horizontal = if h != v { Some(h) } else { None };
 }
 
 /// Load mouse settings from KDL file
@@ -211,7 +243,10 @@ pub fn parse_touchpad_from_children(tp_children: &KdlDocument, settings: &mut Se
     settings.touchpad.tap = has_flag(tp_children, &["tap"]);
     settings.touchpad.dwt = has_flag(tp_children, &["dwt"]);
     settings.touchpad.dwtp = has_flag(tp_children, &["dwtp"]);
-    settings.touchpad.drag = has_flag(tp_children, &["drag"]);
+    // drag is Option<bool>: None when absent (libinput default), else its value
+    settings.touchpad.drag = tp_children
+        .get("drag")
+        .map(|_| has_flag(tp_children, &["drag"]));
     settings.touchpad.drag_lock = has_flag(tp_children, &["drag-lock"]);
     settings.touchpad.disabled_on_external_mouse =
         has_flag(tp_children, &["disabled-on-external-mouse"]);
@@ -269,6 +304,8 @@ pub fn load_trackball(path: &Path, settings: &mut Settings) {
 pub fn parse_tablet_from_children(t_children: &KdlDocument, settings: &mut Settings) {
     settings.tablet.off = has_flag(t_children, &["off"]);
     settings.tablet.left_handed = has_flag(t_children, &["left-handed"]);
+    settings.tablet.map_to_focused_output = has_flag(t_children, &["map-to-focused-output"]);
+    settings.tablet.map_to_focused_window = has_flag(t_children, &["map-to-focused-window"]);
 
     if let Some(v) = get_string(t_children, &["map-to-output"]) {
         settings.tablet.map_to_output = v;
@@ -292,6 +329,21 @@ pub fn parse_tablet_from_children(t_children: &KdlDocument, settings: &mut Setti
 /// Load tablet (drawing tablet / stylus) settings from KDL file
 pub fn load_tablet(path: &Path, settings: &mut Settings) {
     load_input_device(path, "tablet", settings, parse_tablet_from_children);
+
+    // P1 preservation: version-gated / unreleased mapping flags are written
+    // slashdashed (`/-map-to-focused-output`, `/-map-to-focused-window`) so they
+    // survive round-trips without being applied by an incompatible niri. The KDL
+    // parser drops slashdashed nodes, so read them back from the raw file text.
+    // Use a string/comment-aware scan so the flags aren't falsely set by the
+    // node name appearing inside a comment or quoted string.
+    if let Ok(text) = std::fs::read_to_string(path) {
+        if slashdash_node_present(&text, "map-to-focused-output") {
+            settings.tablet.map_to_focused_output = true;
+        }
+        if slashdash_node_present(&text, "map-to-focused-window") {
+            settings.tablet.map_to_focused_window = true;
+        }
+    }
 }
 
 /// Parse touch settings from touch node children
@@ -322,4 +374,44 @@ pub fn parse_touch_from_children(t_children: &KdlDocument, settings: &mut Settin
 /// Load touch screen settings from KDL file
 pub fn load_touch(path: &Path, settings: &mut Settings) {
     load_input_device(path, "touch", settings, parse_touch_from_children);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_tmp(name: &str, contents: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "nirify_loader_input_{}_{}.kdl",
+            name,
+            std::process::id()
+        ));
+        std::fs::write(&path, contents).unwrap();
+        path
+    }
+
+    #[test]
+    fn load_tablet_reads_back_real_slashdash_flags() {
+        let kdl = "tablet {\n    /-map-to-focused-output\n    /-map-to-focused-window\n}\n";
+        let path = write_tmp("real_slashdash", kdl);
+        let mut settings = Settings::default();
+        load_tablet(&path, &mut settings);
+        let _ = std::fs::remove_file(&path);
+        assert!(settings.tablet.map_to_focused_output);
+        assert!(settings.tablet.map_to_focused_window);
+    }
+
+    #[test]
+    fn load_tablet_ignores_slashdash_text_in_comment() {
+        // The token appears only inside a line comment and a quoted string, so the
+        // string/comment-aware scan must NOT set the flags (regression guard for
+        // the old naive `str::contains`).
+        let kdl = "tablet {\n    // /-map-to-focused-output is documented here\n    /*\n      /-map-to-focused-window in a block comment\n    */\n    map-to-output \"note: /-map-to-focused-output /-map-to-focused-window\"\n}\n";
+        let path = write_tmp("comment_only", kdl);
+        let mut settings = Settings::default();
+        load_tablet(&path, &mut settings);
+        let _ = std::fs::remove_file(&path);
+        assert!(!settings.tablet.map_to_focused_output);
+        assert!(!settings.tablet.map_to_focused_window);
+    }
 }

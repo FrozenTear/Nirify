@@ -3,7 +3,115 @@
 use crate::types::ColorOrGradient;
 use nirify_macros::SlintIndex;
 
-use super::layout::{DefaultColumnDisplay, ShadowSettings, TabIndicatorSettings};
+use super::layout::{DefaultColumnDisplay, ShadowSettings};
+
+// ============================================================================
+// SHARED VALUE TYPES
+// ============================================================================
+
+/// A default preset size for a window rule (column width / window height).
+///
+/// niri models these as `default-column-width { fixed N; }`,
+/// `{ proportion F; }`, or an EMPTY block `{}` meaning "natural / unset".
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RuleDefaultSize {
+    /// Empty block `{}` — use niri's natural sizing.
+    Natural,
+    /// `proportion F` (0.0-1.0 of the working area).
+    Proportion(f32),
+    /// `fixed N` logical pixels.
+    Fixed(i32),
+}
+
+/// Per-corner geometry corner radius.
+///
+/// niri accepts either one value (uniform) or four values in the order
+/// top-left top-right bottom-right bottom-left.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct CornerRadiusValue {
+    pub top_left: f32,
+    pub top_right: f32,
+    pub bottom_right: f32,
+    pub bottom_left: f32,
+}
+
+impl CornerRadiusValue {
+    pub fn uniform(r: f32) -> Self {
+        Self {
+            top_left: r,
+            top_right: r,
+            bottom_right: r,
+            bottom_left: r,
+        }
+    }
+
+    pub fn is_uniform(&self) -> bool {
+        self.top_left == self.top_right
+            && self.top_right == self.bottom_right
+            && self.bottom_right == self.bottom_left
+    }
+}
+
+/// Background effect override (blur / xray), shared by window and layer rules.
+/// Since niri 26.04.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct BackgroundEffectSettings {
+    /// See through to the wallpaper (None = follow the window's request).
+    pub xray: Option<bool>,
+    /// Blur behind the surface (None = follow the window's request).
+    pub blur: Option<bool>,
+    /// Noise amount (niri: FloatOrInt<0,1000>).
+    pub noise: Option<f32>,
+    /// Saturation multiplier (niri: FloatOrInt<0,1000>).
+    pub saturation: Option<f32>,
+}
+
+impl BackgroundEffectSettings {
+    /// True when nothing is configured (so the block can be skipped).
+    pub fn is_empty(&self) -> bool {
+        self.xray.is_none()
+            && self.blur.is_none()
+            && self.noise.is_none()
+            && self.saturation.is_none()
+    }
+}
+
+/// Popup override block, shared by window and layer rules. Since niri 26.04.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct PopupsSettings {
+    pub opacity: Option<f32>,
+    pub geometry_corner_radius: Option<CornerRadiusValue>,
+    pub background_effect: Option<BackgroundEffectSettings>,
+}
+
+impl PopupsSettings {
+    pub fn is_empty(&self) -> bool {
+        self.opacity.is_none()
+            && self.geometry_corner_radius.is_none()
+            && self
+                .background_effect
+                .as_ref()
+                .map(|b| b.is_empty())
+                .unwrap_or(true)
+    }
+}
+
+/// Per-window tab-indicator override.
+///
+/// niri's `TabIndicatorRule` only accepts colour/gradient children — NOT the
+/// on/off/width/length/etc. that the global tab-indicator config accepts.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct TabIndicatorOverride {
+    pub active: Option<ColorOrGradient>,
+    pub inactive: Option<ColorOrGradient>,
+    pub urgent: Option<ColorOrGradient>,
+}
+
+impl TabIndicatorOverride {
+    pub fn is_empty(&self) -> bool {
+        self.active.is_none() && self.inactive.is_none() && self.urgent.is_none()
+    }
+}
 
 // ============================================================================
 // LAYER RULES
@@ -20,6 +128,51 @@ pub enum BlockOutFrom {
     ScreenCapture,
 }
 
+/// Which layer-shell layer a layer rule matches. Since niri 26.04.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LayerKind {
+    Background,
+    Bottom,
+    Top,
+    Overlay,
+}
+
+impl LayerKind {
+    pub fn all() -> &'static [Self] {
+        &[Self::Background, Self::Bottom, Self::Top, Self::Overlay]
+    }
+
+    pub fn to_kdl(&self) -> &'static str {
+        match self {
+            Self::Background => "background",
+            Self::Bottom => "bottom",
+            Self::Top => "top",
+            Self::Overlay => "overlay",
+        }
+    }
+
+    pub fn from_kdl(s: &str) -> Option<Self> {
+        match s {
+            "background" => Some(Self::Background),
+            "bottom" => Some(Self::Bottom),
+            "top" => Some(Self::Top),
+            "overlay" => Some(Self::Overlay),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for LayerKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Background => write!(f, "Background"),
+            Self::Bottom => write!(f, "Bottom"),
+            Self::Top => write!(f, "Top"),
+            Self::Overlay => write!(f, "Overlay"),
+        }
+    }
+}
+
 /// Match criteria for layer rules
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct LayerRuleMatch {
@@ -27,6 +180,8 @@ pub struct LayerRuleMatch {
     pub namespace: Option<String>,
     /// Match only during first 60 seconds after niri launch
     pub at_startup: Option<bool>,
+    /// Match by layer-shell layer (Since niri 26.04)
+    pub layer: Option<LayerKind>,
 }
 
 /// A single layer rule
@@ -40,6 +195,8 @@ pub struct LayerRule {
     pub name: String,
     /// Match criteria (multiple allowed - rule applies if ANY match)
     pub matches: Vec<LayerRuleMatch>,
+    /// Exclude criteria (rule does NOT apply if ANY exclude matches)
+    pub excludes: Vec<LayerRuleMatch>,
     /// Block layer surface from screencasts/captures
     pub block_out_from: Option<BlockOutFrom>,
     /// Layer opacity (0.0-1.0)
@@ -47,11 +204,15 @@ pub struct LayerRule {
     /// Shadow settings (v25.02+)
     pub shadow: Option<ShadowSettings>,
     /// Corner radius for geometry (v25.02+)
-    pub geometry_corner_radius: Option<i32>,
+    pub geometry_corner_radius: Option<CornerRadiusValue>,
     /// Place within backdrop (v25.05+)
     pub place_within_backdrop: bool,
     /// Treat as floating for animations (v25.05+)
     pub baba_is_float: bool,
+    /// Background effect override (Since 26.04)
+    pub background_effect: Option<BackgroundEffectSettings>,
+    /// Popup override block (Since 26.04)
+    pub popups: Option<PopupsSettings>,
 }
 
 impl Default for LayerRule {
@@ -61,12 +222,15 @@ impl Default for LayerRule {
             enabled: true,
             name: String::from("New Layer Rule"),
             matches: vec![LayerRuleMatch::default()],
+            excludes: vec![],
             block_out_from: None,
             opacity: None,
             shadow: None,
             geometry_corner_radius: None,
             place_within_backdrop: false,
             baba_is_float: false,
+            background_effect: None,
+            popups: None,
         }
     }
 }
@@ -125,17 +289,6 @@ pub struct WindowRuleMatch {
     pub at_startup: Option<bool>,
 }
 
-/// Opening behavior for window rules
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, SlintIndex)]
-pub enum OpenBehavior {
-    #[default]
-    #[slint_index(default)]
-    Normal,
-    Maximized,
-    Fullscreen,
-    Floating,
-}
-
 /// Position reference point for floating windows
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, SlintIndex)]
 pub enum PositionRelativeTo {
@@ -149,7 +302,6 @@ pub enum PositionRelativeTo {
     Bottom,
     Left,
     Right,
-    Center,
 }
 
 impl std::fmt::Display for PositionRelativeTo {
@@ -163,7 +315,6 @@ impl std::fmt::Display for PositionRelativeTo {
             Self::Bottom => write!(f, "Bottom"),
             Self::Left => write!(f, "Left"),
             Self::Right => write!(f, "Right"),
-            Self::Center => write!(f, "Center"),
         }
     }
 }
@@ -179,7 +330,6 @@ impl PositionRelativeTo {
             Self::Bottom,
             Self::Left,
             Self::Right,
-            Self::Center,
         ]
     }
 
@@ -194,11 +344,11 @@ impl PositionRelativeTo {
             Self::Bottom => "bottom",
             Self::Left => "left",
             Self::Right => "right",
-            Self::Center => "center",
         }
     }
 
-    /// Parse from KDL string
+    /// Parse from KDL string. Unknown values (incl. the removed "center") fall
+    /// back to TopLeft.
     pub fn from_kdl(s: &str) -> Self {
         match s {
             "top-right" => Self::TopRight,
@@ -208,8 +358,11 @@ impl PositionRelativeTo {
             "bottom" => Self::Bottom,
             "left" => Self::Left,
             "right" => Self::Right,
-            "center" => Self::Center,
-            _ => Self::TopLeft,
+            "top-left" => Self::TopLeft,
+            _ => {
+                log::warn!("Unknown relative-to value {:?}, using top-left", s);
+                Self::TopLeft
+            }
         }
     }
 }
@@ -238,34 +391,39 @@ pub struct WindowRule {
     pub matches: Vec<WindowRuleMatch>,
     /// Exclude criteria (multiple allowed - rule doesn't apply if ANY exclude matches)
     pub excludes: Vec<WindowRuleMatch>,
-    /// Opening behavior
-    pub open_behavior: OpenBehavior,
-    /// Window opacity (0.0-1.0, None = default)
-    pub opacity: Option<f32>,
-    /// Block from screencasts
-    pub block_out_from_screencast: bool,
-    /// Custom corner radius (None = use global)
-    pub corner_radius: Option<i32>,
-    /// Clip window to visual geometry (cuts shadows, rounds corners)
-    pub clip_to_geometry: Option<bool>,
+
+    // Opening behaviour — each independent (None = don't emit).
+    /// Open maximized within the column
+    pub open_maximized: Option<bool>,
+    /// Open fullscreen
+    pub open_fullscreen: Option<bool>,
+    /// Open floating
+    pub open_floating: Option<bool>,
+    /// Maximize to screen edges instead of columns (v25.11+)
+    pub open_maximized_to_edges: Option<bool>,
     /// Open focused
     pub open_focused: Option<bool>,
+
+    /// Window opacity (0.0-1.0, None = default)
+    pub opacity: Option<f32>,
+    /// Block from screencasts / all captures
+    pub block_out_from: Option<BlockOutFrom>,
+    /// Custom corner radius (None = use global)
+    pub corner_radius: Option<CornerRadiusValue>,
+    /// Clip window to visual geometry (cuts shadows, rounds corners)
+    pub clip_to_geometry: Option<bool>,
     /// Open on specific output
     pub open_on_output: Option<String>,
     /// Open on specific workspace
     pub open_on_workspace: Option<String>,
     /// Default floating window position
     pub default_floating_position: Option<FloatingPosition>,
-    /// Default column width proportion (0.0-1.0)
-    pub default_column_width: Option<f32>,
+    /// Default column width
+    pub default_column_width: Option<RuleDefaultSize>,
+    /// Default window height
+    pub default_window_height: Option<RuleDefaultSize>,
 
-    // New opening properties (v25.01+)
-    /// Default window height proportion (0.0-1.0, None = auto)
-    pub default_window_height: Option<f32>,
-    /// Maximize to screen edges instead of columns (v25.11+)
-    pub open_maximized_to_edges: Option<bool>,
-
-    // New dynamic properties
+    // Dynamic properties
     /// Per-window scroll factor (v25.02+)
     pub scroll_factor: Option<f64>,
     /// Draw border with background
@@ -308,8 +466,12 @@ pub struct WindowRule {
     pub default_column_display: Option<DefaultColumnDisplay>,
     /// Custom shadow settings for this window
     pub shadow: Option<ShadowSettings>,
-    /// Custom tab indicator for this window
-    pub tab_indicator: Option<TabIndicatorSettings>,
+    /// Custom tab indicator colours for this window
+    pub tab_indicator: Option<TabIndicatorOverride>,
+    /// Background effect override (Since 26.04)
+    pub background_effect: Option<BackgroundEffectSettings>,
+    /// Popup override block (Since 26.04)
+    pub popups: Option<PopupsSettings>,
     /// Mark window as tiled (for X11 compatibility)
     pub tiled_state: Option<bool>,
     /// Animated floating effect (v25.05+)
@@ -324,27 +486,26 @@ impl Default for WindowRule {
             name: String::from("New Rule"),
             matches: vec![WindowRuleMatch::default()],
             excludes: vec![],
-            open_behavior: OpenBehavior::Normal,
+            open_maximized: None,
+            open_fullscreen: None,
+            open_floating: None,
+            open_maximized_to_edges: None,
+            open_focused: None,
             opacity: None,
-            block_out_from_screencast: false,
+            block_out_from: None,
             corner_radius: None,
             clip_to_geometry: None,
-            open_focused: None,
             open_on_output: None,
             open_on_workspace: None,
             default_floating_position: None,
             default_column_width: None,
-            // New opening properties
             default_window_height: None,
-            open_maximized_to_edges: None,
-            // New dynamic properties
             scroll_factor: None,
             draw_border_with_background: None,
             min_width: None,
             max_width: None,
             min_height: None,
             max_height: None,
-            // Styling overrides
             focus_ring_enabled: None,
             focus_ring_width: None,
             focus_ring_active: None,
@@ -355,11 +516,12 @@ impl Default for WindowRule {
             border_active: None,
             border_inactive: None,
             border_urgent: None,
-            // Additional dynamic properties
             variable_refresh_rate: None,
             default_column_display: None,
             shadow: None,
             tab_indicator: None,
+            background_effect: None,
+            popups: None,
             tiled_state: None,
             baba_is_float: None,
         }
@@ -390,5 +552,38 @@ impl WindowRulesSettings {
         let len_before = self.rules.len();
         self.rules.retain(|r| r.id != id);
         self.rules.len() < len_before
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relative_to_center_falls_back_to_top_left() {
+        assert_eq!(
+            PositionRelativeTo::from_kdl("center"),
+            PositionRelativeTo::TopLeft
+        );
+        assert_eq!(
+            PositionRelativeTo::from_kdl("garbage"),
+            PositionRelativeTo::TopLeft
+        );
+        assert_eq!(
+            PositionRelativeTo::from_kdl("bottom-right"),
+            PositionRelativeTo::BottomRight
+        );
+    }
+
+    #[test]
+    fn corner_radius_uniform_detection() {
+        assert!(CornerRadiusValue::uniform(8.0).is_uniform());
+        let cr = CornerRadiusValue {
+            top_left: 8.0,
+            top_right: 8.0,
+            bottom_right: 0.0,
+            bottom_left: 0.0,
+        };
+        assert!(!cr.is_uniform());
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "nirify"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.82"
 description = "A native settings application for the niri Wayland compositor"
@@ -30,6 +30,8 @@ env_logger = "0.11"
 rfd = "0.15"
 paste = "1.0"
 regex-syntax = "0.8"
+# CSS color parsing (same crate niri uses) for importing rgb()/rgba()/named colors
+csscolorparser = "0.7"
 
 # System theme detection
 ashpd = "0.12"

@@ -56,9 +56,9 @@ fn test_input_clamping_logic() {
     assert_eq!(clamp_accel(2.0), ACCEL_SPEED_MAX);
     assert_eq!(clamp_accel(0.5), 0.5);
 
-    // Scroll factor: 0.1 to 10.0
-    assert_eq!(clamp_scroll_factor(0.0), SCROLL_FACTOR_MIN);
-    assert_eq!(clamp_scroll_factor(100.0), SCROLL_FACTOR_MAX);
+    // Scroll factor: -100.0 to 100.0 (niri per-axis FloatOrInt<-100,100>)
+    assert_eq!(clamp_scroll_factor(-200.0), SCROLL_FACTOR_MIN);
+    assert_eq!(clamp_scroll_factor(200.0), SCROLL_FACTOR_MAX);
     assert_eq!(clamp_scroll_factor(1.5), 1.5);
 }
 
@@ -99,8 +99,14 @@ fn test_save_dirty_single_category() {
     let mut dirty = HashSet::new();
     dirty.insert(SettingsCategory::Appearance);
 
-    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled())
-        .expect("save_dirty failed");
+    let files_written = save_dirty(
+        &paths,
+        &settings,
+        &dirty,
+        FeatureCompat::all_enabled(),
+        &std::collections::HashSet::new(),
+    )
+    .expect("save_dirty failed");
     assert_eq!(files_written, 1, "Should write exactly 1 file");
 
     // Verify the change persisted
@@ -128,8 +134,14 @@ fn test_save_dirty_multiple_categories() {
     dirty.insert(SettingsCategory::Cursor);
     dirty.insert(SettingsCategory::Keyboard);
 
-    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled())
-        .expect("save_dirty failed");
+    let files_written = save_dirty(
+        &paths,
+        &settings,
+        &dirty,
+        FeatureCompat::all_enabled(),
+        &std::collections::HashSet::new(),
+    )
+    .expect("save_dirty failed");
     assert_eq!(files_written, 3, "Should write exactly 3 files");
 
     // Verify all changes persisted
@@ -150,8 +162,14 @@ fn test_save_dirty_empty() {
 
     // Empty dirty set
     let dirty = HashSet::new();
-    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled())
-        .expect("save_dirty failed");
+    let files_written = save_dirty(
+        &paths,
+        &settings,
+        &dirty,
+        FeatureCompat::all_enabled(),
+        &std::collections::HashSet::new(),
+    )
+    .expect("save_dirty failed");
     assert_eq!(files_written, 0, "Should write 0 files for empty dirty set");
 }
 
@@ -178,8 +196,14 @@ fn test_dirty_tracker_save_integration() {
     assert_eq!(dirty.len(), 2);
 
     // Save dirty categories
-    let files_written = save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled())
-        .expect("save_dirty failed");
+    let files_written = save_dirty(
+        &paths,
+        &settings,
+        &dirty,
+        FeatureCompat::all_enabled(),
+        &std::collections::HashSet::new(),
+    )
+    .expect("save_dirty failed");
     assert_eq!(files_written, 2);
 
     // Tracker should be empty now
@@ -261,7 +285,14 @@ fn test_full_callback_save_cycle() {
 
     // Save
     let dirty = tracker.take();
-    save_dirty(&paths, &settings, &dirty, FeatureCompat::all_enabled()).expect("save_dirty failed");
+    save_dirty(
+        &paths,
+        &settings,
+        &dirty,
+        FeatureCompat::all_enabled(),
+        &std::collections::HashSet::new(),
+    )
+    .expect("save_dirty failed");
 
     // Verify final value persisted
     let loaded = load_settings(&paths);

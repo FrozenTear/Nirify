@@ -10,6 +10,7 @@
 
 pub mod calibration_matrix;
 pub mod color_picker;
+pub mod error_banner;
 pub mod expandable_section;
 pub mod file_path;
 pub mod gradient_picker;

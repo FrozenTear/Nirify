@@ -8,17 +8,117 @@
 //! - Consolidation dialog
 //! - Import summary dialog
 
-use iced::widget::{button, checkbox, column, container, row, scrollable, text, Column};
+use iced::widget::{
+    button, checkbox, column, container, mouse_area, row, scrollable, stack, text, Column, Space,
+};
 use iced::{Alignment, Border, Color as IcedColor, Element, Length};
 
 use crate::messages::{ConfirmAction, ConsolidationSuggestion, DialogState, Message, WizardStep};
 use crate::version::{get_unsupported_features, NiriVersion};
+
+/// Theme-aware muted text color for dialog body copy. Pulls the theme's
+/// base text color partway toward the base background so it reads as a
+/// secondary tone in BOTH light and dark themes (the old hard-coded light
+/// greys were invisible white-on-white on the light palettes).
+pub(crate) fn muted_text_style(theme: &iced::Theme) -> text::Style {
+    let p = theme.extended_palette();
+    let fg = p.background.base.text;
+    let bg = p.background.base.color;
+    let t = 0.30_f32;
+    text::Style {
+        color: Some(IcedColor::from_rgb(
+            fg.r + (bg.r - fg.r) * t,
+            fg.g + (bg.g - fg.g) * t,
+            fg.b + (bg.b - fg.b) * t,
+        )),
+    }
+}
+
+/// Theme-aware warning/attention text color for dialog body copy.
+fn warning_text_style(theme: &iced::Theme) -> text::Style {
+    let p = theme.extended_palette();
+    text::Style {
+        color: Some(p.danger.strong.color),
+    }
+}
+
+/// Theme-aware accent color for info-box headings ("Features:", "How it works:")
+/// and highlighted values, readable in both light and dark themes.
+fn accent_text_style(theme: &iced::Theme) -> text::Style {
+    text::Style {
+        color: Some(theme.extended_palette().primary.strong.color),
+    }
+}
+
+/// Theme-aware positive/confirmation color (e.g. the include-line snippet).
+fn success_text_style(theme: &iced::Theme) -> text::Style {
+    text::Style {
+        color: Some(theme.extended_palette().success.strong.color),
+    }
+}
+
+/// Theme-aware container style for the callout/info boxes inside dialogs.
+/// Uses the theme's weak background so it reads as a subtle panel in BOTH
+/// light and dark themes, and pins the text color so any uncolored inner
+/// copy stays legible (the old hard-coded dark boxes turned into dark
+/// islands with dark inherited text on the light palettes).
+fn info_box_style(theme: &iced::Theme) -> container::Style {
+    let p = theme.extended_palette();
+    container::Style {
+        background: Some(p.background.weak.color.into()),
+        text_color: Some(p.background.weak.text),
+        border: Border {
+            color: p.background.strong.color,
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Theme-aware warning callout box (version notes etc.).
+fn warning_box_style(theme: &iced::Theme) -> container::Style {
+    let p = theme.extended_palette();
+    container::Style {
+        background: Some(p.danger.weak.color.into()),
+        text_color: Some(p.danger.weak.text),
+        border: Border {
+            color: p.danger.strong.color,
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Theme-aware style for a selectable list item (consolidation suggestions).
+/// Selected rows use the primary-weak tint, others the neutral weak panel;
+/// both pin their text color so inner copy is legible in every theme.
+fn selection_item_style(theme: &iced::Theme, selected: bool) -> container::Style {
+    let p = theme.extended_palette();
+    let pair = if selected {
+        p.primary.weak
+    } else {
+        p.background.weak
+    };
+    container::Style {
+        background: Some(pair.color.into()),
+        text_color: Some(pair.text),
+        border: Border {
+            color: p.background.strong.color,
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    }
+}
 
 /// Creates the modal overlay with dialog content
 pub fn view<'a>(
     dialog: &'a DialogState,
     wizard_suggestions: &'a [ConsolidationSuggestion],
     niri_version: Option<NiriVersion>,
+    pending_revert: Option<&crate::app::ui_state::PendingRevert>,
 ) -> Option<Element<'a, Message>> {
     match dialog {
         DialogState::None => None,
@@ -51,6 +151,10 @@ pub fn view<'a>(
             before,
             after,
         } => Some(diff_view_dialog(title, before, after)),
+        DialogState::RevertCountdown { description } => {
+            let seconds_left = pending_revert.map(|p| p.seconds_left).unwrap_or(0);
+            Some(revert_countdown_dialog(description, seconds_left))
+        }
     }
 }
 
@@ -62,7 +166,7 @@ fn error_dialog<'a>(
 ) -> Element<'a, Message> {
     let mut content = column![
         text(title).size(24),
-        text(message).size(14).color([0.9, 0.9, 0.9]),
+        text(message).size(14).style(muted_text_style),
     ]
     .spacing(12);
 
@@ -71,17 +175,7 @@ fn error_dialog<'a>(
             scrollable(
                 container(text(details_str).size(12))
                     .padding(8)
-                    .style(|_theme| container::Style {
-                        background: Some(iced::Background::Color(IcedColor::from_rgb(
-                            0.15, 0.15, 0.15,
-                        ))),
-                        border: Border {
-                            color: IcedColor::from_rgb(0.3, 0.3, 0.3),
-                            width: 1.0,
-                            radius: 4.0.into(),
-                        },
-                        ..Default::default()
-                    }),
+                    .style(info_box_style),
             )
             .height(Length::Fixed(150.0)),
         );
@@ -104,7 +198,7 @@ fn error_dialog<'a>(
         .align_y(Alignment::Center),
     );
 
-    dialog_container(content)
+    dialog_container(content, true, 600.0)
 }
 
 /// Confirm dialog
@@ -116,7 +210,7 @@ fn confirm_dialog<'a>(
 ) -> Element<'a, Message> {
     let content = column![
         text(title).size(24),
-        text(message).size(14).color([0.9, 0.9, 0.9]),
+        text(message).size(14).style(muted_text_style),
         row![
             button(text("Cancel"))
                 .on_press(Message::CloseDialog)
@@ -148,7 +242,7 @@ fn confirm_dialog<'a>(
     ]
     .spacing(16);
 
-    dialog_container(content)
+    dialog_container(content, true, 600.0)
 }
 
 /// First-run wizard dialog
@@ -163,9 +257,11 @@ fn wizard_dialog<'a>(
         WizardStep::ImportResults => wizard_import_results(),
         WizardStep::Consolidation => wizard_consolidation(wizard_suggestions),
         WizardStep::Complete => wizard_complete(),
+        WizardStep::SkipWarning => wizard_skip_warning(),
     };
 
-    dialog_container(content)
+    // The wizard must not be dismissible via backdrop click before setup.
+    dialog_container(content, false, 600.0)
 }
 
 fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> {
@@ -173,40 +269,30 @@ fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> 
         text("Welcome to Niri Settings").size(28),
         text("A graphical settings manager for the niri Wayland compositor")
             .size(14)
-            .color([0.8, 0.8, 0.8]),
+            .style(muted_text_style),
         container(
             column![
-                text("Features:").size(13).color([0.7, 0.8, 0.9]),
+                text("Features:").size(13).style(accent_text_style),
                 text("  - Visual configuration for all niri settings")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
                 text("  - Window & layer rules with regex pattern matching")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
                 text("  - Smart rule consolidation to merge similar rules")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
                 text("  - Live preview - changes apply instantly")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
                 text("  - Import your existing config automatically")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
             ]
             .spacing(4)
         )
         .padding([12, 16])
-        .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(
-                0.12, 0.14, 0.18
-            ))),
-            border: Border {
-                color: IcedColor::from_rgb(0.25, 0.3, 0.4),
-                width: 1.0,
-                radius: 6.0.into(),
-            },
-            ..Default::default()
-        }),
+        .style(info_box_style),
     ]
     .spacing(16);
 
@@ -225,24 +311,14 @@ fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> 
                     column![
                         text(format!("Note: niri {} detected", version))
                             .size(12)
-                            .color([0.9, 0.7, 0.3]),
-                        text("Some features are not available in your version:")
-                            .size(11)
-                            .color([0.8, 0.6, 0.3]),
-                        text(feature_list).size(11).color([0.7, 0.6, 0.4]),
+                            .style(warning_text_style),
+                        text("Some features are not available in your version:").size(11),
+                        text(feature_list).size(11),
                     ]
                     .spacing(4),
                 )
                 .padding([10, 14])
-                .style(|_theme| container::Style {
-                    background: Some(iced::Background::Color(IcedColor::from_rgb(0.2, 0.15, 0.1))),
-                    border: Border {
-                        color: IcedColor::from_rgb(0.4, 0.3, 0.15),
-                        width: 1.0,
-                        radius: 6.0.into(),
-                    },
-                    ..Default::default()
-                }),
+                .style(warning_box_style),
             );
         }
     }
@@ -250,13 +326,13 @@ fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> 
     content = content.push(
         text("This wizard will help you set up the application.")
             .size(13)
-            .color([0.6, 0.6, 0.6]),
+            .style(muted_text_style),
     );
 
     content = content.push(
         row![
             button(text("Skip"))
-                .on_press(Message::CloseDialog)
+                .on_press(Message::WizardBack)
                 .padding([8, 24]),
             button(text("Get Started"))
                 .on_press(Message::WizardNext)
@@ -282,43 +358,33 @@ fn wizard_config_setup<'a>() -> Column<'a, Message> {
         text("Config Setup").size(24),
         text("Niri Settings uses a non-destructive approach to manage your config.")
             .size(14)
-            .color([0.8, 0.8, 0.8]),
+            .style(muted_text_style),
         container(
             column![
-                text("How it works:").size(13).color([0.7, 0.8, 0.9]),
+                text("How it works:").size(13).style(accent_text_style),
                 text("1. We create separate .kdl files in a nirify/ subdirectory")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
                 text("2. One include line is added to your config.kdl:")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
                 container(
                     text("include \"nirify/main.kdl\"")
                         .size(11)
-                        .color([0.5, 0.8, 0.5])
+                        .style(success_text_style)
                 )
                 .padding([4, 12]),
                 text("3. Your original config.kdl stays mostly untouched")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
             ]
             .spacing(6)
         )
         .padding([12, 16])
-        .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(
-                0.12, 0.14, 0.12
-            ))),
-            border: Border {
-                color: IcedColor::from_rgb(0.25, 0.35, 0.25),
-                width: 1.0,
-                radius: 6.0.into(),
-            },
-            ..Default::default()
-        }),
+        .style(info_box_style),
         text("A backup of your config will be created before any changes.")
             .size(12)
-            .color([0.6, 0.7, 0.6]),
+            .style(muted_text_style),
         row![
             button(text("Back"))
                 .on_press(Message::WizardBack)
@@ -346,31 +412,33 @@ fn wizard_import_results<'a>() -> Column<'a, Message> {
         text("Configuration Ready").size(24),
         text("Your settings are now managed by Niri Settings.")
             .size(14)
-            .color([0.8, 0.8, 0.8]),
+            .style(muted_text_style),
         container(
             column![
-                text("What was set up:").size(13).color([0.7, 0.8, 0.9]),
-                text("  - Appearance, animations, and cursor settings").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Input devices (keyboard, mouse, touchpad, etc.)").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Window rules and layer rules").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Keybindings and gestures").size(12).color([0.7, 0.7, 0.7]),
-                text("  - Workspaces, outputs, and layout settings").size(12).color([0.7, 0.7, 0.7]),
+                text("What was set up:").size(13).style(accent_text_style),
+                text("  - Appearance, animations, and cursor settings")
+                    .size(12)
+                    .style(muted_text_style),
+                text("  - Input devices (keyboard, mouse, touchpad, etc.)")
+                    .size(12)
+                    .style(muted_text_style),
+                text("  - Window rules and layer rules")
+                    .size(12)
+                    .style(muted_text_style),
+                text("  - Keybindings and gestures")
+                    .size(12)
+                    .style(muted_text_style),
+                text("  - Workspaces, outputs, and layout settings")
+                    .size(12)
+                    .style(muted_text_style),
             ]
             .spacing(4)
         )
         .padding([12, 16])
-        .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(0.12, 0.14, 0.18))),
-            border: Border {
-                color: IcedColor::from_rgb(0.25, 0.3, 0.4),
-                width: 1.0,
-                radius: 6.0.into(),
-            },
-            ..Default::default()
-        }),
+        .style(info_box_style),
         text("If you had existing window/layer rules, check the Tools page for consolidation suggestions.")
             .size(12)
-            .color([0.7, 0.7, 0.6]),
+            .style(muted_text_style),
         row![
             button(text("Back"))
                 .on_press(Message::WizardBack)
@@ -404,10 +472,10 @@ fn wizard_consolidation<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Colum
             total_count
         ))
         .size(14)
-        .color([0.8, 0.8, 0.8]),
+        .style(muted_text_style),
         text("Select which suggestions to apply:")
             .size(13)
-            .color([0.7, 0.7, 0.7]),
+            .style(muted_text_style),
     ]
     .spacing(12);
 
@@ -430,11 +498,7 @@ fn wizard_consolidation<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Colum
             )
         };
 
-        let bg_color = if suggestion.selected {
-            IcedColor::from_rgb(0.15, 0.2, 0.15)
-        } else {
-            IcedColor::from_rgb(0.12, 0.12, 0.14)
-        };
+        let selected = suggestion.selected;
 
         suggestion_list = suggestion_list.push(
             container(
@@ -445,10 +509,10 @@ fn wizard_consolidation<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Colum
                         text(&suggestion.description).size(12),
                         text(format!("{} rules: {}", rule_type, patterns_preview))
                             .size(11)
-                            .color([0.6, 0.6, 0.6]),
+                            .style(muted_text_style),
                         text(format!("→ {}", suggestion.merged_pattern))
                             .size(11)
-                            .color([0.5, 0.7, 0.9]),
+                            .style(accent_text_style),
                     ]
                     .spacing(2)
                     .width(Length::Fill),
@@ -458,15 +522,7 @@ fn wizard_consolidation<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Colum
             )
             .padding(10)
             .width(Length::Fill)
-            .style(move |_theme| container::Style {
-                background: Some(iced::Background::Color(bg_color)),
-                border: Border {
-                    color: IcedColor::from_rgb(0.25, 0.25, 0.28),
-                    width: 1.0,
-                    radius: 4.0.into(),
-                },
-                ..Default::default()
-            }),
+            .style(move |theme: &iced::Theme| selection_item_style(theme, selected)),
         );
     }
 
@@ -502,37 +558,27 @@ fn wizard_complete<'a>() -> Column<'a, Message> {
         text("You're All Set!").size(28),
         text("Niri Settings is ready to use.")
             .size(14)
-            .color([0.8, 0.8, 0.8]),
+            .style(muted_text_style),
         container(
             column![
-                text("Tips:").size(13).color([0.7, 0.8, 0.9]),
+                text("Tips:").size(13).style(accent_text_style),
                 text("  - Changes apply instantly - no need to save manually")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
                 text("  - Use Window Rules to customize per-app behavior")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
                 text("  - Check Tools > Analyze Rules to consolidate similar rules")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
                 text("  - Backups are saved to ~/.config/niri/.nirify-backups/")
                     .size(12)
-                    .color([0.7, 0.7, 0.7]),
+                    .style(muted_text_style),
             ]
             .spacing(4)
         )
         .padding([12, 16])
-        .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(
-                0.12, 0.15, 0.12
-            ))),
-            border: Border {
-                color: IcedColor::from_rgb(0.25, 0.35, 0.25),
-                width: 1.0,
-                radius: 6.0.into(),
-            },
-            ..Default::default()
-        }),
+        .style(info_box_style),
         button(text("Start Configuring"))
             .on_press(Message::CloseDialog)
             .padding([10, 32])
@@ -559,32 +605,22 @@ fn import_summary_dialog<'a>(
         text("Import Summary").size(24),
         text(format!("Imported {} settings sections", imported_count))
             .size(14)
-            .color([0.8, 0.8, 0.8]),
+            .style(muted_text_style),
         text(format!("{} sections used default values", defaulted_count))
             .size(13)
-            .color([0.7, 0.7, 0.7]),
+            .style(muted_text_style),
     ]
     .spacing(12);
 
     if !warnings.is_empty() {
         let warnings_text = warnings.join("\n");
 
-        content = content.push(text("Warnings:").size(14).color([0.9, 0.6, 0.3]));
+        content = content.push(text("Warnings:").size(14).style(warning_text_style));
         content = content.push(
             scrollable(
                 container(text(warnings_text).size(12))
                     .padding(8)
-                    .style(|_theme| container::Style {
-                        background: Some(iced::Background::Color(IcedColor::from_rgb(
-                            0.2, 0.15, 0.1,
-                        ))),
-                        border: Border {
-                            color: IcedColor::from_rgb(0.5, 0.3, 0.2),
-                            width: 1.0,
-                            radius: 4.0.into(),
-                        },
-                        ..Default::default()
-                    }),
+                    .style(warning_box_style),
             )
             .height(Length::Fixed(150.0)),
         );
@@ -596,7 +632,7 @@ fn import_summary_dialog<'a>(
             .padding([8, 24]),
     );
 
-    dialog_container(content)
+    dialog_container(content, true, 600.0)
 }
 
 /// Consolidation dialog
@@ -611,10 +647,10 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
             suggestion_count, selected_count
         ))
         .size(14)
-        .color([0.8, 0.8, 0.8]),
+        .style(muted_text_style),
         text("Select suggestions to apply:")
             .size(13)
-            .color([0.7, 0.7, 0.7]),
+            .style(muted_text_style),
     ]
     .spacing(12);
 
@@ -635,11 +671,7 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
             )
         };
 
-        let bg_color = if suggestion.selected {
-            IcedColor::from_rgb(0.2, 0.25, 0.2)
-        } else {
-            IcedColor::from_rgb(0.15, 0.15, 0.15)
-        };
+        let selected = suggestion.selected;
 
         content = content.push(
             container(
@@ -650,13 +682,13 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
                         text(&suggestion.description).size(13),
                         text(format!("Type: {} rules", rule_type))
                             .size(11)
-                            .color([0.6, 0.7, 0.6]),
+                            .style(muted_text_style),
                         text(format!("Patterns: {}", patterns_preview))
                             .size(11)
-                            .color([0.6, 0.6, 0.6]),
+                            .style(muted_text_style),
                         text(format!("Merged: {}", suggestion.merged_pattern))
                             .size(11)
-                            .color([0.5, 0.7, 0.9]),
+                            .style(accent_text_style),
                     ]
                     .spacing(2)
                     .width(Length::Fill),
@@ -666,15 +698,7 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
             )
             .padding(12)
             .width(Length::Fill)
-            .style(move |_theme| container::Style {
-                background: Some(iced::Background::Color(bg_color)),
-                border: Border {
-                    color: IcedColor::from_rgb(0.3, 0.3, 0.3),
-                    width: 1.0,
-                    radius: 4.0.into(),
-                },
-                ..Default::default()
-            }),
+            .style(move |theme: &iced::Theme| selection_item_style(theme, selected)),
         );
     }
 
@@ -717,7 +741,7 @@ fn consolidation_dialog<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Eleme
         .spacing(12),
     );
 
-    dialog_container(content)
+    dialog_container(content, false, 600.0)
 }
 
 /// Diff view dialog showing before/after config changes
@@ -726,25 +750,27 @@ fn diff_view_dialog<'a>(title: &'a str, before: &'a str, after: &'a str) -> Elem
         text(title).size(24),
         text("Compare configuration changes before applying")
             .size(13)
-            .color([0.7, 0.7, 0.7]),
+            .style(muted_text_style),
         row![
             // Before panel
             column![
-                text("Before").size(14).color([0.9, 0.5, 0.5]),
+                text("Before").size(14).style(warning_text_style),
                 scrollable(
                     container(text(before).size(12).font(iced::Font::MONOSPACE))
                         .padding(12)
                         .width(Length::Fill)
-                        .style(|_theme| container::Style {
-                            background: Some(iced::Background::Color(IcedColor::from_rgb(
-                                0.12, 0.10, 0.10
-                            ))),
-                            border: Border {
-                                color: IcedColor::from_rgb(0.4, 0.25, 0.25),
-                                width: 1.0,
-                                radius: 4.0.into(),
-                            },
-                            ..Default::default()
+                        .style(|theme: &iced::Theme| {
+                            let p = theme.extended_palette();
+                            container::Style {
+                                background: Some(p.danger.weak.color.into()),
+                                text_color: Some(p.danger.weak.text),
+                                border: Border {
+                                    color: p.danger.strong.color,
+                                    width: 1.0,
+                                    radius: 4.0.into(),
+                                },
+                                ..Default::default()
+                            }
                         })
                 )
                 .height(Length::Fixed(300.0))
@@ -753,21 +779,23 @@ fn diff_view_dialog<'a>(title: &'a str, before: &'a str, after: &'a str) -> Elem
             .width(Length::Fill),
             // After panel
             column![
-                text("After").size(14).color([0.5, 0.9, 0.5]),
+                text("After").size(14).style(success_text_style),
                 scrollable(
                     container(text(after).size(12).font(iced::Font::MONOSPACE))
                         .padding(12)
                         .width(Length::Fill)
-                        .style(|_theme| container::Style {
-                            background: Some(iced::Background::Color(IcedColor::from_rgb(
-                                0.10, 0.12, 0.10
-                            ))),
-                            border: Border {
-                                color: IcedColor::from_rgb(0.25, 0.4, 0.25),
-                                width: 1.0,
-                                radius: 4.0.into(),
-                            },
-                            ..Default::default()
+                        .style(|theme: &iced::Theme| {
+                            let p = theme.extended_palette();
+                            container::Style {
+                                background: Some(p.success.weak.color.into()),
+                                text_color: Some(p.success.weak.text),
+                                border: Border {
+                                    color: p.success.strong.color,
+                                    width: 1.0,
+                                    radius: 4.0.into(),
+                                },
+                                ..Default::default()
+                            }
                         })
                 )
                 .height(Length::Fixed(300.0))
@@ -806,71 +834,155 @@ fn diff_view_dialog<'a>(title: &'a str, before: &'a str, after: &'a str) -> Elem
     ]
     .spacing(16);
 
-    // Use wider dialog for diff view
-    let dialog = container(content)
-        .padding(32)
-        .width(Length::Fixed(900.0))
-        .max_height(600.0)
-        .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(
-                0.18, 0.18, 0.20,
-            ))),
-            border: Border {
-                color: IcedColor::from_rgb(0.4, 0.4, 0.4),
-                width: 2.0,
-                radius: 12.0.into(),
-            },
-            ..Default::default()
-        });
-
-    container(dialog)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center(Length::Fill)
-        .style(|_theme: &iced::Theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
-                a: 0.7,
-            })),
-            ..Default::default()
-        })
-        .into()
+    // Themed + backdrop-dismissible, wider than the standard dialogs.
+    dialog_container(content, true, 900.0)
 }
 
-/// Wraps content in a dialog container with backdrop
-fn dialog_container<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
-    // Create dialog box
+/// Apply-then-confirm countdown dialog for risky live-applied changes
+/// (output mode/disable, keybinding changes). Not dismissible via backdrop —
+/// the user must explicitly Keep or Revert.
+fn revert_countdown_dialog<'a>(description: &'a str, seconds_left: u8) -> Element<'a, Message> {
+    let content = column![
+        text("Keep these changes?").size(20),
+        Space::new().height(12),
+        text(format!(
+            "{}. Reverting in {} s unless you confirm.",
+            description, seconds_left
+        ))
+        .size(14),
+        Space::new().height(24),
+        row![
+            button(text("Revert"))
+                .on_press(Message::RevertNow)
+                .style(button::secondary)
+                .padding([8, 24]),
+            Space::new().width(Length::Fill),
+            button(text("Keep changes"))
+                .on_press(Message::RevertKeep)
+                .style(button::primary)
+                .padding([8, 24]),
+        ]
+        .align_y(Alignment::Center),
+    ];
+
+    dialog_container(content, false, 600.0)
+}
+
+/// Wizard step shown when the user tries to skip setup before the niri include
+/// line is present. Requires an explicit acknowledgement.
+fn wizard_skip_warning<'a>() -> Column<'a, Message> {
+    let code_line = container(text("include \"nirify/main.kdl\"").size(13))
+        .padding(10)
+        .style(|theme: &iced::Theme| {
+            let palette = theme.extended_palette();
+            container::Style {
+                background: Some(palette.background.weak.color.into()),
+                border: Border {
+                    color: palette.background.strong.color,
+                    width: 1.0,
+                    radius: 6.0.into(),
+                },
+                text_color: Some(palette.background.weak.text),
+                ..Default::default()
+            }
+        })
+        .width(Length::Fill);
+
+    column![
+        text("Skip setup?").size(22),
+        Space::new().height(12),
+        text(
+            "Nothing you change in this app will affect niri until this line is \
+             added to your niri config (~/.config/niri/config.kdl):"
+        )
+        .size(14),
+        Space::new().height(8),
+        code_line,
+        Space::new().height(8),
+        text("You can run setup later from the Tools page.").size(13),
+        Space::new().height(24),
+        row![
+            button(text("Go back to setup"))
+                .on_press(Message::WizardBack)
+                .style(button::primary)
+                .padding([8, 24]),
+            Space::new().width(Length::Fill),
+            button(text("Skip setup — I understand the app won't work yet"))
+                .on_press(Message::WizardSkipConfirmed)
+                .style(button::danger)
+                .padding([8, 24]),
+        ]
+        .align_y(Alignment::Center),
+    ]
+    .spacing(0)
+}
+
+/// Wraps content in a themed dialog box over a dimming backdrop.
+///
+/// When `dismissible` is true, clicking the backdrop (scrim) dispatches
+/// `Message::CloseDialog`; clicks on the dialog box itself are swallowed.
+fn dialog_container<'a>(
+    content: impl Into<Element<'a, Message>>,
+    dismissible: bool,
+    width_px: f32,
+) -> Element<'a, Message> {
+    // Themed dialog box (adapts to light/dark theme).
     let dialog = container(content)
         .padding(32)
-        .width(Length::Fixed(600.0))
+        .width(Length::Fixed(width_px))
         .max_height(700.0)
-        .style(|_theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor::from_rgb(
-                0.18, 0.18, 0.20,
-            ))),
-            border: Border {
-                color: IcedColor::from_rgb(0.4, 0.4, 0.4),
-                width: 2.0,
-                radius: 12.0.into(),
-            },
-            ..Default::default()
+        .style(|theme: &iced::Theme| {
+            let palette = theme.extended_palette();
+            container::Style {
+                background: Some(palette.background.base.color.into()),
+                border: Border {
+                    color: palette.background.strong.color,
+                    width: 1.0,
+                    radius: 12.0.into(),
+                },
+                text_color: Some(palette.background.base.text),
+                shadow: iced::Shadow {
+                    color: IcedColor::from_rgba(0.0, 0.0, 0.0, 0.3),
+                    offset: iced::Vector::new(0.0, 4.0),
+                    blur_radius: 24.0,
+                },
+                ..Default::default()
+            }
         });
 
-    // Stack dialog on top of backdrop (using a column for now - iced doesn't have true z-stacking)
-    container(dialog)
+    let scrim_style = |_theme: &iced::Theme| container::Style {
+        background: Some(iced::Background::Color(IcedColor {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 0.7,
+        })),
+        ..Default::default()
+    };
+
+    // Backdrop scrim: for a dismissible dialog a press closes it; for a modal
+    // (non-dismissible) dialog the press is swallowed (NoOp) so it cannot fall
+    // through to the UI underneath. Wrapping in `mouse_area` is the iced 0.14
+    // modal pattern for capturing pointer events over the overlay.
+    let scrim = mouse_area(
+        container(Space::new())
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(scrim_style),
+    )
+    .on_press(if dismissible {
+        Message::CloseDialog
+    } else {
+        Message::NoOp
+    });
+
+    // The dialog box itself always swallows clicks so presses on its
+    // non-interactive areas never reach controls behind the overlay.
+    let boxed = mouse_area(dialog).on_press(Message::NoOp);
+    let centered = container(boxed)
         .width(Length::Fill)
         .height(Length::Fill)
-        .center(Length::Fill)
-        .style(|_theme: &iced::Theme| container::Style {
-            background: Some(iced::Background::Color(IcedColor {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
-                a: 0.7,
-            })),
-            ..Default::default()
-        })
-        .into()
+        .center(Length::Fill);
+
+    stack![scrim, centered].into()
 }

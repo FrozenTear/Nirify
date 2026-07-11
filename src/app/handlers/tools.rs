@@ -11,41 +11,38 @@ impl super::super::App {
             ToolsMessage::RefreshWindows => {
                 self.ui.tools_state.loading_windows = true;
                 self.ui.tools_state.last_error = None;
-                Task::perform(
-                    async { crate::ipc::get_windows().map_err(|e| e.to_string()) },
-                    |result| Message::Tools(ToolsMessage::WindowsLoaded(result)),
-                )
+                crate::ipc::tasks::get_windows_async(|r| {
+                    Message::Tools(ToolsMessage::WindowsLoaded(r.map_err(|e| e.to_string())))
+                })
             }
             ToolsMessage::RefreshWorkspaces => {
                 self.ui.tools_state.loading_workspaces = true;
                 self.ui.tools_state.last_error = None;
-                Task::perform(
-                    async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
-                    |result| Message::Tools(ToolsMessage::WorkspacesLoaded(result)),
-                )
+                crate::ipc::tasks::get_workspaces_async(|r| {
+                    Message::Tools(ToolsMessage::WorkspacesLoaded(r.map_err(|e| e.to_string())))
+                })
             }
             ToolsMessage::RefreshOutputs => {
                 self.ui.tools_state.loading_outputs = true;
                 self.ui.tools_state.last_error = None;
-                Task::perform(
-                    async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
-                    |result| Message::Tools(ToolsMessage::OutputsLoaded(result)),
-                )
+                crate::ipc::tasks::get_full_outputs_async(|r| {
+                    Message::Tools(ToolsMessage::OutputsLoaded(r.map_err(|e| e.to_string())))
+                })
             }
             ToolsMessage::RefreshFocusedWindow => {
                 self.ui.tools_state.last_error = None;
-                Task::perform(
-                    async { crate::ipc::get_focused_window().map_err(|e| e.to_string()) },
-                    |result| Message::Tools(ToolsMessage::FocusedWindowLoaded(result)),
-                )
+                crate::ipc::tasks::get_focused_window_async(|r| {
+                    Message::Tools(ToolsMessage::FocusedWindowLoaded(
+                        r.map_err(|e| e.to_string()),
+                    ))
+                })
             }
             ToolsMessage::RefreshVersion => {
                 self.ui.tools_state.loading_version = true;
                 self.ui.tools_state.last_error = None;
-                Task::perform(
-                    async { crate::ipc::get_version().map_err(|e| e.to_string()) },
-                    |result| Message::Tools(ToolsMessage::VersionLoaded(result)),
-                )
+                crate::ipc::tasks::get_version_async(|r| {
+                    Message::Tools(ToolsMessage::VersionLoaded(r.map_err(|e| e.to_string())))
+                })
             }
 
             // Query results
@@ -103,7 +100,37 @@ impl super::super::App {
                 self.ui.tools_state.loading_version = false;
                 match result {
                     Ok(version) => {
-                        self.ui.tools_state.version = Some(version);
+                        self.ui.tools_state.version = Some(version.clone());
+                        // Refresh version-gated feature compatibility on (re)connect.
+                        if let Some(parsed) = crate::version::NiriVersion::parse(&version) {
+                            let new_compat =
+                                crate::version::FeatureCompat::from_version(Some(parsed));
+                            let compat_changed = new_compat != self.ui.feature_compat;
+                            self.ui.niri_version = Some(parsed);
+                            self.ui.feature_compat = new_compat;
+                            if compat_changed {
+                                // main.kdl's include list is version-gated; regenerate now.
+                                let content = crate::config::storage::generate_main_kdl(new_compat);
+                                if let Err(e) =
+                                    crate::config::atomic_write(&self.paths.main_kdl, &content)
+                                {
+                                    log::warn!(
+                                        "failed to refresh main.kdl after version change: {e}"
+                                    );
+                                }
+                                // Create any files newly allowed by the version.
+                                if let Err(e) = crate::config::ensure_required_files_exist(
+                                    &self.paths,
+                                    &self.settings,
+                                    new_compat,
+                                ) {
+                                    log::warn!(
+                                        "failed to ensure config files after version change: {e}"
+                                    );
+                                }
+                            }
+                        }
+                        // If parse fails, leave niri_version/feature_compat untouched.
                     }
                     Err(e) => {
                         self.ui.tools_state.last_error = Some(e);
@@ -116,19 +143,19 @@ impl super::super::App {
             ToolsMessage::ReloadConfig => {
                 self.ui.tools_state.reloading = true;
                 self.ui.tools_state.last_error = None;
-                Task::perform(
-                    async { crate::ipc::reload_config().map_err(|e| e.to_string()) },
-                    |result| Message::Tools(ToolsMessage::ReloadCompleted(result)),
-                )
+                crate::ipc::tasks::reload_config_async(|r| {
+                    Message::Tools(ToolsMessage::ReloadCompleted(r.map_err(|e| e.to_string())))
+                })
             }
             ToolsMessage::ValidateConfig => {
                 self.ui.tools_state.validating = true;
                 self.ui.tools_state.last_error = None;
                 self.ui.tools_state.validation_result = None;
-                Task::perform(
-                    async { crate::ipc::validate_config().map_err(|e| e.to_string()) },
-                    |result| Message::Tools(ToolsMessage::ValidateCompleted(result)),
-                )
+                crate::ipc::tasks::validate_config_async(|r| {
+                    Message::Tools(ToolsMessage::ValidateCompleted(
+                        r.map_err(|e| e.to_string()),
+                    ))
+                })
             }
 
             // Action results

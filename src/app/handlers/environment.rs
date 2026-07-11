@@ -17,7 +17,7 @@ impl super::super::App {
                     .push(crate::config::models::EnvironmentVariable {
                         id,
                         name: String::new(),
-                        value: String::new(),
+                        value: Some(String::new()),
                     });
             }
             EnvironmentMessage::RemoveVariable(id) => {
@@ -30,7 +30,12 @@ impl super::super::App {
             }
             EnvironmentMessage::SetVariableValue(id, value) => {
                 if let Some(var) = env.variables.iter_mut().find(|v| v.id == id) {
-                    var.value = value;
+                    var.value = Some(value);
+                }
+            }
+            EnvironmentMessage::SetVariableUnset(id, unset) => {
+                if let Some(var) = env.variables.iter_mut().find(|v| v.id == id) {
+                    var.value = if unset { None } else { Some(String::new()) };
                 }
             }
         }

@@ -34,17 +34,15 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
                 Space::new().height(4),
                 styled_slider(
                     "MAX SCROLL AMOUNT",
-                    &format!(
-                        "{}",
-                        settings
-                            .focus_follows_mouse_max_scroll_amount
-                            .map(|v| format!("{:.0}%", v))
-                            .unwrap_or_else(|| "off".to_string())
-                    ),
+                    &settings
+                        .focus_follows_mouse_max_scroll_amount
+                        .map(|v| format!("{:.0}%", v))
+                        .unwrap_or_else(|| "off".to_string())
+                        .to_string(),
                     0.0..=100.0,
                     settings
                         .focus_follows_mouse_max_scroll_amount
-                        .unwrap_or(50.0) as f32,
+                        .unwrap_or(50.0),
                     1.0,
                     |v| Message::Behavior(BehaviorMessage::SetFocusFollowsMouseMaxScroll(Some(v))),
                 ),
@@ -129,32 +127,32 @@ pub fn view(settings: &BehaviorSettings) -> Element<'_, Message> {
                 styled_slider(
                     "LEFT STRUT",
                     &format!("{:.0} px", settings.strut_left),
-                    0.0..=200.0,
-                    settings.strut_left as f32,
+                    -200.0..=200.0,
+                    settings.strut_left,
                     1.0,
                     |v| Message::Behavior(BehaviorMessage::SetStrutLeft(v)),
                 ),
                 styled_slider(
                     "RIGHT STRUT",
                     &format!("{:.0} px", settings.strut_right),
-                    0.0..=200.0,
-                    settings.strut_right as f32,
+                    -200.0..=200.0,
+                    settings.strut_right,
                     1.0,
                     |v| Message::Behavior(BehaviorMessage::SetStrutRight(v)),
                 ),
                 styled_slider(
                     "TOP STRUT",
                     &format!("{:.0} px", settings.strut_top),
-                    0.0..=200.0,
-                    settings.strut_top as f32,
+                    -200.0..=200.0,
+                    settings.strut_top,
                     1.0,
                     |v| Message::Behavior(BehaviorMessage::SetStrutTop(v)),
                 ),
                 styled_slider(
                     "BOTTOM STRUT",
                     &format!("{:.0} px", settings.strut_bottom),
-                    0.0..=200.0,
-                    settings.strut_bottom as f32,
+                    -200.0..=200.0,
+                    settings.strut_bottom,
                     1.0,
                     |v| Message::Behavior(BehaviorMessage::SetStrutBottom(v)),
                 ),
@@ -316,32 +314,32 @@ pub fn struts_section(settings: &BehaviorSettings) -> Element<'_, Message> {
         styled_slider(
             "LEFT STRUT",
             &format!("{:.0} px", settings.strut_left),
-            0.0..=200.0,
-            settings.strut_left as f32,
+            -200.0..=200.0,
+            settings.strut_left,
             1.0,
             |v| Message::Behavior(BehaviorMessage::SetStrutLeft(v)),
         ),
         styled_slider(
             "RIGHT STRUT",
             &format!("{:.0} px", settings.strut_right),
-            0.0..=200.0,
-            settings.strut_right as f32,
+            -200.0..=200.0,
+            settings.strut_right,
             1.0,
             |v| Message::Behavior(BehaviorMessage::SetStrutRight(v)),
         ),
         styled_slider(
             "TOP STRUT",
             &format!("{:.0} px", settings.strut_top),
-            0.0..=200.0,
-            settings.strut_top as f32,
+            -200.0..=200.0,
+            settings.strut_top,
             1.0,
             |v| Message::Behavior(BehaviorMessage::SetStrutTop(v)),
         ),
         styled_slider(
             "BOTTOM STRUT",
             &format!("{:.0} px", settings.strut_bottom),
-            0.0..=200.0,
-            settings.strut_bottom as f32,
+            -200.0..=200.0,
+            settings.strut_bottom,
             1.0,
             |v| Message::Behavior(BehaviorMessage::SetStrutBottom(v)),
         ),

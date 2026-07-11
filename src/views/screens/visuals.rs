@@ -4,7 +4,8 @@ use iced::widget::{column, container, row, scrollable, text, Space};
 use iced::{Alignment, Element, Length};
 
 use crate::config::models::{
-    AnimationSettings, AppearanceSettings, BehaviorSettings, CursorSettings, LayoutExtrasSettings,
+    AnimationSettings, AppearanceSettings, BehaviorSettings, BlurSettings, CursorSettings,
+    LayoutExtrasSettings,
 };
 use crate::messages::{EditableSection, Message};
 use crate::theme::{fonts, neon};
@@ -15,6 +16,8 @@ pub fn view<'a>(
     cursor: &'a CursorSettings,
     layout_extras: &'a LayoutExtrasSettings,
     behavior: &'a BehaviorSettings,
+    blur: &'a BlurSettings,
+    blur_supported: bool,
 ) -> Element<'a, Message> {
     let content = column![
         super::hero_header(
@@ -53,6 +56,18 @@ pub fn view<'a>(
             summary_card(EditableSection::Cursor, vec![
                 ("Theme", cursor.theme.clone()),
                 ("Size", format!("{}", cursor.size)),
+            ]),
+        ].spacing(12).align_y(Alignment::Start),
+        Space::new().height(12),
+        // Row 3
+        row![
+            summary_card(EditableSection::Blur, vec![
+                ("Enabled", if blur.enabled { "On" } else { "Off" }.to_string()),
+                if blur_supported {
+                    ("Passes", format!("{}", blur.passes))
+                } else {
+                    ("Requires", "niri 26.04+".to_string())
+                },
             ]),
         ].spacing(12).align_y(Alignment::Start),
     ]

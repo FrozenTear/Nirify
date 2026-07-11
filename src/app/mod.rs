@@ -7,10 +7,12 @@
 
 mod handlers;
 mod helpers;
-mod ui_state;
+pub mod ui_state;
 
 pub use ui_state::UiState;
+use ui_state::{ErrorBanner, ErrorBannerKind};
 
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -24,7 +26,6 @@ use crate::save_manager::{ReloadResult, SaveResult};
 use crate::theme::{fonts, neon};
 use crate::views;
 
-/// Groups save-related state for cleaner App organization
 pub struct SaveState {
     /// Tracks which settings categories have unsaved changes
     pub dirty_tracker: DirtyTracker,
@@ -32,6 +33,14 @@ pub struct SaveState {
     pub last_change_time: Option<std::time::Instant>,
     /// Whether a save is currently in progress
     pub in_progress: bool,
+    /// Categories taken by the currently in-air async save (recovered on failure/exit)
+    pub in_flight: HashSet<SettingsCategory>,
+    /// Categories already backed up this session (first-write-per-session policy)
+    pub backed_up: HashSet<SettingsCategory>,
+    /// Load-failed categories excluded from saving (would overwrite an unread file)
+    pub blocked: HashSet<SettingsCategory>,
+    /// Last save-failure time, for retry backoff (retry at most every 5s)
+    pub last_failure_time: Option<std::time::Instant>,
 }
 
 impl SaveState {
@@ -40,6 +49,10 @@ impl SaveState {
             dirty_tracker: DirtyTracker::new(),
             last_change_time: None,
             in_progress: false,
+            in_flight: HashSet::new(),
+            backed_up: HashSet::new(),
+            blocked: HashSet::new(),
+            last_failure_time: None,
         }
     }
 }
@@ -60,6 +73,23 @@ pub struct App {
 
     /// UI-only state (selections, expansions, dialogs, etc.)
     ui: UiState,
+}
+
+/// Whether an outputs message is a "risky" live-applied change that should arm
+/// the revert countdown (disabling an output or changing its mode).
+fn output_msg_is_risky(m: &crate::messages::OutputsMessage) -> bool {
+    use crate::messages::OutputsMessage as O;
+    matches!(
+        m,
+        O::SetEnabled(_, false) | O::SetMode(_, _) | O::SetModeCustom(_, _) | O::SetModeline(_, _)
+    )
+}
+
+/// Whether a keybindings message commits a new key combo / modifier set and
+/// should arm the revert countdown.
+fn keybinding_msg_is_risky(m: &crate::messages::KeybindingsMessage) -> bool {
+    use crate::messages::KeybindingsMessage as K;
+    matches!(m, K::CapturedKey(_) | K::UpdateModifiers(_, _))
 }
 
 impl App {
@@ -112,9 +142,16 @@ impl App {
             log::warn!("Failed to clean up old backups: {}", e);
         }
 
-        // Load settings from disk (load_settings returns Settings, not Result)
-        let settings = crate::config::load_settings(&paths);
-        log::info!("Settings loaded successfully");
+        // Load settings from disk, tracking which files failed to parse/read so we
+        // can pause saving those categories (avoids overwriting an unread file).
+        let load_result = crate::config::load_settings_with_result(&paths);
+        let settings = load_result.settings;
+        let blocked: HashSet<SettingsCategory> = load_result
+            .failed_files
+            .iter()
+            .filter_map(|f| SettingsCategory::from_relative_path(f))
+            .collect();
+        log::info!("Settings loaded ({} file(s) failed to read)", blocked.len());
 
         // Parse theme from settings
         let current_theme = settings
@@ -129,29 +166,12 @@ impl App {
         let touch_calibration_cache =
             crate::views::widgets::format_matrix_values(settings.touch.calibration_matrix);
 
-        // Check initial niri connection status and version
-        let (niri_status, niri_version) = if crate::ipc::is_niri_running() {
-            let version = crate::ipc::get_version()
-                .ok()
-                .and_then(|v| crate::version::NiriVersion::parse(&v));
-            if let Some(v) = version {
-                log::info!("Detected niri version: {}", v);
-            }
-            (crate::views::status_bar::NiriStatus::Connected, version)
-        } else {
-            (crate::views::status_bar::NiriStatus::Disconnected, None)
-        };
-
-        // Determine feature compatibility based on niri version
+        // Startup IPC is async to avoid blocking the UI thread on
+        // startup. Begin Disconnected with unknown version; the async
+        // NiriStatusChecked → VersionLoaded flow refreshes status/version/compat.
+        let niri_status = crate::views::status_bar::NiriStatus::Disconnected;
+        let niri_version: Option<crate::version::NiriVersion> = None;
         let feature_compat = crate::version::FeatureCompat::from_version(niri_version);
-        if !feature_compat.recent_windows {
-            log::info!(
-                "Recent windows feature disabled (requires niri 25.11+, detected: {})",
-                niri_version
-                    .map(|v| v.to_string())
-                    .unwrap_or_else(|| "unknown".to_string())
-            );
-        }
 
         // Ensure all required config files exist (handles upgrades from older versions)
         // This creates any missing .kdl files that main.kdl includes
@@ -181,6 +201,9 @@ impl App {
         ui.niri_version = niri_version;
         ui.feature_compat = feature_compat;
         ui.show_search_bar = settings.preferences.show_search_bar;
+        // Seed the exact scroll-factor entry buffers from the loaded model.
+        ui.mouse_scroll_factor_text = format!("{}", settings.mouse.scroll_factor);
+        ui.touchpad_scroll_factor_text = format!("{}", settings.touchpad.scroll_factor);
 
         // Check if this is the first run and show the wizard
         if paths.is_first_run() {
@@ -190,7 +213,7 @@ impl App {
             };
         }
 
-        let app = Self {
+        let mut app = Self {
             settings,
             paths,
             save: SaveState::new(),
@@ -198,22 +221,29 @@ impl App {
             ui,
         };
 
-        // If niri is connected at startup, fetch dashboard data immediately
-        let startup_task = if matches!(niri_status, crate::views::status_bar::NiriStatus::Connected)
-        {
-            Task::batch([
-                Task::perform(
-                    async { crate::ipc::get_windows().map_err(|e| e.to_string()) },
-                    |r| Message::Tools(crate::messages::ToolsMessage::WindowsLoaded(r)),
-                ),
-                Task::perform(
-                    async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
-                    |r| Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(r)),
-                ),
-            ])
-        } else {
-            Task::none()
-        };
+        // Pause saving for categories whose file could not be read, and surface it.
+        app.save.blocked = blocked;
+        if !app.save.blocked.is_empty() {
+            let mut details: Vec<String> = load_result.failed_files.clone();
+            details.push(
+                "Those pages show defaults. Saving them is paused so your file on disk \
+                 is not overwritten."
+                    .to_string(),
+            );
+            app.ui.error_banner = Some(ErrorBanner {
+                kind: ErrorBannerKind::LoadFailed,
+                title: "Some settings files could not be read".to_string(),
+                details,
+            });
+        }
+
+        // Record whether niri's config already includes our settings file, to
+        // drive the "setup incomplete" banner.
+        app.refresh_include_line_present();
+
+        // Kick off async niri detection; on first connection NiriStatusChecked
+        // fetches windows/workspaces and the version.
+        let startup_task = crate::ipc::tasks::check_niri_running(Message::NiriStatusChecked);
 
         (app, startup_task)
     }
@@ -251,8 +281,12 @@ impl App {
 
     /// Updates application state based on messages
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        // Arm the revert countdown BEFORE the handler applies any risky change,
+        // so the snapshot captures pre-change state.
+        self.maybe_arm_revert(&message);
+
         match message {
-            Message::NoOp => return Task::none(),
+            Message::NoOp => Task::none(),
 
             // Navigation
             Message::NavigateToPage(page) => {
@@ -266,23 +300,21 @@ impl App {
 
                 // Auto-refresh IPC outputs when navigating to Outputs page
                 if page == Page::Outputs && is_connected {
-                    return Task::perform(
-                        async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
-                        |result| {
-                            Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(result))
-                        },
-                    );
+                    return crate::ipc::tasks::get_full_outputs_async(|result| {
+                        Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(
+                            result.map_err(|e| e.to_string()),
+                        ))
+                    });
                 }
 
                 // Auto-refresh workspaces when navigating to Window Rules page
                 // (for the workspace dropdown)
                 if page == Page::WindowRules && is_connected {
-                    return Task::perform(
-                        async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
-                        |result| {
-                            Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(result))
-                        },
-                    );
+                    return crate::ipc::tasks::get_workspaces_async(|result| {
+                        Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(
+                            result.map_err(|e| e.to_string()),
+                        ))
+                    });
                 }
 
                 Task::none()
@@ -297,6 +329,7 @@ impl App {
             Message::SearchQueryChanged(query) => {
                 self.ui.search_query = query;
                 self.ui.last_search_time = Some(std::time::Instant::now());
+                self.ui.search_selected_index = 0;
 
                 // Perform search immediately
                 self.ui.search_results = self.search_index.search(&self.ui.search_query);
@@ -408,6 +441,7 @@ impl App {
             Message::Outputs(msg) => self.update_outputs(msg),
 
             Message::Overview(msg) => self.update_overview(msg),
+            Message::Blur(msg) => self.update_blur(msg),
 
             // Save subsystem (Phase 4)
             Message::Save(SaveMessage::CheckSave) => {
@@ -421,16 +455,46 @@ impl App {
 
             Message::SaveCompleted(result) => {
                 self.save.in_progress = false;
+                self.save.in_flight.clear();
                 match result {
-                    SaveResult::Success { files_written, .. } => {
+                    SaveResult::Success {
+                        files_written,
+                        categories,
+                    } => {
+                        // Remember which categories were backed up so subsequent
+                        // saves this session don't re-snapshot them.
+                        self.save.backed_up.extend(categories.iter().copied());
+                        self.save.last_failure_time = None;
+                        // Clear any save/validation banner now that a save succeeded.
+                        if matches!(
+                            self.ui.error_banner.as_ref().map(|b| &b.kind),
+                            Some(ErrorBannerKind::SaveFailed)
+                                | Some(ErrorBannerKind::ValidationBlocked)
+                        ) {
+                            self.ui.error_banner = None;
+                        }
                         self.ui.toast = Some(format!("Saved {} file(s)", files_written));
                         self.ui.toast_shown_at = Some(std::time::Instant::now());
                         // Trigger niri config reload
                         self.reload_niri_config_task()
                     }
-                    SaveResult::Error { message } => {
-                        self.ui.toast = Some(format!("Save failed: {}", message));
-                        self.ui.toast_shown_at = Some(std::time::Instant::now());
+                    SaveResult::Error {
+                        message,
+                        categories,
+                    } => {
+                        // Keep the dirty set: re-mark so the changes retry.
+                        self.save.dirty_tracker.mark_many(&categories);
+                        self.save.last_failure_time = Some(std::time::Instant::now());
+                        self.ui.error_banner = Some(ErrorBanner {
+                            kind: ErrorBannerKind::SaveFailed,
+                            title: "Saving failed".to_string(),
+                            details: vec![
+                                message,
+                                "Your changes are kept in memory and will be retried \
+                                 automatically."
+                                    .to_string(),
+                            ],
+                        });
                         Task::none()
                     }
                     SaveResult::NothingToSave => Task::none(),
@@ -452,10 +516,28 @@ impl App {
                 match result {
                     ReloadResult::Success => {
                         log::info!("Niri config reloaded");
+                        // A successful reload clears a prior niri-rejection banner.
+                        if matches!(
+                            self.ui.error_banner.as_ref().map(|b| &b.kind),
+                            Some(ErrorBannerKind::NiriRejected)
+                        ) {
+                            self.ui.error_banner = None;
+                        }
                     }
                     ReloadResult::Error { message } => {
                         log::warn!("Failed to reload niri config: {}", message);
-                        // Don't show error to user - niri might not be running
+                        // Only surface when we believe niri is actually connected;
+                        // otherwise it's just "niri not running", which is expected.
+                        if matches!(
+                            self.ui.niri_status,
+                            crate::views::status_bar::NiriStatus::Connected
+                        ) {
+                            self.ui.error_banner = Some(ErrorBanner {
+                                kind: ErrorBannerKind::NiriRejected,
+                                title: "niri rejected the configuration".to_string(),
+                                details: vec![message],
+                            });
+                        }
                     }
                 }
                 Task::none()
@@ -486,6 +568,16 @@ impl App {
                         return iced::exit();
                     }
                 }
+                // Defense in depth: never silently dismiss the wizard before the
+                // include line exists — divert to the skip-warning step instead.
+                if matches!(self.ui.dialog_state, DialogState::FirstRunWizard { .. })
+                    && !self.paths.has_include_line()
+                {
+                    self.ui.dialog_state = DialogState::FirstRunWizard {
+                        step: crate::messages::WizardStep::SkipWarning,
+                    };
+                    return Task::none();
+                }
                 self.ui.dialog_state = DialogState::None;
                 Task::none()
             }
@@ -496,29 +588,40 @@ impl App {
                     DialogState::Confirm { on_confirm, .. } => {
                         use crate::messages::ConfirmAction;
                         match on_confirm {
-                            ConfirmAction::DeleteRule(rule_id) => {
-                                // Try to delete from window rules first, then layer rules
+                            ConfirmAction::DeleteWindowRule(rule_id) => {
                                 let rule_id = *rule_id;
-                                if self.settings.window_rules.remove(rule_id) {
-                                    log::info!("Deleted window rule {}", rule_id);
-                                    if self.ui.selected_window_rule_id == Some(rule_id) {
-                                        self.ui.selected_window_rule_id =
-                                            self.settings.window_rules.rules.first().map(|r| r.id);
-                                    }
-                                    self.save
-                                        .dirty_tracker
-                                        .mark(crate::config::SettingsCategory::WindowRules);
-                                } else if self.settings.layer_rules.remove(rule_id) {
-                                    log::info!("Deleted layer rule {}", rule_id);
-                                    if self.ui.selected_layer_rule_id == Some(rule_id) {
-                                        self.ui.selected_layer_rule_id =
-                                            self.settings.layer_rules.rules.first().map(|r| r.id);
-                                    }
-                                    self.save
-                                        .dirty_tracker
-                                        .mark(crate::config::SettingsCategory::LayerRules);
-                                }
-                                self.mark_changed();
+                                self.ui.dialog_state = DialogState::None;
+                                return self.update(Message::WindowRules(
+                                    crate::messages::WindowRulesMessage::DeleteRule(rule_id),
+                                ));
+                            }
+                            ConfirmAction::DeleteLayerRule(rule_id) => {
+                                let rule_id = *rule_id;
+                                self.ui.dialog_state = DialogState::None;
+                                return self.update(Message::LayerRules(
+                                    crate::messages::LayerRulesMessage::DeleteRule(rule_id),
+                                ));
+                            }
+                            ConfirmAction::DeleteKeybinding(idx) => {
+                                let idx = *idx;
+                                self.ui.dialog_state = DialogState::None;
+                                return self.update(Message::Keybindings(
+                                    crate::messages::KeybindingsMessage::RemoveKeybinding(idx),
+                                ));
+                            }
+                            ConfirmAction::DeleteOutput(idx) => {
+                                let idx = *idx;
+                                self.ui.dialog_state = DialogState::None;
+                                return self.update(Message::Outputs(
+                                    crate::messages::OutputsMessage::RemoveOutput(idx),
+                                ));
+                            }
+                            ConfirmAction::DeleteWorkspace(idx) => {
+                                let idx = *idx;
+                                self.ui.dialog_state = DialogState::None;
+                                return self.update(Message::Workspaces(
+                                    crate::messages::WorkspacesMessage::RemoveWorkspace(idx),
+                                ));
                             }
                             ConfirmAction::ResetSettings => {
                                 log::info!("Resetting all settings to defaults");
@@ -533,6 +636,13 @@ impl App {
                                     .dirty_tracker
                                     .mark(crate::config::SettingsCategory::Keybindings);
                                 self.mark_changed();
+                            }
+                            ConfirmAction::RestoreBackup(idx) => {
+                                let idx = *idx;
+                                self.ui.dialog_state = DialogState::None;
+                                return self.update_backups(
+                                    crate::messages::BackupsMessage::RestoreBackup(idx),
+                                );
                             }
                         }
                     }
@@ -569,6 +679,8 @@ impl App {
                             self.ui.dialog_state = DialogState::None;
                             return Task::none();
                         }
+                        // Skip-warning has no "next"; treat as staying on Welcome.
+                        WizardStep::SkipWarning => WizardStep::Welcome,
                     };
                     self.ui.dialog_state = DialogState::FirstRunWizard { step: next_step };
                 }
@@ -579,11 +691,18 @@ impl App {
                 // Go back to previous wizard step
                 if let DialogState::FirstRunWizard { step } = &self.ui.dialog_state {
                     use crate::messages::WizardStep;
+                    let step = step.clone();
                     let prev_step = match step {
                         WizardStep::Welcome => {
-                            self.ui.dialog_state = DialogState::None;
-                            return Task::none();
+                            // Do not silently dismiss before the include line exists.
+                            if self.paths.has_include_line() {
+                                self.ui.dialog_state = DialogState::None;
+                                return Task::none();
+                            }
+                            WizardStep::SkipWarning
                         }
+                        // From the skip warning, "Go back to setup" returns to Welcome.
+                        WizardStep::SkipWarning => WizardStep::Welcome,
                         WizardStep::ConfigSetup => WizardStep::Welcome,
                         WizardStep::ImportResults => WizardStep::ConfigSetup,
                         WizardStep::Consolidation => WizardStep::ImportResults,
@@ -668,7 +787,8 @@ impl App {
                 // Trigger initial save to create all config files
                 // Note: This is safe from race conditions because:
                 // 1. iced is single-threaded - this handler completes atomically
-                // 2. SaveManager uses 300ms debounce before actually saving
+                // 2. `App::should_save` enforces the 300ms debounce before the
+                //    periodic tick actually writes the dirty categories
                 // 3. We've already created main.kdl and config.kdl above
                 self.save.dirty_tracker.mark_all();
                 self.mark_changed();
@@ -715,6 +835,9 @@ impl App {
                         self.ui.wizard_suggestions.len()
                     );
                 }
+
+                // Config now includes our settings file.
+                self.refresh_include_line_present();
 
                 // Progress to next step
                 if let DialogState::FirstRunWizard { .. } = &self.ui.dialog_state {
@@ -886,27 +1009,32 @@ impl App {
 
             // System
             Message::WindowCloseRequested => {
-                // Perform final save before exiting (blocking to prevent data loss)
-                if self.save.dirty_tracker.is_dirty() {
-                    log::info!("Window closing with unsaved changes, performing blocking save...");
+                // Flush any changes that would otherwise be lost: still-dirty plus
+                // the in-flight (possibly-lost) async save, minus load-blocked.
+                let mut cats = self.save.dirty_tracker.take();
+                cats.extend(self.save.in_flight.iter().copied());
+                cats.retain(|c| !self.save.blocked.contains(c));
 
-                    // Take dirty categories for blocking save
-                    let dirty = self.save.dirty_tracker.take();
-
-                    // Perform blocking save (acceptable since typically <100ms)
-                    match crate::config::save_dirty(
-                        &self.paths,
-                        &self.settings,
-                        &dirty,
-                        self.ui.feature_compat,
-                    ) {
-                        Ok(count) => {
-                            log::info!("Successfully saved {} file(s) before exit", count);
+                if !cats.is_empty() {
+                    let validation = crate::config::validation::validate_settings(&self.settings);
+                    if validation.is_valid() {
+                        let needs_backup: HashSet<_> =
+                            cats.difference(&self.save.backed_up).copied().collect();
+                        match crate::config::save_dirty(
+                            &self.paths,
+                            &self.settings,
+                            &cats,
+                            self.ui.feature_compat,
+                            &needs_backup,
+                        ) {
+                            Ok(n) => log::info!("Saved {} file(s) before exit", n),
+                            Err(e) => log::error!("Failed to save on exit: {}", e),
                         }
-                        Err(e) => {
-                            log::error!("Failed to save on exit: {}", e);
-                            // Exit anyway - user explicitly closed window
-                        }
+                    } else {
+                        log::error!(
+                            "Skipping exit save: validation errors: {:?}",
+                            validation.errors
+                        );
                     }
                 }
 
@@ -931,18 +1059,21 @@ impl App {
                 };
                 // On first connection, fetch dashboard data
                 if is_connected && !was_connected {
-                    let t1 = Task::perform(
-                        async { crate::ipc::get_windows().map_err(|e| e.to_string()) },
-                        |r| Message::Tools(crate::messages::ToolsMessage::WindowsLoaded(r)),
-                    );
-                    let t2 = Task::perform(
-                        async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
-                        |r| Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(r)),
-                    );
-                    let t3 = Task::perform(
-                        async { crate::ipc::get_version().map_err(|e| e.to_string()) },
-                        |r| Message::Tools(crate::messages::ToolsMessage::VersionLoaded(r)),
-                    );
+                    let t1 = crate::ipc::tasks::get_windows_async(|r| {
+                        Message::Tools(crate::messages::ToolsMessage::WindowsLoaded(
+                            r.map_err(|e| e.to_string()),
+                        ))
+                    });
+                    let t2 = crate::ipc::tasks::get_workspaces_async(|r| {
+                        Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(
+                            r.map_err(|e| e.to_string()),
+                        ))
+                    });
+                    let t3 = crate::ipc::tasks::get_version_async(|r| {
+                        Message::Tools(crate::messages::ToolsMessage::VersionLoaded(
+                            r.map_err(|e| e.to_string()),
+                        ))
+                    });
                     return Task::batch([t1, t2, t3]);
                 }
                 Task::none()
@@ -965,7 +1096,26 @@ impl App {
             Message::ConfigEditor(msg) => self.update_config_editor(msg),
             Message::Backups(msg) => self.update_backups(msg),
 
-            Message::None => Task::none(),
+            Message::DismissErrorBanner => {
+                self.ui.error_banner = None;
+                Task::none()
+            }
+
+            Message::OverwriteFailedCategories => {
+                // Re-enable saving for load-blocked categories and force a save.
+                // The first-write backup (F-E) snapshots the corrupt file first.
+                let blocked = std::mem::take(&mut self.save.blocked);
+                let cats: Vec<SettingsCategory> = blocked.into_iter().collect();
+                self.save.dirty_tracker.mark_many(&cats);
+                self.mark_changed();
+                if matches!(
+                    self.ui.error_banner.as_ref().map(|b| &b.kind),
+                    Some(ErrorBannerKind::LoadFailed)
+                ) {
+                    self.ui.error_banner = None;
+                }
+                Task::none()
+            }
 
             // Redesign navigation
             Message::NavigateToScreen(screen) => {
@@ -981,35 +1131,31 @@ impl App {
                 // Auto-refresh IPC data for relevant screens
                 if screen == Screen::Dashboard && is_connected {
                     // Fetch windows + workspaces for dashboard stats
-                    let t1 = Task::perform(
-                        async { crate::ipc::get_windows().map_err(|e| e.to_string()) },
-                        |result| {
-                            Message::Tools(crate::messages::ToolsMessage::WindowsLoaded(result))
-                        },
-                    );
-                    let t2 = Task::perform(
-                        async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
-                        |result| {
-                            Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(result))
-                        },
-                    );
+                    let t1 = crate::ipc::tasks::get_windows_async(|result| {
+                        Message::Tools(crate::messages::ToolsMessage::WindowsLoaded(
+                            result.map_err(|e| e.to_string()),
+                        ))
+                    });
+                    let t2 = crate::ipc::tasks::get_workspaces_async(|result| {
+                        Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(
+                            result.map_err(|e| e.to_string()),
+                        ))
+                    });
                     return Task::batch([t1, t2]);
                 }
                 if screen == Screen::Displays && is_connected {
-                    return Task::perform(
-                        async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
-                        |result| {
-                            Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(result))
-                        },
-                    );
+                    return crate::ipc::tasks::get_full_outputs_async(|result| {
+                        Message::Tools(crate::messages::ToolsMessage::OutputsLoaded(
+                            result.map_err(|e| e.to_string()),
+                        ))
+                    });
                 }
                 if screen == Screen::Rules && is_connected {
-                    return Task::perform(
-                        async { crate::ipc::get_workspaces().map_err(|e| e.to_string()) },
-                        |result| {
-                            Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(result))
-                        },
-                    );
+                    return crate::ipc::tasks::get_workspaces_async(|result| {
+                        Message::Tools(crate::messages::ToolsMessage::WorkspacesLoaded(
+                            result.map_err(|e| e.to_string()),
+                        ))
+                    });
                 }
                 Task::none()
             }
@@ -1057,21 +1203,258 @@ impl App {
                 self.ui.highlight_setting = None;
                 Task::none()
             }
+
+            // ── UX safety: revert countdown ──────────────────────────────────
+            Message::RevertTick => {
+                if let Some(pr) = self.ui.pending_revert.as_mut() {
+                    pr.seconds_left = pr.seconds_left.saturating_sub(1);
+                    if pr.seconds_left == 0 {
+                        return self.update(Message::RevertNow);
+                    }
+                }
+                Task::none()
+            }
+            Message::RevertKeep => {
+                self.ui.pending_revert = None;
+                if matches!(self.ui.dialog_state, DialogState::RevertCountdown { .. }) {
+                    self.ui.dialog_state = DialogState::None;
+                }
+                Task::none()
+            }
+            Message::RevertNow => {
+                if let Some(pr) = self.ui.pending_revert.take() {
+                    use crate::app::ui_state::RevertSnapshot;
+                    match pr.snapshot {
+                        RevertSnapshot::Outputs(s) => {
+                            self.settings.outputs = s;
+                            self.save.dirty_tracker.mark(SettingsCategory::Outputs);
+                        }
+                        RevertSnapshot::Keybindings(s) => {
+                            self.settings.keybindings = s;
+                            self.save.dirty_tracker.mark(SettingsCategory::Keybindings);
+                        }
+                    }
+                    self.mark_changed();
+                    self.ui.toast = Some("Changes reverted".to_string());
+                    self.ui.toast_shown_at = Some(std::time::Instant::now());
+                }
+                if matches!(self.ui.dialog_state, DialogState::RevertCountdown { .. }) {
+                    self.ui.dialog_state = DialogState::None;
+                }
+                Task::none()
+            }
+
+            // ── Search keyboard navigation ───────────────────────────────────
+            Message::SearchNavUp => {
+                if self.ui.search_selected_index > 0 {
+                    self.ui.search_selected_index -= 1;
+                }
+                Task::none()
+            }
+            Message::SearchNavDown => {
+                self.ui.search_selected_index = crate::search::clamp_selected_index(
+                    self.ui.search_selected_index + 1,
+                    self.ui.search_results.len(),
+                );
+                Task::none()
+            }
+            Message::SearchNavActivate => {
+                if self.search_ui_visible() && !self.ui.search_results.is_empty() {
+                    let idx = crate::search::clamp_selected_index(
+                        self.ui.search_selected_index,
+                        self.ui.search_results.len(),
+                    );
+                    return self.update(Message::SearchResultSelected(idx));
+                }
+                Task::none()
+            }
+            Message::EscapePressed => self.handle_escape(),
+
+            Message::WizardSkipConfirmed => {
+                self.ui.dialog_state = DialogState::None;
+                self.refresh_include_line_present();
+                Task::none()
+            }
         }
     }
 
-    /// Returns the subscription for periodic save checks and keyboard capture
+    /// True when a search surface (modal or persistent bar) is showing.
+    fn search_ui_visible(&self) -> bool {
+        self.ui.search_focused || self.ui.show_search_bar
+    }
+
+    /// True when any editor modal is currently open.
+    fn any_editor_open(&self) -> bool {
+        self.ui.editing_window_rule_id.is_some()
+            || self.ui.editing_layer_rule_id.is_some()
+            || self.ui.editing_keybinding_index.is_some()
+            || self.ui.editing_section.is_some()
+            || self.ui.editing_output_index.is_some()
+            || self.ui.editing_device.is_some()
+    }
+
+    /// Refresh whether the niri include line is present (cheap sync read).
+    /// `None` when the niri config file does not exist (non-niri machine).
+    fn refresh_include_line_present(&mut self) {
+        self.ui.include_line_present = if self.paths.niri_config.exists() {
+            Some(self.paths.has_include_line())
+        } else {
+            None
+        };
+    }
+
+    /// Handle Escape: close the topmost overlay layer in priority order.
+    fn handle_escape(&mut self) -> Task<Message> {
+        // a. Revert countdown → revert (safe default)
+        if matches!(self.ui.dialog_state, DialogState::RevertCountdown { .. }) {
+            return self.update(Message::RevertNow);
+        }
+        // b. Wizard → route through skip-guard, never plain close
+        if matches!(self.ui.dialog_state, DialogState::FirstRunWizard { .. }) {
+            return self.update(Message::WizardBack);
+        }
+        // c. Any other non-None dialog → close
+        if self.ui.dialog_state != DialogState::None {
+            return self.update(Message::CloseDialog);
+        }
+        // d. Search modal open → close
+        if self.ui.search_focused {
+            return self.update(Message::ToggleSearch);
+        }
+        // e. Editor modal open → dispatch its close message
+        if self.ui.editing_window_rule_id.is_some() {
+            return self.update(Message::WindowRules(
+                crate::messages::WindowRulesMessage::CloseEditor,
+            ));
+        }
+        if self.ui.editing_layer_rule_id.is_some() {
+            return self.update(Message::LayerRules(
+                crate::messages::LayerRulesMessage::CloseEditor,
+            ));
+        }
+        if self.ui.editing_keybinding_index.is_some() {
+            return self.update(Message::CloseKeybindingEditor);
+        }
+        if self.ui.editing_section.is_some() {
+            return self.update(Message::CloseSectionEditor);
+        }
+        if self.ui.editing_output_index.is_some() {
+            return self.update(Message::Outputs(
+                crate::messages::OutputsMessage::CloseEditor,
+            ));
+        }
+        if self.ui.editing_device.is_some() {
+            return self.update(Message::CloseDeviceEditor);
+        }
+        Task::none()
+    }
+
+    /// Arm the revert countdown for risky live-applied changes, taking a
+    /// snapshot BEFORE the handler applies the change. Called at the top of
+    /// `update()` so `self.settings` still holds the pre-change state.
+    fn maybe_arm_revert(&mut self, message: &Message) {
+        use crate::app::ui_state::{PendingRevert, RevertSnapshot};
+
+        // Never arm while the first-run wizard is open.
+        if matches!(self.ui.dialog_state, DialogState::FirstRunWizard { .. }) {
+            return;
+        }
+
+        enum Cat {
+            Outputs,
+            Keybindings,
+        }
+        let armed: Option<(Cat, &'static str)> = match message {
+            Message::Outputs(m) => {
+                output_msg_is_risky(m).then_some((Cat::Outputs, "Display settings changed"))
+            }
+            Message::Keybindings(m) => {
+                keybinding_msg_is_risky(m).then_some((Cat::Keybindings, "Keybinding changed"))
+            }
+            _ => None,
+        };
+
+        let Some((cat, description)) = armed else {
+            return;
+        };
+
+        // Same category already pending: keep original snapshot, reset timer.
+        match (&mut self.ui.pending_revert, &cat) {
+            (Some(pr), Cat::Outputs) if matches!(pr.snapshot, RevertSnapshot::Outputs(_)) => {
+                pr.seconds_left = 15;
+                pr.description = description.to_string();
+                return;
+            }
+            (Some(pr), Cat::Keybindings)
+                if matches!(pr.snapshot, RevertSnapshot::Keybindings(_)) =>
+            {
+                pr.seconds_left = 15;
+                pr.description = description.to_string();
+                return;
+            }
+            _ => {}
+        }
+
+        let snapshot = match cat {
+            Cat::Outputs => RevertSnapshot::Outputs(self.settings.outputs.clone()),
+            Cat::Keybindings => RevertSnapshot::Keybindings(self.settings.keybindings.clone()),
+        };
+        self.ui.pending_revert = Some(PendingRevert {
+            snapshot,
+            seconds_left: 15,
+            description: description.to_string(),
+        });
+        // Open the countdown dialog when nothing else is showing, and also
+        // refresh its description if a countdown dialog is ALREADY open (a new
+        // risky change for the other category re-armed the revert). Don't
+        // clobber unrelated dialog types.
+        match &self.ui.dialog_state {
+            DialogState::None | DialogState::RevertCountdown { .. } => {
+                self.ui.dialog_state = DialogState::RevertCountdown {
+                    description: description.to_string(),
+                };
+            }
+            _ => {}
+        }
+    }
+
     pub fn subscription(&self) -> Subscription<Message> {
         let mut subs = self.base_subscriptions();
 
         // Add keyboard subscription based on current mode
         if self.ui.key_capture_active.is_some() {
             subs.push(self.key_capture_subscription());
-        } else if !self.settings.preferences.search_hotkey.is_empty() {
-            subs.push(self.search_hotkey_subscription());
+        } else {
+            if !self.settings.preferences.search_hotkey.is_empty() {
+                subs.push(self.search_hotkey_subscription());
+            }
+            // Overlay keys (arrows/Escape/Enter) while any overlay UI is active.
+            if self.ui.search_focused
+                || self.ui.show_search_bar
+                || self.ui.dialog_state != DialogState::None
+                || self.any_editor_open()
+            {
+                subs.push(self.overlay_keys_subscription());
+            }
         }
 
         Subscription::batch(subs)
+    }
+
+    /// Subscription for overlay navigation keys (search arrows, Escape).
+    fn overlay_keys_subscription(&self) -> Subscription<Message> {
+        use iced::keyboard;
+        use iced::keyboard::key::Named;
+
+        keyboard::listen().map(|event| match event {
+            keyboard::Event::KeyPressed { key, .. } => match key {
+                keyboard::Key::Named(Named::ArrowUp) => Message::SearchNavUp,
+                keyboard::Key::Named(Named::ArrowDown) => Message::SearchNavDown,
+                keyboard::Key::Named(Named::Escape) => Message::EscapePressed,
+                _ => Message::NoOp,
+            },
+            _ => Message::NoOp,
+        })
     }
 
     /// Base subscriptions always active: save checks, niri status, toast clearing, system theme
@@ -1083,11 +1466,19 @@ impl App {
             time::every(Duration::from_secs(5)).map(|_| Message::CheckNiriStatus),
             // System theme detection (portal or file watcher)
             crate::system_theme::subscription().map(Message::SystemThemeEvent),
+            // Window close requests (exit_on_close_request is disabled so we can
+            // flush unsaved changes before exiting).
+            iced::window::close_requests().map(|_id| Message::WindowCloseRequested),
         ];
 
         // Toast auto-clear check (every 500ms, only when toast is showing)
         if self.ui.toast.is_some() {
             subs.push(time::every(Duration::from_millis(500)).map(|_| Message::ClearToast));
+        }
+
+        // Revert countdown tick (every 1s while a revert is pending)
+        if self.ui.pending_revert.is_some() {
+            subs.push(time::every(Duration::from_secs(1)).map(|_| Message::RevertTick));
         }
 
         subs
@@ -1120,10 +1511,10 @@ impl App {
                         key_combo,
                     ))
                 } else {
-                    Message::None
+                    Message::NoOp
                 }
             }
-            _ => Message::None,
+            _ => Message::NoOp,
         })
     }
 
@@ -1146,10 +1537,10 @@ impl App {
                     if helpers::hotkey_matches(&key_combo, &hotkey) {
                         Message::ToggleSearch
                     } else {
-                        Message::None
+                        Message::NoOp
                     }
                 }
-                _ => Message::None,
+                _ => Message::NoOp,
             })
     }
 
@@ -1189,6 +1580,7 @@ impl App {
             let search_input = text_input("Search settings...", &self.ui.search_query)
                 .id(views::navigation::search_input_id())
                 .on_input(Message::SearchQueryChanged)
+                .on_submit(Message::SearchNavActivate)
                 .padding(12)
                 .size(16)
                 .width(Length::Fixed(400.0));
@@ -1199,40 +1591,73 @@ impl App {
                     container(
                         text("No matching settings found")
                             .size(14)
-                            .color([0.6, 0.6, 0.6]),
+                            .style(crate::views::dialogs::muted_text_style),
                     )
                     .padding(16)
                     .into()
                 } else {
                     let mut results_col = col![].spacing(4).padding(8);
-                    for (index, result) in self.ui.search_results.iter().take(8).enumerate() {
+                    let selected = self.ui.search_selected_index;
+                    for (index, result) in self
+                        .ui
+                        .search_results
+                        .iter()
+                        .take(crate::search::MAX_VISIBLE_RESULTS)
+                        .enumerate()
+                    {
+                        let is_selected = index == selected;
                         let item = iced::widget::button(
                             row![
                                 col![
                                     text(&result.setting_name)
                                         .size(14)
                                         .font(fonts::UI_FONT_MEDIUM),
-                                    text(&result.description).size(11).color([0.6, 0.6, 0.6]),
+                                    text(&result.description)
+                                        .size(11)
+                                        .style(crate::views::dialogs::muted_text_style),
                                 ]
                                 .spacing(2)
                                 .width(Length::Fill),
-                                text(result.page.name()).size(10).color([0.5, 0.5, 0.5]),
+                                text(result.page.name())
+                                    .size(10)
+                                    .style(crate::views::dialogs::muted_text_style),
                             ]
                             .spacing(8)
                             .padding([10, 12]),
                         )
                         .on_press(Message::SearchResultSelected(index))
                         .width(Length::Fill)
-                        .style(crate::theme::search_dropdown_item_style());
+                        .style(move |theme: &iced::Theme, status| {
+                            if is_selected {
+                                let palette = theme.extended_palette();
+                                iced::widget::button::Style {
+                                    background: Some(iced::Background::Color(
+                                        palette.primary.weak.color,
+                                    )),
+                                    text_color: palette.primary.weak.text,
+                                    border: iced::Border {
+                                        radius: 6.0.into(),
+                                        ..Default::default()
+                                    },
+                                    ..Default::default()
+                                }
+                            } else {
+                                crate::theme::search_dropdown_item_style()(theme, status)
+                            }
+                        });
 
                         results_col = results_col.push(item);
                     }
-                    if self.ui.search_results.len() > 8 {
+                    if self.ui.search_results.len() > crate::search::MAX_VISIBLE_RESULTS {
                         results_col = results_col.push(
                             container(
-                                text(format!("and {} more...", self.ui.search_results.len() - 8))
-                                    .size(12)
-                                    .color([0.5, 0.5, 0.5]),
+                                text(format!(
+                                    "and {} more...",
+                                    self.ui.search_results.len()
+                                        - crate::search::MAX_VISIBLE_RESULTS
+                                ))
+                                .size(12)
+                                .style(crate::views::dialogs::muted_text_style),
                             )
                             .padding([8, 16]),
                         );
@@ -1243,7 +1668,7 @@ impl App {
                 container(
                     text("Type to search settings...")
                         .size(13)
-                        .color([0.5, 0.5, 0.5]),
+                        .style(crate::views::dialogs::muted_text_style),
                 )
                 .padding(16)
                 .into()
@@ -1298,9 +1723,11 @@ impl App {
 
         // Check for search dropdown overlay (when search bar is visible)
         let with_dropdown = if self.ui.show_search_bar {
-            if let Some(dropdown) =
-                views::search_dropdown::view(&self.ui.search_results, &self.ui.search_query)
-            {
+            if let Some(dropdown) = views::search_dropdown::view(
+                &self.ui.search_results,
+                &self.ui.search_query,
+                self.ui.search_selected_index,
+            ) {
                 use iced::widget::{column as col, Space};
                 // Position dropdown at top-right, below nav bar
                 let dropdown_overlay = col![
@@ -1327,6 +1754,7 @@ impl App {
                     &self.ui.window_rule_sections_expanded,
                     &self.ui.window_rule_regex_errors,
                     &self.ui.available_workspaces,
+                    self.ui.feature_compat.background_effects,
                 );
                 stack![with_dropdown, modal].into()
             } else {
@@ -1338,6 +1766,7 @@ impl App {
                     rule,
                     &self.ui.layer_rule_sections_expanded,
                     &self.ui.layer_rule_regex_errors,
+                    self.ui.feature_compat.background_effects,
                 );
                 stack![with_dropdown, modal].into()
             } else {
@@ -1350,6 +1779,8 @@ impl App {
                     idx,
                     &self.ui.keybinding_sections_expanded,
                     self.ui.key_capture_active,
+                    self.ui.niri_version,
+                    self.ui.keybinding_capture_conflict.as_ref(),
                 );
                 stack![with_dropdown, modal].into()
             } else {
@@ -1379,15 +1810,31 @@ impl App {
             with_dropdown
         };
 
-        // If there's an active dialog, render it on top of everything
+        // Persistent banners (setup-incomplete + error banner), full width, on
+        // every page. They must live in the BASE content so that when a modal
+        // dialog is open its full-screen scrim covers them and their buttons
+        // can't be clicked underneath the overlay.
+        let base: Element<'_, Message> = if let Some(banners) =
+            views::widgets::error_banner::error_banners(
+                self.ui.error_banner.as_ref(),
+                self.ui.include_line_present,
+            ) {
+            column![banners, with_rule_editor].into()
+        } else {
+            with_rule_editor
+        };
+
+        // If there's an active dialog, render it as a themed overlay on top of
+        // everything (not a full-UI replacement).
         if let Some(dialog) = views::dialogs::view(
             &self.ui.dialog_state,
             &self.ui.wizard_suggestions,
             self.ui.niri_version,
+            self.ui.pending_revert.as_ref(),
         ) {
-            dialog
+            stack![base, dialog].into()
         } else {
-            with_rule_editor
+            base
         }
     }
 
@@ -1435,6 +1882,7 @@ impl App {
             S::ModifierKeys => views::behavior::modifier_keys_section(&self.settings.behavior),
             S::Animations => views::animations::view(&self.settings.animations),
             S::Cursor => views::cursor::view(&self.settings.cursor),
+            S::Blur => views::blur::view(&self.settings.blur, self.ui.feature_compat.blur),
             // System sections
             S::StartupPrograms => views::startup::view_section(&self.settings.startup),
             S::EnvironmentVars => views::environment::view_section(&self.settings.environment),
@@ -1471,6 +1919,8 @@ impl App {
                 &self.settings.cursor,
                 &self.settings.layout_extras,
                 &self.settings.behavior,
+                &self.settings.blur,
+                self.ui.feature_compat.blur,
             ),
             Screen::Input => views::screens::input::view(&self.settings, &self.ui),
             Screen::Rules => views::screens::rules::view(
@@ -1564,79 +2014,54 @@ impl App {
     fn page_content(&self) -> Element<'_, Message> {
         // Each page handles its own scrollable container
         match self.ui.current_page {
-            Page::Overview => return self.overview_page(),
-            Page::Appearance => {
-                return views::appearance::view(&self.settings.appearance);
-            }
-            Page::Behavior => {
-                return views::behavior::view(&self.settings.behavior);
-            }
-            Page::Keyboard => {
-                return views::keyboard::view(&self.settings.keyboard);
-            }
+            Page::Overview => self.overview_page(),
+            Page::Appearance => views::appearance::view(&self.settings.appearance),
+            Page::Behavior => views::behavior::view(&self.settings.behavior),
+            Page::Keyboard => views::keyboard::view(&self.settings.keyboard),
             Page::Mouse => {
-                return views::mouse::view(&self.settings.mouse);
+                views::mouse::view(&self.settings.mouse, &self.ui.mouse_scroll_factor_text)
             }
-            Page::Touchpad => {
-                return views::touchpad::view(&self.settings.touchpad);
-            }
-            Page::Trackpoint => {
-                return views::trackpoint::view(&self.settings.trackpoint);
-            }
-            Page::Trackball => {
-                return views::trackball::view(&self.settings.trackball);
-            }
+            Page::Touchpad => views::touchpad::view(
+                &self.settings.touchpad,
+                &self.ui.touchpad_scroll_factor_text,
+            ),
+            Page::Trackpoint => views::trackpoint::view(&self.settings.trackpoint),
+            Page::Trackball => views::trackball::view(&self.settings.trackball),
             Page::Tablet => {
-                return views::tablet::view(
-                    &self.settings.tablet,
-                    &self.ui.tablet_calibration_cache,
-                );
+                views::tablet::view(&self.settings.tablet, &self.ui.tablet_calibration_cache)
             }
             Page::Touch => {
-                return views::touch::view(&self.settings.touch, &self.ui.touch_calibration_cache);
+                views::touch::view(&self.settings.touch, &self.ui.touch_calibration_cache)
             }
-            Page::Animations => {
-                return views::animations::view(&self.settings.animations);
-            }
-            Page::Cursor => {
-                return views::cursor::view(&self.settings.cursor);
-            }
-            Page::LayoutExtras => {
-                return views::layout_extras::view(&self.settings.layout_extras);
-            }
-            Page::Gestures => {
-                return views::gestures::view(&self.settings.gestures);
-            }
-            Page::Workspaces => {
-                return views::workspaces::view(&self.settings.workspaces);
-            }
-            Page::WindowRules => {
-                return views::window_rules::view(
-                    &self.settings.window_rules,
-                    &self.ui.rules_search,
-                    self.ui.rules_filter,
-                    &self.ui.window_rule_sections_expanded,
-                    &self.ui.window_rule_regex_errors,
-                    &self.ui.available_workspaces,
-                );
-            }
-            Page::LayerRules => {
-                return views::layer_rules::view(
-                    &self.settings.layer_rules,
-                    &self.ui.rules_search,
-                    self.ui.rules_filter,
-                    &self.ui.layer_rule_sections_expanded,
-                    &self.ui.layer_rule_regex_errors,
-                );
-            }
-            Page::Keybindings => {
-                return views::keybindings::view(
-                    &self.settings.keybindings,
-                    self.ui.selected_keybinding_index,
-                    &self.ui.keybinding_sections_expanded,
-                    self.ui.key_capture_active,
-                );
-            }
+            Page::Animations => views::animations::view(&self.settings.animations),
+            Page::Cursor => views::cursor::view(&self.settings.cursor),
+            Page::Blur => views::blur::view(&self.settings.blur, self.ui.feature_compat.blur),
+            Page::LayoutExtras => views::layout_extras::view(&self.settings.layout_extras),
+            Page::Gestures => views::gestures::view(&self.settings.gestures),
+            Page::Workspaces => views::workspaces::view(&self.settings.workspaces),
+            Page::WindowRules => views::window_rules::view(
+                &self.settings.window_rules,
+                &self.ui.rules_search,
+                self.ui.rules_filter,
+                &self.ui.window_rule_sections_expanded,
+                &self.ui.window_rule_regex_errors,
+                &self.ui.available_workspaces,
+            ),
+            Page::LayerRules => views::layer_rules::view(
+                &self.settings.layer_rules,
+                &self.ui.rules_search,
+                self.ui.rules_filter,
+                &self.ui.layer_rule_sections_expanded,
+                &self.ui.layer_rule_regex_errors,
+            ),
+            Page::Keybindings => views::keybindings::view(
+                &self.settings.keybindings,
+                self.ui.selected_keybinding_index,
+                &self.ui.keybinding_sections_expanded,
+                self.ui.key_capture_active,
+                self.ui.niri_version,
+                self.ui.keybinding_capture_conflict.as_ref(),
+            ),
             Page::Outputs => {
                 return views::outputs::view(
                     &self.settings.outputs,
@@ -1645,47 +2070,29 @@ impl App {
                     &self.ui.tools_state.outputs, // IPC data for available modes
                 );
             }
-            Page::Miscellaneous => {
-                return views::miscellaneous::view(&self.settings.miscellaneous);
-            }
-            Page::Startup => {
-                return views::startup::view(&self.settings.startup);
-            }
-            Page::Environment => {
-                return views::environment::view(&self.settings.environment);
-            }
-            Page::Debug => {
-                return views::debug::view(&self.settings.debug);
-            }
-            Page::SwitchEvents => {
-                return views::switch_events::view(&self.settings.switch_events);
-            }
-            Page::RecentWindows => {
-                return views::recent_windows::view(&self.settings.recent_windows);
-            }
+            Page::Miscellaneous => views::miscellaneous::view(&self.settings.miscellaneous),
+            Page::Startup => views::startup::view(&self.settings.startup),
+            Page::Environment => views::environment::view(&self.settings.environment),
+            Page::Debug => views::debug::view(&self.settings.debug),
+            Page::SwitchEvents => views::switch_events::view(&self.settings.switch_events),
+            Page::RecentWindows => views::recent_windows::view(&self.settings.recent_windows),
             Page::Tools => {
                 let niri_connected = matches!(
                     self.ui.niri_status,
                     crate::views::status_bar::NiriStatus::Connected
                 );
-                return views::tools::view(&self.ui.tools_state, niri_connected);
+                views::tools::view(&self.ui.tools_state, niri_connected)
             }
-            Page::Preferences => {
-                return views::preferences::view(
-                    self.settings.preferences.float_settings_app,
-                    self.ui.show_search_bar,
-                    &self.settings.preferences.search_hotkey,
-                );
-            }
-            Page::ConfigEditor => {
-                return views::config_editor::view(
-                    &self.ui.config_editor_state,
-                    &self.ui.config_editor_content,
-                );
-            }
-            Page::Backups => {
-                return views::backups::view(&self.ui.backups_state);
-            }
+            Page::Preferences => views::preferences::view(
+                self.settings.preferences.float_settings_app,
+                self.ui.show_search_bar,
+                &self.settings.preferences.search_hotkey,
+            ),
+            Page::ConfigEditor => views::config_editor::view(
+                &self.ui.config_editor_state,
+                &self.ui.config_editor_content,
+            ),
+            Page::Backups => views::backups::view(&self.ui.backups_state),
         }
     }
 
@@ -1721,7 +2128,7 @@ impl App {
                 // Zoom slider
                 row![
                     text("Zoom Level:").size(14).width(Length::Fixed(140.0)),
-                    slider(0.1..=2.0, zoom as f32, |v| Message::Overview(OverviewMessage::SetZoom(v as f64)))
+                    slider(crate::constants::OVERVIEW_ZOOM_MIN as f32..=crate::constants::OVERVIEW_ZOOM_MAX as f32, zoom as f32, |v| Message::Overview(OverviewMessage::SetZoom(v as f64)))
                         .step(0.05)
                         .width(Length::Fixed(200.0)),
                     text(format!("{:.2}x", zoom)).size(14).width(Length::Fixed(60.0)),
@@ -1973,8 +2380,27 @@ impl App {
 
     /// Check if we should save now (debounce: 300ms since last change)
     fn should_save(&self) -> bool {
-        if self.save.in_progress || !self.save.dirty_tracker.is_dirty() {
+        if self.save.in_progress {
             return false;
+        }
+
+        // Only unblocked dirty categories are savable; blocked-only dirt must not
+        // spin the debounce loop.
+        let has_unblocked = self
+            .save
+            .dirty_tracker
+            .peek()
+            .iter()
+            .any(|c| !self.save.blocked.contains(c));
+        if !has_unblocked {
+            return false;
+        }
+
+        // After a failed save, back off: retry at most once every 5 seconds.
+        if let Some(f) = self.save.last_failure_time {
+            if f.elapsed() < Duration::from_secs(5) {
+                return false;
+            }
         }
 
         match self.save.last_change_time {
@@ -1985,21 +2411,66 @@ impl App {
 
     /// Create an async save task
     fn save_task(&mut self) -> Task<Message> {
+        // Semantic validation gate: never write settings that fail validation.
+        let validation = crate::config::validation::validate_settings(&self.settings);
+        if !validation.is_valid() {
+            // Stop the debounce loop until the user changes something; dirty flags
+            // stay set so the fixed value saves on the next change.
+            self.save.last_change_time = None;
+            self.ui.error_banner = Some(ErrorBanner {
+                kind: ErrorBannerKind::ValidationBlocked,
+                title: "Not saving: fix invalid values".to_string(),
+                details: validation.errors.iter().map(|e| e.to_string()).collect(),
+            });
+            return Task::none();
+        }
+        // Validation passed: clear a prior ValidationBlocked banner.
+        if matches!(
+            self.ui.error_banner.as_ref().map(|b| &b.kind),
+            Some(ErrorBannerKind::ValidationBlocked)
+        ) {
+            self.ui.error_banner = None;
+        }
+
         self.save.in_progress = true;
+        let dirty = self.save.dirty_tracker.take_except(&self.save.blocked);
+        if dirty.is_empty() {
+            self.save.in_progress = false;
+            return Task::none();
+        }
+        self.save.in_flight = dirty.clone();
+        let needs_backup: HashSet<SettingsCategory> =
+            dirty.difference(&self.save.backed_up).copied().collect();
+
         let settings = self.settings.clone();
-        let dirty = self.save.dirty_tracker.take();
         let paths = self.paths.clone();
         let feature_compat = self.ui.feature_compat;
 
         Task::perform(
             async move {
-                match crate::config::save_dirty(&paths, &settings, &dirty, feature_compat) {
-                    Ok(count) => SaveResult::Success {
+                let categories: Vec<SettingsCategory> = dirty.iter().copied().collect();
+                let result = tokio::task::spawn_blocking(move || {
+                    crate::config::save_dirty(
+                        &paths,
+                        &settings,
+                        &dirty,
+                        feature_compat,
+                        &needs_backup,
+                    )
+                })
+                .await;
+                match result {
+                    Ok(Ok(count)) => SaveResult::Success {
                         files_written: count,
-                        categories: dirty.into_iter().collect(),
+                        categories,
+                    },
+                    Ok(Err(e)) => SaveResult::Error {
+                        message: e.to_string(),
+                        categories,
                     },
                     Err(e) => SaveResult::Error {
-                        message: e.to_string(),
+                        message: format!("Save task panicked: {}", e),
+                        categories,
                     },
                 }
             },
@@ -2009,17 +2480,14 @@ impl App {
 
     /// Create an async task to reload niri config
     fn reload_niri_config_task(&self) -> Task<Message> {
-        Task::perform(
-            async move {
-                match crate::ipc::reload_config() {
-                    Ok(()) => ReloadResult::Success,
-                    Err(e) => ReloadResult::Error {
-                        message: e.to_string(),
-                    },
-                }
-            },
-            Message::ReloadCompleted,
-        )
+        crate::ipc::tasks::reload_config_async(|result| {
+            Message::ReloadCompleted(match result {
+                Ok(()) => ReloadResult::Success,
+                Err(e) => ReloadResult::Error {
+                    message: e.to_string(),
+                },
+            })
+        })
     }
 
     /// Apply window rule consolidation - merge multiple rules into one
@@ -2138,6 +2606,8 @@ pub fn run() -> iced::Result {
         })
         .window(iced::window::Settings {
             min_size: Some(iced::Size::new(650.0, 200.0)),
+            // We handle close requests ourselves so we can flush unsaved changes.
+            exit_on_close_request: false,
             platform_specific: iced::window::settings::PlatformSpecific {
                 application_id: "nirify".to_string(),
                 ..Default::default()
@@ -2145,4 +2615,30 @@ pub fn run() -> iced::Result {
             ..Default::default()
         })
         .run()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{keybinding_msg_is_risky, output_msg_is_risky};
+    use crate::messages::{KeybindingsMessage as K, OutputsMessage as O};
+
+    #[test]
+    fn test_output_msg_riskiness() {
+        assert!(output_msg_is_risky(&O::SetEnabled(0, false)));
+        assert!(!output_msg_is_risky(&O::SetEnabled(0, true)));
+        assert!(output_msg_is_risky(&O::SetMode(0, "1920x1080".to_string())));
+        assert!(output_msg_is_risky(&O::SetModeline(0, None)));
+        assert!(output_msg_is_risky(&O::SetModeCustom(0, true)));
+        assert!(!output_msg_is_risky(&O::SetScale(0, 1.5)));
+        assert!(!output_msg_is_risky(&O::SetPositionX(0, 100)));
+    }
+
+    #[test]
+    fn test_keybinding_msg_riskiness() {
+        assert!(keybinding_msg_is_risky(&K::CapturedKey(
+            "Mod+Q".to_string()
+        )));
+        assert!(keybinding_msg_is_risky(&K::UpdateModifiers(0, vec![])));
+        assert!(!keybinding_msg_is_risky(&K::CancelKeyCapture));
+    }
 }

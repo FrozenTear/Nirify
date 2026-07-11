@@ -12,11 +12,12 @@ pub fn generate_diff(
     settings: &Settings,
     paths: &ConfigPaths,
     dirty_categories: &HashSet<SettingsCategory>,
+    feature_compat: crate::version::FeatureCompat,
 ) -> ConfigDiff {
     let mut diff = ConfigDiff::new();
 
     for category in dirty_categories {
-        if let Some(cat_diff) = generate_category_diff(settings, paths, *category) {
+        if let Some(cat_diff) = generate_category_diff(settings, paths, *category, feature_compat) {
             if cat_diff.has_changes {
                 diff.add_category(cat_diff);
             }
@@ -31,6 +32,7 @@ fn generate_category_diff(
     settings: &Settings,
     paths: &ConfigPaths,
     category: SettingsCategory,
+    feature_compat: crate::version::FeatureCompat,
 ) -> Option<CategoryDiff> {
     let (name, file_path, new_content) = match category {
         SettingsCategory::Appearance => (
@@ -71,7 +73,7 @@ fn generate_category_diff(
         SettingsCategory::Tablet => (
             "Tablet",
             paths.tablet_kdl.clone(),
-            generate_tablet_kdl(&settings.tablet),
+            generate_tablet_kdl(&settings.tablet, feature_compat),
         ),
         SettingsCategory::Touch => (
             "Touch",
@@ -116,12 +118,16 @@ fn generate_category_diff(
         SettingsCategory::WindowRules => (
             "Window Rules",
             paths.window_rules_kdl.clone(),
-            generate_window_rules_kdl(&settings.window_rules),
+            generate_window_rules_kdl(
+                &settings.window_rules,
+                settings.preferences.float_settings_app,
+                feature_compat,
+            ),
         ),
         SettingsCategory::LayerRules => (
             "Layer Rules",
             paths.layer_rules_kdl.clone(),
-            generate_layer_rules_kdl(&settings.layer_rules),
+            generate_layer_rules_kdl(&settings.layer_rules, feature_compat),
         ),
         SettingsCategory::Keybindings => (
             "Keybindings",

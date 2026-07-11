@@ -1,6 +1,7 @@
 //! Behavior settings message handler
 
 use crate::config::SettingsCategory;
+use crate::constants::{STRUT_SIZE_MAX, STRUT_SIZE_MIN};
 use crate::messages::{BehaviorMessage, Message};
 use iced::Task;
 
@@ -34,16 +35,16 @@ impl super::super::App {
                 self.settings.behavior.default_column_width_type = width_type;
             }
             BehaviorMessage::SetStrutLeft(value) => {
-                self.settings.behavior.strut_left = value.clamp(0.0, 200.0);
+                self.settings.behavior.strut_left = value.clamp(STRUT_SIZE_MIN, STRUT_SIZE_MAX);
             }
             BehaviorMessage::SetStrutRight(value) => {
-                self.settings.behavior.strut_right = value.clamp(0.0, 200.0);
+                self.settings.behavior.strut_right = value.clamp(STRUT_SIZE_MIN, STRUT_SIZE_MAX);
             }
             BehaviorMessage::SetStrutTop(value) => {
-                self.settings.behavior.strut_top = value.clamp(0.0, 200.0);
+                self.settings.behavior.strut_top = value.clamp(STRUT_SIZE_MIN, STRUT_SIZE_MAX);
             }
             BehaviorMessage::SetStrutBottom(value) => {
-                self.settings.behavior.strut_bottom = value.clamp(0.0, 200.0);
+                self.settings.behavior.strut_bottom = value.clamp(STRUT_SIZE_MIN, STRUT_SIZE_MAX);
             }
             BehaviorMessage::SetModKey(key) => {
                 self.settings.behavior.mod_key = key;

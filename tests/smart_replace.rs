@@ -86,10 +86,12 @@ fn test_smart_replace_idempotent() {
     let config_path = dir.path().join("config.kdl");
     let backup_dir = dir.path().join(".backup");
 
-    // Create config with our include line already present, no managed nodes
+    // Create config with our include line already present and last, no managed nodes.
+    // The Nirify include must be the final top-level node so it wins override conflicts;
+    // when that already holds, smart_replace is a no-op.
     let content = r#"
-include "nirify/main.kdl"
 custom-node { foo "bar" }
+include "nirify/main.kdl"
 "#;
     fs::write(&config_path, content).unwrap();
 

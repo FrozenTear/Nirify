@@ -98,22 +98,25 @@ pub fn parse_single_animation(children: &KdlDocument) -> SingleAnimationConfig {
                 if let Some(curve_str) = first.value().as_string() {
                     if curve_str == "cubic-bezier" && entries.len() >= 5 {
                         // Parse cubic-bezier control points: curve "cubic-bezier" x1 y1 x2 y2
-                        let x1 = entries
-                            .get(1)
-                            .and_then(|e| e.value().as_float())
-                            .unwrap_or(0.25);
-                        let y1 = entries
-                            .get(2)
-                            .and_then(|e| e.value().as_float())
-                            .unwrap_or(0.1);
-                        let x2 = entries
-                            .get(3)
-                            .and_then(|e| e.value().as_float())
-                            .unwrap_or(0.25);
-                        let y2 = entries
-                            .get(4)
-                            .and_then(|e| e.value().as_float())
-                            .unwrap_or(1.0);
+                        // Accept both float and integer forms: storage writes points
+                        // with `{}` formatting so 1.0 serializes as the KDL integer `1`,
+                        // and niri itself decodes these via FloatOrInt (ints allowed).
+                        // as_float() alone returns None for KdlValue::Integer and would
+                        // silently reset whole-number points to the defaults below.
+                        let point = |i: usize, default: f64| -> f64 {
+                            entries
+                                .get(i)
+                                .and_then(|e| {
+                                    e.value()
+                                        .as_float()
+                                        .or_else(|| e.value().as_integer().map(|n| n as f64))
+                                })
+                                .unwrap_or(default)
+                        };
+                        let x1 = point(1, 0.25);
+                        let y1 = point(2, 0.1);
+                        let x2 = point(3, 0.25);
+                        let y2 = point(4, 1.0);
                         config.easing.curve = EasingCurve::CubicBezier { x1, y1, x2, y2 };
                     } else {
                         // Preset curve
@@ -131,7 +134,7 @@ pub fn parse_single_animation(children: &KdlDocument) -> SingleAnimationConfig {
 /// Parse a layout override block from KDL children
 pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOverride> {
     use crate::config::models::{DefaultColumnDisplay, PresetHeight, PresetWidth};
-    use crate::types::{Color, ColorOrGradient};
+    use crate::types::ColorOrGradient;
 
     let mut layout = LayoutOverride::default();
 
@@ -172,9 +175,34 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
         layout.center_focused_column = CenterFocusedColumn::parse_kdl(&v);
     }
 
-    // always-center-single-column
-    if has_flag(layout_children, &["always-center-single-column"]) {
-        layout.always_center_single_column = Some(true);
+    // always-center-single-column (supports an explicit bool arg for the
+    // unset form `always-center-single-column false`)
+    if let Some(node) = layout_children.get("always-center-single-column") {
+        let val = node
+            .entries()
+            .iter()
+            .find(|e| e.name().is_none())
+            .and_then(|e| e.value().as_bool())
+            .unwrap_or(true);
+        layout.always_center_single_column = Some(val);
+    }
+
+    // empty-workspace-above-first
+    if let Some(node) = layout_children.get("empty-workspace-above-first") {
+        let val = node
+            .entries()
+            .iter()
+            .find(|e| e.name().is_none())
+            .and_then(|e| e.value().as_bool())
+            .unwrap_or(true);
+        layout.empty_workspace_above_first = Some(val);
+    }
+
+    // background-color
+    if let Some(s) = get_string(layout_children, &["background-color"]) {
+        if let Some(c) = parse_color(&s) {
+            layout.background_color = Some(c);
+        }
     }
 
     // default-column-display
@@ -189,12 +217,28 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
     // default-column-width
     if let Some(dcw_node) = layout_children.get("default-column-width") {
         if let Some(dcw_children) = dcw_node.children() {
+            let mut set = false;
             if let Some(v) = get_f64(dcw_children, &["proportion"]) {
                 layout.default_column_width_proportion = Some(v as f32);
+                set = true;
             }
+            // `fixed` is FloatOrInt in niri; accept a float (e.g. `fixed 500.5`)
+            // via fallback so it isn't dropped and misclassified as auto.
             if let Some(v) = get_i64(dcw_children, &["fixed"]) {
                 layout.default_column_width_fixed = Some(v as i32);
+                set = true;
+            } else if let Some(v) = get_f64(dcw_children, &["fixed"]) {
+                layout.default_column_width_fixed = Some(v.round() as i32);
+                set = true;
             }
+            // Empty `default-column-width {}` means "auto": windows pick their own
+            // width. Preserve it so the node round-trips instead of being dropped.
+            if !set {
+                layout.default_column_width_auto = Some(true);
+            }
+        } else {
+            // `default-column-width` with no child block is also an auto marker.
+            layout.default_column_width_auto = Some(true);
         }
     }
 
@@ -262,13 +306,18 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
                 layout.focus_ring_width = Some(v as i32);
             }
             if let Some(s) = get_string(fr_children, &["active-color"]) {
-                if let Some(c) = Color::from_hex(&s) {
+                if let Some(c) = parse_color(&s) {
                     layout.focus_ring_active = Some(ColorOrGradient::Color(c));
                 }
             }
             if let Some(s) = get_string(fr_children, &["inactive-color"]) {
-                if let Some(c) = Color::from_hex(&s) {
+                if let Some(c) = parse_color(&s) {
                     layout.focus_ring_inactive = Some(ColorOrGradient::Color(c));
+                }
+            }
+            if let Some(s) = get_string(fr_children, &["urgent-color"]) {
+                if let Some(c) = parse_color(&s) {
+                    layout.focus_ring_urgent = Some(ColorOrGradient::Color(c));
                 }
             }
         }
@@ -286,13 +335,18 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
                 layout.border_width = Some(v as i32);
             }
             if let Some(s) = get_string(b_children, &["active-color"]) {
-                if let Some(c) = Color::from_hex(&s) {
+                if let Some(c) = parse_color(&s) {
                     layout.border_active = Some(ColorOrGradient::Color(c));
                 }
             }
             if let Some(s) = get_string(b_children, &["inactive-color"]) {
-                if let Some(c) = Color::from_hex(&s) {
+                if let Some(c) = parse_color(&s) {
                     layout.border_inactive = Some(ColorOrGradient::Color(c));
+                }
+            }
+            if let Some(s) = get_string(b_children, &["urgent-color"]) {
+                if let Some(c) = parse_color(&s) {
+                    layout.border_urgent = Some(ColorOrGradient::Color(c));
                 }
             }
         }
@@ -333,10 +387,44 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
                 }
             }
             if let Some(s) = get_string(s_children, &["color"]) {
-                if let Some(c) = Color::from_hex(&s) {
+                if let Some(c) = parse_color(&s) {
                     layout.shadow_color = Some(c);
                 }
             }
+            if let Some(s) = get_string(s_children, &["inactive-color"]) {
+                if let Some(c) = parse_color(&s) {
+                    layout.shadow_inactive_color = Some(c);
+                }
+            }
+            if let Some(node) = s_children.get("draw-behind-window") {
+                let val = node
+                    .entries()
+                    .iter()
+                    .find(|e| e.name().is_none())
+                    .and_then(|e| e.value().as_bool())
+                    .unwrap_or(true);
+                layout.shadow_draw_behind_window = Some(val);
+            }
+        }
+    }
+
+    // tab-indicator / insert-hint sub-blocks.
+    //
+    // These reuse the global tab-indicator/insert-hint settings structs. We
+    // delegate to the shared layout-extras parser (which understands every
+    // sub-field, colors and gradients included) via a throwaway Settings, then
+    // lift the parsed sub-block out only when the corresponding node was present
+    // so a loaded override round-trips instead of being silently dropped.
+    if layout_children.get("tab-indicator").is_some()
+        || layout_children.get("insert-hint").is_some()
+    {
+        let mut tmp = Settings::default();
+        crate::config::loader::parse_layout_extras_from_children(layout_children, &mut tmp);
+        if layout_children.get("tab-indicator").is_some() {
+            layout.tab_indicator = Some(tmp.layout_extras.tab_indicator);
+        }
+        if layout_children.get("insert-hint").is_some() {
+            layout.insert_hint = Some(tmp.layout_extras.insert_hint);
         }
     }
 
@@ -572,12 +660,11 @@ pub fn parse_output_node_children(o_children: &KdlDocument, output: &mut OutputC
 
     // Mode - check for custom flag
     if let Some(mode_node) = o_children.get("mode") {
-        // Get the mode string from first argument
-        if let Some(first_entry) = mode_node.entries().first() {
-            if first_entry.name().is_none() {
-                if let Some(mode_str) = first_entry.value().as_string() {
-                    output.mode = mode_str.to_string();
-                }
+        // Get the mode string from the first positional argument. This handles both
+        // `mode "WxH@R"` and `mode custom=true "WxH@R"` (property-first) forms.
+        if let Some(arg) = mode_node.entries().iter().find(|e| e.name().is_none()) {
+            if let Some(mode_str) = arg.value().as_string() {
+                output.mode = mode_str.to_string();
             }
         }
         // Check for custom=true flag
@@ -592,24 +679,72 @@ pub fn parse_output_node_children(o_children: &KdlDocument, output: &mut OutputC
         }
     }
 
-    // Modeline
-    if let Some(v) = get_string(o_children, &["modeline"]) {
-        output.modeline = Some(v);
+    // Modeline - expects 11 positional entries (clock, 8 timings, 2 polarity strings)
+    if let Some(modeline_node) = o_children.get("modeline") {
+        let args: Vec<&kdl::KdlEntry> = modeline_node
+            .entries()
+            .iter()
+            .filter(|e| e.name().is_none())
+            .collect();
+        if args.len() == 11 {
+            let mut parts: Vec<String> = Vec::with_capacity(11);
+            let mut ok = true;
+
+            // Clock: float or integer
+            if let Some(f) = args[0].value().as_float() {
+                parts.push(format!("{:.2}", f));
+            } else if let Some(i) = args[0].value().as_integer() {
+                parts.push(format!("{:.2}", i as f64));
+            } else {
+                ok = false;
+            }
+
+            // 8 integer timings
+            for arg in &args[1..=8] {
+                if let Some(i) = arg.value().as_integer() {
+                    parts.push(format!("{}", i));
+                } else {
+                    ok = false;
+                    break;
+                }
+            }
+
+            // 2 polarity strings
+            for arg in &args[9..=10] {
+                if let Some(s) = arg.value().as_string() {
+                    parts.push(s.to_ascii_lowercase());
+                } else {
+                    ok = false;
+                    break;
+                }
+            }
+
+            if ok {
+                output.modeline = Some(parts.join(" "));
+            } else {
+                log::warn!("invalid modeline node, ignoring");
+            }
+        } else {
+            log::warn!("invalid modeline node (expected 11 entries), ignoring");
+        }
     }
 
-    // Position
+    // Position - presence of the node means explicit placement (even x=0 y=0)
     if let Some(pos) = o_children.get("position") {
+        let mut x = 0i32;
+        let mut y = 0i32;
         for entry in pos.entries() {
             if let Some(name) = entry.name() {
                 if let Some(val) = entry.value().as_integer() {
                     match name.value() {
-                        "x" => output.position_x = val as i32,
-                        "y" => output.position_y = val as i32,
+                        "x" => x = val as i32,
+                        "y" => y = val as i32,
                         _ => {}
                     }
                 }
             }
         }
+        output.position = Some((x, y));
     }
 
     if let Some(v) = get_string(o_children, &["transform"]) {
@@ -655,6 +790,10 @@ pub fn parse_output_node_children(o_children: &KdlDocument, output: &mut OutputC
 
     if has_flag(o_children, &["focus-at-startup"]) {
         output.focus_at_startup = true;
+    }
+
+    if let Some(v) = get_string(o_children, &["background-color"]) {
+        output.background_color = parse_color(&v);
     }
 
     if let Some(v) = get_string(o_children, &["backdrop-color"]) {

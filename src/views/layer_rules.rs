@@ -8,9 +8,47 @@ use iced::{Alignment, Element, Length};
 use std::collections::HashMap;
 
 use super::widgets::*;
-use crate::config::models::{BlockOutFrom, LayerRule, LayerRulesSettings};
+use crate::config::models::{BlockOutFrom, LayerKind, LayerRule, LayerRulesSettings};
 use crate::messages::{LayerRulesMessage, Message, RulesFilter};
 use crate::theme::{fonts, neon};
+
+/// Display wrapper for the layer-shell layer picker (with an "Any" option).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LayerChoice {
+    Any,
+    Kind(LayerKind),
+}
+
+impl LayerChoice {
+    const ALL: [LayerChoice; 5] = [
+        LayerChoice::Any,
+        LayerChoice::Kind(LayerKind::Background),
+        LayerChoice::Kind(LayerKind::Bottom),
+        LayerChoice::Kind(LayerKind::Top),
+        LayerChoice::Kind(LayerKind::Overlay),
+    ];
+    fn from_opt(v: Option<LayerKind>) -> Self {
+        match v {
+            None => LayerChoice::Any,
+            Some(k) => LayerChoice::Kind(k),
+        }
+    }
+    fn to_opt(self) -> Option<LayerKind> {
+        match self {
+            LayerChoice::Any => None,
+            LayerChoice::Kind(k) => Some(k),
+        }
+    }
+}
+
+impl std::fmt::Display for LayerChoice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LayerChoice::Any => write!(f, "Any"),
+            LayerChoice::Kind(k) => write!(f, "{}", k),
+        }
+    }
+}
 
 const RULE_CARD_HEIGHT: f32 = 320.0;
 const RULE_CARD_SECTION_HEIGHT: f32 = 68.0;
@@ -242,7 +280,19 @@ fn rule_card(rule: &LayerRule) -> Element<'_, Message> {
                 ]
                 .spacing(4)
             )
-            .on_press(Message::LayerRules(LayerRulesMessage::DeleteRule(id)))
+            .on_press(Message::ShowDialog(crate::messages::DialogState::Confirm {
+                title: "Delete layer rule?".to_string(),
+                message: format!(
+                    "Delete the rule \"{}\"? This cannot be undone.",
+                    if rule.name.is_empty() {
+                        "Untitled rule"
+                    } else {
+                        rule.name.as_str()
+                    }
+                ),
+                confirm_label: "Delete".to_string(),
+                on_confirm: crate::messages::ConfirmAction::DeleteLayerRule(id),
+            }))
             .padding([6, 12])
             .style(ghost_button_style),
         ],
@@ -293,6 +343,7 @@ pub fn editor_modal<'a>(
     rule: &'a LayerRule,
     _sections_expanded: &'a HashMap<(u32, String), bool>,
     regex_errors: &'a HashMap<(u32, String), String>,
+    supports_background_effects: bool,
 ) -> Element<'a, Message> {
     let id = rule.id;
 
@@ -415,6 +466,19 @@ pub fn editor_modal<'a>(
             rule_match.at_startup,
             move |value| Message::LayerRules(LayerRulesMessage::SetMatchAtStartup(id, idx, value)),
         ));
+        match_row = match_row.push(picker_row(
+            "Layer",
+            if supports_background_effects {
+                "Match layer-shell layer"
+            } else {
+                "Requires niri 26.04"
+            },
+            &LayerChoice::ALL,
+            Some(LayerChoice::from_opt(rule_match.layer)),
+            move |value| {
+                Message::LayerRules(LayerRulesMessage::SetMatchLayer(id, idx, value.to_opt()))
+            },
+        ));
 
         if rule.matches.len() > 1 {
             match_row = match_row.push(
@@ -433,6 +497,64 @@ pub fn editor_modal<'a>(
     editor = editor.push(
         button(text("+ Add Match").size(12).color(neon::SECONDARY))
             .on_press(Message::LayerRules(LayerRulesMessage::AddMatch(id)))
+            .padding([6, 12])
+            .style(ghost_button_style),
+    );
+
+    // ── EXCLUDE CRITERIA ──
+    editor = editor.push(Space::new().height(16));
+    editor = editor.push(modal_section_header("✕", "EXCLUDE CRITERIA", neon::ERROR));
+    if rule.excludes.is_empty() {
+        editor = editor.push(
+            text("No exclude criteria — rule applies to all matching surfaces")
+                .size(12)
+                .color(neon::ON_SURFACE_VARIANT),
+        );
+    }
+    for (idx, ex) in rule.excludes.iter().enumerate() {
+        let ns_value = ex.namespace.clone().unwrap_or_default();
+        let mut ex_col = column![row![
+            column![
+                text("NAMESPACE (REGEX)")
+                    .size(10)
+                    .font(fonts::UI_FONT_SEMIBOLD)
+                    .color(neon::OUTLINE_VARIANT),
+                text_input("e.g., notifications", &ns_value)
+                    .on_input(move |value| Message::LayerRules(
+                        LayerRulesMessage::SetExcludeNamespace(id, idx, value)
+                    ))
+                    .padding(10),
+            ]
+            .spacing(4)
+            .width(Length::Fill),
+            button(text("✕").size(12).color(neon::ERROR))
+                .on_press(Message::LayerRules(LayerRulesMessage::RemoveExclude(
+                    id, idx
+                )))
+                .padding([8, 10])
+                .style(ghost_button_style),
+        ]
+        .spacing(8)
+        .align_y(Alignment::End),]
+        .spacing(4);
+        ex_col = ex_col.push(picker_row(
+            "Layer",
+            if supports_background_effects {
+                "Exclude by layer-shell layer"
+            } else {
+                "Requires niri 26.04"
+            },
+            &LayerChoice::ALL,
+            Some(LayerChoice::from_opt(ex.layer)),
+            move |value| {
+                Message::LayerRules(LayerRulesMessage::SetExcludeLayer(id, idx, value.to_opt()))
+            },
+        ));
+        editor = editor.push(ex_col);
+    }
+    editor = editor.push(
+        button(text("+ Add Exclude").size(12).color(neon::ERROR))
+            .on_press(Message::LayerRules(LayerRulesMessage::AddExclude(id)))
             .padding([6, 12])
             .style(ghost_button_style),
     );
@@ -467,20 +589,11 @@ pub fn editor_modal<'a>(
                     0.01,
                     move |v| Message::LayerRules(LayerRulesMessage::SetOpacity(id, Some(v))),
                 ),
-                styled_slider_int(
+                super::window_rules::corner_radius_editor(
                     "CORNER RADIUS",
-                    &format!("{}px", rule.geometry_corner_radius.unwrap_or(0)),
-                    move |s| s
-                        .replace("px", "")
-                        .parse::<i32>()
-                        .ok()
-                        .map(|v| Message::LayerRules(LayerRulesMessage::SetCornerRadius(
-                            id,
-                            Some(v.clamp(0, 32))
-                        ))),
-                    0..=32,
-                    rule.geometry_corner_radius.unwrap_or(0),
-                    move |v| Message::LayerRules(LayerRulesMessage::SetCornerRadius(id, Some(v))),
+                    id,
+                    &rule.geometry_corner_radius,
+                    |id, v| Message::LayerRules(LayerRulesMessage::SetCornerRadius(id, v)),
                 ),
             ]
             .spacing(4)
@@ -518,9 +631,28 @@ pub fn editor_modal<'a>(
         .style(crate::theme::card_style),
     );
 
-    editor = editor.push(Space::new().height(8));
-    editor = editor.push(info_text(
-        "Per-layer shadow overrides can be configured via KDL.",
+    editor = editor.push(Space::new().height(16));
+    editor = editor.push(modal_section_header("◌", "SHADOW", neon::TERTIARY));
+    editor = editor.push(super::window_rules::shadow_editor(
+        id,
+        &rule.shadow,
+        |id, v| Message::LayerRules(LayerRulesMessage::SetShadow(id, v)),
+    ));
+
+    // ── BACKGROUND EFFECT & POPUPS (niri 26.04) ──
+    editor = editor.push(Space::new().height(16));
+    editor = editor.push(modal_section_header(
+        "✦",
+        "BACKGROUND EFFECT & POPUPS",
+        neon::TERTIARY,
+    ));
+    editor = editor.push(super::window_rules::background_effect_editor(
+        id,
+        &rule.background_effect,
+        &rule.popups,
+        supports_background_effects,
+        |id, v| Message::LayerRules(LayerRulesMessage::SetBackgroundEffect(id, v)),
+        |id, v| Message::LayerRules(LayerRulesMessage::SetPopups(id, v)),
     ));
 
     // ── Footer ──
@@ -941,39 +1073,6 @@ fn styled_slider<'a>(
             iced::widget::slider(range, value, on_slide)
                 .step(step)
                 .width(Length::Fill),
-        ]
-        .spacing(4)
-        .padding(12),
-    )
-    .style(crate::theme::card_style)
-    .into()
-}
-
-fn styled_slider_int<'a>(
-    label: &'a str,
-    display_value: &str,
-    on_text: impl Fn(String) -> Option<Message> + 'a,
-    range: std::ops::RangeInclusive<i32>,
-    value: i32,
-    on_slide: impl Fn(i32) -> Message + 'a,
-) -> Element<'a, Message> {
-    let display_owned = display_value.to_string();
-    container(
-        column![
-            row![
-                text(label)
-                    .size(10)
-                    .font(fonts::UI_FONT_SEMIBOLD)
-                    .color(neon::OUTLINE_VARIANT),
-                Space::new().width(Length::Fill),
-                text_input("", &display_owned)
-                    .on_input(move |s| on_text(s).unwrap_or(Message::NoOp))
-                    .padding([4, 8])
-                    .size(11)
-                    .width(Length::Fixed(50.0)),
-            ]
-            .align_y(Alignment::Center),
-            iced::widget::slider(range, value, on_slide).width(Length::Fill),
         ]
         .spacing(4)
         .padding(12),

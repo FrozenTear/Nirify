@@ -27,7 +27,23 @@ impl super::super::App {
             MiscellaneousMessage::SetConfigNotificationDisableFailed(v) => {
                 misc.config_notification_disable_failed = v
             }
-            MiscellaneousMessage::SetSpawnShAtStartup(v) => misc.spawn_sh_at_startup = v,
+            MiscellaneousMessage::AddSpawnShAtStartup => {
+                let id = misc.spawn_sh_next_id;
+                misc.spawn_sh_next_id += 1;
+                misc.spawn_sh_at_startup
+                    .push(crate::config::models::SpawnShCommand {
+                        id,
+                        command: String::new(),
+                    });
+            }
+            MiscellaneousMessage::RemoveSpawnShAtStartup(id) => {
+                misc.spawn_sh_at_startup.retain(|c| c.id != id);
+            }
+            MiscellaneousMessage::SetSpawnShAtStartup(id, v) => {
+                if let Some(cmd) = misc.spawn_sh_at_startup.iter_mut().find(|c| c.id == id) {
+                    cmd.command = v;
+                }
+            }
             MiscellaneousMessage::SetXWaylandSatellite(v) => misc.xwayland_satellite = v,
         }
 

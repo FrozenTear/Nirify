@@ -84,11 +84,9 @@ pub fn click_method_to_kdl(method: crate::types::ClickMethod) -> &'static str {
     }
 }
 
-/// Write common input device settings (shared between mouse and touchpad).
-///
-/// Writes boolean flags and numeric settings that are common to both input devices.
-/// If `scroll_factor_horizontal` is Some and differs from `scroll_factor` (vertical),
-/// outputs the split format "horizontal=X vertical=Y".
+// Aggregates the full set of common input KDL fields; grouping them into a struct
+// would just move the argument list elsewhere.
+#[allow(clippy::too_many_arguments)]
 pub fn write_common_input_settings(
     content: &mut String,
     natural_scroll: bool,
@@ -108,20 +106,39 @@ pub fn write_common_input_settings(
     if middle_emulation {
         content.push_str("        middle-emulation\n");
     }
-    content.push_str(&format!("        accel-speed {:.2}\n", accel_speed));
-    content.push_str(&format!(
-        "        accel-profile \"{}\"\n",
-        accel_profile_to_kdl(accel_profile)
-    ));
-
-    // Output scroll-factor: use split format if horizontal differs from vertical
-    if let Some(h) = scroll_factor_horizontal {
+    // accel-speed: only emit when non-default (niri default is 0.0)
+    if accel_speed.abs() > 0.001 {
+        content.push_str(&format!("        accel-speed {:.2}\n", accel_speed));
+    }
+    // accel-profile: only emit when non-default (niri default is unset/adaptive)
+    if !matches!(accel_profile, AccelProfile::Adaptive) {
         content.push_str(&format!(
-            "        scroll-factor \"horizontal={:.2} vertical={:.2}\"\n",
-            h, scroll_factor
+            "        accel-profile \"{}\"\n",
+            accel_profile_to_kdl(accel_profile)
         ));
-    } else {
-        content.push_str(&format!("        scroll-factor {:.2}\n", scroll_factor));
+    }
+
+    // scroll-factor:
+    //   * uniform 1.0 with no horizontal override => omit (niri default)
+    //   * uniform non-negative => bare float argument (base arg is FloatOrInt<0,100>)
+    //   * split, or uniform negative => properties horizontal=/vertical= (each -100..100)
+    match scroll_factor_horizontal {
+        None if scroll_factor == 1.0 => {
+            // niri default; write nothing
+        }
+        None if scroll_factor >= 0.0 => {
+            content.push_str(&format!("        scroll-factor {:.2}\n", scroll_factor));
+        }
+        _ => {
+            // Split axes, or a uniform negative value. The base argument rejects
+            // negatives, so always use the property form here. For a uniform
+            // negative value, horizontal == vertical.
+            let h = scroll_factor_horizontal.unwrap_or(scroll_factor);
+            content.push_str(&format!(
+                "        scroll-factor horizontal={:.2} vertical={:.2}\n",
+                h, scroll_factor
+            ));
+        }
     }
 }
 

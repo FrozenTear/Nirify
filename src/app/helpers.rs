@@ -78,6 +78,8 @@ pub fn parse_spawn_command(command: &str) -> Result<ParsedCommand, String> {
             '\\' if in_double_quote => {
                 // Handle escape sequences in double quotes
                 if let Some(&next) = chars.peek() {
+                    // Wildcard arm pushes the backslash literally, so it cannot collapse.
+                    #[allow(clippy::collapsible_match)]
                     match next {
                         '"' | '\\' | '$' | '`' => {
                             if let Some(escaped) = chars.next() {
@@ -168,19 +170,6 @@ fn check_dangerous_command(args: &[String], full_command: &str) -> Option<String
     }
 
     None
-}
-
-/// Validates and parses a command for use in keybindings.
-/// Returns the parsed args, or an error message if the command is invalid.
-pub fn validate_spawn_command(command: &str) -> Result<Vec<String>, String> {
-    let parsed = parse_spawn_command(command)?;
-
-    // Log warning if present (but don't block the command)
-    if let Some(warning) = &parsed.warning {
-        log::warn!("Keybinding command: {}", warning);
-    }
-
-    Ok(parsed.args)
 }
 
 #[cfg(test)]
@@ -305,6 +294,66 @@ pub fn hotkey_matches(pressed: &str, configured: &str) -> bool {
 
     // But we also want exact match - pressed shouldn't have extra modifiers
     pressed_mods.len() == configured_mods.len()
+}
+
+/// Map a single-character key string to a niri-compatible xkb keysym name.
+///
+/// - ASCII letters are uppercased (niri resolves keysyms case-insensitively).
+/// - ASCII digits are kept as-is.
+/// - ASCII punctuation is mapped to its xkb keysym name (e.g. `,` -> `comma`).
+/// - Any other single char (e.g. `é`) becomes a `U<hex>` Unicode keysym name,
+///   which libxkbcommon's `xkb_keysym_from_name` accepts.
+///
+/// Returns `None` for multi-character strings.
+fn char_to_keysym(s: &str) -> Option<String> {
+    let mut chars = s.chars();
+    let c = chars.next()?;
+    if chars.next().is_some() {
+        return None; // multi-char
+    }
+    if c.is_ascii_alphabetic() {
+        return Some(c.to_ascii_uppercase().to_string());
+    }
+    if c.is_ascii_digit() {
+        return Some(c.to_string());
+    }
+    let name = match c {
+        '!' => "exclam",
+        '"' => "quotedbl",
+        '#' => "numbersign",
+        '$' => "dollar",
+        '%' => "percent",
+        '&' => "ampersand",
+        '\'' => "apostrophe",
+        '(' => "parenleft",
+        ')' => "parenright",
+        '*' => "asterisk",
+        '+' => "plus",
+        ',' => "comma",
+        '-' => "minus",
+        '.' => "period",
+        '/' => "slash",
+        ':' => "colon",
+        ';' => "semicolon",
+        '<' => "less",
+        '=' => "equal",
+        '>' => "greater",
+        '?' => "question",
+        '@' => "at",
+        '[' => "bracketleft",
+        '\\' => "backslash",
+        ']' => "bracketright",
+        '^' => "asciicircum",
+        '_' => "underscore",
+        '`' => "grave",
+        '{' => "braceleft",
+        '|' => "bar",
+        '}' => "braceright",
+        '~' => "asciitilde",
+        ' ' => "space",
+        _ => return Some(format!("U{:04X}", c as u32)),
+    };
+    Some(name.to_string())
 }
 
 /// Formats a key press event into a niri-compatible key combo string
@@ -441,12 +490,11 @@ pub fn format_key_combo(
                     "/" => "KP_Divide",
                     _ => {
                         // Unknown numpad character, fall through to regular handling
-                        if s.len() == 1 {
-                            let upper = s.to_uppercase();
+                        if let Some(mapped) = char_to_keysym(s) {
                             if parts.is_empty() {
-                                return upper;
+                                return mapped;
                             } else {
-                                return format!("{}+{}", parts.join("+"), upper);
+                                return format!("{}+{}", parts.join("+"), mapped);
                             }
                         } else {
                             return String::new();
@@ -459,14 +507,13 @@ pub fn format_key_combo(
                     return format!("{}+{}", parts.join("+"), kp_name);
                 }
             } else {
-                // For character keys, uppercase for consistent display
-                if s.len() == 1 {
-                    // Single character - uppercase it for display
-                    let upper = s.to_uppercase();
+                // Map to a niri-compatible xkb keysym name (letters uppercased,
+                // punctuation -> keysym names, non-ASCII -> U<hex>).
+                if let Some(mapped) = char_to_keysym(s) {
                     if parts.is_empty() {
-                        return upper;
+                        return mapped;
                     } else {
-                        return format!("{}+{}", parts.join("+"), upper);
+                        return format!("{}+{}", parts.join("+"), mapped);
                     }
                 } else {
                     return String::new();
@@ -538,5 +585,43 @@ pub fn apply_gradient_message(target: &mut ColorOrGradient, msg: GradientPickerM
                 gradient.hue_interpolation = Some(hue_interp);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod keycombo_tests {
+    use super::*;
+    use iced::keyboard::{Key, Location, Modifiers};
+
+    fn ch(s: &str, mods: Modifiers) -> String {
+        format_key_combo(&Key::Character(s.into()), mods, Location::Standard)
+    }
+
+    #[test]
+    fn test_punctuation_comma() {
+        assert_eq!(ch(",", Modifiers::empty()), "comma");
+    }
+
+    #[test]
+    fn test_shifted_exclam_with_mods() {
+        assert_eq!(
+            ch("!", Modifiers::LOGO | Modifiers::SHIFT),
+            "Mod+Shift+exclam"
+        );
+    }
+
+    #[test]
+    fn test_digit_with_shift() {
+        assert_eq!(ch("1", Modifiers::SHIFT), "Shift+1");
+    }
+
+    #[test]
+    fn test_non_ascii_unicode_keysym() {
+        assert_eq!(ch("é", Modifiers::empty()), "U00E9");
+    }
+
+    #[test]
+    fn test_letter_uppercased() {
+        assert_eq!(ch("a", Modifiers::empty()), "A");
     }
 }

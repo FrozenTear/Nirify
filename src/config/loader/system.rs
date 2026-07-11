@@ -81,14 +81,19 @@ pub fn parse_environment_from_doc(doc: &KdlDocument, settings: &mut Settings) {
         if let Some(env_children) = env_node.children() {
             for node in env_children.nodes() {
                 let name = node.name().value().to_string();
-                // Get the first string argument as the value
-                let value = node
-                    .entries()
-                    .iter()
-                    .find(|e| e.name().is_none())
-                    .and_then(|e| e.value().as_string())
-                    .map(|s| s.to_string())
-                    .unwrap_or_default();
+                // Determine the value: `null` -> None (unset); string -> Some(s);
+                // no positional entry -> Some("") (empty string).
+                let value = match node.entries().iter().find(|e| e.name().is_none()) {
+                    Some(entry) if entry.value().is_null() => None,
+                    Some(entry) => Some(
+                        entry
+                            .value()
+                            .as_string()
+                            .map(|s| s.to_string())
+                            .unwrap_or_default(),
+                    ),
+                    None => Some(String::new()),
+                };
 
                 settings.environment.variables.push(EnvironmentVariable {
                     id: next_id,

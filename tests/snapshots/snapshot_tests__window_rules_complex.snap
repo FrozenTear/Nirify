@@ -4,6 +4,7 @@ expression: kdl
 ---
 // Window rules - managed by Nirify
 
+
 // Terminals floating
 window-rule {
     match app-id="kitty"

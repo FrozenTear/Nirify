@@ -21,11 +21,36 @@ impl super::super::App {
                 self.settings.mouse.accel_profile = profile;
             }
             MouseMessage::SetScrollFactor(value) => {
-                self.settings.mouse.scroll_factor = value.clamp(0.1, 10.0) as f64;
+                self.settings.mouse.scroll_factor = (value as f64).clamp(
+                    crate::constants::SCROLL_FACTOR_MIN,
+                    crate::constants::SCROLL_FACTOR_MAX,
+                );
+                // Keep the exact-entry buffer in sync when the slider drives it.
+                self.ui.mouse_scroll_factor_text = format!("{}", self.settings.mouse.scroll_factor);
+            }
+            MouseMessage::SetScrollFactorText(text) => {
+                // Commit on successful parse (clamped so out-of-range never
+                // persists) but keep the raw text so intermediate strings like
+                // "-", "1." and "" survive re-render.
+                if let Ok(v) = text.parse::<f64>() {
+                    self.settings.mouse.scroll_factor = v.clamp(
+                        crate::constants::SCROLL_FACTOR_MIN,
+                        crate::constants::SCROLL_FACTOR_MAX,
+                    );
+                }
+                self.ui.mouse_scroll_factor_text = text;
+            }
+            MouseMessage::CommitScrollFactor => {
+                // On submit/blur, snap the buffer back to the clamped model value.
+                self.ui.mouse_scroll_factor_text = format!("{}", self.settings.mouse.scroll_factor);
             }
             MouseMessage::SetScrollFactorHorizontal(value) => {
-                self.settings.mouse.scroll_factor_horizontal =
-                    value.map(|v| v.clamp(0.1, 10.0) as f64);
+                self.settings.mouse.scroll_factor_horizontal = value.map(|v| {
+                    (v as f64).clamp(
+                        crate::constants::SCROLL_FACTOR_MIN,
+                        crate::constants::SCROLL_FACTOR_MAX,
+                    )
+                });
             }
             MouseMessage::SetScrollMethod(method) => {
                 self.settings.mouse.scroll_method = method;

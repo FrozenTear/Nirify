@@ -31,36 +31,34 @@ struct StyledFeatureData {
 /// Parse a styled feature (focus-ring, border) from a layout's children.
 ///
 /// Both focus-ring and border share the same structure:
-/// - Can be disabled with an "off" flag
+/// - Enabled state is controlled by explicit `on`/`off` flags (default on)
 /// - Have a "width" property
 /// - Have "active-color" or "active-gradient" for active state
 /// - Have "inactive-color" or "inactive-gradient" for inactive state
 /// - Have "urgent-color" or "urgent-gradient" for urgent windows
+///
+/// Styling is parsed unconditionally so that width/colors round-trip even when
+/// the feature is disabled.
 ///
 /// Returns `None` if the feature node is not present in the document.
 fn parse_styled_feature(children: &KdlDocument, feature_name: &str) -> Option<StyledFeatureData> {
     let node = children.get(feature_name)?;
     let feature_children = node.children()?;
 
-    // Check for "off" flag
-    if feature_children.get("off").is_some() {
-        return Some(StyledFeatureData {
-            enabled: false,
-            width: None,
-            active: None,
-            inactive: None,
-            urgent: None,
-        });
-    }
+    // Enabled by default; an explicit `off` flag disables it. An `on` flag is
+    // simply the default and requires no special handling.
+    let enabled = !has_flag(feature_children, &["off"]);
 
-    // Feature is enabled, parse all properties
-    let width = get_i64(feature_children, &["width"]).map(|w| w as f32);
+    // Parse all styling properties regardless of enabled state.
+    let width = get_i64(feature_children, &["width"])
+        .map(|w| w as f32)
+        .or_else(|| get_f64(feature_children, &["width"]).map(|w| w as f32));
     let active = load_color_or_gradient(feature_children, "active");
     let inactive = load_color_or_gradient(feature_children, "inactive");
     let urgent = load_color_or_gradient(feature_children, "urgent");
 
     Some(StyledFeatureData {
-        enabled: true,
+        enabled,
         width,
         active,
         inactive,
@@ -173,17 +171,29 @@ pub fn parse_layout_children(layout_children: &KdlDocument, settings: &mut Setti
     // Struts
     if let Some(struts) = layout_children.get("struts") {
         if let Some(s_children) = struts.children() {
-            if let Some(v) = get_i64(s_children, &["left"]) {
-                settings.behavior.strut_left = v as f32;
+            if let Some(v) = get_i64(s_children, &["left"])
+                .map(|v| v as f32)
+                .or_else(|| get_f64(s_children, &["left"]).map(|v| v as f32))
+            {
+                settings.behavior.strut_left = v;
             }
-            if let Some(v) = get_i64(s_children, &["right"]) {
-                settings.behavior.strut_right = v as f32;
+            if let Some(v) = get_i64(s_children, &["right"])
+                .map(|v| v as f32)
+                .or_else(|| get_f64(s_children, &["right"]).map(|v| v as f32))
+            {
+                settings.behavior.strut_right = v;
             }
-            if let Some(v) = get_i64(s_children, &["top"]) {
-                settings.behavior.strut_top = v as f32;
+            if let Some(v) = get_i64(s_children, &["top"])
+                .map(|v| v as f32)
+                .or_else(|| get_f64(s_children, &["top"]).map(|v| v as f32))
+            {
+                settings.behavior.strut_top = v;
             }
-            if let Some(v) = get_i64(s_children, &["bottom"]) {
-                settings.behavior.strut_bottom = v as f32;
+            if let Some(v) = get_i64(s_children, &["bottom"])
+                .map(|v| v as f32)
+                .or_else(|| get_f64(s_children, &["bottom"]).map(|v| v as f32))
+            {
+                settings.behavior.strut_bottom = v;
             }
         }
     }
@@ -207,15 +217,30 @@ pub fn parse_layout_children(layout_children: &KdlDocument, settings: &mut Setti
         settings.behavior.empty_workspace_above_first = true;
     }
 
-    // Default column width
+    // Default column width. An empty `default-column-width {}` (or a bare node
+    // with no proportion/fixed child) is niri's "windows pick their own width"
+    // semantic and must be preserved as Auto rather than rewritten.
     if let Some(dcw) = layout_children.get("default-column-width") {
-        if let Some(dcw_children) = dcw.children() {
-            if let Some(prop) = get_f64(dcw_children, &["proportion"]) {
-                settings.behavior.default_column_width_type = ColumnWidthType::Proportion;
-                settings.behavior.default_column_width_proportion = prop as f32;
-            } else if let Some(fixed) = get_i64(dcw_children, &["fixed"]) {
-                settings.behavior.default_column_width_type = ColumnWidthType::Fixed;
-                settings.behavior.default_column_width_fixed = fixed as f32;
+        match dcw.children() {
+            Some(dcw_children) => {
+                if let Some(prop) = get_f64(dcw_children, &["proportion"]) {
+                    settings.behavior.default_column_width_type = ColumnWidthType::Proportion;
+                    settings.behavior.default_column_width_proportion = prop as f32;
+                } else if let Some(fixed) = get_f64(dcw_children, &["fixed"]) {
+                    // `fixed` is FloatOrInt in niri, so accept a float such as
+                    // `fixed 500.5` (get_f64 handles both int and float). Reading
+                    // it with get_i64 only would drop the float and misclassify it
+                    // as Auto, rewriting the user's fixed width to an empty block.
+                    settings.behavior.default_column_width_type = ColumnWidthType::Fixed;
+                    settings.behavior.default_column_width_fixed = fixed as f32;
+                } else {
+                    // `default-column-width {}` — empty block.
+                    settings.behavior.default_column_width_type = ColumnWidthType::Auto;
+                }
+            }
+            None => {
+                // `default-column-width` with no block at all — treat as Auto.
+                settings.behavior.default_column_width_type = ColumnWidthType::Auto;
             }
         }
     }
@@ -223,5 +248,46 @@ pub fn parse_layout_children(layout_children: &KdlDocument, settings: &mut Setti
     // Background color
     if let Some(bg) = get_string(layout_children, &["background-color"]) {
         settings.appearance.background_color = parse_color(&bg);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_layout_children;
+    use crate::config::models::{ColumnWidthType, Settings};
+    use kdl::KdlDocument;
+    use std::str::FromStr;
+
+    fn parse(kdl: &str) -> Settings {
+        let doc = KdlDocument::from_str(kdl).expect("KDL must parse");
+        let layout = doc
+            .get("layout")
+            .and_then(|n| n.children())
+            .expect("layout block");
+        let mut settings = Settings::default();
+        parse_layout_children(layout, &mut settings);
+        settings
+    }
+
+    #[test]
+    fn default_column_width_float_fixed_is_fixed_not_auto() {
+        // `fixed 500.5` is a valid niri FloatOrInt; it must be read as Fixed rather
+        // than dropped and misclassified as Auto (which would rewrite it on save).
+        let s = parse("layout {\n    default-column-width {\n        fixed 500.5\n    }\n}");
+        assert_eq!(s.behavior.default_column_width_type, ColumnWidthType::Fixed);
+        assert!((s.behavior.default_column_width_fixed - 500.5).abs() < 1e-3);
+    }
+
+    #[test]
+    fn default_column_width_integer_fixed_still_fixed() {
+        let s = parse("layout {\n    default-column-width {\n        fixed 640\n    }\n}");
+        assert_eq!(s.behavior.default_column_width_type, ColumnWidthType::Fixed);
+        assert!((s.behavior.default_column_width_fixed - 640.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn default_column_width_empty_is_auto() {
+        let s = parse("layout {\n    default-column-width {\n    }\n}");
+        assert_eq!(s.behavior.default_column_width_type, ColumnWidthType::Auto);
     }
 }

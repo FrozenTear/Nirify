@@ -69,6 +69,9 @@ pub fn view(settings: &GestureSettings) -> Element<'static, Message> {
                 )
                 .padding(8)
                 .style(crate::theme::card_style),
+                text("niri enables the top-left hot corner by default.")
+                    .size(10)
+                    .color(neon::OUTLINE_VARIANT),
             ]
             .spacing(6)
             .width(Length::FillPortion(1)),
@@ -87,6 +90,9 @@ pub fn view(settings: &GestureSettings) -> Element<'static, Message> {
                 )
                 .padding(8)
                 .style(crate::theme::card_style),
+                text("Disabling sets the edge trigger zone to 0 px (niri has no off switch for this).")
+                    .size(10)
+                    .color(neon::OUTLINE_VARIANT),
                 Space::new().height(8),
                 styled_slider_int(
                     "TRIGGER WIDTH",
@@ -130,7 +136,10 @@ pub fn view(settings: &GestureSettings) -> Element<'static, Message> {
                 .spacing(0)
             )
             .padding(8)
-            .style(crate::theme::card_style),]
+            .style(crate::theme::card_style),
+            text("Disabling sets the edge trigger zone to 0 px (niri has no off switch for this).")
+                .size(10)
+                .color(neon::OUTLINE_VARIANT),]
             .spacing(6)
             .width(Length::FillPortion(1)),
             column![

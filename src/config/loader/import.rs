@@ -11,7 +11,7 @@ use super::super::models::{LayerRule, NamedWorkspace, OutputConfig, Settings, Wi
 use super::super::parser::get_i64;
 use super::{
     helpers, load_keybindings, parse_animations_from_children, parse_appearance_from_doc,
-    parse_behavior_from_doc, parse_cursor_from_children, parse_debug_from_doc,
+    parse_behavior_from_doc, parse_blur_from_doc, parse_cursor_from_children, parse_debug_from_doc,
     parse_environment_from_doc, parse_gestures_from_doc, parse_keyboard_from_children,
     parse_layer_rule_node_children, parse_layout_extras_from_children, parse_misc_from_doc,
     parse_mouse_from_children, parse_output_node_children, parse_overview_from_children,
@@ -292,6 +292,8 @@ fn import_from_document(doc: &KdlDocument, settings: &mut Settings) {
     // Direct calls to shared parsers (no wrapper needed)
     parse_gestures_from_doc(doc, settings);
     parse_misc_from_doc(doc, settings);
+    // Top-level blur (niri 26.04+)
+    parse_blur_from_doc(doc, settings);
 
     // Collection-based settings (need import-specific ID management)
     import_workspaces_from_doc(doc, settings);

@@ -10,6 +10,8 @@ use iced::Color;
 use std::path::PathBuf;
 
 /// Events emitted by the system theme watcher
+// Variant payloads are small structs; boxing adds indirection without meaningful benefit.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum SystemThemeEvent {
     /// Color scheme changed via portal (dark/light preference)
@@ -92,9 +94,9 @@ impl WalColors {
         let colors_obj = obj.get("colors").and_then(|c| c.as_object());
         let mut colors: [String; 16] = std::array::from_fn(|_| String::new());
 
-        for i in 0..16 {
+        for (i, color) in colors.iter_mut().enumerate() {
             let key = format!("color{i}");
-            colors[i] = colors_obj
+            *color = colors_obj
                 .and_then(|c| c.get(&key))
                 .and_then(|v| v.as_str())
                 .unwrap_or("#000000")
@@ -465,11 +467,9 @@ pub mod file_watcher {
         let mut watched_any = false;
         for path in color_file_paths() {
             if let Some(parent) = path.parent() {
-                if parent.exists() {
-                    if watcher.watch(parent, RecursiveMode::NonRecursive).is_ok() {
-                        watched_any = true;
-                        log::debug!("Watching directory: {}", parent.display());
-                    }
+                if parent.exists() && watcher.watch(parent, RecursiveMode::NonRecursive).is_ok() {
+                    watched_any = true;
+                    log::debug!("Watching directory: {}", parent.display());
                 }
             }
         }

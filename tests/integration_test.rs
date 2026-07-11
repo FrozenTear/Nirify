@@ -189,7 +189,7 @@ layout {
 
 #[test]
 fn test_window_rules_lifecycle() {
-    use nirify::config::models::{OpenBehavior, WindowRule, WindowRuleMatch};
+    use nirify::config::models::{CornerRadiusValue, WindowRule, WindowRuleMatch};
 
     let dir = tempdir().unwrap();
     let paths = create_test_paths(dir.path());
@@ -205,9 +205,9 @@ fn test_window_rules_lifecycle() {
             app_id: Some("firefox".to_string()),
             ..Default::default()
         }],
-        open_behavior: OpenBehavior::Floating,
+        open_floating: Some(true),
         opacity: Some(0.95),
-        corner_radius: Some(12),
+        corner_radius: Some(CornerRadiusValue::uniform(12.0)),
         ..Default::default()
     });
     settings.window_rules.next_id = 2;
@@ -220,9 +220,9 @@ fn test_window_rules_lifecycle() {
     assert_eq!(loaded.window_rules.rules.len(), 1);
     let rule = &loaded.window_rules.rules[0];
     assert_eq!(rule.matches[0].app_id, Some("firefox".to_string()));
-    assert_eq!(rule.open_behavior, OpenBehavior::Floating);
+    assert_eq!(rule.open_floating, Some(true));
     assert!((rule.opacity.unwrap() - 0.95).abs() < 0.01);
-    assert_eq!(rule.corner_radius, Some(12));
+    assert_eq!(rule.corner_radius, Some(CornerRadiusValue::uniform(12.0)));
 }
 
 #[test]
@@ -240,8 +240,7 @@ fn test_output_settings_lifecycle() {
         enabled: true,
         scale: 1.5,
         mode: "2560x1440@144".to_string(),
-        position_x: 0,
-        position_y: 0,
+        position: Some((0, 0)),
         transform: Transform::Normal,
         vrr: VrrMode::On,
         focus_at_startup: true,

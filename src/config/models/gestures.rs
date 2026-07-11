@@ -1,13 +1,27 @@
 //! Gesture settings (hot corners, DnD edge triggers)
 
 /// Hot corner positions
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HotCorners {
     pub enabled: bool,
     pub top_left: bool,
     pub top_right: bool,
     pub bottom_left: bool,
     pub bottom_right: bool,
+}
+
+impl Default for HotCorners {
+    /// niri's default when no `hot-corners` node is present: the top-left
+    /// corner is active, all others inactive.
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            top_left: true,
+            top_right: false,
+            bottom_left: false,
+            bottom_right: false,
+        }
+    }
 }
 
 /// DND edge trigger settings (shared between scroll and workspace switch)

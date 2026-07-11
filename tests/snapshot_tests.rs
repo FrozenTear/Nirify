@@ -11,6 +11,7 @@ use insta::assert_snapshot;
 use nirify::config::models::*;
 use nirify::config::storage::*;
 use nirify::types::*;
+use nirify::version::FeatureCompat;
 
 // ============================================================================
 // APPEARANCE SNAPSHOTS
@@ -186,7 +187,7 @@ fn snapshot_touchpad_custom() {
         dwt: true,
         dwtp: true,
         accel_speed: 0.3,
-        scroll_method: ScrollMethod::TwoFinger,
+        scroll_method: Some(ScrollMethod::TwoFinger),
         click_method: ClickMethod::Clickfinger,
         ..Default::default()
     };
@@ -281,8 +282,7 @@ fn snapshot_outputs_single() {
             enabled: true,
             scale: 1.5,
             mode: "2560x1440@144".to_string(),
-            position_x: 0,
-            position_y: 0,
+            position: Some((0, 0)),
             transform: Transform::Normal,
             vrr: VrrMode::On,
             ..Default::default()
@@ -301,8 +301,7 @@ fn snapshot_outputs_multiple() {
                 enabled: true,
                 scale: 2.0,
                 mode: "3840x2160@60".to_string(),
-                position_x: 0,
-                position_y: 0,
+                position: Some((0, 0)),
                 transform: Transform::Normal,
                 vrr: VrrMode::Off,
                 ..Default::default()
@@ -312,8 +311,7 @@ fn snapshot_outputs_multiple() {
                 enabled: true,
                 scale: 1.0,
                 mode: "1920x1080@60".to_string(),
-                position_x: 3840,
-                position_y: 0,
+                position: Some((3840, 0)),
                 transform: Transform::Rotate90,
                 vrr: VrrMode::Off,
                 ..Default::default()
@@ -384,7 +382,7 @@ fn snapshot_workspaces_named() {
 #[test]
 fn snapshot_window_rules_empty() {
     let rules = WindowRulesSettings::default();
-    let kdl = generate_window_rules_kdl(&rules, false);
+    let kdl = generate_window_rules_kdl(&rules, false, FeatureCompat::all_enabled());
     assert_snapshot!("window_rules_empty", kdl);
 }
 
@@ -398,14 +396,14 @@ fn snapshot_window_rules_single() {
                 app_id: Some("firefox".to_string()),
                 ..Default::default()
             }],
-            open_behavior: OpenBehavior::Floating,
+            open_floating: Some(true),
             opacity: Some(0.95),
-            corner_radius: Some(12),
+            corner_radius: Some(CornerRadiusValue::uniform(12.0)),
             ..Default::default()
         }],
         next_id: 2,
     };
-    let kdl = generate_window_rules_kdl(&rules, false);
+    let kdl = generate_window_rules_kdl(&rules, false, FeatureCompat::all_enabled());
     assert_snapshot!("window_rules_single", kdl);
 }
 
@@ -426,7 +424,7 @@ fn snapshot_window_rules_complex() {
                         ..Default::default()
                     },
                 ],
-                open_behavior: OpenBehavior::Floating,
+                open_floating: Some(true),
                 ..Default::default()
             },
             WindowRule {
@@ -436,21 +434,21 @@ fn snapshot_window_rules_complex() {
                     app_id: Some("mpv".to_string()),
                     ..Default::default()
                 }],
-                open_behavior: OpenBehavior::Fullscreen,
-                block_out_from_screencast: true,
+                open_fullscreen: Some(true),
+                block_out_from: Some(BlockOutFrom::Screencast),
                 ..Default::default()
             },
         ],
         next_id: 3,
     };
-    let kdl = generate_window_rules_kdl(&rules, false);
+    let kdl = generate_window_rules_kdl(&rules, false, FeatureCompat::all_enabled());
     assert_snapshot!("window_rules_complex", kdl);
 }
 
 #[test]
 fn snapshot_layer_rules_empty() {
     let rules = LayerRulesSettings::default();
-    let kdl = generate_layer_rules_kdl(&rules);
+    let kdl = generate_layer_rules_kdl(&rules, FeatureCompat::all_enabled());
     assert_snapshot!("layer_rules_empty", kdl);
 }
 
@@ -469,7 +467,7 @@ fn snapshot_misc_default() {
 fn snapshot_misc_custom() {
     let misc = MiscSettings {
         prefer_no_csd: true,
-        screenshot_path: "~/Pictures/Screenshots".to_string(),
+        screenshot_path: ScreenshotPathConfig::Custom("~/Pictures/Screenshots".to_string()),
         hotkey_overlay_skip_at_startup: true,
         ..Default::default()
     };
@@ -525,12 +523,12 @@ fn snapshot_environment_with_vars() {
             EnvironmentVariable {
                 id: 1,
                 name: "GTK_THEME".to_string(),
-                value: "Adwaita:dark".to_string(),
+                value: Some("Adwaita:dark".to_string()),
             },
             EnvironmentVariable {
                 id: 2,
                 name: "QT_QPA_PLATFORM".to_string(),
-                value: "wayland".to_string(),
+                value: Some("wayland".to_string()),
             },
         ],
         next_id: 3,

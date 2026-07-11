@@ -41,10 +41,9 @@ impl super::super::App {
                     crate::views::status_bar::NiriStatus::Connected
                 );
                 if is_connected {
-                    return Task::perform(
-                        async { crate::ipc::get_full_outputs().map_err(|e| e.to_string()) },
-                        |result| Message::Tools(ToolsMessage::OutputsLoaded(result)),
-                    );
+                    return crate::ipc::tasks::get_full_outputs_async(|r| {
+                        Message::Tools(ToolsMessage::OutputsLoaded(r.map_err(|e| e.to_string())))
+                    });
                 }
                 return Task::none();
             }
@@ -87,13 +86,23 @@ impl super::super::App {
 
             M::SetPositionX(idx, value) => {
                 if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
-                    output.position_x = value;
+                    output.position.get_or_insert((0, 0)).0 = value;
                 }
             }
 
             M::SetPositionY(idx, value) => {
                 if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
-                    output.position_y = value;
+                    output.position.get_or_insert((0, 0)).1 = value;
+                }
+            }
+
+            M::SetPositionAuto(idx, auto) => {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
+                    output.position = if auto {
+                        None
+                    } else {
+                        Some(output.position.unwrap_or((0, 0)))
+                    };
                 }
             }
 
@@ -112,6 +121,12 @@ impl super::super::App {
             M::SetFocusAtStartup(idx, value) => {
                 if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.focus_at_startup = value;
+                }
+            }
+
+            M::SetBackgroundColor(idx, value) => {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
+                    output.background_color = value;
                 }
             }
 

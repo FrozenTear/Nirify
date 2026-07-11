@@ -377,7 +377,7 @@ screenshot-path "~/Pictures/Screenshots"
     assert!(settings.miscellaneous.prefer_no_csd);
     assert_eq!(
         settings.miscellaneous.screenshot_path,
-        "~/Pictures/Screenshots"
+        nirify::config::models::ScreenshotPathConfig::Custom("~/Pictures/Screenshots".to_string())
     );
 }
 

@@ -7,6 +7,7 @@ mod animations;
 mod appearance;
 mod backups;
 mod behavior;
+mod blur;
 mod config_editor;
 mod cursor;
 mod debug;

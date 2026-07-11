@@ -17,7 +17,7 @@ impl super::super::App {
             // Shadow settings
             LayoutExtrasMessage::SetShadowEnabled(v) => layout.shadow.enabled = v,
             LayoutExtrasMessage::SetShadowSoftness(v) => layout.shadow.softness = v.clamp(0, 100),
-            LayoutExtrasMessage::SetShadowSpread(v) => layout.shadow.spread = v.clamp(0, 100),
+            LayoutExtrasMessage::SetShadowSpread(v) => layout.shadow.spread = v.clamp(-1024, 1024),
             LayoutExtrasMessage::SetShadowOffsetX(v) => layout.shadow.offset_x = v.clamp(-100, 100),
             LayoutExtrasMessage::SetShadowOffsetY(v) => layout.shadow.offset_y = v.clamp(-100, 100),
             LayoutExtrasMessage::SetShadowDrawBehindWindow(v) => {
@@ -31,7 +31,11 @@ impl super::super::App {
             LayoutExtrasMessage::SetShadowInactiveColor(hex) => {
                 if let Some(color) = crate::types::Color::from_hex(&hex) {
                     layout.shadow.inactive_color = color;
+                    layout.shadow.use_inactive_color = true;
                 }
+            }
+            LayoutExtrasMessage::SetShadowUseInactiveColor(v) => {
+                layout.shadow.use_inactive_color = v
             }
 
             // Tab indicator
@@ -47,7 +51,7 @@ impl super::super::App {
                 layout.tab_indicator.width = v.clamp(1, 50)
             }
             LayoutExtrasMessage::SetTabIndicatorLengthProportion(v) => {
-                layout.tab_indicator.length_proportion = v.clamp(0.1, 1.0)
+                layout.tab_indicator.length_proportion = v.clamp(0.1, 2.0)
             }
             LayoutExtrasMessage::SetTabIndicatorCornerRadius(v) => {
                 layout.tab_indicator.corner_radius = v.clamp(0, 50)
@@ -59,17 +63,29 @@ impl super::super::App {
             LayoutExtrasMessage::SetTabIndicatorActiveColor(hex) => {
                 if let Some(color) = crate::types::Color::from_hex(&hex) {
                     layout.tab_indicator.active = ColorOrGradient::Color(color);
+                    layout.tab_indicator.use_active_color = true;
                 }
             }
             LayoutExtrasMessage::SetTabIndicatorInactiveColor(hex) => {
                 if let Some(color) = crate::types::Color::from_hex(&hex) {
                     layout.tab_indicator.inactive = ColorOrGradient::Color(color);
+                    layout.tab_indicator.use_inactive_color = true;
                 }
             }
             LayoutExtrasMessage::SetTabIndicatorUrgentColor(hex) => {
                 if let Some(color) = crate::types::Color::from_hex(&hex) {
                     layout.tab_indicator.urgent = ColorOrGradient::Color(color);
+                    layout.tab_indicator.use_urgent_color = true;
                 }
+            }
+            LayoutExtrasMessage::SetTabIndicatorUseActiveColor(v) => {
+                layout.tab_indicator.use_active_color = v
+            }
+            LayoutExtrasMessage::SetTabIndicatorUseInactiveColor(v) => {
+                layout.tab_indicator.use_inactive_color = v
+            }
+            LayoutExtrasMessage::SetTabIndicatorUseUrgentColor(v) => {
+                layout.tab_indicator.use_urgent_color = v
             }
 
             // Insert hint

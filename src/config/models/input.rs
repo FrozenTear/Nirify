@@ -7,8 +7,6 @@ use nirify_macros::SlintIndex;
 /// Keyboard settings
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeyboardSettings {
-    /// Disable the keyboard device entirely (WARNING: may lock you out!)
-    pub off: bool,
     pub xkb_layout: String,
     pub xkb_variant: String,
     pub xkb_model: String,
@@ -25,7 +23,6 @@ pub struct KeyboardSettings {
 impl Default for KeyboardSettings {
     fn default() -> Self {
         Self {
-            off: false,
             xkb_layout: String::from("us"),
             xkb_variant: String::new(),
             xkb_model: String::new(),
@@ -52,7 +49,8 @@ pub struct MouseSettings {
     pub scroll_factor: f64,
     /// Optional separate horizontal scroll factor (if different from vertical)
     pub scroll_factor_horizontal: Option<f64>,
-    pub scroll_method: ScrollMethod,
+    /// Scroll method (None = libinput device default)
+    pub scroll_method: Option<ScrollMethod>,
     pub middle_emulation: bool,
     /// Mouse button for on-button-down scrolling (device-dependent)
     pub scroll_button: Option<i32>,
@@ -70,7 +68,7 @@ impl Default for MouseSettings {
             accel_profile: AccelProfile::Adaptive,
             scroll_factor: 1.0,
             scroll_factor_horizontal: None,
-            scroll_method: ScrollMethod::NoScroll, // Mouse doesn't use scroll method by default
+            scroll_method: None, // None = libinput device default
             middle_emulation: false,
             scroll_button: None,
             scroll_button_lock: false,
@@ -88,14 +86,16 @@ pub struct TouchpadSettings {
     pub left_handed: bool,
     pub dwt: bool,
     pub dwtp: bool,
-    pub drag: bool,
+    /// Tap-and-drag (None = libinput device default)
+    pub drag: Option<bool>,
     pub drag_lock: bool,
     pub accel_speed: f64,
     pub accel_profile: AccelProfile,
     pub scroll_factor: f64,
     /// Optional separate horizontal scroll factor (if different from vertical)
     pub scroll_factor_horizontal: Option<f64>,
-    pub scroll_method: ScrollMethod,
+    /// Scroll method (None = libinput device default)
+    pub scroll_method: Option<ScrollMethod>,
     pub click_method: ClickMethod,
     pub tap_button_map: TapButtonMap,
     pub middle_emulation: bool,
@@ -110,18 +110,18 @@ impl Default for TouchpadSettings {
     fn default() -> Self {
         Self {
             off: false,
-            tap: true,
-            natural_scroll: true,
+            tap: false,
+            natural_scroll: false,
             left_handed: false,
-            dwt: true,
+            dwt: false,
             dwtp: false,
-            drag: true,
+            drag: None,
             drag_lock: false,
             accel_speed: 0.0,
             accel_profile: AccelProfile::Adaptive,
             scroll_factor: 1.0,
             scroll_factor_horizontal: None,
-            scroll_method: ScrollMethod::TwoFinger,
+            scroll_method: None,
             click_method: ClickMethod::ButtonAreas,
             tap_button_map: TapButtonMap::LeftRightMiddle,
             middle_emulation: false,
@@ -141,7 +141,8 @@ pub struct TrackpointSettings {
     pub accel_profile: AccelProfile,
     pub natural_scroll: bool,
     pub left_handed: bool,
-    pub scroll_method: ScrollMethod,
+    /// Scroll method (None = libinput device default)
+    pub scroll_method: Option<ScrollMethod>,
     /// Mouse button for on-button-down scrolling
     pub scroll_button: Option<i32>,
     /// Lock scroll button state (don't need to hold)
@@ -157,7 +158,7 @@ impl Default for TrackpointSettings {
             accel_profile: AccelProfile::Adaptive,
             natural_scroll: false,
             left_handed: false,
-            scroll_method: ScrollMethod::OnButtonDown,
+            scroll_method: None, // None = libinput device default
             scroll_button: None, // Uses default middle button
             scroll_button_lock: false,
             middle_emulation: false,
@@ -174,7 +175,8 @@ pub struct TrackballSettings {
     pub accel_profile: AccelProfile,
     pub natural_scroll: bool,
     pub left_handed: bool,
-    pub scroll_method: ScrollMethod,
+    /// Scroll method (None = libinput device default)
+    pub scroll_method: Option<ScrollMethod>,
     /// Mouse button for on-button-down scrolling
     pub scroll_button: Option<i32>,
     /// Lock scroll button state (don't need to hold)
@@ -190,7 +192,7 @@ impl Default for TrackballSettings {
             accel_profile: AccelProfile::Adaptive,
             natural_scroll: false,
             left_handed: false,
-            scroll_method: ScrollMethod::OnButtonDown,
+            scroll_method: None, // None = libinput device default
             scroll_button: None,
             scroll_button_lock: false,
             middle_emulation: false,
@@ -258,10 +260,10 @@ macro_rules! impl_pointer_device_settings {
                 self.accel_profile = value;
             }
 
-            fn scroll_method(&self) -> ScrollMethod {
+            fn scroll_method(&self) -> Option<ScrollMethod> {
                 self.scroll_method
             }
-            fn set_scroll_method(&mut self, value: ScrollMethod) {
+            fn set_scroll_method(&mut self, value: Option<ScrollMethod>) {
                 self.scroll_method = value;
             }
 
@@ -287,6 +289,10 @@ pub struct TabletSettings {
     pub off: bool,
     /// Map tablet to a specific output (monitor name)
     pub map_to_output: String,
+    /// Map tablet to whichever output currently has focus
+    pub map_to_focused_output: bool,
+    /// Map tablet to whichever window currently has focus
+    pub map_to_focused_window: bool,
     pub left_handed: bool,
     /// Calibration matrix (6 values for libinput transformation)
     pub calibration_matrix: Option<[f64; 6]>,

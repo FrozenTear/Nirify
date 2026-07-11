@@ -60,11 +60,18 @@ impl super::super::App {
                 self.settings.appearance.corner_radius = value.clamp(0.0, 32.0);
             }
 
-            // Background
+            // Background. `None` clears it; `Some(hex)` only updates when the hex
+            // parses, so an in-progress partial edit doesn't wipe/hide the control.
             AppearanceMessage::SetBackgroundColor(hex_opt) => {
                 use crate::types::Color;
-                self.settings.appearance.background_color =
-                    hex_opt.and_then(|hex| Color::from_hex(&hex));
+                match hex_opt {
+                    None => self.settings.appearance.background_color = None,
+                    Some(hex) => {
+                        if let Some(color) = Color::from_hex(&hex) {
+                            self.settings.appearance.background_color = Some(color);
+                        }
+                    }
+                }
             }
         }
 

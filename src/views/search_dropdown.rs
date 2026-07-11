@@ -9,12 +9,16 @@ use crate::messages::Message;
 use crate::search::SearchResult;
 use crate::theme::{fonts, search_dropdown_item_style, search_dropdown_style};
 
-/// Maximum results to show in dropdown
-const MAX_DROPDOWN_RESULTS: usize = 6;
+/// Maximum results to show in dropdown (shared with the modal + keyboard-nav clamp)
+const MAX_DROPDOWN_RESULTS: usize = crate::search::MAX_VISIBLE_RESULTS;
 
 /// Creates the search dropdown if there are results to show
 /// Returns None if query is empty
-pub fn view(results: &[SearchResult], query: &str) -> Option<Element<'static, Message>> {
+pub fn view(
+    results: &[SearchResult],
+    query: &str,
+    selected: usize,
+) -> Option<Element<'static, Message>> {
     if query.trim().is_empty() {
         return None;
     }
@@ -31,14 +35,14 @@ pub fn view(results: &[SearchResult], query: &str) -> Option<Element<'static, Me
         .style(search_dropdown_style)
         .into()
     } else {
-        build_results_list(results)
+        build_results_list(results, selected)
     };
 
     Some(dropdown)
 }
 
 /// Builds the results list
-fn build_results_list(results: &[SearchResult]) -> Element<'static, Message> {
+fn build_results_list(results: &[SearchResult], selected: usize) -> Element<'static, Message> {
     let total_count = results.len();
     let mut items = column![].spacing(2).padding([8, 8]);
 
@@ -46,6 +50,7 @@ fn build_results_list(results: &[SearchResult]) -> Element<'static, Message> {
         let setting_name = result.setting_name.clone();
         let description = result.description.clone();
         let page_name = result.page.name();
+        let is_selected = index == selected;
 
         let item = button(
             row![
@@ -63,7 +68,22 @@ fn build_results_list(results: &[SearchResult]) -> Element<'static, Message> {
         )
         .on_press(Message::SearchResultSelected(index))
         .width(Length::Fill)
-        .style(search_dropdown_item_style());
+        .style(move |theme: &iced::Theme, status| {
+            if is_selected {
+                let palette = theme.extended_palette();
+                button::Style {
+                    background: Some(iced::Background::Color(palette.primary.weak.color)),
+                    text_color: palette.primary.weak.text,
+                    border: iced::Border {
+                        radius: 6.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
+            } else {
+                search_dropdown_item_style()(theme, status)
+            }
+        });
 
         items = items.push(item);
     }

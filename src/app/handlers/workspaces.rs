@@ -50,6 +50,11 @@ impl super::super::App {
                     self.settings.workspaces.workspaces.swap(index, index + 1);
                 }
             }
+            WorkspacesMessage::SetLayoutOverride(index, override_opt) => {
+                if let Some(workspace) = self.settings.workspaces.workspaces.get_mut(index) {
+                    workspace.layout_override = override_opt.map(|b| *b);
+                }
+            }
         }
 
         self.save.dirty_tracker.mark(SettingsCategory::Workspaces);
