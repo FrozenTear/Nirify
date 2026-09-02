@@ -10,15 +10,17 @@
 use super::super::models::{LayerRule, NamedWorkspace, OutputConfig, Settings, WindowRule};
 use super::super::parser::get_i64;
 use super::{
-    helpers, load_keybindings, parse_animations_from_children, parse_appearance_from_doc,
-    parse_behavior_from_doc, parse_blur_from_doc, parse_cursor_from_children, parse_debug_from_doc,
-    parse_environment_from_doc, parse_gestures_from_doc, parse_keyboard_from_children,
-    parse_layer_rule_node_children, parse_layout_extras_from_children, parse_misc_from_doc,
-    parse_mouse_from_children, parse_output_node_children, parse_overview_from_children,
+    helpers, load_keybindings, load_keybindings_from_doc, parse_animations_from_children,
+    parse_appearance_from_doc, parse_behavior_from_doc, parse_blur_from_doc,
+    parse_cursor_from_children, parse_debug_from_doc, parse_environment_from_doc,
+    parse_gestures_from_doc, parse_keyboard_from_children, parse_layer_rule_node_children,
+    parse_layout_extras_from_children, parse_misc_from_doc, parse_mouse_from_children,
+    parse_output_node_children, parse_overview_from_children, parse_recent_windows_from_doc,
     parse_startup_from_doc, parse_switch_events_from_doc, parse_tablet_from_children,
     parse_touch_from_children, parse_touchpad_from_children, parse_trackball_from_children,
     parse_trackpoint_from_children, parse_window_rule_node_children, parse_workspace_node_children,
 };
+use crate::config::replace::is_nirify_include_path;
 use kdl::KdlDocument;
 use log::{debug, info, warn};
 use std::path::{Path, PathBuf};
@@ -86,7 +88,6 @@ pub fn import_from_niri_config(niri_config: &Path) -> Settings {
 /// information about what was imported, what used defaults, and any warnings.
 pub fn import_from_niri_config_with_result(niri_config: &Path) -> ImportResult {
     let mut settings = Settings::default();
-    let default_settings = Settings::default();
     let mut warnings = Vec::new();
     let mut includes_processed = 0;
 
@@ -101,6 +102,45 @@ pub fn import_from_niri_config_with_result(niri_config: &Path) -> ImportResult {
 
     // Always load keybindings (already has its own include traversal)
     load_keybindings(niri_config, &mut settings.keybindings);
+
+    finish_import(settings, warnings, includes_processed)
+}
+
+/// Import settings from a KDL document string without following includes.
+///
+/// Used when absorbing top-level managed nodes that `smart_replace` is about
+/// to strip from `config.kdl`. Those nodes are already inlined; walking
+/// includes would re-import Nirify-managed files and defeat the merge.
+pub fn import_from_kdl_str(content: &str) -> ImportResult {
+    let mut settings = Settings::default();
+    let mut warnings = Vec::new();
+
+    if content.trim().is_empty() {
+        return finish_import(settings, warnings, 0);
+    }
+
+    match content.parse::<KdlDocument>() {
+        Ok(doc) => {
+            import_from_document(&doc, &mut settings);
+            load_keybindings_from_doc(&doc, &mut settings.keybindings);
+        }
+        Err(e) => {
+            let msg = format!("Could not parse stripped nodes as KDL: {}", e);
+            warn!("{}", msg);
+            warnings.push(msg);
+        }
+    }
+
+    finish_import(settings, warnings, 0)
+}
+
+/// Validate settings and classify which sections differ from defaults.
+fn finish_import(
+    mut settings: Settings,
+    warnings: Vec<String>,
+    includes_processed: usize,
+) -> ImportResult {
+    let default_settings = Settings::default();
 
     // Validate and clamp all values to valid ranges
     settings.validate();
@@ -148,6 +188,19 @@ pub fn import_from_niri_config_with_result(niri_config: &Path) -> ImportResult {
         default_settings.switch_events,
         "switch-events"
     );
+    check_section!(settings.blur, default_settings.blur, "blur");
+    check_section!(settings.gestures, default_settings.gestures, "gestures");
+    check_section!(settings.overview, default_settings.overview, "overview");
+    check_section!(
+        settings.layout_extras,
+        default_settings.layout_extras,
+        "layout-extras"
+    );
+    check_section!(
+        settings.recent_windows,
+        default_settings.recent_windows,
+        "recent-windows"
+    );
 
     // Convert to owned Strings (only allocates here, at the end)
     let mut imported_sections: Vec<String> = imported.into_iter().map(String::from).collect();
@@ -176,6 +229,18 @@ pub fn import_from_niri_config_with_result(niri_config: &Path) -> ImportResult {
         imported_sections.push(format!(
             "environment ({})",
             settings.environment.variables.len()
+        ));
+    }
+    if !settings.layer_rules.rules.is_empty() {
+        imported_sections.push(format!(
+            "layer-rules ({})",
+            settings.layer_rules.rules.len()
+        ));
+    }
+    if !settings.keybindings.bindings.is_empty() {
+        imported_sections.push(format!(
+            "keybindings ({})",
+            settings.keybindings.bindings.len()
         ));
     }
 
@@ -235,6 +300,10 @@ fn import_from_niri_config_recursive_tracked(
     for node in doc.nodes() {
         if node.name().value() == "include" {
             if let Some(path_str) = node.entries().first().and_then(|e| e.value().as_string()) {
+                if is_nirify_include_path(path_str) {
+                    debug!("Skipping Nirify include during import: {}", path_str);
+                    continue;
+                }
                 if let Some(resolved) = resolve_include_path(path_str, config_dir) {
                     debug!(
                         "Following include (depth {}): {} -> {:?}",
@@ -259,7 +328,7 @@ fn import_from_niri_config_recursive_tracked(
 }
 
 /// Import all settings from a single KDL document
-fn import_from_document(doc: &KdlDocument, settings: &mut Settings) {
+pub(crate) fn import_from_document(doc: &KdlDocument, settings: &mut Settings) {
     // Macro to reduce boilerplate for "get node, get children, call parser" pattern
     macro_rules! parse_node_children {
         ($doc:expr, $node_name:literal, $parser:ident, $settings:expr) => {
@@ -305,6 +374,7 @@ fn import_from_document(doc: &KdlDocument, settings: &mut Settings) {
     parse_environment_from_doc(doc, settings);
     parse_debug_from_doc(doc, settings);
     parse_switch_events_from_doc(doc, settings);
+    parse_recent_windows_from_doc(doc, settings);
 }
 
 /// Resolve an include path relative to the config directory

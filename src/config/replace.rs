@@ -100,6 +100,23 @@ impl ConfigAnalysis {
         }
         false
     }
+
+    /// Render only the top-level managed nodes as KDL (the ones `smart_replace`
+    /// is about to strip). Does not follow includes.
+    pub fn managed_nodes_kdl(&self) -> String {
+        let mut result = String::new();
+        let nodes = self.document.nodes();
+        for (idx, classification) in &self.node_classifications {
+            if *classification != NodeClassification::Managed {
+                continue;
+            }
+            if *idx >= nodes.len() {
+                continue;
+            }
+            result.push_str(&format!("{}\n", nodes[*idx]));
+        }
+        result
+    }
 }
 
 /// Result of the smart replace operation
@@ -154,11 +171,27 @@ const MANAGED_NODES: &[&str] = &[
     "workspace-auto-back-and-forth",
     // Keybindings
     "binds",
+    // Additional nodes Nirify writes (must be stripped or they override managed files)
+    "gestures",
+    "clipboard",
+    "xwayland-satellite",
+    "blur",
+    "spawn-sh-at-startup",
+    "config-notification",
+    "recent-windows",
 ];
 
 /// Check if a node name is managed by Nirify
-fn is_managed_node(name: &str) -> bool {
+pub fn is_managed_node(name: &str) -> bool {
     MANAGED_NODES.contains(&name)
+}
+
+/// Whether an include path points at Nirify-managed files.
+///
+/// Matches the same heuristic as [`is_nirify_include`]: any path containing
+/// `nirify` (relative `nirify/main.kdl` or a legacy absolute/tilde path).
+pub fn is_nirify_include_path(path: &str) -> bool {
+    path.contains("nirify")
 }
 
 /// Check if this is a Nirify include line
@@ -169,7 +202,7 @@ fn is_nirify_include(node: &KdlNode) -> bool {
     node.entries()
         .first()
         .and_then(|e| e.value().as_string())
-        .map(|s| s.contains("nirify"))
+        .map(is_nirify_include_path)
         .unwrap_or(false)
 }
 
@@ -578,6 +611,13 @@ mod tests {
         assert!(is_managed_node("output"));
         assert!(is_managed_node("window-rule"));
         assert!(is_managed_node("binds"));
+        assert!(is_managed_node("gestures"));
+        assert!(is_managed_node("clipboard"));
+        assert!(is_managed_node("xwayland-satellite"));
+        assert!(is_managed_node("blur"));
+        assert!(is_managed_node("spawn-sh-at-startup"));
+        assert!(is_managed_node("config-notification"));
+        assert!(is_managed_node("recent-windows"));
 
         assert!(!is_managed_node("custom-node"));
         assert!(!is_managed_node("my-setting"));
