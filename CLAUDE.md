@@ -79,8 +79,8 @@ cargo build --release    # Release binary
 ### Takeover Strategy
 
 The app doesn't edit `config.kdl` directly. Instead:
-1. Manages config files in `~/.config/niri/niri-settings/`
-2. User adds one line to their config: `include "~/.config/niri/niri-settings/main.kdl"`
+1. Manages config files in `~/.config/niri/nirify/`
+2. User adds one line to their config: `include "nirify/main.kdl"` (relative to `~/.config/niri/`; last so Nirify wins override conflicts)
 3. Each settings category = one `.kdl` file (appearance.kdl, behavior.kdl, input/keyboard.kdl, etc.)
 
 ### Code Structure
