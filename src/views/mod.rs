@@ -26,6 +26,7 @@ pub mod layout_extras;
 pub mod miscellaneous;
 pub mod mouse;
 pub mod outputs;
+pub mod overview;
 pub mod preferences;
 pub mod recent_windows;
 pub mod sidebar;

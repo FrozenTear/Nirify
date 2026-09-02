@@ -348,6 +348,7 @@ impl App {
                 self.ui.search_query = query;
                 self.ui.last_search_time = Some(std::time::Instant::now());
                 self.ui.search_selected_index = 0;
+                self.ui.search_focused = true;
 
                 // Perform search immediately
                 self.ui.search_results = self.search_index.search(&self.ui.search_query);
@@ -357,36 +358,12 @@ impl App {
             }
 
             Message::SearchResultSelected(index) => {
-                // Navigate to the correct screen + sub-tab
-                if let Some(result) = self.ui.search_results.get(index) {
-                    use crate::messages::{GearSubTab, RulesSubTab, Screen};
-
-                    let page = result.page;
-                    let screen = Screen::from_page(page);
-                    self.ui.current_screen = screen;
-                    self.ui.current_page = page;
-
-                    // Set appropriate sub-tab based on page
-                    if let Some(input_tab) = Screen::input_sub_tab_from_page(page) {
-                        self.ui.input_sub_tab = input_tab;
-                    }
-                    match page {
-                        Page::WindowRules => self.ui.rules_sub_tab = RulesSubTab::WindowRules,
-                        Page::LayerRules => self.ui.rules_sub_tab = RulesSubTab::LayerRules,
-                        Page::Tools => self.ui.gear_sub_tab = GearSubTab::Tools,
-                        Page::Preferences => self.ui.gear_sub_tab = GearSubTab::Preferences,
-                        Page::ConfigEditor => self.ui.gear_sub_tab = GearSubTab::ConfigEditor,
-                        Page::Backups => self.ui.gear_sub_tab = GearSubTab::Backups,
-                        _ => {}
-                    }
-
-                    // Store setting name for highlighting on the target page
-                    self.ui.highlight_setting = Some(result.setting_name.clone());
-                    // Clear search after navigation
+                if let Some(result) = self.ui.search_results.get(index).cloned() {
+                    self.apply_search_destination(result.destination);
                     self.ui.search_query.clear();
                     self.ui.search_results.clear();
-                    // Close search modal if open
                     self.ui.search_focused = false;
+                    self.ui.search_selected_index = 0;
                 }
                 Task::none()
             }
@@ -399,16 +376,15 @@ impl App {
             }
 
             Message::ToggleSearch => {
-                // If search bar is visible, just focus it
-                // If hidden, show it as focused (modal mode)
                 self.ui.search_focused = !self.ui.search_focused;
                 if self.ui.search_focused {
-                    // Focus the search input
+                    // Bar path: focus the sidebar field. Modal path: same id
+                    // is mounted on the overlay input.
                     iced::widget::operation::focus(views::navigation::search_input_id())
                 } else {
-                    // Clear search when closing
                     self.ui.search_query.clear();
                     self.ui.search_results.clear();
+                    self.ui.search_selected_index = 0;
                     Task::none()
                 }
             }
@@ -1102,6 +1078,9 @@ impl App {
                 use crate::messages::Screen;
                 self.ui.current_screen = screen;
                 self.ui.highlight_setting = None;
+                self.ui.search_focused = false;
+                self.ui.search_query.clear();
+                self.ui.search_results.clear();
 
                 let is_connected = matches!(
                     self.ui.niri_status,
@@ -1258,9 +1237,49 @@ impl App {
         }
     }
 
-    /// True when a search surface (modal or persistent bar) is showing.
+    /// True when a search surface the user can type into is actually on screen.
     fn search_ui_visible(&self) -> bool {
-        self.ui.search_focused || self.ui.show_search_bar
+        if self.ui.show_search_bar {
+            true
+        } else {
+            self.ui.search_focused
+        }
+    }
+
+    /// True when search is the active overlay (arrows / Enter should apply).
+    fn search_overlay_active(&self) -> bool {
+        if self.ui.show_search_bar {
+            self.ui.search_focused || !self.ui.search_query.trim().is_empty()
+        } else {
+            self.ui.search_focused
+        }
+    }
+
+    /// Switch to the redesigned screen and open the matching editor when possible.
+    fn apply_search_destination(&mut self, dest: crate::search::SearchDestination) {
+        use crate::search::SearchDestination;
+
+        self.ui.current_screen = dest.screen();
+        self.ui.highlight_setting = None;
+        self.ui.editing_section = None;
+        self.ui.editing_device = None;
+
+        match dest {
+            SearchDestination::Section(section) => {
+                self.ui.editing_section = Some(section);
+            }
+            SearchDestination::Device(device) => {
+                self.ui.editing_device = Some(device);
+            }
+            SearchDestination::Keybindings => {}
+            SearchDestination::Displays => {}
+            SearchDestination::Rules(tab) => {
+                self.ui.rules_sub_tab = tab;
+            }
+            SearchDestination::Gear(tab) => {
+                self.ui.gear_sub_tab = tab;
+            }
+        }
     }
 
     /// True when any editor modal is currently open.
@@ -1409,8 +1428,7 @@ impl App {
                 subs.push(self.search_hotkey_subscription());
             }
             // Overlay keys (arrows/Escape/Enter) while any overlay UI is active.
-            if self.ui.search_focused
-                || self.ui.show_search_bar
+            if self.search_overlay_active()
                 || self.ui.dialog_state != DialogState::None
                 || self.any_editor_open()
             {
@@ -1527,7 +1545,11 @@ impl App {
     /// Constructs the UI from current state
     pub fn view(&self) -> Element<'_, Message> {
         // Sidebar navigation
-        let sidebar = views::sidebar::view(self.ui.current_screen);
+        let sidebar = views::sidebar::view(
+            self.ui.current_screen,
+            &self.ui.search_query,
+            self.ui.show_search_bar,
+        );
 
         // Main content area
         let content_area = self.screen_content();
@@ -1598,7 +1620,7 @@ impl App {
                                 ]
                                 .spacing(2)
                                 .width(Length::Fill),
-                                text(result.page.name())
+                                text(result.destination.location_label())
                                     .size(10)
                                     .style(crate::views::dialogs::muted_text_style),
                             ]
@@ -1708,14 +1730,14 @@ impl App {
                 &self.ui.search_query,
                 self.ui.search_selected_index,
             ) {
-                use iced::widget::{column as col, Space};
-                // Position dropdown at top-right, below nav bar
-                let dropdown_overlay = col![
-                    Space::new().height(Length::Fixed(50.0)),
-                    container(dropdown)
-                        .width(Length::Fill)
-                        .padding(20)
-                        .align_x(Horizontal::Right),
+                use iced::widget::{column as col, row as row_w, Space};
+                // Sit the dropdown next to the sidebar search field
+                let dropdown_overlay = row_w![
+                    Space::new().width(Length::Fixed(220.0)),
+                    col![
+                        Space::new().height(Length::Fixed(88.0)),
+                        container(dropdown).padding([0, 8]),
+                    ],
                 ];
 
                 stack![with_search_modal, dropdown_overlay].into()
@@ -1856,6 +1878,19 @@ impl App {
                 views::layout_extras::insert_hint_section(&self.settings.layout_extras)
             }
             S::NamedWorkspaces => views::workspaces::view(&self.settings.workspaces),
+            S::PresetSizes => iced::widget::row![
+                iced::widget::column![views::layout_extras::preset_widths_section(
+                    &self.settings.layout_extras
+                )]
+                .width(iced::Length::FillPortion(1)),
+                iced::widget::column![views::layout_extras::preset_heights_section(
+                    &self.settings.layout_extras
+                )]
+                .width(iced::Length::FillPortion(1)),
+            ]
+            .spacing(32)
+            .align_y(iced::Alignment::Start)
+            .into(),
             // Visuals sections
             S::FocusRing => views::appearance::focus_ring_section(&self.settings.appearance),
             S::WindowBorder => views::appearance::border_section(&self.settings.appearance),
@@ -1864,6 +1899,10 @@ impl App {
             S::Animations => views::animations::view(&self.settings.animations),
             S::Cursor => views::cursor::view(&self.settings.cursor),
             S::Blur => views::blur::view(&self.settings.blur, self.ui.feature_compat.blur),
+            S::WorkspaceBackground => {
+                views::appearance::background_color_section(&self.settings.appearance)
+            }
+            S::Overview => views::overview::section(&self.settings.overview),
             // System sections
             S::StartupPrograms => views::startup::view_section(&self.settings.startup),
             S::EnvironmentVars => views::environment::view_section(&self.settings.environment),
@@ -1876,10 +1915,6 @@ impl App {
 
     /// Creates the content area for the current screen (redesign)
     fn screen_content(&self) -> Element<'_, Message> {
-        if self.ui.highlight_setting.is_some() {
-            return self.search_result_content();
-        }
-
         use crate::messages::Screen;
         match self.ui.current_screen {
             Screen::Dashboard => views::screens::dashboard::view(
@@ -1937,6 +1972,7 @@ impl App {
                 self.ui.niri_status,
                 &self.settings.preferences,
                 self.ui.show_search_bar,
+                self.ui.current_theme,
                 &self.ui.config_editor_state,
                 &self.ui.config_editor_content,
                 &self.ui.backups_state,
@@ -1945,6 +1981,7 @@ impl App {
     }
 
     /// Shows the detailed legacy page for a matched search result.
+    #[allow(dead_code)]
     fn search_result_content(&self) -> Element<'_, Message> {
         let setting_name = self.ui.highlight_setting.as_deref().unwrap_or_default();
 
@@ -2069,6 +2106,7 @@ impl App {
                 self.settings.preferences.float_settings_app,
                 self.ui.show_search_bar,
                 &self.settings.preferences.search_hotkey,
+                self.ui.current_theme,
             ),
             Page::ConfigEditor => views::config_editor::view(
                 &self.ui.config_editor_state,
@@ -2629,5 +2667,21 @@ mod tests {
         )));
         assert!(keybinding_msg_is_risky(&K::UpdateModifiers(0, vec![])));
         assert!(!keybinding_msg_is_risky(&K::CancelKeyCapture));
+    }
+
+    #[test]
+    fn test_search_destination_lands_on_screen_and_editor() {
+        use crate::messages::{EditableDevice, EditableSection, GearSubTab, Screen};
+        use crate::search::SearchDestination;
+
+        let dest = SearchDestination::Section(EditableSection::Overview);
+        assert_eq!(dest.screen(), Screen::Dashboard);
+
+        let dest = SearchDestination::Device(EditableDevice::Keyboard);
+        assert_eq!(dest.screen(), Screen::Input);
+
+        let dest = SearchDestination::Gear(GearSubTab::Preferences);
+        assert_eq!(dest.screen(), Screen::Gear);
+        assert_eq!(dest.location_label(), "Preferences");
     }
 }

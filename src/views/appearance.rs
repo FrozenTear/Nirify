@@ -165,7 +165,7 @@ pub fn view(settings: &AppearanceSettings) -> Element<'_, Message> {
 }
 
 /// Workspace background-color control — enable toggle + hex input.
-fn background_color_section(settings: &AppearanceSettings) -> Element<'_, Message> {
+pub fn background_color_section(settings: &AppearanceSettings) -> Element<'_, Message> {
     let enabled = settings.background_color.is_some();
     let hex = settings
         .background_color
