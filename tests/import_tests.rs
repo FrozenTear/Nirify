@@ -2,7 +2,9 @@
 //!
 //! Tests for importing settings from user's existing niri config.kdl
 
+use nirify::config::models::{normalized_key_combo, KeybindAction};
 use nirify::config::{import_from_niri_config, import_from_niri_config_with_result};
+use serial_test::serial;
 use std::fs;
 use tempfile::tempdir;
 
@@ -599,6 +601,100 @@ window-rule {
         .imported_sections
         .iter()
         .any(|s| s.contains("window-rules") && s.contains("2")));
+}
+
+#[test]
+fn test_import_duplicate_mod_q_last_wins() {
+    let dir = tempdir().unwrap();
+    let config = dir.path().join("config.kdl");
+
+    fs::write(
+        &config,
+        r#"
+binds {
+    Mod+Q { close-window; }
+    Mod+Q { spawn "kitty"; }
+}
+"#,
+    )
+    .unwrap();
+
+    let settings = import_from_niri_config(&config);
+    assert_eq!(settings.keybindings.bindings.len(), 1);
+    assert_eq!(
+        normalized_key_combo(&settings.keybindings.bindings[0].key_combo),
+        normalized_key_combo("Mod+Q")
+    );
+    assert!(
+        matches!(
+            &settings.keybindings.bindings[0].action,
+            KeybindAction::Spawn(args) if args == &["kitty"]
+        ),
+        "first-run import must keep the last Mod+Q action, got {:?}",
+        settings.keybindings.bindings[0].action
+    );
+}
+
+fn with_xdg_niri_home<F>(f: F)
+where
+    F: FnOnce(&std::path::Path),
+{
+    let tmp = tempdir().unwrap();
+    let niri_dir = tmp.path().join("niri");
+    fs::create_dir_all(&niri_dir).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+    f(&niri_dir);
+    match old {
+        Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+        None => std::env::remove_var("XDG_CONFIG_HOME"),
+    }
+}
+
+#[test]
+#[serial]
+fn test_import_includes_are_positional_later_same_file_wins() {
+    with_xdg_niri_home(|niri_dir| {
+        fs::write(niri_dir.join("early.kdl"), "layout { gaps 8 }\n").unwrap();
+        let config = niri_dir.join("config.kdl");
+        fs::write(
+            &config,
+            r#"
+include "early.kdl"
+layout { gaps 24 }
+"#,
+        )
+        .unwrap();
+
+        let settings = import_from_niri_config(&config);
+        assert_eq!(
+            settings.appearance.gaps, 24.0,
+            "content after include must override the include (niri positionality)"
+        );
+    });
+}
+
+#[test]
+#[serial]
+fn test_import_includes_are_positional_later_include_wins() {
+    with_xdg_niri_home(|niri_dir| {
+        fs::write(niri_dir.join("late.kdl"), "layout { gaps 8 }\n").unwrap();
+        let config = niri_dir.join("config.kdl");
+        fs::write(
+            &config,
+            r#"
+layout { gaps 24 }
+include "late.kdl"
+"#,
+        )
+        .unwrap();
+
+        let settings = import_from_niri_config(&config);
+        assert_eq!(
+            settings.appearance.gaps, 8.0,
+            "include after same-file nodes must override (niri positionality)"
+        );
+    });
 }
 
 #[test]
