@@ -6,13 +6,17 @@
 
 use super::helpers::read_kdl_file;
 use crate::config::models::{
-    ActionNode, ActionValue, HotkeyOverlayTitle, KeybindAction, Keybinding, KeybindingsSettings,
+    last_wins_keybindings, ActionNode, ActionValue, HotkeyOverlayTitle, KeybindAction, Keybinding,
+    KeybindingsSettings,
 };
 use crate::config::parser::parse_document;
 use kdl::{KdlDocument, KdlNode};
 use log::debug;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+/// Maximum include depth (same as settings import) to prevent circular includes.
+const MAX_INCLUDE_DEPTH: usize = 10;
 
 /// Load keybindings from the user's niri config file
 pub fn load_keybindings(niri_config_path: &Path, settings: &mut KeybindingsSettings) {
@@ -52,19 +56,58 @@ pub fn load_keybindings(niri_config_path: &Path, settings: &mut KeybindingsSetti
     let config_dir = niri_config_path.parent().unwrap_or(Path::new("."));
     let mut id_counter = 0u32;
 
-    // Check for binds in the main config
-    if let Some(binds_node) = doc.get("binds") {
-        debug!("Found binds block in main config");
-        if let Some(binds_doc) = binds_node.children() {
-            parse_binds_block(binds_doc, &mut settings.bindings, &mut id_counter);
-            settings.source_file = Some(niri_config_path.display().to_string());
-        }
+    load_keybindings_walk(
+        &doc,
+        config_dir,
+        niri_config_path,
+        settings,
+        &mut id_counter,
+        0,
+    );
+
+    // niri last-wins: later duplicate combos (same file or later include) win.
+    settings.bindings = last_wins_keybindings(std::mem::take(&mut settings.bindings));
+    settings.loaded = !settings.bindings.is_empty();
+    debug!(
+        "Loaded {} keybindings from {:?}",
+        settings.bindings.len(),
+        settings.source_file
+    );
+}
+
+/// Walk top-level nodes in document order, interleaving `binds` with includes.
+fn load_keybindings_walk(
+    doc: &KdlDocument,
+    config_dir: &Path,
+    source_path: &Path,
+    settings: &mut KeybindingsSettings,
+    id_counter: &mut u32,
+    depth: usize,
+) {
+    if depth > MAX_INCLUDE_DEPTH {
+        debug!(
+            "Keybindings include depth exceeded maximum of {}, stopping",
+            MAX_INCLUDE_DEPTH
+        );
+        return;
     }
 
-    // Also look for include directives that might contain bindings
     for node in doc.nodes() {
-        if node.name().value() == "include" {
-            if let Some(include_path) = node.entries().first().and_then(|e| e.value().as_string()) {
+        match node.name().value() {
+            "binds" => {
+                debug!("Found binds block in {:?}", source_path);
+                if let Some(binds_doc) = node.children() {
+                    parse_binds_block(binds_doc, &mut settings.bindings, id_counter);
+                    if settings.source_file.is_none() {
+                        settings.source_file = Some(source_path.display().to_string());
+                    }
+                }
+            }
+            "include" => {
+                let Some(include_path) = node.entries().first().and_then(|e| e.value().as_string())
+                else {
+                    continue;
+                };
                 if crate::config::replace::is_nirify_include_path(include_path) {
                     debug!(
                         "Skipping Nirify include while loading keybindings: {}",
@@ -72,46 +115,27 @@ pub fn load_keybindings(niri_config_path: &Path, settings: &mut KeybindingsSetti
                     );
                     continue;
                 }
-                // resolve_include_path returns None if the path is outside allowed directories
                 let Some(resolved_path) = resolve_include_path(include_path, config_dir) else {
                     continue;
                 };
                 debug!("Found include: {} -> {:?}", include_path, resolved_path);
-
                 if let Some(included_doc) = read_kdl_file(&resolved_path) {
-                    // Check if the included file has a binds block
-                    if let Some(binds_node) = included_doc.get("binds") {
-                        debug!("Found binds block in {:?}", resolved_path);
-                        if let Some(binds_doc) = binds_node.children() {
-                            let count_before = settings.bindings.len();
-                            parse_binds_block(binds_doc, &mut settings.bindings, &mut id_counter);
-                            debug!(
-                                "Parsed {} bindings from {:?}",
-                                settings.bindings.len() - count_before,
-                                resolved_path
-                            );
-                            if settings.bindings.len() > count_before {
-                                // Update source file to include this path
-                                if settings.source_file.is_none() {
-                                    settings.source_file =
-                                        Some(resolved_path.display().to_string());
-                                }
-                            }
-                        }
-                    }
+                    let included_dir = resolved_path.parent().unwrap_or(config_dir);
+                    load_keybindings_walk(
+                        &included_doc,
+                        included_dir,
+                        &resolved_path,
+                        settings,
+                        id_counter,
+                        depth + 1,
+                    );
                 } else {
                     debug!("Could not read/parse included file {:?}", resolved_path);
                 }
             }
+            _ => {}
         }
     }
-
-    settings.loaded = !settings.bindings.is_empty();
-    debug!(
-        "Loaded {} keybindings from {:?}",
-        settings.bindings.len(),
-        settings.source_file
-    );
 }
 
 /// Resolve an include path relative to the config directory
@@ -158,6 +182,9 @@ fn resolve_include_path(include_path: &str, config_dir: &Path) -> Option<PathBuf
 }
 
 /// Load keybindings from a KDL document without following includes.
+///
+/// All `binds` blocks are read in document order; duplicate combos last-win
+/// (same as niri and [`load_keybindings`]).
 pub fn load_keybindings_from_doc(doc: &KdlDocument, settings: &mut KeybindingsSettings) {
     settings.bindings.clear();
     settings.loaded = false;
@@ -165,11 +192,14 @@ pub fn load_keybindings_from_doc(doc: &KdlDocument, settings: &mut KeybindingsSe
     settings.source_file = None;
 
     let mut id_counter = 0u32;
-    if let Some(binds_node) = doc.get("binds") {
-        if let Some(binds_doc) = binds_node.children() {
-            parse_binds_block(binds_doc, &mut settings.bindings, &mut id_counter);
+    for node in doc.nodes() {
+        if node.name().value() == "binds" {
+            if let Some(binds_doc) = node.children() {
+                parse_binds_block(binds_doc, &mut settings.bindings, &mut id_counter);
+            }
         }
     }
+    settings.bindings = last_wins_keybindings(std::mem::take(&mut settings.bindings));
     settings.loaded = !settings.bindings.is_empty();
 }
 
@@ -434,5 +464,37 @@ binds {
             }
             other => panic!("expected NiriAction, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn load_duplicate_mod_q_last_wins() {
+        let content = r#"
+binds {
+    Mod+Q { close-window; }
+    Mod+Return { spawn "alacritty"; }
+    mod+q { spawn "kitty"; }
+}
+"#;
+        let doc = parse_document(content).unwrap();
+        let mut loaded = KeybindingsSettings::default();
+        load_keybindings_from_doc(&doc, &mut loaded);
+        assert_eq!(loaded.bindings.len(), 2);
+        let mod_q = loaded
+            .bindings
+            .iter()
+            .find(|b| {
+                crate::config::models::normalized_key_combo(&b.key_combo)
+                    == normalized_combo("Mod+Q")
+            })
+            .expect("Mod+Q kept");
+        assert!(
+            matches!(&mod_q.action, KeybindAction::Spawn(args) if args == &["kitty"]),
+            "last Mod+Q action must win, got {:?}",
+            mod_q.action
+        );
+    }
+
+    fn normalized_combo(s: &str) -> String {
+        crate::config::models::normalized_key_combo(s)
     }
 }

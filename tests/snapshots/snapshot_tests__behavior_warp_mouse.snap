@@ -6,4 +6,5 @@ expression: kdl
 
 input {
     warp-mouse-to-focus mode="center-xy"
+    workspace-auto-back-and-forth false
 }

@@ -27,6 +27,14 @@ use crate::config::models::{
 ///
 /// A radius-only catch-all is emitted only when no managed window-rule
 /// already acts as a catch-all (see [`generate_appearance_kdl_for_settings`]).
+///
+/// # Omit-default policy
+///
+/// Keywords Nirify owns are **always emitted**, including niri defaults
+/// (`center-focused-column "never"`). We do **not** wait for a
+/// `ConflictingInclude`: if this category file exists, Nirify claims the
+/// property and must last-wins against earlier user includes. `scale` stays
+/// `Option<f64>` (`None` = omit / niri auto) and is not affected here.
 pub fn generate_appearance_kdl(
     settings: &AppearanceSettings,
     behavior: &BehaviorSettings,
@@ -103,18 +111,15 @@ fn generate_appearance_kdl_ex(
             });
         }
 
-        // Center focused column
-        match behavior.center_focused_column {
-            crate::types::CenterFocusedColumn::Never => {}
-            crate::types::CenterFocusedColumn::Always => {
-                b.newline();
-                b.field_string("center-focused-column", "always");
-            }
-            crate::types::CenterFocusedColumn::OnOverflow => {
-                b.newline();
-                b.field_string("center-focused-column", "on-overflow");
-            }
-        }
+        // Always emit center-focused-column, including niri's default "never".
+        // Nirify's include is last, but omitted properties do not override an
+        // earlier user include (niri merges only written keys). See the
+        // omit-default policy on [`generate_appearance_kdl`].
+        b.newline();
+        b.field_string(
+            "center-focused-column",
+            behavior.center_focused_column.to_kdl(),
+        );
 
         // Always center single column
         b.optional_flag(
@@ -259,6 +264,21 @@ mod tests {
         assert_eq!(
             dst.behavior.default_column_width_type,
             ColumnWidthType::Auto
+        );
+    }
+
+    #[test]
+    fn always_emits_center_focused_column_never() {
+        let defaults = Settings::default();
+        let kdl = generate_appearance_kdl(&defaults.appearance, &defaults.behavior);
+        assert!(
+            kdl.contains("center-focused-column \"never\""),
+            "owned default must last-wins against earlier includes:\n{kdl}"
+        );
+        let dst = reparse_layout(&kdl);
+        assert_eq!(
+            dst.behavior.center_focused_column,
+            crate::types::CenterFocusedColumn::Never
         );
     }
 

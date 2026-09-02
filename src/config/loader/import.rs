@@ -3,6 +3,10 @@
 //! This module handles importing settings from the user's existing niri config.kdl
 //! on first run, preserving their existing configuration.
 //!
+//! Includes are walked **in document order**, interleaved with same-file nodes,
+//! matching niri include positionality (content after an include overrides that
+//! include). `~/` expansion + the import jail are unchanged (sweep follow-up).
+//!
 //! This module uses shared parsing functions from the loader modules to avoid
 //! code duplication. The import functions primarily delegate to these shared
 //! parsers, with some import-specific handling (e.g., global corner radius).
@@ -293,10 +297,9 @@ fn import_from_niri_config_recursive_tracked(
         return;
     };
 
-    // Import from this document
-    import_from_document(&doc, settings);
-
-    // Traverse includes and import from them too
+    // Walk top-level nodes in document order so includes interleave with
+    // same-file nodes (niri include positionality). Importing the whole
+    // file first, then includes, inverted later same-file overrides.
     for node in doc.nodes() {
         if node.name().value() == "include" {
             if let Some(path_str) = node.entries().first().and_then(|e| e.value().as_string()) {
@@ -323,6 +326,23 @@ fn import_from_niri_config_recursive_tracked(
                     warnings.push(msg);
                 }
             }
+        } else {
+            import_single_node(node, settings);
+        }
+    }
+}
+
+/// Import one top-level node by wrapping it in a one-node document.
+fn import_single_node(node: &kdl::KdlNode, settings: &mut Settings) {
+    let snippet = node.to_string();
+    match snippet.parse::<KdlDocument>() {
+        Ok(tmp) => import_from_document(&tmp, settings),
+        Err(e) => {
+            warn!(
+                "Could not re-parse node '{}' during positional import: {}",
+                node.name().value(),
+                e
+            );
         }
     }
 }

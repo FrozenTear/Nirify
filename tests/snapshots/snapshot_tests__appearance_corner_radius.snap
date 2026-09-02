@@ -23,6 +23,8 @@ layout {
         urgent-color "#9b0000"
     }
 
+    center-focused-column "never"
+
     default-column-width { proportion 0.50; }
 }
 

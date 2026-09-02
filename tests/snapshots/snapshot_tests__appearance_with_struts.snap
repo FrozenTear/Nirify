@@ -30,5 +30,7 @@ layout {
         bottom 0
     }
 
+    center-focused-column "never"
+
     default-column-width { proportion 0.50; }
 }
