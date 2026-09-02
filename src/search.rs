@@ -1050,7 +1050,15 @@ mod tests {
     fn test_destination_screens() {
         assert_eq!(
             SearchDestination::Section(EditableSection::Overview).screen(),
-            Screen::Dashboard
+            Screen::Visuals
+        );
+        assert_eq!(
+            SearchDestination::Section(EditableSection::WorkspaceBackground).screen(),
+            Screen::Visuals
+        );
+        assert_eq!(
+            SearchDestination::Section(EditableSection::PresetSizes).screen(),
+            Screen::Layout
         );
         assert_eq!(
             SearchDestination::Section(EditableSection::FocusRing).screen(),

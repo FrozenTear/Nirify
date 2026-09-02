@@ -5,7 +5,7 @@ use iced::{Alignment, Element, Length};
 
 use crate::config::models::{
     AnimationSettings, AppearanceSettings, BehaviorSettings, BlurSettings, CursorSettings,
-    LayoutExtrasSettings,
+    LayoutExtrasSettings, OverviewSettings,
 };
 use crate::messages::{EditableSection, Message};
 use crate::theme::{fonts, neon};
@@ -18,12 +18,13 @@ pub fn view<'a>(
     behavior: &'a BehaviorSettings,
     blur: &'a BlurSettings,
     blur_supported: bool,
+    overview: &'a OverviewSettings,
 ) -> Element<'a, Message> {
     let content = column![
         super::hero_header(
             "VISUAL ENGINE",
             "Surface & Motion",
-            "Control how windows present themselves visually — focus indicators, borders, shadows, animations, and cursor behavior.",
+            "Control how windows present themselves visually — focus indicators, borders, shadows, workspace background, overview, animations, and cursor behavior.",
             neon::PRIMARY,
         ),
         Space::new().height(24),
@@ -59,7 +60,7 @@ pub fn view<'a>(
             ]),
         ].spacing(12).align_y(Alignment::Start),
         Space::new().height(12),
-        // Row 3
+        // Row 3 — blur, workspace background, overview (browse, not search-only)
         row![
             summary_card(EditableSection::Blur, vec![
                 ("Enabled", if blur.enabled { "On" } else { "Off" }.to_string()),
@@ -68,6 +69,20 @@ pub fn view<'a>(
                 } else {
                     ("Requires", "niri 26.04+".to_string())
                 },
+            ]),
+            summary_card(EditableSection::WorkspaceBackground, vec![
+                ("Color", appearance.background_color
+                    .map(|c| c.to_hex())
+                    .unwrap_or_else(|| "Default".to_string())),
+                ("Override", if appearance.background_color.is_some() { "On" } else { "Off" }.to_string()),
+            ]),
+            summary_card(EditableSection::Overview, vec![
+                ("Zoom", format!("{:.2}x", overview.zoom)),
+                ("Shadow", if overview.workspace_shadow.as_ref().is_some_and(|s| s.enabled) {
+                    "On"
+                } else {
+                    "Off"
+                }.to_string()),
             ]),
         ].spacing(12).align_y(Alignment::Start),
     ]
