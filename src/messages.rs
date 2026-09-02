@@ -409,7 +409,7 @@ impl Screen {
     /// Maps a legacy Page to the Screen it now lives in
     pub fn from_page(page: Page) -> Screen {
         match page {
-            Page::Overview => Screen::Dashboard,
+            Page::Overview => Screen::Visuals,
             Page::Appearance | Page::Animations | Page::Cursor | Page::Blur => Screen::Visuals,
             Page::Behavior | Page::LayoutExtras | Page::Workspaces => Screen::Layout,
             Page::Keyboard
@@ -719,14 +719,52 @@ impl EditableSection {
             | Self::Animations
             | Self::Cursor
             | Self::Blur
-            | Self::WorkspaceBackground => Screen::Visuals,
-            Self::Overview => Screen::Dashboard,
+            | Self::WorkspaceBackground
+            | Self::Overview => Screen::Visuals,
             Self::StartupPrograms
             | Self::EnvironmentVars
             | Self::Miscellaneous
             | Self::SwitchEvents
             | Self::Debug
             | Self::RecentWindows => Screen::System,
+        }
+    }
+
+    /// Sections shown as browse cards on a redesigned screen (no search required).
+    pub fn cards_on(screen: Screen) -> &'static [EditableSection] {
+        match screen {
+            Screen::Layout => &[
+                Self::SpatialGaps,
+                Self::CenteringDynamics,
+                Self::ColumnManager,
+                Self::ScreenEdgeStruts,
+                Self::TabIndicator,
+                Self::InsertHint,
+                Self::NamedWorkspaces,
+                Self::PresetSizes,
+            ],
+            Screen::Visuals => &[
+                Self::FocusRing,
+                Self::WindowBorder,
+                Self::WindowShadow,
+                Self::ModifierKeys,
+                Self::Animations,
+                Self::Cursor,
+                Self::Blur,
+                Self::WorkspaceBackground,
+                Self::Overview,
+            ],
+            Screen::System => &[
+                Self::StartupPrograms,
+                Self::EnvironmentVars,
+                Self::Miscellaneous,
+                Self::SwitchEvents,
+                Self::Debug,
+                Self::RecentWindows,
+            ],
+            Screen::Dashboard | Screen::Input | Screen::Rules | Screen::Displays | Screen::Gear => {
+                &[]
+            }
         }
     }
 
@@ -1745,4 +1783,32 @@ pub struct ConsolidationSuggestion {
     pub is_window_rule: bool,
     /// Whether this suggestion is selected for merging
     pub selected: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EditableSection, Screen};
+
+    #[test]
+    fn test_every_section_has_a_browse_card() {
+        for section in EditableSection::ALL {
+            let screen = section.screen();
+            let cards = EditableSection::cards_on(screen);
+            assert!(
+                cards.contains(section),
+                "{:?} maps to {:?} but has no browse card",
+                section,
+                screen
+            );
+        }
+    }
+
+    #[test]
+    fn test_slice2_orphans_are_first_class_cards() {
+        assert_eq!(EditableSection::Overview.screen(), Screen::Visuals);
+        assert!(EditableSection::cards_on(Screen::Visuals).contains(&EditableSection::Overview));
+        assert!(EditableSection::cards_on(Screen::Visuals)
+            .contains(&EditableSection::WorkspaceBackground));
+        assert!(EditableSection::cards_on(Screen::Layout).contains(&EditableSection::PresetSizes));
+    }
 }
