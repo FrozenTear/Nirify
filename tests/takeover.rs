@@ -150,3 +150,122 @@ include "nirify/main.kdl"
         .iter()
         .any(|b| normalized_key_combo(&b.key_combo) == normalized_key_combo("Mod+Q")));
 }
+
+#[test]
+fn wizard_imports_catchall_window_rule_effects() {
+    let dir = tempdir().unwrap();
+    let paths = paths_under(dir.path());
+
+    fs::write(
+        &paths.niri_config,
+        r#"
+window-rule {
+    opacity 0.9
+    clip-to-geometry true
+    open-maximized true
+    draw-border-with-background false
+    geometry-corner-radius 12
+}
+window-rule {
+    match app-id="firefox"
+    opacity 0.95
+}
+"#,
+    )
+    .unwrap();
+
+    if paths.managed_dir.exists() {
+        fs::remove_dir_all(&paths.managed_dir).unwrap();
+    }
+
+    first_run_setup(&paths, FeatureCompat::all_enabled()).unwrap();
+
+    let loaded = load_settings(&paths);
+    let catch_all = loaded
+        .window_rules
+        .rules
+        .iter()
+        .find(|r| r.is_catch_all())
+        .expect("catch-all must survive first_run_setup");
+    assert_eq!(catch_all.opacity, Some(0.9));
+    assert_eq!(catch_all.clip_to_geometry, Some(true));
+    assert_eq!(catch_all.open_maximized, Some(true));
+    assert_eq!(catch_all.draw_border_with_background, Some(false));
+    assert_eq!(
+        catch_all.corner_radius,
+        Some(nirify::config::models::CornerRadiusValue::uniform(12.0))
+    );
+    assert_eq!(loaded.appearance.corner_radius, 12.0);
+
+    let appearance = fs::read_to_string(&paths.appearance_kdl).unwrap();
+    assert!(
+        !appearance.contains("window-rule"),
+        "appearance.kdl must not emit a second radius-only catch-all:\n{appearance}"
+    );
+    let rules = fs::read_to_string(&paths.window_rules_kdl).unwrap();
+    assert!(rules.contains("opacity 0.9"), "{rules}");
+    assert!(rules.contains("clip-to-geometry true"), "{rules}");
+    assert!(rules.contains("open-maximized true"), "{rules}");
+    assert!(rules.contains("geometry-corner-radius 12"), "{rules}");
+}
+
+#[test]
+fn launch_absorb_adopts_catchall_window_rule() {
+    let dir = tempdir().unwrap();
+    let paths = paths_under(dir.path());
+    paths.ensure_directories().unwrap();
+
+    let mut existing = nirify::config::Settings::default();
+    existing.appearance.gaps = 16.0;
+    existing.appearance.corner_radius = 8.0;
+    nirify::config::save_settings(&paths, &existing, FeatureCompat::all_enabled()).unwrap();
+
+    let appearance_before = fs::read_to_string(&paths.appearance_kdl).unwrap();
+    assert!(
+        appearance_before.contains("geometry-corner-radius 8"),
+        "precondition: appearance emits radius-only catch-all:\n{appearance_before}"
+    );
+
+    fs::write(
+        &paths.niri_config,
+        r#"
+window-rule {
+    opacity 0.85
+    clip-to-geometry true
+    open-fullscreen true
+    geometry-corner-radius 16
+}
+include "nirify/main.kdl"
+"#,
+    )
+    .unwrap();
+
+    let result = absorb_stripped_nodes(&paths, FeatureCompat::all_enabled()).unwrap();
+    assert!(result.adopted.contains(&SettingsCategory::WindowRules));
+
+    let loaded = load_settings(&paths);
+    let catch_all = loaded
+        .window_rules
+        .rules
+        .iter()
+        .find(|r| r.is_catch_all())
+        .expect("absorb must adopt the catch-all, not strip it");
+    assert_eq!(catch_all.opacity, Some(0.85));
+    assert_eq!(catch_all.clip_to_geometry, Some(true));
+    assert_eq!(catch_all.open_fullscreen, Some(true));
+    assert_eq!(
+        catch_all.corner_radius,
+        Some(nirify::config::models::CornerRadiusValue::uniform(16.0))
+    );
+    assert_eq!(loaded.appearance.corner_radius, 16.0);
+
+    let appearance_after = fs::read_to_string(&paths.appearance_kdl).unwrap();
+    assert!(
+        !appearance_after.contains("window-rule"),
+        "absorb must stop dual-emitting a radius-only catch-all:\n{appearance_after}"
+    );
+    let rules = fs::read_to_string(&paths.window_rules_kdl).unwrap();
+    assert!(rules.contains("opacity 0.85"), "{rules}");
+    assert!(rules.contains("clip-to-geometry true"), "{rules}");
+    assert!(rules.contains("open-fullscreen true"), "{rules}");
+}

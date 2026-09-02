@@ -3,7 +3,9 @@
 //! Generates KDL configuration for visual appearance settings.
 
 use super::builder::KdlBuilder;
-use crate::config::models::{AppearanceSettings, BehaviorSettings, ColumnWidthType};
+use crate::config::models::{
+    AppearanceSettings, BehaviorSettings, ColumnWidthType, WindowRulesSettings,
+};
 
 /// Generate appearance.kdl content from settings.
 ///
@@ -22,9 +24,30 @@ use crate::config::models::{AppearanceSettings, BehaviorSettings, ColumnWidthTyp
 ///
 /// # Returns
 /// A string containing valid KDL configuration for niri.
+///
+/// A radius-only catch-all is emitted only when no managed window-rule
+/// already acts as a catch-all (see [`generate_appearance_kdl_for_settings`]).
 pub fn generate_appearance_kdl(
     settings: &AppearanceSettings,
     behavior: &BehaviorSettings,
+) -> String {
+    generate_appearance_kdl_ex(settings, behavior, true)
+}
+
+/// Generate appearance.kdl, skipping the radius-only catch-all when
+/// `window_rules` already contains a no-match rule.
+pub fn generate_appearance_kdl_for_settings(
+    settings: &AppearanceSettings,
+    behavior: &BehaviorSettings,
+    window_rules: &WindowRulesSettings,
+) -> String {
+    generate_appearance_kdl_ex(settings, behavior, !window_rules.has_catch_all())
+}
+
+fn generate_appearance_kdl_ex(
+    settings: &AppearanceSettings,
+    behavior: &BehaviorSettings,
+    emit_corner_radius_rule: bool,
 ) -> String {
     let mut kdl = KdlBuilder::with_header("Appearance settings - managed by Nirify");
 
@@ -127,8 +150,10 @@ pub fn generate_appearance_kdl(
         }
     });
 
-    // Window corner radius
-    if settings.corner_radius > 0.0 {
+    // Window corner radius — only when no managed catch-all already carries
+    // (or will carry) that radius. Dual-emitting a radius-only catch-all from
+    // appearance.kdl would overwrite imported global opacity/clip/open-*.
+    if emit_corner_radius_rule && settings.corner_radius > 0.0 {
         kdl.newline();
         kdl.block("window-rule", |wr| {
             wr.field_f32_as_int("geometry-corner-radius", settings.corner_radius);
@@ -256,5 +281,35 @@ mod tests {
             &variant.behavior
         ))
         .is_ok());
+    }
+
+    #[test]
+    fn appearance_skips_radius_rule_when_catch_all_exists() {
+        use crate::config::models::{CornerRadiusValue, WindowRule, WindowRulesSettings};
+
+        let appearance = AppearanceSettings {
+            corner_radius: 12.0,
+            ..Default::default()
+        };
+        let behavior = BehaviorSettings::default();
+
+        let emitted = generate_appearance_kdl(&appearance, &behavior);
+        assert!(emitted.contains("window-rule {"));
+        assert!(emitted.contains("geometry-corner-radius 12"));
+
+        let window_rules = WindowRulesSettings {
+            rules: vec![WindowRule {
+                opacity: Some(0.9),
+                clip_to_geometry: Some(true),
+                corner_radius: Some(CornerRadiusValue::uniform(12.0)),
+                ..Default::default()
+            }],
+            next_id: 1,
+        };
+        let skipped = generate_appearance_kdl_for_settings(&appearance, &behavior, &window_rules);
+        assert!(
+            !skipped.contains("window-rule"),
+            "must not dual-emit a radius-only catch-all:\n{skipped}"
+        );
     }
 }

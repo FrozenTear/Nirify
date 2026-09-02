@@ -655,7 +655,7 @@ pub fn parse_output_node_children(o_children: &KdlDocument, output: &mut OutputC
     }
 
     if let Some(v) = get_f64(o_children, &["scale"]) {
-        output.scale = v;
+        output.scale = Some(v);
     }
 
     // Mode - check for custom flag

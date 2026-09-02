@@ -37,7 +37,7 @@ mod system;
 mod workspaces;
 
 // Re-export public generators
-pub use appearance::generate_appearance_kdl;
+pub use appearance::{generate_appearance_kdl, generate_appearance_kdl_for_settings};
 pub use behavior::{generate_behavior_kdl, generate_main_kdl};
 pub use blur::generate_blur_kdl;
 pub use display::{
@@ -193,7 +193,11 @@ fn write_all_settings(
     // Core settings
     write_config(
         &paths.appearance_kdl,
-        &generate_appearance_kdl(&settings.appearance, &settings.behavior),
+        &generate_appearance_kdl_for_settings(
+            &settings.appearance,
+            &settings.behavior,
+            &settings.window_rules,
+        ),
         strategy,
     )?;
     write_config(
@@ -424,7 +428,11 @@ pub fn save_dirty(
             SettingsCategory::Appearance => (
                 &paths.appearance_kdl,
                 // Appearance includes some behavior settings (struts)
-                generate_appearance_kdl(&settings.appearance, &settings.behavior),
+                generate_appearance_kdl_for_settings(
+                    &settings.appearance,
+                    &settings.behavior,
+                    &settings.window_rules,
+                ),
             ),
             SettingsCategory::Behavior => (
                 &paths.behavior_kdl,

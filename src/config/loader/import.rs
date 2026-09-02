@@ -619,20 +619,20 @@ fn import_layer_rules_from_doc(doc: &KdlDocument, settings: &mut Settings) {
 fn import_window_rules_from_doc(doc: &KdlDocument, settings: &mut Settings) {
     for node in doc.nodes() {
         if node.name().value() == "window-rule" {
-            // Skip catch-all rules (no match criteria) - they're handled in appearance for global corner radius
-            if let Some(children) = node.children() {
-                let has_match = children.nodes().iter().any(|n| n.name().value() == "match");
-                if !has_match {
-                    continue;
-                }
-            }
-
             let id = settings.window_rules.next_id;
             settings.window_rules.next_id += 1;
 
+            let is_catch_all = node.children().is_none_or(|children| {
+                !children.nodes().iter().any(|n| n.name().value() == "match")
+            });
+
             let mut rule = WindowRule {
                 id,
-                name: format!("Rule {}", id + 1),
+                name: if is_catch_all {
+                    "Catch-all".to_string()
+                } else {
+                    format!("Rule {}", id + 1)
+                },
                 ..Default::default()
             };
 
@@ -643,4 +643,11 @@ fn import_window_rules_from_doc(doc: &KdlDocument, settings: &mut Settings) {
             settings.window_rules.rules.push(rule);
         }
     }
+
+    // Appearance radius is a view over the first imported catch-all that
+    // already carries geometry-corner-radius. Do not invent a radius.
+    crate::config::models::sync_appearance_radius_from_catch_all(
+        &mut settings.appearance,
+        &settings.window_rules,
+    );
 }

@@ -516,7 +516,13 @@ fn output_card<'a>(
         Space::new().height(12),
         // Summary rows
         row![
-            summary_field("SCALE", &format!("{:.0}%", output.scale * 100.0)),
+            summary_field(
+                "SCALE",
+                &output
+                    .scale
+                    .map(|s| format!("{:.0}%", s * 100.0))
+                    .unwrap_or_else(|| "auto".to_string()),
+            ),
             summary_field("VRR", &format!("{}", output.vrr)),
             summary_field(
                 "POSITION",

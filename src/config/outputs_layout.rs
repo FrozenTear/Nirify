@@ -102,7 +102,7 @@ fn update_output_from_live(output: &mut OutputConfig, info: &FullOutputInfo) {
     output.enabled = info.logical.is_some();
     if let Some(logical) = &info.logical {
         output.position = Some((logical.x, logical.y));
-        output.scale = logical.scale;
+        output.scale = Some(logical.scale);
         output.transform = info.transform();
     }
     let mode = info.current_mode_string();
@@ -181,7 +181,11 @@ pub fn estimated_logical_size(output: &OutputConfig, live: &[FullOutputInfo]) ->
     if let Some(info) = live.iter().find(|info| info.name == output.name) {
         return info.logical_size();
     }
-    logical_size_from_mode(output.mode.as_str(), output.scale, output.transform)
+    logical_size_from_mode(
+        output.mode.as_str(),
+        output.display_scale(),
+        output.transform,
+    )
 }
 
 /// Logical size from a mode string (`1920x1080@60`), scale, and transform.
@@ -266,12 +270,12 @@ mod tests {
         assert_eq!(settings.outputs.len(), 2);
         assert_eq!(settings.outputs[0].name, "eDP-1");
         assert_eq!(settings.outputs[0].position, Some((0, 0)));
-        assert_eq!(settings.outputs[0].scale, 1.0);
+        assert_eq!(settings.outputs[0].scale, Some(1.0));
         assert_eq!(settings.outputs[0].mode, "1920x1080@60.00");
         assert!(settings.outputs[0].enabled);
         assert_eq!(settings.outputs[1].name, "DP-1");
         assert_eq!(settings.outputs[1].position, Some((1920, 0)));
-        assert_eq!(settings.outputs[1].scale, 1.0);
+        assert_eq!(settings.outputs[1].scale, Some(1.0));
         assert_eq!(settings.outputs[1].mode, "2560x1440@60.00");
     }
 
@@ -312,7 +316,7 @@ mod tests {
 
         let output = &settings.outputs[0];
         assert_eq!(output.position, Some((2560, 0)));
-        assert_eq!(output.scale, 1.5);
+        assert_eq!(output.scale, Some(1.5));
         assert_eq!(output.transform, Transform::Rotate90);
         assert_eq!(output.vrr, VrrMode::On);
         assert_eq!(output.mode, "1920x1080@60.00");
@@ -322,7 +326,7 @@ mod tests {
     fn snapshot_marks_unmapped_live_output_disabled_without_clobbering_position() {
         let mut existing = named("DP-1");
         existing.position = Some((1920, 0));
-        existing.scale = 1.25;
+        existing.scale = Some(1.25);
         let mut settings = OutputSettings {
             outputs: vec![existing],
         };
@@ -336,7 +340,28 @@ mod tests {
 
         assert!(!settings.outputs[0].enabled);
         assert_eq!(settings.outputs[0].position, Some((1920, 0)));
-        assert_eq!(settings.outputs[0].scale, 1.25);
+        assert_eq!(settings.outputs[0].scale, Some(1.25));
+    }
+
+    #[test]
+    fn snapshot_preserves_live_scale_1() {
+        // Live logical.scale is often 1.0. That is an observed value and must
+        // become Some(1.0) so the next save writes `scale 1.0` instead of
+        // dropping it (niri would then auto-guess, often 2× on HiDPI).
+        let mut settings = OutputSettings {
+            outputs: vec![named("eDP-1")],
+        };
+        apply_live_outputs_to_settings(
+            &mut settings,
+            &[live("eDP-1", 0, 0, 1920, 1080, 1.0, 1920, 1080)],
+        );
+        assert_eq!(settings.outputs[0].scale, Some(1.0));
+
+        let kdl = crate::config::storage::generate_outputs_kdl(&settings);
+        assert!(
+            kdl.contains("scale 1.0") || kdl.contains("scale 1\n"),
+            "live 1.0 must be written after snapshot, got:\n{kdl}"
+        );
     }
 
     #[test]

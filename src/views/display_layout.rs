@@ -67,7 +67,7 @@ pub fn output_from_ipc(info: &FullOutputInfo) -> OutputConfig {
     OutputConfig {
         name: info.name.clone(),
         enabled: true,
-        scale: info.scale(),
+        scale: info.logical.as_ref().map(|logical| logical.scale),
         mode: info.current_mode_string(),
         transform: info.transform(),
         vrr: if info.vrr_enabled {
@@ -345,7 +345,7 @@ mod tests {
             outputs: vec![OutputConfig {
                 name: "DP-1".to_string(),
                 mode: "3840x2160@60.00".to_string(),
-                scale: 1.0,
+                scale: Some(1.0),
                 position: Some((0, 0)),
                 ..Default::default()
             }],
@@ -364,7 +364,7 @@ mod tests {
             outputs: vec![OutputConfig {
                 name: "DP-1".to_string(),
                 mode: "3840x2160@60.00".to_string(),
-                scale: 2.0,
+                scale: Some(2.0),
                 position: Some((0, 0)),
                 ..Default::default()
             }],
@@ -378,7 +378,7 @@ mod tests {
             outputs: vec![OutputConfig {
                 name: "DP-1".to_string(),
                 mode: "1920x1080@60.00".to_string(),
-                scale: 1.0,
+                scale: Some(1.0),
                 transform: Transform::Rotate90,
                 position: Some((0, 0)),
                 ..Default::default()
@@ -529,7 +529,7 @@ mod tests {
         let cfg = output_from_ipc(&info);
         assert_eq!(cfg.name, "eDP-1");
         assert!(cfg.position.is_none());
-        assert!((cfg.scale - 2.0).abs() < f64::EPSILON);
+        assert_eq!(cfg.scale, Some(2.0));
         assert_eq!(cfg.transform, Transform::Rotate90);
         assert_eq!(cfg.mode, "3840x2160@60.00");
     }

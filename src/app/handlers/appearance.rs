@@ -58,6 +58,14 @@ impl super::super::App {
             }
             AppearanceMessage::SetCornerRadius(value) => {
                 self.settings.appearance.corner_radius = value.clamp(0.0, 32.0);
+                // Appearance radius is a view over the distinguished catch-all.
+                // Keep them in sync so we do not emit a second radius-only rule.
+                if crate::config::models::apply_appearance_radius_to_catch_all(
+                    &self.settings.appearance,
+                    &mut self.settings.window_rules,
+                ) {
+                    self.save.dirty_tracker.mark(SettingsCategory::WindowRules);
+                }
             }
 
             // Background. `None` clears it; `Some(hex)` only updates when the hex

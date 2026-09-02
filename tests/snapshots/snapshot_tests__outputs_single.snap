@@ -5,7 +5,7 @@ expression: kdl
 // Output/Display settings - managed by Nirify
 
 output "DP-1" {
-    scale 1.50
+    scale 1.5
     mode "2560x1440@144"
     position x=0 y=0
     variable-refresh-rate

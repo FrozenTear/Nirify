@@ -426,7 +426,7 @@ pub fn output_detail_view<'a>(
                 slider_row(
                     "Scale",
                     "HiDPI scaling factor",
-                    output.scale as f32,
+                    output.display_scale() as f32,
                     0.5,
                     4.0,
                     "x",

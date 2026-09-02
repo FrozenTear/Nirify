@@ -211,14 +211,14 @@ pub fn ensure_required_files_exist(
 ) -> anyhow::Result<Vec<String>> {
     use super::super::registry::ConfigFile;
     use super::super::storage::{
-        generate_animations_kdl, generate_appearance_kdl, generate_behavior_kdl, generate_blur_kdl,
-        generate_cursor_kdl, generate_debug_kdl, generate_environment_kdl, generate_gestures_kdl,
-        generate_keybindings_kdl, generate_keyboard_kdl, generate_layer_rules_kdl,
-        generate_layout_extras_kdl, generate_misc_kdl, generate_mouse_kdl, generate_outputs_kdl,
-        generate_overview_kdl, generate_preferences_kdl, generate_recent_windows_kdl,
-        generate_startup_kdl, generate_switch_events_kdl, generate_tablet_kdl, generate_touch_kdl,
-        generate_touchpad_kdl, generate_trackball_kdl, generate_trackpoint_kdl,
-        generate_window_rules_kdl, generate_workspaces_kdl,
+        generate_animations_kdl, generate_appearance_kdl_for_settings, generate_behavior_kdl,
+        generate_blur_kdl, generate_cursor_kdl, generate_debug_kdl, generate_environment_kdl,
+        generate_gestures_kdl, generate_keybindings_kdl, generate_keyboard_kdl,
+        generate_layer_rules_kdl, generate_layout_extras_kdl, generate_misc_kdl,
+        generate_mouse_kdl, generate_outputs_kdl, generate_overview_kdl, generate_preferences_kdl,
+        generate_recent_windows_kdl, generate_startup_kdl, generate_switch_events_kdl,
+        generate_tablet_kdl, generate_touch_kdl, generate_touchpad_kdl, generate_trackball_kdl,
+        generate_trackpoint_kdl, generate_window_rules_kdl, generate_workspaces_kdl,
     };
 
     // Ensure directories exist first
@@ -232,9 +232,11 @@ pub fn ensure_required_files_exist(
         if !path.exists() {
             // Generate content based on file type
             let content = match file {
-                ConfigFile::Appearance => {
-                    generate_appearance_kdl(&settings.appearance, &settings.behavior)
-                }
+                ConfigFile::Appearance => generate_appearance_kdl_for_settings(
+                    &settings.appearance,
+                    &settings.behavior,
+                    &settings.window_rules,
+                ),
                 ConfigFile::Behavior => generate_behavior_kdl(&settings.behavior),
                 ConfigFile::Keyboard => generate_keyboard_kdl(&settings.keyboard),
                 ConfigFile::Mouse => generate_mouse_kdl(&settings.mouse),

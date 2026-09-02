@@ -317,10 +317,20 @@ pub fn merge_stripped_into_managed(
         adopted.insert(SettingsCategory::Workspaces);
     }
 
-    if !file_failed(load, "advanced/window-rules.kdl")
-        && merge_window_rules(&mut managed.window_rules, &stripped.window_rules.rules)
-    {
-        adopted.insert(SettingsCategory::WindowRules);
+    if !file_failed(load, "advanced/window-rules.kdl") {
+        let had_catch_all = managed.window_rules.has_catch_all();
+        if merge_window_rules(&mut managed.window_rules, &stripped.window_rules.rules) {
+            adopted.insert(SettingsCategory::WindowRules);
+            // A newly adopted catch-all owns global radius. Rewrite appearance.kdl
+            // so it does not keep emitting a conflicting radius-only window-rule.
+            if !had_catch_all && managed.window_rules.has_catch_all() {
+                super::models::sync_appearance_radius_from_catch_all(
+                    &mut managed.appearance,
+                    &managed.window_rules,
+                );
+                adopted.insert(SettingsCategory::Appearance);
+            }
+        }
     }
 
     if !file_failed(load, "advanced/layer-rules.kdl")
@@ -825,6 +835,33 @@ include "nirify/main.kdl"
             .matches
             .iter()
             .any(|m| m.app_id.as_deref() == Some("alacritty"))));
+    }
+
+    #[test]
+    fn merge_adopts_catchall_window_rule() {
+        let managed = Settings::default();
+        let mut stripped = Settings::default();
+        stripped.window_rules.rules.push(WindowRule {
+            id: 0,
+            matches: vec![],
+            opacity: Some(0.9),
+            clip_to_geometry: Some(true),
+            open_maximized: Some(true),
+            ..Default::default()
+        });
+
+        let load = LoadResult::default();
+        let (merged, adopted) = merge_stripped_into_managed(managed, &stripped, &load);
+        assert!(adopted.contains(&SettingsCategory::WindowRules));
+        let catch_all = merged
+            .window_rules
+            .rules
+            .iter()
+            .find(|r| r.is_catch_all())
+            .expect("catch-all adopted");
+        assert_eq!(catch_all.opacity, Some(0.9));
+        assert_eq!(catch_all.clip_to_geometry, Some(true));
+        assert_eq!(catch_all.open_maximized, Some(true));
     }
 
     #[test]
