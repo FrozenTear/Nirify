@@ -222,6 +222,18 @@ pub fn validate_settings(settings: &Settings) -> ValidationResult {
         }
     }
 
+    // Empty connector names must never be written (`output "" { ... }`).
+    // Storage skips them; warn so the Displays UI can prompt for a name.
+    for (idx, output) in settings.outputs.outputs.iter().enumerate() {
+        if output.name.trim().is_empty() {
+            result.add_warning(
+                "Outputs",
+                &format!("output[{}].name", idx),
+                "Empty connector name; this output will not be written to config",
+            );
+        }
+    }
+
     // Log validation results
     if result.errors.is_empty() && result.warnings.is_empty() {
         log::debug!("Settings validation passed");
@@ -321,6 +333,27 @@ mod tests {
         let settings = Settings::default();
         let result = validate_settings(&settings);
         assert!(result.is_valid());
+    }
+
+    #[test]
+    fn empty_output_name_is_a_warning_not_an_error() {
+        use crate::config::models::OutputConfig;
+
+        let mut settings = Settings::default();
+        settings.outputs.outputs.push(OutputConfig::default());
+        let result = validate_settings(&settings);
+        assert!(
+            result.is_valid(),
+            "empty connector names must not block other saves"
+        );
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.category == "Outputs" && w.field == "output[0].name"),
+            "expected Outputs warning, got {:?}",
+            result.warnings
+        );
     }
 
     #[test]

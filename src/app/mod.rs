@@ -87,7 +87,7 @@ fn output_msg_is_risky(m: &crate::messages::OutputsMessage) -> bool {
             | O::SetModeline(_, _)
             // Bulk layout import can move every monitor; arm the same 15s
             // apply-then-confirm used for mode / disable. Per-output
-            // SetPositionX/Y stay unarmed so a future drag canvas does not
+            // SetPositionX/Y stay unarmed so the drag canvas does not
             // pop the countdown on every snap.
             | O::LiveOutputsSnapshotLoaded(Ok(_))
     )
@@ -1921,6 +1921,7 @@ impl App {
                 self.ui.selected_output_index,
                 &self.ui.output_sections_expanded,
                 &self.ui.tools_state.outputs,
+                self.ui.monitor_drag.as_ref().map(|drag| drag.index),
             ),
             Screen::System => views::screens::system::view(
                 &self.settings.startup,
