@@ -196,6 +196,17 @@ impl std::fmt::Display for DefaultColumnDisplay {
     }
 }
 
+impl DefaultColumnDisplay {
+    /// niri `default-column-display` argument.
+    #[must_use]
+    pub fn to_kdl(self) -> &'static str {
+        match self {
+            Self::Normal => "normal",
+            Self::Tabbed => "tabbed",
+        }
+    }
+}
+
 /// Layout extras settings
 #[derive(Debug, Clone, PartialEq)]
 pub struct LayoutExtrasSettings {

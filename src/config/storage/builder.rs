@@ -110,6 +110,17 @@ impl KdlBuilder {
         self
     }
 
+    /// Emit a niri [`Flag`](https://github.com/niri-wm/niri/blob/main/niri-config/src/utils.rs):
+    /// presence / `true` enables, explicit `false` disables (needed so a later
+    /// include can override an earlier include that set the flag).
+    pub fn flag_or_false(&mut self, name: &str, enabled: bool) -> &mut Self {
+        if enabled {
+            self.flag(name)
+        } else {
+            self.raw(&format!("{name} false"))
+        }
+    }
+
     /// Add an integer field
     pub fn field_i32(&mut self, name: &str, value: i32) -> &mut Self {
         self.content.push_str(&self.indent());

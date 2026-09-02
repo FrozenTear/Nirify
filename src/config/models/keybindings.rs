@@ -242,6 +242,31 @@ pub struct KeybindingsSettings {
     pub error: Option<String>,
 }
 
+/// Keep the last binding for each normalized combo (niri last-wins).
+///
+/// niri merges `binds` so a later entry for the same key combination
+/// overrides earlier ones ([Include § Binds](https://niri-wm.github.io/niri/Configuration%3A-Include.html#binds)).
+/// Nirify used to keep the first and drop later duplicates; that disagreed
+/// with niri and could persist the wrong action after first-run / absorb.
+///
+/// Surviving bindings stay in their original relative order (the last
+/// occurrence of each combo is kept).
+#[must_use]
+pub fn last_wins_keybindings(bindings: Vec<Keybinding>) -> Vec<Keybinding> {
+    use std::collections::HashMap;
+
+    let mut last_index: HashMap<String, usize> = HashMap::new();
+    for (i, binding) in bindings.iter().enumerate() {
+        last_index.insert(normalized_key_combo(&binding.key_combo), i);
+    }
+    bindings
+        .into_iter()
+        .enumerate()
+        .filter(|(i, binding)| last_index.get(&normalized_key_combo(&binding.key_combo)) == Some(i))
+        .map(|(_, binding)| binding)
+        .collect()
+}
+
 /// Normalize a key-combo string for duplicate detection.
 ///
 /// Splits on `+`, canonicalizes modifier aliases case-insensitively
@@ -690,6 +715,29 @@ mod tests {
         assert_eq!(
             normalized_key_combo("Shift+Mod+F"),
             normalized_key_combo("Mod+Shift+F")
+        );
+    }
+
+    #[test]
+    fn last_wins_keeps_later_mod_q() {
+        let first = Keybinding {
+            id: 0,
+            key_combo: "Mod+Q".to_string(),
+            action: KeybindAction::NiriAction(ActionNode::bare("close-window")),
+            ..Default::default()
+        };
+        let last = Keybinding {
+            id: 1,
+            key_combo: "mod+q".to_string(),
+            action: KeybindAction::NiriAction(ActionNode::bare("spawn")),
+            ..Default::default()
+        };
+        let kept = last_wins_keybindings(vec![first, last.clone()]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].id, 1);
+        assert_eq!(
+            kept[0].action,
+            KeybindAction::NiriAction(ActionNode::bare("spawn"))
         );
     }
 

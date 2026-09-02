@@ -471,10 +471,10 @@ pub fn generate_window_rules_kdl(
             content.push_str(&format!("    variable-refresh-rate {}\n", vrr));
         }
         if let Some(ref display) = rule.default_column_display {
-            use crate::config::models::DefaultColumnDisplay;
-            if matches!(display, DefaultColumnDisplay::Tabbed) {
-                content.push_str("    default-column-display \"tabbed\"\n");
-            }
+            content.push_str(&format!(
+                "    default-column-display \"{}\"\n",
+                display.to_kdl()
+            ));
         }
         if let Some(tiled) = rule.tiled_state {
             content.push_str(&format!("    tiled-state {}\n", tiled));
@@ -723,6 +723,27 @@ mod tests {
         assert_eq!(got.default_column_display, expected.default_column_display);
         assert_eq!(got.tiled_state, expected.tiled_state);
         assert_eq!(got.baba_is_float, expected.baba_is_float);
+    }
+
+    #[test]
+    fn window_rule_emits_default_column_display_normal() {
+        let rule = WindowRule {
+            default_column_display: Some(DefaultColumnDisplay::Normal),
+            matches: vec![WindowRuleMatch {
+                app_id: Some("kitty".to_string()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let settings = WindowRulesSettings {
+            rules: vec![rule],
+            next_id: 1,
+        };
+        let content = generate_window_rules_kdl(&settings, false, FeatureCompat::all_enabled());
+        assert!(
+            content.contains("default-column-display \"normal\""),
+            "owned \"normal\" must override an earlier include's \"tabbed\":\n{content}"
+        );
     }
 
     #[test]

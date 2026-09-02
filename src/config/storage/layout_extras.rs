@@ -15,6 +15,12 @@ use crate::types::ColorOrGradient;
 /// - Shadow settings (softness, spread, offset, colors)
 /// - Tab indicator settings (position, width, gap, colors)
 /// - Insert hint settings (color)
+///
+/// # Omit-default policy
+///
+/// `default-column-display` is always written, including `"normal"`. Nirify
+/// owns this keyword whenever the category file is managed; omitting the
+/// niri default cannot override an earlier include that set `"tabbed"`.
 pub fn generate_layout_extras_kdl(settings: &LayoutExtrasSettings) -> String {
     let mut kdl = KdlBuilder::with_header("Layout extras settings - managed by Nirify");
 
@@ -122,14 +128,13 @@ pub fn generate_layout_extras_kdl(settings: &LayoutExtrasSettings) -> String {
             });
         }
 
-        // Default column display mode
-        match settings.default_column_display {
-            DefaultColumnDisplay::Normal => {} // Don't output default
-            DefaultColumnDisplay::Tabbed => {
-                b.newline();
-                b.field_string("default-column-display", "tabbed");
-            }
-        }
+        // Always emit, including niri's default "normal", so a later Nirify
+        // include overrides an earlier user `default-column-display "tabbed"`.
+        b.newline();
+        b.field_string(
+            "default-column-display",
+            settings.default_column_display.to_kdl(),
+        );
     });
 
     kdl.build()
@@ -322,6 +327,21 @@ mod tests {
         assert_eq!(dst.layout_extras.shadow.spread, 6);
         assert_eq!(dst.layout_extras.tab_indicator.width, 5);
         assert_eq!(dst.layout_extras.tab_indicator.corner_radius, 2);
+    }
+
+    #[test]
+    fn always_emits_default_column_display_normal() {
+        let defaults = Settings::default();
+        let kdl = generate_layout_extras_kdl(&defaults.layout_extras);
+        assert!(
+            kdl.contains("default-column-display \"normal\""),
+            "owned default must last-wins against earlier includes:\n{kdl}"
+        );
+        let dst = reparse(&kdl);
+        assert_eq!(
+            dst.layout_extras.default_column_display,
+            DefaultColumnDisplay::Normal
+        );
     }
 
     #[test]

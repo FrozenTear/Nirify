@@ -725,9 +725,11 @@ mod tests {
         let behavior = BehaviorSettings::default();
         let content = generate_behavior_kdl(&behavior);
 
-        // Default settings shouldn't include these
+        // Presence-only Option structs still omit Off (niri has no disable form).
         assert!(!content.contains("focus-follows-mouse"));
         assert!(!content.contains("warp-mouse-to-focus"));
+        // Owned Flag default is written so later include last-wins.
+        assert!(content.contains("workspace-auto-back-and-forth false"));
     }
 
     #[test]
