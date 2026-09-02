@@ -1,13 +1,17 @@
 //! Layout extras settings view — neon modal style
 //!
 //! Configure shadows, tab indicators, insert hints, and preset sizes.
+//!
+//! These sections bind `LayoutExtrasMessage` for the global Layout page and
+//! cannot be remounted on per-output / per-workspace overrides. The shared
+//! layout-override editor reuses the same widget primitives and `preset_entry_row`.
 
 use iced::widget::{
     button, column, container, pick_list, row, scrollable, text, text_input, Space,
 };
 use iced::{Alignment, Element, Length};
 
-use super::widgets::{gradient_picker, info_text, toggle_row};
+use super::widgets::{gradient_picker, info_text, preset_entry_row, toggle_row};
 use crate::config::models::{
     DefaultColumnDisplay, LayoutExtrasSettings, PresetHeight, PresetWidth, TabIndicatorPosition,
 };
@@ -63,8 +67,6 @@ pub fn view(settings: &LayoutExtrasSettings) -> Element<'_, Message> {
         .into()
 }
 
-const PRESET_KINDS: [&str; 2] = ["Proportion", "Fixed"];
-
 /// Preset column widths editor (switch-preset-column-width cycles through these).
 pub fn preset_widths_section(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
     let mut col = column![
@@ -88,7 +90,7 @@ pub fn preset_widths_section(settings: &LayoutExtrasSettings) -> Element<'static
             }
         };
         let value_for_kind = value_str.clone();
-        col = col.push(preset_row(
+        col = col.push(preset_entry_row(
             kind,
             &value_str,
             is_prop,
@@ -136,7 +138,7 @@ pub fn preset_heights_section(settings: &LayoutExtrasSettings) -> Element<'stati
             }
         };
         let value_for_kind = value_str.clone();
-        col = col.push(preset_row(
+        col = col.push(preset_entry_row(
             kind,
             &value_str,
             is_prop,
@@ -159,45 +161,6 @@ pub fn preset_heights_section(settings: &LayoutExtrasSettings) -> Element<'stati
             .padding([6, 12]),
     );
     col.into()
-}
-
-/// A single preset entry row: kind pick_list + numeric value + remove button.
-#[allow(clippy::too_many_arguments)]
-fn preset_row<'a>(
-    kind: &'a str,
-    value: &str,
-    is_proportion: bool,
-    on_kind: impl Fn(&str) -> Message + 'a,
-    on_value: impl Fn(String, String) -> Message + 'a,
-    on_remove: Message,
-) -> Element<'a, Message> {
-    let value_owned = value.to_string();
-    let kind_owned = kind.to_string();
-    let hint = if is_proportion { "0.0 - 1.0" } else { "pixels" };
-    let selected = if is_proportion { "Proportion" } else { "Fixed" };
-
-    container(
-        row![
-            pick_list(PRESET_KINDS.to_vec(), Some(selected), move |k: &str| {
-                on_kind(k)
-            })
-            .width(Length::Fixed(120.0)),
-            text_input(hint, &value_owned)
-                .on_input(move |v| on_value(kind_owned.clone(), v))
-                .padding(6)
-                .font(fonts::MONO_FONT)
-                .size(12)
-                .width(Length::Fill),
-            button(text("×").size(14))
-                .on_press(on_remove)
-                .padding([4, 10]),
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center),
-    )
-    .padding(8)
-    .style(crate::theme::card_style)
-    .into()
 }
 
 /// Window shadow settings

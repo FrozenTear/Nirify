@@ -2,7 +2,7 @@
 //!
 //! Provides a text input field with color preview and optional preset swatches.
 
-use iced::widget::{button, column, container, row, text, text_input};
+use iced::widget::{button, column, container, row, text, text_input, toggler};
 use iced::{Alignment, Border, Color as IcedColor, Element, Length};
 
 use crate::theme::{fonts, muted_text_container};
@@ -162,4 +162,80 @@ pub fn color_picker_with_swatches<'a, Message: Clone + 'a>(
     .spacing(8)
     .padding(12)
     .into()
+}
+
+/// Optional `Color` override: inherit/off toggle plus hex input and preview.
+///
+/// Used by output backdrop/background rows and per-output / per-workspace
+/// layout-override shadow and background colors.
+pub fn optional_color_row<'a, Message: Clone + 'a>(
+    label: &'a str,
+    description: &'a str,
+    value: Option<&Color>,
+    on_change: impl Fn(Option<Color>) -> Message + Clone + 'a,
+) -> Element<'a, Message> {
+    let is_enabled = value.is_some();
+    let color = value.cloned().unwrap_or_default();
+    let hex_value = color.to_hex();
+
+    let on_change_toggle = on_change.clone();
+    let on_change_input = on_change;
+
+    let mut content = column![row![
+        column![
+            text(label).size(15),
+            container(text(description).size(11)).style(muted_text_container),
+        ]
+        .spacing(2)
+        .width(Length::Fill),
+        toggler(is_enabled).on_toggle(move |enabled| {
+            if enabled {
+                on_change_toggle(Some(Color::default()))
+            } else {
+                on_change_toggle(None)
+            }
+        }),
+    ]
+    .spacing(12)
+    .align_y(Alignment::Center),]
+    .spacing(6)
+    .padding(12);
+
+    if is_enabled {
+        let preview_color = IcedColor::from_rgb8(color.r, color.g, color.b);
+        let preview = container(text(""))
+            .width(Length::Fixed(32.0))
+            .height(Length::Fixed(32.0))
+            .style(move |_theme: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(preview_color)),
+                border: Border {
+                    color: IcedColor::from_rgb(0.4, 0.4, 0.4),
+                    width: 1.0,
+                    radius: 4.0.into(),
+                },
+                ..Default::default()
+            });
+
+        let current = color;
+        let hex_input = text_input("", &hex_value)
+            .on_input(move |hex| {
+                if let Some(c) = Color::from_hex(&hex) {
+                    on_change_input(Some(c))
+                } else {
+                    // Incomplete hex while typing: keep the last valid color.
+                    on_change_input(Some(current))
+                }
+            })
+            .padding(8)
+            .width(Length::Fixed(100.0))
+            .font(fonts::MONO_FONT);
+
+        content = content.push(
+            row![preview, hex_input]
+                .spacing(8)
+                .align_y(Alignment::Center),
+        );
+    }
+
+    content.into()
 }

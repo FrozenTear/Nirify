@@ -2,13 +2,11 @@
 //!
 //! Provides an interface for managing named workspaces.
 
-use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input};
+use iced::widget::{button, column, container, row, scrollable, text, text_input};
 use iced::{Alignment, Element, Length};
 
 use super::widgets::*;
-use crate::config::models::{
-    DefaultColumnDisplay, LayoutOverride, NamedWorkspace, WorkspacesSettings,
-};
+use crate::config::models::WorkspacesSettings;
 use crate::messages::{Message, WorkspacesMessage};
 use crate::theme::muted_text_container;
 
@@ -135,7 +133,16 @@ pub fn view(settings: &WorkspacesSettings) -> Element<'_, Message> {
                         .width(Length::Fill),
                     ]
                     .spacing(16),
-                    layout_override_editor(workspace, idx),
+                    layout_override_content(
+                        workspace.layout_override.as_ref(),
+                        move |v| {
+                            Message::Workspaces(WorkspacesMessage::SetLayoutOverride(
+                                idx,
+                                v.map(Box::new),
+                            ))
+                        },
+                        "Override global layout settings (gaps, borders, focus ring, shadow, presets, tab indicator, …) for this workspace.",
+                    ),
                 ]
                 .spacing(8)
                 .padding(12)
@@ -169,140 +176,6 @@ pub fn view(settings: &WorkspacesSettings) -> Element<'_, Message> {
     scrollable(container(content).padding(20).width(iced::Length::Fill))
         .height(iced::Length::Fill)
         .into()
-}
-
-/// Build a `SetLayoutOverride` message from a mutated clone of the current override.
-///
-/// Cloning preserves every field (including options this editor does not expose),
-/// so a round-tripped workspace override never drops data the UI cannot edit.
-fn wo_update(lo: &LayoutOverride, idx: usize, mutate: impl FnOnce(&mut LayoutOverride)) -> Message {
-    let mut clone = lo.clone();
-    mutate(&mut clone);
-    Message::Workspaces(WorkspacesMessage::SetLayoutOverride(
-        idx,
-        Some(Box::new(clone)),
-    ))
-}
-
-/// Per-workspace layout override editor (mirrors the per-output editor).
-fn layout_override_editor(workspace: &NamedWorkspace, idx: usize) -> Element<'_, Message> {
-    let Some(lo) = workspace.layout_override.as_ref() else {
-        return column![
-            container(text("Layout override: inherits global layout").size(13))
-                .style(muted_text_container),
-            button(text("Add Layout Override").size(13))
-                .on_press(Message::Workspaces(WorkspacesMessage::SetLayoutOverride(
-                    idx,
-                    Some(Box::new(LayoutOverride::default())),
-                )))
-                .padding([6, 12]),
-        ]
-        .spacing(6)
-        .into();
-    };
-
-    // Gaps override
-    let gaps_value = lo.gaps.map(|g| format!("{}", g as i32)).unwrap_or_default();
-    let lo_gaps = lo.clone();
-    let gaps_input = column![
-        container(text("Gaps override (blank = inherit)").size(13)).style(muted_text_container),
-        text_input("e.g. 16", &gaps_value)
-            .on_input(move |v| {
-                let parsed = v.trim().parse::<f32>().ok();
-                wo_update(&lo_gaps, idx, |l| l.gaps = parsed)
-            })
-            .padding(8),
-    ]
-    .spacing(4);
-
-    // Default column display override
-    let lo_disp = lo.clone();
-    let disp_picker = column![
-        container(text("Default column display").size(13)).style(muted_text_container),
-        pick_list(
-            vec![DefaultColumnDisplay::Normal, DefaultColumnDisplay::Tabbed],
-            lo.default_column_display,
-            move |v| wo_update(&lo_disp, idx, |l| l.default_column_display = Some(v)),
-        )
-        .width(Length::Fixed(140.0)),
-    ]
-    .spacing(4);
-
-    // Always-center-single-column override
-    let lo_center = lo.clone();
-    let center_toggle = toggle_row(
-        "Always center single column",
-        "Override for this workspace",
-        lo.always_center_single_column.unwrap_or(false),
-        move |v| wo_update(&lo_center, idx, |l| l.always_center_single_column = Some(v)),
-    );
-
-    let lo_fr_a = lo.clone();
-    let lo_fr_i = lo.clone();
-    let lo_fr_u = lo.clone();
-    let lo_br_a = lo.clone();
-    let lo_br_i = lo.clone();
-    let lo_br_u = lo.clone();
-
-    card(
-        column![
-            row![
-                container(text("Layout Override").size(14)).style(muted_text_container),
-                iced::widget::Space::new().width(Length::Fill),
-                button(text("Remove").size(13))
-                    .on_press(Message::Workspaces(WorkspacesMessage::SetLayoutOverride(
-                        idx, None
-                    )))
-                    .padding([4, 10])
-                    .style(delete_button_style),
-            ]
-            .align_y(Alignment::Center),
-            row![gaps_input, disp_picker].spacing(16),
-            center_toggle,
-            info_text(
-                "Color overrides use the same gradient picker as Appearance. Leave off to inherit."
-            ),
-            optional_gradient_picker(
-                "Focus ring active",
-                "Color or gradient for the active focus ring on this workspace",
-                lo.focus_ring_active.as_ref(),
-                move |v| wo_update(&lo_fr_a, idx, |l| l.focus_ring_active = v),
-            ),
-            optional_gradient_picker(
-                "Focus ring inactive",
-                "Color or gradient for the inactive focus ring on this workspace",
-                lo.focus_ring_inactive.as_ref(),
-                move |v| wo_update(&lo_fr_i, idx, |l| l.focus_ring_inactive = v),
-            ),
-            optional_gradient_picker(
-                "Focus ring urgent",
-                "Color or gradient for the urgent focus ring on this workspace",
-                lo.focus_ring_urgent.as_ref(),
-                move |v| wo_update(&lo_fr_u, idx, |l| l.focus_ring_urgent = v),
-            ),
-            optional_gradient_picker(
-                "Border active",
-                "Color or gradient for the active border on this workspace",
-                lo.border_active.as_ref(),
-                move |v| wo_update(&lo_br_a, idx, |l| l.border_active = v),
-            ),
-            optional_gradient_picker(
-                "Border inactive",
-                "Color or gradient for the inactive border on this workspace",
-                lo.border_inactive.as_ref(),
-                move |v| wo_update(&lo_br_i, idx, |l| l.border_inactive = v),
-            ),
-            optional_gradient_picker(
-                "Border urgent",
-                "Color or gradient for the urgent border on this workspace",
-                lo.border_urgent.as_ref(),
-                move |v| wo_update(&lo_br_u, idx, |l| l.border_urgent = v),
-            ),
-        ]
-        .spacing(10)
-        .padding(12)
-        .width(Length::Fill),
-    )
 }
 
 /// Style for move buttons - uses theme text color
