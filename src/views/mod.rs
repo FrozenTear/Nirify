@@ -16,6 +16,7 @@ pub mod blur;
 pub mod config_editor;
 pub mod cursor;
 pub mod debug;
+pub mod display_layout;
 pub mod environment;
 pub mod gestures;
 pub mod keybindings;

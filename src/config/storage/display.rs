@@ -570,7 +570,13 @@ pub fn generate_outputs_kdl(settings: &OutputSettings) -> String {
     let mut content = String::with_capacity(1536);
     content.push_str("// Output/Display settings - managed by Nirify\n\n");
 
-    if settings.outputs.is_empty() {
+    let named_outputs: Vec<&crate::config::models::OutputConfig> = settings
+        .outputs
+        .iter()
+        .filter(|output| !output.name.trim().is_empty())
+        .collect();
+
+    if named_outputs.is_empty() {
         content.push_str("// No outputs configured yet.\n");
         content.push_str("// Add outputs through the UI or manually here.\n");
         content.push_str("// Example:\n");
@@ -578,7 +584,7 @@ pub fn generate_outputs_kdl(settings: &OutputSettings) -> String {
         content.push_str("//     scale 1.0\n");
         content.push_str("// }\n");
     } else {
-        for output in &settings.outputs {
+        for output in named_outputs {
             content.push_str(&format!(
                 "output \"{}\" {{\n",
                 escape_kdl_string(&output.name)
@@ -854,6 +860,35 @@ mod tests {
         assert!(kdl.contains("backdrop-color \""), "{kdl}");
         assert_eq!(loaded.background_color, output.background_color);
         assert_eq!(loaded.backdrop_color, output.backdrop_color);
+    }
+
+    #[test]
+    fn empty_connector_name_is_not_written() {
+        let settings = OutputSettings {
+            outputs: vec![
+                OutputConfig {
+                    name: String::new(),
+                    mode: "1920x1080@60".into(),
+                    ..Default::default()
+                },
+                OutputConfig {
+                    name: "   ".into(),
+                    ..Default::default()
+                },
+                OutputConfig {
+                    name: "DP-1".into(),
+                    mode: "1920x1080@60".into(),
+                    ..Default::default()
+                },
+            ],
+        };
+        let kdl = generate_outputs_kdl(&settings);
+        assert!(
+            !kdl.contains("output \"\""),
+            "blank output blocks must not be saved: {kdl}"
+        );
+        assert!(kdl.contains("output \"DP-1\""), "{kdl}");
+        assert_eq!(kdl.matches("output \"").count(), 1, "{kdl}");
     }
 
     #[test]

@@ -1921,6 +1921,7 @@ impl App {
                 self.ui.selected_output_index,
                 &self.ui.output_sections_expanded,
                 &self.ui.tools_state.outputs,
+                self.ui.monitor_drag.as_ref().map(|drag| drag.index),
             ),
             Screen::System => views::screens::system::view(
                 &self.settings.startup,

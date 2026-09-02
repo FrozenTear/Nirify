@@ -131,6 +131,10 @@ pub struct UiState {
     pub editing_output_index: Option<usize>,
     /// Expanded sections in outputs view
     pub output_sections_expanded: HashMap<String, bool>,
+    /// Last pointer position on the Displays arrangement canvas (canvas pixels)
+    pub canvas_pointer: Option<(f32, f32)>,
+    /// In-progress monitor drag on the Displays canvas
+    pub monitor_drag: Option<MonitorDrag>,
 
     // Rules shared state
     /// Search text for rules card grid
@@ -218,6 +222,23 @@ pub struct UiState {
     /// Whether the niri config include line is present.
     /// `None` = config.kdl unreadable / unknown (no niri config on this machine).
     pub include_line_present: Option<bool>,
+}
+
+/// Drag state for rearranging monitors on the Displays canvas.
+#[derive(Debug, Clone)]
+pub struct MonitorDrag {
+    /// Configured output index being dragged
+    pub index: usize,
+    pub last_canvas_x: f32,
+    pub last_canvas_y: f32,
+    pub press_canvas_x: f32,
+    pub press_canvas_y: f32,
+    /// Preview scale at press time (canvas px per logical px)
+    pub scale: f32,
+    /// Displayed logical origin of the monitor at press (used to seed auto → explicit)
+    pub origin_logical: (i32, i32),
+    /// True once the pointer has moved past the click threshold
+    pub moved: bool,
 }
 
 impl UiState {

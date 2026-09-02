@@ -1089,8 +1089,15 @@ pub enum LayerRulesMessage {
 pub enum OutputsMessage {
     // List management
     AddOutput,
+    /// Create configs for every connected IPC output that is not already named.
+    AdoptConnected,
     RemoveOutput(usize),
     SelectOutput(usize),
+
+    // Arrangement canvas (pointer is in canvas-local pixels)
+    CanvasMove(f32, f32),
+    CanvasPress,
+    CanvasRelease,
 
     // Basic properties
     SetOutputName(usize, String),

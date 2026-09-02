@@ -770,6 +770,20 @@ impl FullOutputInfo {
             .map_or_else(|| "Normal".to_string(), |l| l.transform.clone())
     }
 
+    /// Human-readable label: `DP-1 — Dell U2720Q` (falls back to the connector).
+    #[must_use]
+    pub fn display_label(&self) -> String {
+        let make_model = format!("{} {}", self.make, self.model)
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        if make_model.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{} — {}", self.name, make_model)
+        }
+    }
+
     /// Get the transform as our Transform enum
     #[must_use]
     pub fn transform(&self) -> crate::types::Transform {
@@ -1213,6 +1227,34 @@ mod tests {
             };
             assert_eq!(info.transform(), expected, "Failed for input: {}", input);
         }
+    }
+
+    #[test]
+    fn test_full_output_display_label_and_logical_size() {
+        let info = FullOutputInfo {
+            name: "DP-1".to_string(),
+            make: "Dell".to_string(),
+            model: "U2720Q".to_string(),
+            current_mode: Some(0),
+            modes: vec![OutputMode {
+                width: 3840,
+                height: 2160,
+                refresh_rate: 60000,
+                is_preferred: true,
+            }],
+            logical: Some(OutputLogical {
+                x: 1920,
+                y: 0,
+                scale: 2.0,
+                transform: "90".to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(info.display_label(), "DP-1 — Dell U2720Q");
+        // 3840x2160 @ 2.0, swapped on 90° → 1080 x 1920
+        assert_eq!(info.logical_size(), (1080, 1920));
+        assert_eq!((info.position_x(), info.position_y()), (1920, 0));
     }
 
     #[test]

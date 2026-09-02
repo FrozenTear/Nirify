@@ -33,6 +33,39 @@ impl std::fmt::Display for ModeOption {
     }
 }
 
+/// Connector name option for the identity picker
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectorOption {
+    pub name: String,
+    pub label: String,
+}
+
+impl std::fmt::Display for ConnectorOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.label)
+    }
+}
+
+fn connector_options(current: &str, available: &[FullOutputInfo]) -> Vec<ConnectorOption> {
+    let mut opts: Vec<ConnectorOption> = available
+        .iter()
+        .map(|info| ConnectorOption {
+            name: info.name.clone(),
+            label: info.display_label(),
+        })
+        .collect();
+    if !current.is_empty() && !opts.iter().any(|opt| opt.name == current) {
+        opts.insert(
+            0,
+            ConnectorOption {
+                name: current.to_string(),
+                label: current.to_string(),
+            },
+        );
+    }
+    opts
+}
+
 /// Creates the outputs settings view with list-detail pattern
 /// Returns Element<'_> because text_input widgets borrow from settings
 pub fn view<'a>(
@@ -316,7 +349,62 @@ pub fn output_detail_view<'a>(
         .into()
     };
 
+    let connector_choices = connector_options(&output.name, available_outputs);
+    let selected_connector = connector_choices
+        .iter()
+        .find(|opt| opt.name == output.name)
+        .cloned();
+
     let mut content = column![
+        // ── IDENTITY ──
+        modal_section("◎", "IDENTITY", neon::PRIMARY),
+        container(
+            column![
+                row![
+                    column![
+                        text("Connector").size(14).width(Length::FillPortion(1)),
+                        container(text("niri output name (required to save)").size(12))
+                            .style(muted_text_container),
+                    ]
+                    .spacing(2)
+                    .width(Length::FillPortion(1)),
+                    pick_list(
+                        connector_choices,
+                        selected_connector,
+                        move |opt: ConnectorOption| {
+                            Message::Outputs(OutputsMessage::SetOutputName(idx, opt.name))
+                        },
+                    )
+                    .placeholder("Select connector…")
+                    .width(Length::FillPortion(2))
+                    .padding(8),
+                ]
+                .spacing(12)
+                .align_y(Alignment::Center),
+                text_input_row(
+                    "Custom name",
+                    "Type a connector name if the display is disconnected",
+                    output.name.as_str(),
+                    move |value| Message::Outputs(OutputsMessage::SetOutputName(idx, value)),
+                ),
+            ]
+            .spacing(4),
+        )
+        .padding(8)
+        .style(crate::theme::card_style),
+        if output.name.trim().is_empty() {
+            Element::from(
+                container(
+                    text("Set a connector name — empty output blocks are not saved.")
+                        .size(12)
+                        .color(neon::ERROR),
+                )
+                .padding([4, 8]),
+            )
+        } else {
+            spacer(0.0)
+        },
+        Space::new().height(12),
         // ── ROW 1: DISPLAY MODE | OPTIONS ──
         row![
             column![
