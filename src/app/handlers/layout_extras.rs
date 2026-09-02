@@ -168,6 +168,7 @@ mod tests {
                 assert_eq!(g.angle, 45);
             }
             ColorOrGradient::Color(_) => panic!("tab urgent flattened"),
+            ColorOrGradient::Raw(_) => panic!("tab urgent converted to raw"),
         }
     }
 }

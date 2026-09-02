@@ -1356,6 +1356,7 @@ mod tests {
         match &tab.active {
             ColorOrGradient::Gradient(g) => assert_eq!(g.angle, 90),
             ColorOrGradient::Color(_) => panic!("gradient flattened"),
+            ColorOrGradient::Raw(_) => panic!("gradient converted to raw"),
         }
     }
 

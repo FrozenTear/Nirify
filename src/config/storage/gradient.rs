@@ -1,6 +1,8 @@
 //! Gradient KDL generation helpers
 //!
-//! Functions for converting gradient and color types to KDL string representations.
+//! Writers emit niri-valid `{variant}-color` / `{variant}-gradient` nodes.
+//! [`ColorOrGradient::Raw`] is written verbatim so unsupported shapes survive
+//! a save. See `config/loader/gradient.rs` for the supported / raw policy.
 
 use crate::types::{ColorOrGradient, ColorSpace, Gradient, GradientRelativeTo};
 
@@ -68,7 +70,8 @@ pub fn gradient_to_kdl(gradient: &Gradient, variant: &str) -> String {
 /// Generate KDL for a ColorOrGradient with a given variant name.
 ///
 /// For solid colors, outputs: `active-color "#80c8ff"`
-/// For gradients, outputs: `active-gradient from="#80c8ff" to="#bbddff" ...`
+/// For modeled gradients, outputs: `active-gradient from="#80c8ff" to="#bbddff" ...`
+/// For raw (unsupported) nodes, emits the stored KDL verbatim.
 pub fn color_or_gradient_to_kdl(cog: &ColorOrGradient, variant: &str) -> String {
     use std::fmt::Write;
     match cog {
@@ -80,5 +83,18 @@ pub fn color_or_gradient_to_kdl(cog: &ColorOrGradient, variant: &str) -> String 
             output
         }
         ColorOrGradient::Gradient(g) => gradient_to_kdl(g, variant),
+        ColorOrGradient::Raw(raw) => raw.clone(),
     }
+}
+
+/// Append an indented color-or-gradient line (with trailing newline).
+pub fn push_color_or_gradient(
+    content: &mut String,
+    indent: &str,
+    variant: &str,
+    value: &ColorOrGradient,
+) {
+    content.push_str(indent);
+    content.push_str(&color_or_gradient_to_kdl(value, variant));
+    content.push('\n');
 }
