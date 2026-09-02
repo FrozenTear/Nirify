@@ -1,17 +1,18 @@
 //! Preferences settings view — neon modal style
 
-use iced::widget::{column, container, row, scrollable, text, text_input, Space};
+use iced::widget::{column, container, pick_list, row, scrollable, text, text_input, Space};
 use iced::{Alignment, Element, Length};
 
 use super::widgets::{info_text, toggle_row};
 use crate::messages::{Message, PreferencesMessage};
-use crate::theme::{fonts, neon};
+use crate::theme::{fonts, neon, AppTheme};
 
 /// Creates the preferences settings view
 pub fn view(
     float_settings_app: bool,
     show_search_bar: bool,
     search_hotkey: &str,
+    current_theme: AppTheme,
 ) -> Element<'static, Message> {
     let search_hotkey_owned = search_hotkey.to_string();
 
@@ -67,9 +68,27 @@ pub fn view(
             column![
                 modal_section("\u{26A1}", "NAVIGATION", neon::PRIMARY),
                 Space::new().height(4),
+                container(
+                    column![
+                        text("APP THEME")
+                            .size(10)
+                            .font(fonts::UI_FONT_SEMIBOLD)
+                            .color(neon::OUTLINE_VARIANT),
+                        pick_list(AppTheme::all(), Some(current_theme), Message::ChangeTheme)
+                            .placeholder("Select theme...")
+                            .width(Length::Fill),
+                        text("Light, dark, or follow the system theme.")
+                            .size(11)
+                            .color(neon::OUTLINE),
+                    ]
+                    .spacing(6),
+                )
+                .padding(12)
+                .style(crate::theme::card_style),
+                Space::new().height(8),
                 container(toggle_row(
                     "Show Search Bar",
-                    "When disabled, use the keyboard shortcut to open search as a popup",
+                    "Search field in the sidebar. Off: use the shortcut (Ctrl+K) to open a popup",
                     show_search_bar,
                     |v| Message::Preferences(PreferencesMessage::SetShowSearchBar(v)),
                 ),)

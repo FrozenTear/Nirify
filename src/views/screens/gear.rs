@@ -21,6 +21,7 @@ pub fn view<'a>(
     niri_status: NiriStatus,
     preferences: &'a PreferencesSettings,
     show_search_bar: bool,
+    current_theme: crate::theme::AppTheme,
     config_editor_state: &'a ConfigEditorState,
     config_editor_content: &'a text_editor::Content,
     backups_state: &'a BackupsState,
@@ -33,6 +34,7 @@ pub fn view<'a>(
             preferences.float_settings_app,
             show_search_bar,
             &preferences.search_hotkey,
+            current_theme,
         ),
         GearSubTab::ConfigEditor => {
             views::config_editor::view(config_editor_state, config_editor_content)

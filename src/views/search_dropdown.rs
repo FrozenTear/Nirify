@@ -49,7 +49,7 @@ fn build_results_list(results: &[SearchResult], selected: usize) -> Element<'sta
     for (index, result) in results.iter().take(MAX_DROPDOWN_RESULTS).enumerate() {
         let setting_name = result.setting_name.clone();
         let description = result.description.clone();
-        let page_name = result.page.name();
+        let page_name = result.destination.location_label();
         let is_selected = index == selected;
 
         let item = button(

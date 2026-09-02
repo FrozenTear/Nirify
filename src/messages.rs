@@ -535,6 +535,18 @@ impl EditableDevice {
         }
     }
 
+    /// Every device variant (keeps search coverage exhaustive).
+    pub const ALL: &'static [EditableDevice] = &[
+        Self::Keyboard,
+        Self::Mouse,
+        Self::Touchpad,
+        Self::Trackpoint,
+        Self::Trackball,
+        Self::Tablet,
+        Self::Touch,
+        Self::Gestures,
+    ];
+
     pub fn icon(&self) -> &'static str {
         match self {
             Self::Keyboard => "⌨",
@@ -579,7 +591,7 @@ pub enum RulesFilter {
     Disabled,
 }
 
-/// Sections that can be edited in a modal (Layout, Visuals, System screens)
+/// Sections that can be edited in a modal (Layout, Visuals, System, Dashboard)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditableSection {
     // Layout
@@ -590,6 +602,7 @@ pub enum EditableSection {
     TabIndicator,
     InsertHint,
     NamedWorkspaces,
+    PresetSizes,
     // Visuals
     FocusRing,
     WindowBorder,
@@ -598,6 +611,9 @@ pub enum EditableSection {
     Animations,
     Cursor,
     Blur,
+    WorkspaceBackground,
+    // Dashboard
+    Overview,
     // System
     StartupPrograms,
     EnvironmentVars,
@@ -617,6 +633,7 @@ impl EditableSection {
             Self::TabIndicator => "Tab Indicator",
             Self::InsertHint => "Insert Hint",
             Self::NamedWorkspaces => "Named Workspaces",
+            Self::PresetSizes => "Preset Sizes",
             Self::FocusRing => "Focus Ring",
             Self::WindowBorder => "Window Border",
             Self::WindowShadow => "Window Shadow",
@@ -624,6 +641,8 @@ impl EditableSection {
             Self::Animations => "Animations",
             Self::Cursor => "Cursor",
             Self::Blur => "Background Blur",
+            Self::WorkspaceBackground => "Workspace Background",
+            Self::Overview => "Workspace Overview",
             Self::StartupPrograms => "Startup Programs",
             Self::EnvironmentVars => "Environment Variables",
             Self::Miscellaneous => "Miscellaneous",
@@ -642,6 +661,7 @@ impl EditableSection {
             Self::TabIndicator => "▤",
             Self::InsertHint => "◇",
             Self::NamedWorkspaces => "▥",
+            Self::PresetSizes => "▦",
             Self::FocusRing => "◉",
             Self::WindowBorder => "▭",
             Self::WindowShadow => "◌",
@@ -649,6 +669,8 @@ impl EditableSection {
             Self::Animations => "◈",
             Self::Cursor => "↗",
             Self::Blur => "◍",
+            Self::WorkspaceBackground => "▣",
+            Self::Overview => "⧉",
             Self::StartupPrograms => "⚡",
             Self::EnvironmentVars => "⚙",
             Self::Miscellaneous => "⬡",
@@ -666,9 +688,11 @@ impl EditableSection {
             | Self::FocusRing
             | Self::Animations
             | Self::Blur
+            | Self::Overview
             | Self::StartupPrograms => neon::PRIMARY,
             Self::ColumnManager
             | Self::TabIndicator
+            | Self::PresetSizes
             | Self::WindowBorder
             | Self::ModifierKeys
             | Self::EnvironmentVars
@@ -676,6 +700,62 @@ impl EditableSection {
             _ => neon::TERTIARY,
         }
     }
+
+    /// Screen that hosts this section in the redesigned chrome
+    pub fn screen(self) -> Screen {
+        match self {
+            Self::SpatialGaps
+            | Self::CenteringDynamics
+            | Self::ColumnManager
+            | Self::ScreenEdgeStruts
+            | Self::TabIndicator
+            | Self::InsertHint
+            | Self::NamedWorkspaces
+            | Self::PresetSizes => Screen::Layout,
+            Self::FocusRing
+            | Self::WindowBorder
+            | Self::WindowShadow
+            | Self::ModifierKeys
+            | Self::Animations
+            | Self::Cursor
+            | Self::Blur
+            | Self::WorkspaceBackground => Screen::Visuals,
+            Self::Overview => Screen::Dashboard,
+            Self::StartupPrograms
+            | Self::EnvironmentVars
+            | Self::Miscellaneous
+            | Self::SwitchEvents
+            | Self::Debug
+            | Self::RecentWindows => Screen::System,
+        }
+    }
+
+    /// Every section variant (keeps search coverage exhaustive).
+    pub const ALL: &'static [EditableSection] = &[
+        Self::SpatialGaps,
+        Self::CenteringDynamics,
+        Self::ColumnManager,
+        Self::ScreenEdgeStruts,
+        Self::TabIndicator,
+        Self::InsertHint,
+        Self::NamedWorkspaces,
+        Self::PresetSizes,
+        Self::FocusRing,
+        Self::WindowBorder,
+        Self::WindowShadow,
+        Self::ModifierKeys,
+        Self::Animations,
+        Self::Cursor,
+        Self::Blur,
+        Self::WorkspaceBackground,
+        Self::Overview,
+        Self::StartupPrograms,
+        Self::EnvironmentVars,
+        Self::Miscellaneous,
+        Self::SwitchEvents,
+        Self::Debug,
+        Self::RecentWindows,
+    ];
 }
 
 /// Sub-tab within the Gear screen

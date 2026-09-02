@@ -1,13 +1,18 @@
-//! Sidebar navigation component — redesigned with 7 screens + gear
+//! Sidebar navigation component — redesigned with 7 screens + gear + search
 
-use iced::widget::{button, column, container, text, Column, Space};
-use iced::{Element, Length};
+use iced::widget::{button, column, container, row, text, text_input, Column, Space};
+use iced::{Alignment, Element, Length};
 
 use crate::messages::{Message, Screen};
-use crate::theme::{fonts, sidebar_item_style, sidebar_style};
+use crate::theme::{fonts, search_container_style, sidebar_item_style, sidebar_style};
+use crate::views::navigation::search_input_id;
 
 /// Creates the sidebar navigation UI
-pub fn view(current_screen: Screen) -> Element<'static, Message> {
+pub fn view<'a>(
+    current_screen: Screen,
+    search_query: &'a str,
+    show_search_bar: bool,
+) -> Element<'a, Message> {
     let mut items = Column::new().spacing(4).padding([16, 12]);
 
     // App title
@@ -23,7 +28,44 @@ pub fn view(current_screen: Screen) -> Element<'static, Message> {
         .padding([0, 8]),
     );
 
-    items = items.push(Space::new().height(16));
+    items = items.push(Space::new().height(12));
+
+    // Search: inline field (default) or a button that opens the Ctrl+K modal
+    if show_search_bar {
+        items = items.push(
+            container(
+                row![
+                    text("🔍").size(13),
+                    text_input("Search settings...", search_query)
+                        .id(search_input_id())
+                        .on_input(Message::SearchQueryChanged)
+                        .on_submit(Message::SearchNavActivate)
+                        .padding([6, 8])
+                        .size(13)
+                        .width(Length::Fill),
+                ]
+                .spacing(6)
+                .align_y(Alignment::Center),
+            )
+            .padding([4, 6])
+            .width(Length::Fill)
+            .style(search_container_style),
+        );
+    } else {
+        items = items.push(
+            button(
+                row![text("🔍").size(13), text("Search").size(13)]
+                    .spacing(6)
+                    .align_y(Alignment::Center),
+            )
+            .on_press(Message::ToggleSearch)
+            .width(Length::Fill)
+            .padding([8, 12])
+            .style(sidebar_item_style(false)),
+        );
+    }
+
+    items = items.push(Space::new().height(12));
 
     // Main screen items
     for screen in Screen::sidebar_items() {
