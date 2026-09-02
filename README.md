@@ -62,7 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh
 curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --prefix=/usr
 
 # Install a specific version
-curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --version=0.2.7
+curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --version=0.4.0
 ```
 
 ### Using Make
@@ -103,10 +103,11 @@ On first launch, a setup wizard will guide you through connecting the app to you
    - Reorganize your config to use Nirify for managed options
    - Preserve any custom settings you've added
 
-2. **Manual setup**: Add this line to your `~/.config/niri/config.kdl`:
+2. **Manual setup**: Add this line to your `~/.config/niri/config.kdl` (put it last so Nirify wins override conflicts):
    ```kdl
-   include "~/.config/niri/nirify/main.kdl"
+   include "nirify/main.kdl"
    ```
+   This path is relative to `~/.config/niri/`. Do not use a `~/...` include: tilde expansion only works on niri 26.04+, and Nirify's documented minimum remains 25.11.
 
 ## Configuration Structure
 
