@@ -7,7 +7,7 @@ use iced::widget::{
 };
 use iced::{Alignment, Element, Length};
 
-use super::widgets::{info_text, toggle_row};
+use super::widgets::{gradient_picker, info_text, toggle_row};
 use crate::config::models::{
     DefaultColumnDisplay, LayoutExtrasSettings, PresetHeight, PresetWidth, TabIndicatorPosition,
 };
@@ -15,7 +15,7 @@ use crate::messages::{LayoutExtrasMessage, Message};
 use crate::theme::{fonts, neon};
 
 /// Creates the full layout extras view
-pub fn view(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
+pub fn view(settings: &LayoutExtrasSettings) -> Element<'_, Message> {
     let content = column![
         // ── ROW 1: SHADOWS | TAB INDICATOR (top) ──
         row![
@@ -280,12 +280,9 @@ pub fn shadow_section(settings: &LayoutExtrasSettings) -> Element<'static, Messa
 }
 
 /// Tab indicator settings
-pub fn tab_indicator_section(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
+pub fn tab_indicator_section(settings: &LayoutExtrasSettings) -> Element<'_, Message> {
     let tab = &settings.tab_indicator;
     let tab_length = (tab.length_proportion * 100.0) as i32;
-    let tab_active_color = tab.active.to_hex();
-    let tab_inactive_color = tab.inactive.to_hex();
-    let tab_urgent_color = tab.urgent.to_hex();
 
     column![
         modal_section("\u{25A4}", "TAB INDICATOR", neon::SECONDARY),
@@ -403,23 +400,32 @@ pub fn tab_indicator_section(settings: &LayoutExtrasSettings) -> Element<'static
         .style(crate::theme::card_style),
         Space::new().height(4),
         if tab.use_active_color {
-            color_input("ACTIVE COLOR", &tab_active_color, |s| {
-                Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorActiveColor(s))
-            })
+            gradient_picker(
+                "Active color",
+                "Color or gradient for the active tab indicator",
+                &tab.active,
+                |msg| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorActiveColor(msg)),
+            )
         } else {
             info_text("Active follows focus ring colors when off.")
         },
         if tab.use_inactive_color {
-            color_input("INACTIVE COLOR", &tab_inactive_color, |s| {
-                Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorInactiveColor(s))
-            })
+            gradient_picker(
+                "Inactive color",
+                "Color or gradient for the inactive tab indicator",
+                &tab.inactive,
+                |msg| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorInactiveColor(msg)),
+            )
         } else {
             info_text("Inactive follows focus ring colors when off.")
         },
         if tab.use_urgent_color {
-            color_input("URGENT COLOR", &tab_urgent_color, |s| {
-                Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorUrgentColor(s))
-            })
+            gradient_picker(
+                "Urgent color",
+                "Color or gradient for urgent tab indicators",
+                &tab.urgent,
+                |msg| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorUrgentColor(msg)),
+            )
         } else {
             info_text("niri default #9b0000 when off.")
         },
@@ -429,9 +435,8 @@ pub fn tab_indicator_section(settings: &LayoutExtrasSettings) -> Element<'static
 }
 
 /// Insert hint settings
-pub fn insert_hint_section(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
+pub fn insert_hint_section(settings: &LayoutExtrasSettings) -> Element<'_, Message> {
     let hint = &settings.insert_hint;
-    let hint_color = hint.color.to_hex();
 
     column![
         modal_section("\u{25C7}", "INSERT HINT", neon::TERTIARY),
@@ -448,9 +453,12 @@ pub fn insert_hint_section(settings: &LayoutExtrasSettings) -> Element<'static, 
         .padding(8)
         .style(crate::theme::card_style),
         Space::new().height(4),
-        color_input("HINT COLOR", &hint_color, |s| Message::LayoutExtras(
-            LayoutExtrasMessage::SetInsertHintColor(s)
-        ),),
+        gradient_picker(
+            "Hint color",
+            "Color or gradient shown when inserting a window",
+            &hint.color,
+            |msg| Message::LayoutExtras(LayoutExtrasMessage::SetInsertHintColor(msg)),
+        ),
     ]
     .spacing(6)
     .into()

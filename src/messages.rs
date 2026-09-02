@@ -1526,9 +1526,9 @@ pub enum LayoutExtrasMessage {
     SetTabIndicatorCornerRadius(i32),
     SetTabIndicatorGapsBetweenTabs(i32),
     SetTabIndicatorPosition(crate::config::models::TabIndicatorPosition),
-    SetTabIndicatorActiveColor(String),
-    SetTabIndicatorInactiveColor(String),
-    SetTabIndicatorUrgentColor(String),
+    SetTabIndicatorActiveColor(GradientPickerMessage),
+    SetTabIndicatorInactiveColor(GradientPickerMessage),
+    SetTabIndicatorUrgentColor(GradientPickerMessage),
 
     // Custom-color opt-ins: when off, niri falls back to focus-ring colors
     SetShadowUseInactiveColor(bool),
@@ -1538,7 +1538,7 @@ pub enum LayoutExtrasMessage {
 
     // Insert hint
     SetInsertHintEnabled(bool),
-    SetInsertHintColor(String),
+    SetInsertHintColor(GradientPickerMessage),
 
     // Preset widths/heights
     AddPresetWidth,
