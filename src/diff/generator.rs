@@ -38,7 +38,11 @@ fn generate_category_diff(
         SettingsCategory::Appearance => (
             "Appearance",
             paths.appearance_kdl.clone(),
-            generate_appearance_kdl(&settings.appearance, &settings.behavior),
+            generate_appearance_kdl_for_settings(
+                &settings.appearance,
+                &settings.behavior,
+                &settings.window_rules,
+            ),
         ),
         SettingsCategory::Behavior => (
             "Behavior",

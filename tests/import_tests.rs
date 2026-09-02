@@ -262,7 +262,45 @@ output "DP-1" {
     let output = &settings.outputs.outputs[0];
     assert_eq!(output.name, "DP-1");
     assert_eq!(output.mode, "2560x1440@144");
-    assert!((output.scale - 1.5).abs() < 0.01);
+    assert_eq!(output.scale, Some(1.5));
+}
+
+#[test]
+fn test_import_explicit_scale_1_is_some() {
+    let dir = tempdir().unwrap();
+    let config = dir.path().join("config.kdl");
+
+    fs::write(
+        &config,
+        r#"
+output "eDP-1" {
+    scale 1.0
+}
+"#,
+    )
+    .unwrap();
+
+    let settings = import_from_niri_config(&config);
+    assert_eq!(settings.outputs.outputs[0].scale, Some(1.0));
+}
+
+#[test]
+fn test_import_unset_scale_stays_none() {
+    let dir = tempdir().unwrap();
+    let config = dir.path().join("config.kdl");
+
+    fs::write(
+        &config,
+        r#"
+output "eDP-1" {
+    mode "1920x1080@60"
+}
+"#,
+    )
+    .unwrap();
+
+    let settings = import_from_niri_config(&config);
+    assert_eq!(settings.outputs.outputs[0].scale, None);
 }
 
 #[test]
@@ -311,6 +349,59 @@ window-rule {
 
     let settings = import_from_niri_config(&config);
     assert_eq!(settings.window_rules.rules.len(), 2);
+}
+
+#[test]
+fn test_import_catchall_window_rule_keeps_full_effects() {
+    let dir = tempdir().unwrap();
+    let config = dir.path().join("config.kdl");
+
+    fs::write(
+        &config,
+        r#"
+window-rule {
+    opacity 0.9
+    clip-to-geometry true
+    open-maximized true
+    open-floating false
+    draw-border-with-background false
+    geometry-corner-radius 12
+}
+window-rule {
+    match app-id="firefox"
+    opacity 0.95
+}
+"#,
+    )
+    .unwrap();
+
+    let settings = import_from_niri_config(&config);
+    assert_eq!(settings.window_rules.rules.len(), 2);
+
+    let catch_all = settings
+        .window_rules
+        .rules
+        .iter()
+        .find(|r| r.is_catch_all())
+        .expect("catch-all must be imported, not discarded");
+    assert_eq!(catch_all.opacity, Some(0.9));
+    assert_eq!(catch_all.clip_to_geometry, Some(true));
+    assert_eq!(catch_all.open_maximized, Some(true));
+    assert_eq!(catch_all.open_floating, Some(false));
+    assert_eq!(catch_all.draw_border_with_background, Some(false));
+    assert_eq!(
+        catch_all.corner_radius,
+        Some(nirify::config::models::CornerRadiusValue::uniform(12.0))
+    );
+    assert_eq!(settings.appearance.corner_radius, 12.0);
+
+    let matched = settings
+        .window_rules
+        .rules
+        .iter()
+        .find(|r| !r.is_catch_all())
+        .expect("matched rule still imported");
+    assert_eq!(matched.matches[0].app_id.as_deref(), Some("firefox"));
 }
 
 #[test]

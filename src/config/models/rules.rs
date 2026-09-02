@@ -289,6 +289,14 @@ pub struct WindowRuleMatch {
     pub at_startup: Option<bool>,
 }
 
+impl WindowRuleMatch {
+    /// True when this match has no criteria (niri treats it as catch-all).
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
 /// Position reference point for floating windows
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, SlintIndex)]
 pub enum PositionRelativeTo {
@@ -528,6 +536,17 @@ impl Default for WindowRule {
     }
 }
 
+impl WindowRule {
+    /// True when this rule has no match criteria (niri catch-all).
+    ///
+    /// The loader injects a default empty `match` when none is present, so
+    /// "no criteria" and "no match nodes" are the same catch-all identity.
+    #[must_use]
+    pub fn is_catch_all(&self) -> bool {
+        self.matches.iter().all(WindowRuleMatch::is_empty)
+    }
+}
+
 /// Window rules settings
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct WindowRulesSettings {
@@ -553,6 +572,57 @@ impl WindowRulesSettings {
         self.rules.retain(|r| r.id != id);
         self.rules.len() < len_before
     }
+
+    /// First catch-all (no-match) window-rule, if any.
+    #[must_use]
+    pub fn catch_all(&self) -> Option<&WindowRule> {
+        self.rules.iter().find(|r| r.is_catch_all())
+    }
+
+    /// First catch-all (no-match) window-rule, if any.
+    pub fn catch_all_mut(&mut self) -> Option<&mut WindowRule> {
+        self.rules.iter_mut().find(|r| r.is_catch_all())
+    }
+
+    /// True when a managed window-rule already acts as a niri catch-all.
+    #[must_use]
+    pub fn has_catch_all(&self) -> bool {
+        self.rules.iter().any(WindowRule::is_catch_all)
+    }
+}
+
+/// Copy `geometry-corner-radius` from the first catch-all into Appearance.
+///
+/// Appearance radius is a view over that distinguished catch-all. If the
+/// catch-all has no radius, the Appearance field is left unchanged.
+pub fn sync_appearance_radius_from_catch_all(
+    appearance: &mut super::appearance::AppearanceSettings,
+    window_rules: &WindowRulesSettings,
+) {
+    if let Some(rule) = window_rules.catch_all() {
+        if let Some(cr) = rule.corner_radius {
+            appearance.corner_radius = cr.top_left;
+        }
+    }
+}
+
+/// Write Appearance radius onto the first catch-all (creating none).
+///
+/// Used when the user edits the Appearance slider and a catch-all already
+/// exists, so we do not emit a second radius-only rule from `appearance.kdl`.
+pub fn apply_appearance_radius_to_catch_all(
+    appearance: &super::appearance::AppearanceSettings,
+    window_rules: &mut WindowRulesSettings,
+) -> bool {
+    let Some(rule) = window_rules.catch_all_mut() else {
+        return false;
+    };
+    rule.corner_radius = if appearance.corner_radius > 0.0 {
+        Some(CornerRadiusValue::uniform(appearance.corner_radius))
+    } else {
+        None
+    };
+    true
 }
 
 #[cfg(test)]
@@ -585,5 +655,19 @@ mod tests {
             bottom_left: 0.0,
         };
         assert!(!cr.is_uniform());
+    }
+
+    #[test]
+    fn catch_all_treats_empty_injected_match_as_global() {
+        let empty = WindowRule::default();
+        assert!(empty.is_catch_all());
+        let matched = WindowRule {
+            matches: vec![WindowRuleMatch {
+                app_id: Some("firefox".into()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert!(!matched.is_catch_all());
     }
 }

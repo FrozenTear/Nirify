@@ -564,6 +564,17 @@ fn format_modeline(modeline: &str) -> Option<String> {
     ))
 }
 
+/// Format an explicit output scale for KDL (`1.0`, `1.5`, `1.333333`).
+fn format_output_scale(scale: f64) -> String {
+    let formatted = format!("{:.6}", scale);
+    let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
+    if trimmed.contains('.') {
+        trimmed.to_string()
+    } else {
+        format!("{trimmed}.0")
+    }
+}
+
 /// Generate outputs.kdl from output settings
 pub fn generate_outputs_kdl(settings: &OutputSettings) -> String {
     // Pre-allocate ~1.5KB for outputs (multiple displays with new features)
@@ -599,8 +610,10 @@ pub fn generate_outputs_kdl(settings: &OutputSettings) -> String {
                 content.push_str("    off\n");
             }
             {
-                if (output.scale - 1.0).abs() > 0.001 {
-                    content.push_str(&format!("    scale {:.2}\n", output.scale));
+                // `None` = omit (niri auto-guess). `Some(1.0)` must be written:
+                // niri treats an unset scale as "guess from the monitor", not 1×.
+                if let Some(scale) = output.scale {
+                    content.push_str(&format!("    scale {}\n", format_output_scale(scale)));
                 }
 
                 // Mode with optional custom flag (v25.11+)
@@ -1036,7 +1049,7 @@ mod tests {
         let output = OutputConfig {
             name: "DP-8".into(),
             enabled: false,
-            scale: 2.0,
+            scale: Some(2.0),
             mode: "1920x1080@60".into(),
             position: Some((10, 20)),
             background_color: Some(Color::from_hex("#123456").unwrap()),
@@ -1048,10 +1061,42 @@ mod tests {
         assert!(kdl.contains("mode \"1920x1080@60\""), "{kdl}");
         assert!(kdl.contains("position x=10 y=20"), "{kdl}");
         assert!(!loaded.enabled, "{kdl}");
-        assert!((loaded.scale - 2.0).abs() < 1e-6, "{kdl}");
+        assert_eq!(loaded.scale, Some(2.0), "{kdl}");
         assert_eq!(loaded.mode, "1920x1080@60", "{kdl}");
         assert_eq!(loaded.position, Some((10, 20)), "{kdl}");
         assert_eq!(loaded.background_color, output.background_color, "{kdl}");
+    }
+
+    #[test]
+    fn explicit_scale_1_round_trips_and_is_written() {
+        // niri unset scale = auto-guess, not 1.0. An explicit 1× must survive.
+        let output = OutputConfig {
+            name: "eDP-1".into(),
+            scale: Some(1.0),
+            ..Default::default()
+        };
+        let (kdl, loaded) = roundtrip_output(&output);
+        assert!(
+            kdl.contains("scale 1.0") || kdl.contains("scale 1\n") || kdl.contains("scale 1 "),
+            "explicit 1.0 must be written, got:\n{kdl}"
+        );
+        assert_eq!(loaded.scale, Some(1.0), "{kdl}");
+    }
+
+    #[test]
+    fn unset_scale_is_omitted_and_stays_none() {
+        let output = OutputConfig {
+            name: "eDP-1".into(),
+            scale: None,
+            ..Default::default()
+        };
+        let (kdl, loaded) = roundtrip_output(&output);
+        assert!(
+            !kdl.lines()
+                .any(|line| line.trim_start().starts_with("scale ")),
+            "unset scale must be omitted so niri can auto-guess, got:\n{kdl}"
+        );
+        assert_eq!(loaded.scale, None, "{kdl}");
     }
 
     #[test]

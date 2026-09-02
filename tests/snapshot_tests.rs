@@ -280,7 +280,7 @@ fn snapshot_outputs_single() {
         outputs: vec![OutputConfig {
             name: "DP-1".to_string(),
             enabled: true,
-            scale: 1.5,
+            scale: Some(1.5),
             mode: "2560x1440@144".to_string(),
             position: Some((0, 0)),
             transform: Transform::Normal,
@@ -299,7 +299,7 @@ fn snapshot_outputs_multiple() {
             OutputConfig {
                 name: "DP-1".to_string(),
                 enabled: true,
-                scale: 2.0,
+                scale: Some(2.0),
                 mode: "3840x2160@60".to_string(),
                 position: Some((0, 0)),
                 transform: Transform::Normal,
@@ -309,7 +309,7 @@ fn snapshot_outputs_multiple() {
             OutputConfig {
                 name: "HDMI-A-1".to_string(),
                 enabled: true,
-                scale: 1.0,
+                scale: Some(1.0),
                 mode: "1920x1080@60".to_string(),
                 position: Some((3840, 0)),
                 transform: Transform::Rotate90,

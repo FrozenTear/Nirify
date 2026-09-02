@@ -502,6 +502,10 @@ pub fn load_settings_with_result(paths: &ConfigPaths) -> LoadResult {
         let status = read_kdl_file_with_status(&paths.window_rules_kdl);
         if status.document().is_some() {
             load_window_rules(&paths.window_rules_kdl, &mut result.settings);
+            crate::config::models::sync_appearance_radius_from_catch_all(
+                &mut result.settings.appearance,
+                &result.settings.window_rules,
+            );
         }
         result.track("advanced/window-rules.kdl", &status);
     }

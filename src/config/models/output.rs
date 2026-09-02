@@ -36,7 +36,10 @@ impl OutputHotCorners {
 pub struct OutputConfig {
     pub name: String,
     pub enabled: bool,
-    pub scale: f64,
+    /// Output scale. `None` = omit from KDL (niri auto-guesses from
+    /// physical size/resolution). `Some(1.0)` is an explicit 1× and must
+    /// be written — niri does **not** treat unset scale as 1.0.
+    pub scale: Option<f64>,
     pub mode: String, // e.g., "1920x1080@60.000"
     /// Whether mode uses custom=true flag (v25.11+)
     pub mode_custom: bool,
@@ -61,7 +64,7 @@ impl Default for OutputConfig {
         Self {
             name: String::new(),
             enabled: true,
-            scale: 1.0,
+            scale: None,
             mode: String::new(),
             mode_custom: false,
             modeline: None,
@@ -74,6 +77,18 @@ impl Default for OutputConfig {
             hot_corners: None,
             layout_override: None,
         }
+    }
+}
+
+impl OutputConfig {
+    /// Scale for UI sliders and logical-size estimates.
+    ///
+    /// Unset (`None`, niri auto-guess) displays as 1.0 until the user picks
+    /// an explicit value. Layout helpers should still prefer live IPC size
+    /// when available.
+    #[must_use]
+    pub fn display_scale(&self) -> f64 {
+        self.scale.unwrap_or(1.0)
     }
 }
 

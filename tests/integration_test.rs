@@ -238,7 +238,7 @@ fn test_output_settings_lifecycle() {
     settings.outputs.outputs.push(OutputConfig {
         name: "DP-1".to_string(),
         enabled: true,
-        scale: 1.5,
+        scale: Some(1.5),
         mode: "2560x1440@144".to_string(),
         position: Some((0, 0)),
         transform: Transform::Normal,
@@ -267,7 +267,7 @@ fn test_output_settings_lifecycle() {
         .find(|o| o.name == "DP-1")
         .unwrap();
     assert!(dp1.enabled);
-    assert!((dp1.scale - 1.5).abs() < 0.01);
+    assert_eq!(dp1.scale, Some(1.5));
     assert_eq!(dp1.mode, "2560x1440@144");
     assert_eq!(dp1.vrr, VrrMode::On);
     assert!(dp1.focus_at_startup);

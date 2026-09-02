@@ -131,7 +131,7 @@ impl super::super::App {
 
             M::SetScale(idx, value) => {
                 if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
-                    output.scale = value;
+                    output.scale = Some(value);
                 }
             }
 
