@@ -69,7 +69,7 @@ pub use input::{
     parse_tablet_from_children, parse_touch_from_children, parse_touchpad_from_children,
     parse_trackball_from_children, parse_trackpoint_from_children,
 };
-pub use keybindings::load_keybindings;
+pub use keybindings::{load_keybindings, load_keybindings_from_doc};
 pub use layout_extras::{load_layout_extras, parse_layout_extras_from_children};
 pub use misc::{load_misc, parse_misc_from_doc};
 pub use preferences::{load_preferences, parse_preferences_from_doc};
@@ -91,7 +91,9 @@ pub use health::{
 };
 
 // Re-export import module items
-pub use import::{import_from_niri_config, import_from_niri_config_with_result, ImportResult};
+pub use import::{
+    import_from_kdl_str, import_from_niri_config, import_from_niri_config_with_result, ImportResult,
+};
 
 // Re-export FileLoadStatus for tracking individual file load results
 pub use helpers::FileLoadStatus;

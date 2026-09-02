@@ -115,18 +115,28 @@ impl App {
             log::warn!("Failed to migrate include line: {}", e);
         }
 
-        // Ensure config.kdl is properly set up with include directive
-        // This replaces managed nodes with the include, preserving custom content
-        // Safe to call every time - it early-returns if no changes needed
+        // Absorb any hand-edited managed nodes still sitting in config.kdl
+        // into nirify/*.kdl, then strip them. Safe to call every time — it
+        // early-returns when there is nothing to merge or rewrite.
         if paths.niri_config.exists() && paths.managed_dir.exists() {
-            match crate::config::smart_replace_config(&paths.niri_config, &paths.backup_dir) {
+            // Version is not known yet (async IPC). all_enabled lets adopted
+            // blur/recent-windows files be written; main.kdl is not rewritten
+            // when it already exists.
+            match crate::config::absorb_stripped_nodes(
+                &paths,
+                crate::version::FeatureCompat::all_enabled(),
+            ) {
                 Ok(result) => {
-                    if result.replaced_count > 0 || result.include_added {
+                    if result.replace.replaced_count > 0
+                        || result.replace.include_added
+                        || !result.adopted.is_empty()
+                    {
                         log::info!(
-                            "Config updated: {} managed nodes replaced, {} preserved, include added: {}",
-                            result.replaced_count,
-                            result.preserved_count,
-                            result.include_added
+                            "Config updated: {} managed nodes replaced, {} preserved, include added: {}, {} categor(ies) absorbed",
+                            result.replace.replaced_count,
+                            result.replace.preserved_count,
+                            result.replace.include_added,
+                            result.adopted.len()
                         );
                     }
                 }
@@ -721,77 +731,39 @@ impl App {
             }
 
             Message::WizardSetupConfig => {
-                // Set up the config: create directories and add include line
+                // Import the user's current config *before* stripping managed
+                // nodes, then write those imported settings (not empty defaults).
                 log::info!("Wizard: Setting up config...");
 
-                // Ensure directories exist
-                if let Err(e) = self.paths.ensure_directories() {
-                    log::error!("Failed to create directories: {}", e);
-                    self.ui.dialog_state = DialogState::Error {
-                        title: "Setup Error".to_string(),
-                        message: "Failed to create configuration directories.".to_string(),
-                        details: Some(e.to_string()),
-                    };
-                    return Task::none();
-                }
-
-                // Create main.kdl immediately (before adding include line)
-                // This ensures niri can load the config even if the app crashes
-                // before the debounced save completes
-                if !self.paths.main_kdl.exists() {
-                    let main_kdl_content =
-                        crate::config::storage::generate_main_kdl(self.ui.feature_compat);
-                    if let Err(e) = crate::config::storage::atomic_write(
-                        &self.paths.main_kdl,
-                        &main_kdl_content,
-                    ) {
-                        log::error!("Failed to create main.kdl: {}", e);
-                        self.ui.dialog_state = DialogState::Error {
-                            title: "Setup Error".to_string(),
-                            message: "Failed to create main.kdl configuration file.".to_string(),
-                            details: Some(e.to_string()),
-                        };
-                        return Task::none();
-                    }
-                    log::info!("Created main.kdl");
-                }
-
-                // Replace user's config.kdl with our managed version
-                // This removes managed nodes and adds the include directive
-                match crate::config::smart_replace_config(
-                    &self.paths.niri_config,
-                    &self.paths.backup_dir,
-                ) {
+                match crate::config::first_run_setup(&self.paths, self.ui.feature_compat) {
                     Ok(result) => {
+                        log::info!("Wizard import: {}", result.import.summary());
+                        for warning in &result.import.warnings {
+                            log::warn!("Import warning: {}", warning);
+                        }
                         log::info!(
                             "Smart replace complete: {} nodes replaced, {} preserved, backup at {:?}",
-                            result.replaced_count,
-                            result.preserved_count,
-                            result.backup_path
+                            result.replace.replaced_count,
+                            result.replace.preserved_count,
+                            result.replace.backup_path
                         );
-                        for warning in &result.warnings {
+                        for warning in &result.replace.warnings {
                             log::warn!("Smart replace warning: {}", warning);
                         }
+                        self.ui.wizard_import =
+                            Some(ui_state::WizardImportSummary::from_import(&result.import));
+                        self.settings = result.import.settings;
                     }
                     Err(e) => {
-                        log::error!("Failed to replace config: {}", e);
+                        log::error!("Failed to set up config: {}", e);
                         self.ui.dialog_state = DialogState::Error {
                             title: "Setup Error".to_string(),
-                            message: "Failed to set up config.kdl.".to_string(),
+                            message: "Failed to import settings and set up config.kdl.".to_string(),
                             details: Some(e.to_string()),
                         };
                         return Task::none();
                     }
                 }
-
-                // Trigger initial save to create all config files
-                // Note: This is safe from race conditions because:
-                // 1. iced is single-threaded - this handler completes atomically
-                // 2. `App::should_save` enforces the 300ms debounce before the
-                //    periodic tick actually writes the dirty categories
-                // 3. We've already created main.kdl and config.kdl above
-                self.save.dirty_tracker.mark_all();
-                self.mark_changed();
 
                 log::info!("Wizard: Config setup complete");
 
@@ -1831,6 +1803,7 @@ impl App {
             &self.ui.wizard_suggestions,
             self.ui.niri_version,
             self.ui.pending_revert.as_ref(),
+            self.ui.wizard_import.as_ref(),
         ) {
             stack![base, dialog].into()
         } else {

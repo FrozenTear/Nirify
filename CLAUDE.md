@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Native Rust settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor. Uses **iced 0.14** for UI and manages KDL config files without modifying the user's main config directly.
+Native Rust settings application for the [niri](https://github.com/YaLTeR/niri) Wayland compositor. Uses **iced 0.14** for UI. Owns settings in `~/.config/niri/nirify/` and **does rewrite** the user's `config.kdl` via `smart_replace_config` (backup first, strip managed nodes, keep `include "nirify/main.kdl"` last).
 
 **Target users**: Non-technical users who don't want to edit KDL config files manually.
 
@@ -78,10 +78,15 @@ cargo build --release    # Release binary
 
 ### Takeover Strategy
 
-The app doesn't edit `config.kdl` directly. Instead:
-1. Manages config files in `~/.config/niri/nirify/`
-2. User adds one line to their config: `include "nirify/main.kdl"` (relative to `~/.config/niri/`; last so Nirify wins override conflicts)
-3. Each settings category = one `.kdl` file (appearance.kdl, behavior.kdl, input/keyboard.kdl, etc.)
+The app **does** rewrite `~/.config/niri/config.kdl` through `smart_replace_config`. It never edits that file without a backup.
+
+1. **Backup** `config.kdl` to `~/.config/niri/.nirify-backups/` first.
+2. **Import / absorb** managed nodes into in-memory settings:
+   - First run (wizard): `import_from_niri_config_with_result` reads the current `config.kdl` and user includes (Nirify includes are skipped), then those settings are written to `nirify/*.kdl`.
+   - Later launches: if `config.kdl` still has top-level managed nodes (hand-edits), they are merged into existing managed settings — adopt items/sections not already represented in `nirify/`; do **not** clobber intentional Nirify state with stale duplicates.
+3. **Strip** managed top-level nodes from `config.kdl` and preserve unmanaged / custom content.
+4. **Ensure** `include "nirify/main.kdl"` is the last top-level node (relative path; niri 25.11 does not expand `~`).
+5. Each settings category = one `.kdl` file under `~/.config/niri/nirify/` (`appearance.kdl`, `behavior.kdl`, `input/keyboard.kdl`, …).
 
 ### Code Structure
 

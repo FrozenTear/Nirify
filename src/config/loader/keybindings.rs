@@ -65,6 +65,13 @@ pub fn load_keybindings(niri_config_path: &Path, settings: &mut KeybindingsSetti
     for node in doc.nodes() {
         if node.name().value() == "include" {
             if let Some(include_path) = node.entries().first().and_then(|e| e.value().as_string()) {
+                if crate::config::replace::is_nirify_include_path(include_path) {
+                    debug!(
+                        "Skipping Nirify include while loading keybindings: {}",
+                        include_path
+                    );
+                    continue;
+                }
                 // resolve_include_path returns None if the path is outside allowed directories
                 let Some(resolved_path) = resolve_include_path(include_path, config_dir) else {
                     continue;
@@ -148,6 +155,22 @@ fn resolve_include_path(include_path: &str, config_dir: &Path) -> Option<PathBuf
         );
         None
     }
+}
+
+/// Load keybindings from a KDL document without following includes.
+pub fn load_keybindings_from_doc(doc: &KdlDocument, settings: &mut KeybindingsSettings) {
+    settings.bindings.clear();
+    settings.loaded = false;
+    settings.error = None;
+    settings.source_file = None;
+
+    let mut id_counter = 0u32;
+    if let Some(binds_node) = doc.get("binds") {
+        if let Some(binds_doc) = binds_node.children() {
+            parse_binds_block(binds_doc, &mut settings.bindings, &mut id_counter);
+        }
+    }
+    settings.loaded = !settings.bindings.is_empty();
 }
 
 /// Parse a binds block and extract all keybindings

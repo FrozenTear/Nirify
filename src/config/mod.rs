@@ -9,6 +9,7 @@ pub mod paths;
 pub mod registry;
 pub mod replace;
 pub mod storage;
+pub mod takeover;
 pub mod validation;
 
 pub use crate::types::CenterFocusedColumn;
@@ -17,7 +18,7 @@ pub use consolidation::{analyze_rules, ConsolidationAnalysis, ConsolidationSugge
 pub use dirty::{DirtyTracker, SettingsCategory};
 pub use error::ConfigError;
 pub use loader::{
-    check_config_health, ensure_required_files_exist, import_from_niri_config,
+    check_config_health, ensure_required_files_exist, import_from_kdl_str, import_from_niri_config,
     import_from_niri_config_with_result, load_settings, load_settings_with_result,
     repair_corrupted_configs, ConfigFileStatus, ConfigHealthReport, FileLoadStatus, ImportResult,
     LoadResult,
@@ -28,6 +29,12 @@ pub use models::{
 };
 pub use paths::ConfigPaths;
 pub use registry::ConfigFile;
-pub use replace::{smart_replace_config, SmartReplaceResult};
+pub use replace::{
+    analyze_config, is_managed_node, smart_replace_config, ConfigAnalysis, SmartReplaceResult,
+};
 pub use storage::{atomic_write, save_dirty, save_settings};
+pub use takeover::{
+    absorb_stripped_nodes, first_run_setup, merge_stripped_into_managed, AbsorbResult,
+    FirstRunSetupResult,
+};
 pub use validation::{validate_string, validate_string_opt};

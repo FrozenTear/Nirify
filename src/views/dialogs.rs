@@ -13,6 +13,7 @@ use iced::widget::{
 };
 use iced::{Alignment, Border, Color as IcedColor, Element, Length};
 
+use crate::app::ui_state::WizardImportSummary;
 use crate::messages::{ConfirmAction, ConsolidationSuggestion, DialogState, Message, WizardStep};
 use crate::version::{get_unsupported_features, NiriVersion};
 
@@ -119,6 +120,7 @@ pub fn view<'a>(
     wizard_suggestions: &'a [ConsolidationSuggestion],
     niri_version: Option<NiriVersion>,
     pending_revert: Option<&crate::app::ui_state::PendingRevert>,
+    wizard_import: Option<&'a WizardImportSummary>,
 ) -> Option<Element<'a, Message>> {
     match dialog {
         DialogState::None => None,
@@ -133,9 +135,12 @@ pub fn view<'a>(
             confirm_label,
             on_confirm,
         } => Some(confirm_dialog(title, message, confirm_label, on_confirm)),
-        DialogState::FirstRunWizard { step } => {
-            Some(wizard_dialog(step, wizard_suggestions, niri_version))
-        }
+        DialogState::FirstRunWizard { step } => Some(wizard_dialog(
+            step,
+            wizard_suggestions,
+            niri_version,
+            wizard_import,
+        )),
         DialogState::ImportSummary {
             imported_count,
             defaulted_count,
@@ -250,11 +255,12 @@ fn wizard_dialog<'a>(
     step: &WizardStep,
     wizard_suggestions: &'a [ConsolidationSuggestion],
     niri_version: Option<NiriVersion>,
+    wizard_import: Option<&'a WizardImportSummary>,
 ) -> Element<'a, Message> {
     let content: Column<'a, Message> = match step {
         WizardStep::Welcome => wizard_welcome(niri_version),
         WizardStep::ConfigSetup => wizard_config_setup(),
-        WizardStep::ImportResults => wizard_import_results(),
+        WizardStep::ImportResults => wizard_import_results(wizard_import),
         WizardStep::Consolidation => wizard_consolidation(wizard_suggestions),
         WizardStep::Complete => wizard_complete(),
         WizardStep::SkipWarning => wizard_skip_warning(),
@@ -356,16 +362,22 @@ fn wizard_welcome<'a>(niri_version: Option<NiriVersion>) -> Column<'a, Message> 
 fn wizard_config_setup<'a>() -> Column<'a, Message> {
     column![
         text("Config Setup").size(24),
-        text("Niri Settings uses a non-destructive approach to manage your config.")
+        text("Nirify will import your current settings, then take over those sections.")
             .size(14)
             .style(muted_text_style),
         container(
             column![
                 text("How it works:").size(13).style(accent_text_style),
-                text("1. We create separate .kdl files in a nirify/ subdirectory")
+                text("1. Your existing config.kdl (and includes) is imported into Nirify")
                     .size(12)
                     .style(muted_text_style),
-                text("2. One include line is added to your config.kdl:")
+                text("2. A timestamped backup is written to .nirify-backups/")
+                    .size(12)
+                    .style(muted_text_style),
+                text("3. Managed sections (layout, input, outputs, binds, …) move into nirify/")
+                    .size(12)
+                    .style(muted_text_style),
+                text("4. One include line is added last in config.kdl:")
                     .size(12)
                     .style(muted_text_style),
                 container(
@@ -374,7 +386,7 @@ fn wizard_config_setup<'a>() -> Column<'a, Message> {
                         .style(success_text_style)
                 )
                 .padding([4, 12]),
-                text("3. Your original config.kdl stays mostly untouched")
+                text("5. Unmanaged / custom nodes in config.kdl are preserved")
                     .size(12)
                     .style(muted_text_style),
             ]
@@ -382,7 +394,7 @@ fn wizard_config_setup<'a>() -> Column<'a, Message> {
         )
         .padding([12, 16])
         .style(info_box_style),
-        text("A backup of your config will be created before any changes.")
+        text("A backup of your config is always created before config.kdl is rewritten.")
             .size(12)
             .style(muted_text_style),
         row![
@@ -407,38 +419,94 @@ fn wizard_config_setup<'a>() -> Column<'a, Message> {
     .spacing(16)
 }
 
-fn wizard_import_results<'a>() -> Column<'a, Message> {
-    column![
+fn wizard_import_results<'a>(import: Option<&'a WizardImportSummary>) -> Column<'a, Message> {
+    let heading = import
+        .map(|i| i.summary.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("Configuration ready");
+
+    let mut imported_list = Column::new().spacing(4);
+    imported_list = imported_list.push(
+        text("What was imported from your config:")
+            .size(13)
+            .style(accent_text_style),
+    );
+    match import {
+        Some(i) if !i.imported_sections.is_empty() => {
+            for section in &i.imported_sections {
+                imported_list = imported_list.push(
+                    text(format!("  - {}", section))
+                        .size(12)
+                        .style(muted_text_style),
+                );
+            }
+            if i.includes_processed > 0 {
+                imported_list = imported_list.push(
+                    text(format!(
+                        "  ({} include file(s) processed)",
+                        i.includes_processed
+                    ))
+                    .size(11)
+                    .style(muted_text_style),
+                );
+            }
+        }
+        Some(i) => {
+            imported_list = imported_list.push(
+                text("No existing settings found in config.kdl; using defaults.")
+                    .size(12)
+                    .style(muted_text_style),
+            );
+            if i.defaulted_count > 0 {
+                imported_list = imported_list.push(
+                    text(format!(
+                        "{} section(s) used built-in defaults.",
+                        i.defaulted_count
+                    ))
+                    .size(11)
+                    .style(muted_text_style),
+                );
+            }
+        }
+        None => {
+            imported_list = imported_list.push(
+                text("Import results were not recorded. Your nirify/ files were written from the in-memory settings at setup time.")
+                    .size(12)
+                    .style(muted_text_style),
+            );
+        }
+    }
+
+    let mut content = column![
         text("Configuration Ready").size(24),
-        text("Your settings are now managed by Niri Settings.")
-            .size(14)
-            .style(muted_text_style),
-        container(
-            column![
-                text("What was set up:").size(13).style(accent_text_style),
-                text("  - Appearance, animations, and cursor settings")
-                    .size(12)
-                    .style(muted_text_style),
-                text("  - Input devices (keyboard, mouse, touchpad, etc.)")
-                    .size(12)
-                    .style(muted_text_style),
-                text("  - Window rules and layer rules")
-                    .size(12)
-                    .style(muted_text_style),
-                text("  - Keybindings and gestures")
-                    .size(12)
-                    .style(muted_text_style),
-                text("  - Workspaces, outputs, and layout settings")
-                    .size(12)
-                    .style(muted_text_style),
-            ]
-            .spacing(4)
-        )
-        .padding([12, 16])
-        .style(info_box_style),
+        text(heading).size(14).style(muted_text_style),
+        container(imported_list)
+            .padding([12, 16])
+            .style(info_box_style),
+    ]
+    .spacing(16);
+
+    if let Some(i) = import {
+        if !i.warnings.is_empty() {
+            let warnings_text = i.warnings.join("\n");
+            content = content.push(text("Warnings:").size(13).style(warning_text_style));
+            content = content.push(
+                scrollable(
+                    container(text(warnings_text).size(12))
+                        .padding(8)
+                        .style(warning_box_style),
+                )
+                .height(Length::Fixed(100.0)),
+            );
+        }
+    }
+
+    content = content.push(
         text("If you had existing window/layer rules, check the Tools page for consolidation suggestions.")
             .size(12)
             .style(muted_text_style),
+    );
+    content = content.push(
         row![
             button(text("Back"))
                 .on_press(Message::WizardBack)
@@ -456,9 +524,9 @@ fn wizard_import_results<'a>() -> Column<'a, Message> {
                     ..Default::default()
                 }),
         ]
-        .spacing(12)
-    ]
-    .spacing(16)
+        .spacing(12),
+    );
+    content
 }
 
 fn wizard_consolidation<'a>(suggestions: &'a [ConsolidationSuggestion]) -> Column<'a, Message> {

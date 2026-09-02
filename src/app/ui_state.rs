@@ -37,6 +37,28 @@ pub struct ErrorBanner {
     pub details: Vec<String>,
 }
 
+/// Slim copy of [`crate::config::ImportResult`] for the wizard results step.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct WizardImportSummary {
+    pub imported_sections: Vec<String>,
+    pub defaulted_count: usize,
+    pub warnings: Vec<String>,
+    pub includes_processed: usize,
+    pub summary: String,
+}
+
+impl WizardImportSummary {
+    pub fn from_import(result: &crate::config::ImportResult) -> Self {
+        Self {
+            imported_sections: result.imported_sections.clone(),
+            defaulted_count: result.defaulted_sections.len(),
+            warnings: result.warnings.clone(),
+            includes_processed: result.includes_processed,
+            summary: result.summary(),
+        }
+    }
+}
+
 /// A snapshot of a settings category taken before a risky live-applied change,
 /// so it can be restored if the user does not confirm within the countdown.
 #[derive(Debug, Clone)]
@@ -187,6 +209,8 @@ pub struct UiState {
     pub error_banner: Option<ErrorBanner>,
     /// Consolidation suggestions for the first-run wizard
     pub wizard_suggestions: Vec<crate::messages::ConsolidationSuggestion>,
+    /// Real import result from the wizard's "Set Up Config" step
+    pub wizard_import: Option<WizardImportSummary>,
     /// Pending apply-then-confirm revert (risky output/keybinding change)
     pub pending_revert: Option<PendingRevert>,
     /// Currently highlighted index in the search results list
