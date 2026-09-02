@@ -25,7 +25,10 @@ pub use calibration_matrix::{calibration_matrix, format_matrix_values, Calibrati
 pub use color_picker::{color_picker_row, color_picker_with_swatches};
 pub use expandable_section::expandable_section;
 pub use file_path::{browse_task, file_path_picker, FilePathMessage, FilePickerType};
-pub use gradient_picker::{gradient_picker, GradientPickerMessage};
+pub use gradient_picker::{
+    apply_gradient_message, apply_optional_gradient_message, gradient_picker,
+    optional_gradient_picker, GradientPickerMessage,
+};
 pub use key_capture::{
     format_key_combination, is_modifier_only, key_capture_row, KeyCaptureMessage, KeyCaptureState,
 };

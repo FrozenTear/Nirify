@@ -535,3 +535,56 @@ impl super::super::App {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::config::models::WindowRule;
+    use crate::types::{Color, ColorOrGradient, Gradient};
+    use crate::views::widgets::{apply_optional_gradient_message, GradientPickerMessage};
+
+    fn gradient() -> ColorOrGradient {
+        ColorOrGradient::Gradient(Gradient {
+            from: Color::from_hex("#112233").unwrap(),
+            to: Color::from_hex("#445566").unwrap(),
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn urgent_and_active_overrides_round_trip_as_gradients() {
+        let mut rule = WindowRule::default();
+        rule.focus_ring_urgent = Some(gradient());
+        rule.border_urgent = Some(gradient());
+        rule.focus_ring_active = Some(gradient());
+
+        apply_optional_gradient_message(
+            &mut rule.focus_ring_urgent,
+            GradientPickerMessage::SetFromColor("#abcdef".into()),
+        );
+        apply_optional_gradient_message(
+            &mut rule.border_urgent,
+            GradientPickerMessage::SetToColor("#fedcba".into()),
+        );
+        apply_optional_gradient_message(
+            &mut rule.focus_ring_active,
+            GradientPickerMessage::SetAngle(30),
+        );
+
+        assert!(
+            rule.focus_ring_urgent
+                .as_ref()
+                .is_some_and(|c| c.is_gradient()),
+            "focus ring urgent flattened"
+        );
+        assert!(
+            rule.border_urgent.as_ref().is_some_and(|c| c.is_gradient()),
+            "border urgent flattened"
+        );
+        assert!(
+            rule.focus_ring_active
+                .as_ref()
+                .is_some_and(|c| c.is_gradient()),
+            "focus ring active flattened"
+        );
+    }
+}
