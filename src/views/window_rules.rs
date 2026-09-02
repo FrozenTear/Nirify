@@ -2066,7 +2066,7 @@ fn color_or_gradient_to_niri(cog: Option<&ColorOrGradient>) -> NiriColor {
     match cog {
         Some(ColorOrGradient::Color(c)) => *c,
         Some(ColorOrGradient::Gradient(g)) => g.from,
-        None => NiriColor {
+        Some(ColorOrGradient::Raw(_)) | None => NiriColor {
             r: 128,
             g: 128,
             b: 128,

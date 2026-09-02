@@ -326,31 +326,30 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
         content.push_str(&format!("{}focus-ring {{\n", inner_indent));
         if layout.focus_ring_enabled == Some(false) {
             content.push_str(&format!("{}off\n", deep_indent));
-        } else {
-            if let Some(w) = layout.focus_ring_width {
-                content.push_str(&format!("{}width {}\n", deep_indent, w));
-            }
-            if let Some(ColorOrGradient::Color(color)) = &layout.focus_ring_active {
-                content.push_str(&format!(
-                    "{}active-color \"{}\"\n",
-                    deep_indent,
-                    color.to_hex()
-                ));
-            }
-            if let Some(ColorOrGradient::Color(color)) = &layout.focus_ring_inactive {
-                content.push_str(&format!(
-                    "{}inactive-color \"{}\"\n",
-                    deep_indent,
-                    color.to_hex()
-                ));
-            }
-            if let Some(ColorOrGradient::Color(color)) = &layout.focus_ring_urgent {
-                content.push_str(&format!(
-                    "{}urgent-color \"{}\"\n",
-                    deep_indent,
-                    color.to_hex()
-                ));
-            }
+        }
+        if let Some(w) = layout.focus_ring_width {
+            content.push_str(&format!("{}width {}\n", deep_indent, w));
+        }
+        if let Some(ref cog) = layout.focus_ring_active {
+            content.push_str(&format!(
+                "{}{}\n",
+                deep_indent,
+                color_or_gradient_to_kdl(cog, "active")
+            ));
+        }
+        if let Some(ref cog) = layout.focus_ring_inactive {
+            content.push_str(&format!(
+                "{}{}\n",
+                deep_indent,
+                color_or_gradient_to_kdl(cog, "inactive")
+            ));
+        }
+        if let Some(ref cog) = layout.focus_ring_urgent {
+            content.push_str(&format!(
+                "{}{}\n",
+                deep_indent,
+                color_or_gradient_to_kdl(cog, "urgent")
+            ));
         }
         content.push_str(&format!("{}}}\n", inner_indent));
     }
@@ -365,31 +364,30 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
         content.push_str(&format!("{}border {{\n", inner_indent));
         if layout.border_enabled == Some(false) {
             content.push_str(&format!("{}off\n", deep_indent));
-        } else {
-            if let Some(w) = layout.border_width {
-                content.push_str(&format!("{}width {}\n", deep_indent, w));
-            }
-            if let Some(ColorOrGradient::Color(color)) = &layout.border_active {
-                content.push_str(&format!(
-                    "{}active-color \"{}\"\n",
-                    deep_indent,
-                    color.to_hex()
-                ));
-            }
-            if let Some(ColorOrGradient::Color(color)) = &layout.border_inactive {
-                content.push_str(&format!(
-                    "{}inactive-color \"{}\"\n",
-                    deep_indent,
-                    color.to_hex()
-                ));
-            }
-            if let Some(ColorOrGradient::Color(color)) = &layout.border_urgent {
-                content.push_str(&format!(
-                    "{}urgent-color \"{}\"\n",
-                    deep_indent,
-                    color.to_hex()
-                ));
-            }
+        }
+        if let Some(w) = layout.border_width {
+            content.push_str(&format!("{}width {}\n", deep_indent, w));
+        }
+        if let Some(ref cog) = layout.border_active {
+            content.push_str(&format!(
+                "{}{}\n",
+                deep_indent,
+                color_or_gradient_to_kdl(cog, "active")
+            ));
+        }
+        if let Some(ref cog) = layout.border_inactive {
+            content.push_str(&format!(
+                "{}{}\n",
+                deep_indent,
+                color_or_gradient_to_kdl(cog, "inactive")
+            ));
+        }
+        if let Some(ref cog) = layout.border_urgent {
+            content.push_str(&format!(
+                "{}{}\n",
+                deep_indent,
+                color_or_gradient_to_kdl(cog, "urgent")
+            ));
         }
         content.push_str(&format!("{}}}\n", inner_indent));
     }
@@ -514,6 +512,9 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
                     deep_indent,
                     gradient_node_to_kdl(g, "gradient")
                 ));
+            }
+            ColorOrGradient::Raw(raw) => {
+                content.push_str(&format!("{}{}\n", deep_indent, raw));
             }
         }
         content.push_str(&format!("{}}}\n", inner_indent));
@@ -771,6 +772,43 @@ mod tests {
             got.always_center_single_column, lo.always_center_single_column,
             "{kdl}"
         );
+    }
+
+    #[test]
+    fn test_layout_override_gradients_round_trip() {
+        use crate::types::{Color, ColorOrGradient, ColorSpace, Gradient, GradientRelativeTo};
+        let gradient = ColorOrGradient::Gradient(Gradient {
+            from: Color::from_hex("#80c8ff").unwrap(),
+            to: Color::from_hex("#bbddff").unwrap(),
+            angle: 90,
+            relative_to: GradientRelativeTo::Window,
+            color_space: ColorSpace::Srgb,
+            hue_interpolation: None,
+        });
+        let lo = LayoutOverride {
+            focus_ring_active: Some(gradient.clone()),
+            focus_ring_inactive: Some(ColorOrGradient::Color(Color::from_hex("#333333").unwrap())),
+            focus_ring_urgent: Some(gradient.clone()),
+            border_active: Some(gradient.clone()),
+            border_urgent: Some(gradient.clone()),
+            ..Default::default()
+        };
+        let output = OutputConfig {
+            name: "DP-grad".into(),
+            layout_override: Some(lo.clone()),
+            ..Default::default()
+        };
+        let (kdl, loaded) = roundtrip_output(&output);
+        assert!(kdl.contains("active-gradient"), "{kdl}");
+        assert!(kdl.contains("urgent-gradient"), "{kdl}");
+        let got = loaded
+            .layout_override
+            .expect("override survives round-trip");
+        assert_eq!(got.focus_ring_active, lo.focus_ring_active, "{kdl}");
+        assert_eq!(got.focus_ring_inactive, lo.focus_ring_inactive, "{kdl}");
+        assert_eq!(got.focus_ring_urgent, lo.focus_ring_urgent, "{kdl}");
+        assert_eq!(got.border_active, lo.border_active, "{kdl}");
+        assert_eq!(got.border_urgent, lo.border_urgent, "{kdl}");
     }
 
     #[test]

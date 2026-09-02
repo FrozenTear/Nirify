@@ -5,6 +5,7 @@
 //! disabled nodes are renamed so the kdl crate parses them as real nodes, which
 //! preserves document order and is immune to braces inside strings/comments.
 
+use super::gradient::load_color_or_gradient;
 use super::helpers::{
     parse_color, preprocess_disabled_rules, read_raw_file, unslashdash_gated_content,
 };
@@ -15,7 +16,6 @@ use crate::config::models::{
 };
 use crate::config::parser::{get_f64, get_i64, get_string, has_flag, parse_document};
 use crate::config::validation::validate_regex_pattern;
-use crate::types::ColorOrGradient;
 use kdl::{KdlDocument, KdlNode};
 use log::{debug, warn};
 use std::path::Path;
@@ -248,20 +248,6 @@ fn parse_popups(node: &KdlNode) -> Option<PopupsSettings> {
         None
     } else {
         Some(p)
-    }
-}
-
-/// Warn (once) if focus-ring/border/tab-indicator gradient children are present.
-fn warn_gradients(ch: &KdlDocument, context: &str) {
-    if ch.get("active-gradient").is_some()
-        || ch.get("inactive-gradient").is_some()
-        || ch.get("urgent-gradient").is_some()
-    {
-        warn!(
-            "{} gradient children are preserved by niri but not editable in Nirify \
-             and will be dropped if this rule is re-saved",
-            context
-        );
     }
 }
 
@@ -630,22 +616,9 @@ pub fn parse_window_rule_node_children(children: &KdlDocument, rule: &mut Window
             if let Some(v) = get_i64(ch, &["width"]) {
                 rule.focus_ring_width = safe_i64_to_i32(v, "focus-ring width");
             }
-            if let Some(hex) = get_string(ch, &["active-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    rule.focus_ring_active = Some(ColorOrGradient::Color(c));
-                }
-            }
-            if let Some(hex) = get_string(ch, &["inactive-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    rule.focus_ring_inactive = Some(ColorOrGradient::Color(c));
-                }
-            }
-            if let Some(hex) = get_string(ch, &["urgent-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    rule.focus_ring_urgent = Some(ColorOrGradient::Color(c));
-                }
-            }
-            warn_gradients(ch, "focus-ring");
+            rule.focus_ring_active = load_color_or_gradient(ch, "active");
+            rule.focus_ring_inactive = load_color_or_gradient(ch, "inactive");
+            rule.focus_ring_urgent = load_color_or_gradient(ch, "urgent");
         }
     }
 
@@ -660,22 +633,9 @@ pub fn parse_window_rule_node_children(children: &KdlDocument, rule: &mut Window
             if let Some(v) = get_i64(ch, &["width"]) {
                 rule.border_width = safe_i64_to_i32(v, "border width");
             }
-            if let Some(hex) = get_string(ch, &["active-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    rule.border_active = Some(ColorOrGradient::Color(c));
-                }
-            }
-            if let Some(hex) = get_string(ch, &["inactive-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    rule.border_inactive = Some(ColorOrGradient::Color(c));
-                }
-            }
-            if let Some(hex) = get_string(ch, &["urgent-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    rule.border_urgent = Some(ColorOrGradient::Color(c));
-                }
-            }
-            warn_gradients(ch, "border");
+            rule.border_active = load_color_or_gradient(ch, "active");
+            rule.border_inactive = load_color_or_gradient(ch, "inactive");
+            rule.border_urgent = load_color_or_gradient(ch, "urgent");
         }
     }
 
@@ -715,22 +675,9 @@ pub fn parse_window_rule_node_children(children: &KdlDocument, rule: &mut Window
     if let Some(ti_node) = children.get("tab-indicator") {
         if let Some(ch) = ti_node.children() {
             let mut ti = TabIndicatorOverride::default();
-            if let Some(hex) = get_string(ch, &["active-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    ti.active = Some(ColorOrGradient::Color(c));
-                }
-            }
-            if let Some(hex) = get_string(ch, &["inactive-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    ti.inactive = Some(ColorOrGradient::Color(c));
-                }
-            }
-            if let Some(hex) = get_string(ch, &["urgent-color"]) {
-                if let Some(c) = parse_color(&hex) {
-                    ti.urgent = Some(ColorOrGradient::Color(c));
-                }
-            }
-            warn_gradients(ch, "tab-indicator");
+            ti.active = load_color_or_gradient(ch, "active");
+            ti.inactive = load_color_or_gradient(ch, "inactive");
+            ti.urgent = load_color_or_gradient(ch, "urgent");
             if !ti.is_empty() {
                 rule.tab_indicator = Some(ti);
             }
