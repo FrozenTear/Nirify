@@ -340,6 +340,25 @@ mod tests {
     }
 
     #[test]
+    fn canvas_prefers_live_reported_logical_size() {
+        let outputs = OutputSettings {
+            outputs: vec![OutputConfig {
+                name: "DP-1".to_string(),
+                mode: "3840x2160@60.00".to_string(),
+                scale: 1.0,
+                position: Some((0, 0)),
+                ..Default::default()
+            }],
+        };
+        let mut info = ipc_output("DP-1", 0, 0, 1.0, "Normal", 3840, 2160);
+        if let Some(logical) = info.logical.as_mut() {
+            logical.width = Some(1920);
+            logical.height = Some(1080);
+        }
+        assert_eq!(calculate_canvas_size(&outputs, &[info]), (1920, 1080));
+    }
+
+    #[test]
     fn canvas_size_uses_logical_not_physical_pixels() {
         let outputs = OutputSettings {
             outputs: vec![OutputConfig {
