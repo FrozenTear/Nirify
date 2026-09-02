@@ -12,7 +12,7 @@ use crate::config::models::{DefaultColumnDisplay, LayoutOverride, OutputConfig, 
 use crate::ipc::FullOutputInfo;
 use crate::messages::{Message, OutputsMessage};
 use crate::theme::{fonts, muted_text_container};
-use crate::types::{CenterFocusedColumn, Color, ColorOrGradient, Transform, VrrMode};
+use crate::types::{CenterFocusedColumn, Color, Transform, VrrMode};
 
 /// Represents an available display mode for dropdown selection
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -780,18 +780,27 @@ fn focus_ring_card(lo: &LayoutOverride, idx: usize) -> Element<'_, Message> {
                     move |v| set_lo_field(&lo_c, idx, |o| o.focus_ring_width = v.map(|f| f as i32)),
                 )
             },
-            optional_color_or_gradient_row(
+            optional_gradient_picker(
                 "Active Color",
-                "Color of the focus ring on the focused window",
+                "Color or gradient of the focus ring on the focused window",
                 lo.focus_ring_active.as_ref(),
                 move |v| set_lo_field(&lo2, idx, |o| o.focus_ring_active = v),
             ),
-            optional_color_or_gradient_row(
+            optional_gradient_picker(
                 "Inactive Color",
-                "Color of the focus ring on unfocused windows",
+                "Color or gradient of the focus ring on unfocused windows",
                 lo.focus_ring_inactive.as_ref(),
                 move |v| set_lo_field(&lo3, idx, |o| o.focus_ring_inactive = v),
             ),
+            {
+                let lo_u = lo.clone();
+                optional_gradient_picker(
+                    "Urgent Color",
+                    "Color or gradient of the focus ring on urgent windows",
+                    lo.focus_ring_urgent.as_ref(),
+                    move |v| set_lo_field(&lo_u, idx, |o| o.focus_ring_urgent = v),
+                )
+            },
         ]
         .spacing(4),
     )
@@ -824,18 +833,27 @@ fn border_card(lo: &LayoutOverride, idx: usize) -> Element<'_, Message> {
                     move |v| set_lo_field(&lo_c, idx, |o| o.border_width = v.map(|f| f as i32)),
                 )
             },
-            optional_color_or_gradient_row(
+            optional_gradient_picker(
                 "Active Color",
-                "Border color on the focused window",
+                "Color or gradient of the border on the focused window",
                 lo.border_active.as_ref(),
                 move |v| set_lo_field(&lo2, idx, |o| o.border_active = v),
             ),
-            optional_color_or_gradient_row(
+            optional_gradient_picker(
                 "Inactive Color",
-                "Border color on unfocused windows",
+                "Color or gradient of the border on unfocused windows",
                 lo.border_inactive.as_ref(),
                 move |v| set_lo_field(&lo3, idx, |o| o.border_inactive = v),
             ),
+            {
+                let lo_u = lo.clone();
+                optional_gradient_picker(
+                    "Urgent Color",
+                    "Color or gradient of the border on urgent windows",
+                    lo.border_urgent.as_ref(),
+                    move |v| set_lo_field(&lo_u, idx, |o| o.border_urgent = v),
+                )
+            },
         ]
         .spacing(4),
     )
@@ -982,88 +1000,6 @@ fn optional_color_row<'a>(
                 .spacing(8)
                 .align_y(Alignment::Center),
         );
-    }
-
-    content.into()
-}
-
-/// Optional color-or-gradient row for `Option<ColorOrGradient>` fields
-///
-/// Shows a toggler to enable/disable. When enabled, shows a hex color input.
-/// Only supports solid colors in the UI; gradients set via KDL are preserved
-/// until the user changes the color.
-fn optional_color_or_gradient_row<'a>(
-    label: &'a str,
-    description: &'a str,
-    value: Option<&ColorOrGradient>,
-    on_change: impl Fn(Option<ColorOrGradient>) -> Message + Clone + 'a,
-) -> Element<'a, Message> {
-    let is_enabled = value.is_some();
-    let color = value.map(|cog| *cog.primary_color()).unwrap_or_default();
-    let hex_value = color.to_hex();
-    let is_gradient = value.map(|v| v.is_gradient()).unwrap_or(false);
-
-    let on_change_toggle = on_change.clone();
-    let on_change_input = on_change.clone();
-
-    let mut content = column![row![
-        column![
-            text(label).size(15).font(fonts::UI_FONT_MEDIUM),
-            container(text(description).size(11)).style(muted_text_container),
-        ]
-        .spacing(2)
-        .width(Length::Fill),
-        toggler(is_enabled).on_toggle(move |enabled| {
-            if enabled {
-                on_change_toggle(Some(ColorOrGradient::Color(Color::default())))
-            } else {
-                on_change_toggle(None)
-            }
-        }),
-    ]
-    .spacing(12)
-    .align_y(Alignment::Center),]
-    .spacing(6)
-    .padding(12);
-
-    if is_enabled {
-        let preview_color = IcedColor::from_rgb8(color.r, color.g, color.b);
-        let preview = container(text(""))
-            .width(Length::Fixed(32.0))
-            .height(Length::Fixed(32.0))
-            .style(move |_theme: &iced::Theme| container::Style {
-                background: Some(iced::Background::Color(preview_color)),
-                border: Border {
-                    color: IcedColor::from_rgb(0.4, 0.4, 0.4),
-                    width: 1.0,
-                    radius: 4.0.into(),
-                },
-                ..Default::default()
-            });
-
-        let hex_input = text_input("", &hex_value)
-            .on_input(move |hex| {
-                if let Some(c) = Color::from_hex(&hex) {
-                    on_change_input(Some(ColorOrGradient::Color(c)))
-                } else {
-                    Message::NoOp
-                }
-            })
-            .padding(8)
-            .width(Length::Fixed(100.0))
-            .font(fonts::MONO_FONT);
-
-        let mut input_row = row![preview, hex_input]
-            .spacing(8)
-            .align_y(Alignment::Center);
-
-        if is_gradient {
-            input_row = input_row.push(
-                container(text("gradient (edit via KDL)").size(11)).style(muted_text_container),
-            );
-        }
-
-        content = content.push(input_row);
     }
 
     content.into()

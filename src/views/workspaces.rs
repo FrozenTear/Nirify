@@ -13,7 +13,7 @@ use crate::messages::{Message, WorkspacesMessage};
 use crate::theme::muted_text_container;
 
 /// Creates the workspaces settings view
-pub fn view(settings: &WorkspacesSettings) -> Element<'static, Message> {
+pub fn view(settings: &WorkspacesSettings) -> Element<'_, Message> {
     let mut content = column![
         page_title("Named Workspaces"),
         info_text(
@@ -185,7 +185,7 @@ fn wo_update(lo: &LayoutOverride, idx: usize, mutate: impl FnOnce(&mut LayoutOve
 }
 
 /// Per-workspace layout override editor (mirrors the per-output editor).
-fn layout_override_editor(workspace: &NamedWorkspace, idx: usize) -> Element<'static, Message> {
+fn layout_override_editor(workspace: &NamedWorkspace, idx: usize) -> Element<'_, Message> {
     let Some(lo) = workspace.layout_override.as_ref() else {
         return column![
             container(text("Layout override: inherits global layout").size(13))
@@ -237,6 +237,13 @@ fn layout_override_editor(workspace: &NamedWorkspace, idx: usize) -> Element<'st
         move |v| wo_update(&lo_center, idx, |l| l.always_center_single_column = Some(v)),
     );
 
+    let lo_fr_a = lo.clone();
+    let lo_fr_i = lo.clone();
+    let lo_fr_u = lo.clone();
+    let lo_br_a = lo.clone();
+    let lo_br_i = lo.clone();
+    let lo_br_u = lo.clone();
+
     card(
         column![
             row![
@@ -252,6 +259,45 @@ fn layout_override_editor(workspace: &NamedWorkspace, idx: usize) -> Element<'st
             .align_y(Alignment::Center),
             row![gaps_input, disp_picker].spacing(16),
             center_toggle,
+            info_text(
+                "Color overrides use the same gradient picker as Appearance. Leave off to inherit."
+            ),
+            optional_gradient_picker(
+                "Focus ring active",
+                "Color or gradient for the active focus ring on this workspace",
+                lo.focus_ring_active.as_ref(),
+                move |v| wo_update(&lo_fr_a, idx, |l| l.focus_ring_active = v),
+            ),
+            optional_gradient_picker(
+                "Focus ring inactive",
+                "Color or gradient for the inactive focus ring on this workspace",
+                lo.focus_ring_inactive.as_ref(),
+                move |v| wo_update(&lo_fr_i, idx, |l| l.focus_ring_inactive = v),
+            ),
+            optional_gradient_picker(
+                "Focus ring urgent",
+                "Color or gradient for the urgent focus ring on this workspace",
+                lo.focus_ring_urgent.as_ref(),
+                move |v| wo_update(&lo_fr_u, idx, |l| l.focus_ring_urgent = v),
+            ),
+            optional_gradient_picker(
+                "Border active",
+                "Color or gradient for the active border on this workspace",
+                lo.border_active.as_ref(),
+                move |v| wo_update(&lo_br_a, idx, |l| l.border_active = v),
+            ),
+            optional_gradient_picker(
+                "Border inactive",
+                "Color or gradient for the inactive border on this workspace",
+                lo.border_inactive.as_ref(),
+                move |v| wo_update(&lo_br_i, idx, |l| l.border_inactive = v),
+            ),
+            optional_gradient_picker(
+                "Border urgent",
+                "Color or gradient for the urgent border on this workspace",
+                lo.border_urgent.as_ref(),
+                move |v| wo_update(&lo_br_u, idx, |l| l.border_urgent = v),
+            ),
         ]
         .spacing(10)
         .padding(12)

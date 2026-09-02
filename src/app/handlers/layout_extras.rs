@@ -1,8 +1,8 @@
 //! Layout extras settings message handler
 
+use crate::app::helpers::apply_gradient_message;
 use crate::config::SettingsCategory;
 use crate::messages::{LayoutExtrasMessage, Message};
-use crate::types::ColorOrGradient;
 use iced::Task;
 
 impl super::super::App {
@@ -60,23 +60,17 @@ impl super::super::App {
                 layout.tab_indicator.gaps_between_tabs = v.clamp(0, 50)
             }
             LayoutExtrasMessage::SetTabIndicatorPosition(v) => layout.tab_indicator.position = v,
-            LayoutExtrasMessage::SetTabIndicatorActiveColor(hex) => {
-                if let Some(color) = crate::types::Color::from_hex(&hex) {
-                    layout.tab_indicator.active = ColorOrGradient::Color(color);
-                    layout.tab_indicator.use_active_color = true;
-                }
+            LayoutExtrasMessage::SetTabIndicatorActiveColor(msg) => {
+                apply_gradient_message(&mut layout.tab_indicator.active, msg);
+                layout.tab_indicator.use_active_color = true;
             }
-            LayoutExtrasMessage::SetTabIndicatorInactiveColor(hex) => {
-                if let Some(color) = crate::types::Color::from_hex(&hex) {
-                    layout.tab_indicator.inactive = ColorOrGradient::Color(color);
-                    layout.tab_indicator.use_inactive_color = true;
-                }
+            LayoutExtrasMessage::SetTabIndicatorInactiveColor(msg) => {
+                apply_gradient_message(&mut layout.tab_indicator.inactive, msg);
+                layout.tab_indicator.use_inactive_color = true;
             }
-            LayoutExtrasMessage::SetTabIndicatorUrgentColor(hex) => {
-                if let Some(color) = crate::types::Color::from_hex(&hex) {
-                    layout.tab_indicator.urgent = ColorOrGradient::Color(color);
-                    layout.tab_indicator.use_urgent_color = true;
-                }
+            LayoutExtrasMessage::SetTabIndicatorUrgentColor(msg) => {
+                apply_gradient_message(&mut layout.tab_indicator.urgent, msg);
+                layout.tab_indicator.use_urgent_color = true;
             }
             LayoutExtrasMessage::SetTabIndicatorUseActiveColor(v) => {
                 layout.tab_indicator.use_active_color = v
@@ -90,10 +84,8 @@ impl super::super::App {
 
             // Insert hint
             LayoutExtrasMessage::SetInsertHintEnabled(v) => layout.insert_hint.enabled = v,
-            LayoutExtrasMessage::SetInsertHintColor(hex) => {
-                if let Some(color) = crate::types::Color::from_hex(&hex) {
-                    layout.insert_hint.color = ColorOrGradient::Color(color);
-                }
+            LayoutExtrasMessage::SetInsertHintColor(msg) => {
+                apply_gradient_message(&mut layout.insert_hint.color, msg);
             }
 
             // Preset widths/heights
@@ -135,5 +127,47 @@ impl super::super::App {
         self.save.dirty_tracker.mark(SettingsCategory::LayoutExtras);
         self.mark_changed();
         Task::none()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::models::LayoutExtrasSettings;
+    use crate::types::{Color, ColorOrGradient, Gradient};
+    use crate::views::widgets::{apply_gradient_message, GradientPickerMessage};
+
+    fn gradient() -> ColorOrGradient {
+        ColorOrGradient::Gradient(Gradient {
+            from: Color::from_hex("#ff0000").unwrap(),
+            to: Color::from_hex("#0000ff").unwrap(),
+            angle: 45,
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn tab_and_insert_hint_edits_keep_imported_gradients() {
+        let mut layout = LayoutExtrasSettings::default();
+        layout.tab_indicator.urgent = gradient();
+        layout.insert_hint.color = gradient();
+
+        apply_gradient_message(
+            &mut layout.tab_indicator.urgent,
+            GradientPickerMessage::SetFromColor("#00ff00".into()),
+        );
+        apply_gradient_message(
+            &mut layout.insert_hint.color,
+            GradientPickerMessage::SetToColor("#ffffff".into()),
+        );
+
+        assert!(layout.tab_indicator.urgent.is_gradient());
+        assert!(layout.insert_hint.color.is_gradient());
+        match &layout.tab_indicator.urgent {
+            ColorOrGradient::Gradient(g) => {
+                assert_eq!(g.from, Color::from_hex("#00ff00").unwrap());
+                assert_eq!(g.angle, 45);
+            }
+            ColorOrGradient::Color(_) => panic!("tab urgent flattened"),
+        }
     }
 }

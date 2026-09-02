@@ -60,7 +60,7 @@ pub fn view<'a>(
             ]),
             summary_card(EditableSection::InsertHint, vec![
                 ("Enabled", if layout_extras.insert_hint.enabled { "On" } else { "Off" }.to_string()),
-                ("Color", layout_extras.insert_hint.color.to_hex()),
+                ("Color", layout_extras.insert_hint.color.display_label()),
             ]),
         ].spacing(12).align_y(Alignment::Start),
         Space::new().height(12),
