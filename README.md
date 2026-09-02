@@ -155,6 +155,14 @@ The settings app has its own preferences (separate from niri config):
 
 These can be changed in the **Tools** page under "App Preferences".
 
+## Gradient round-trip
+
+Nirify models niri’s 2-stop linear gradients (`active-gradient` / `inactive-gradient` / `urgent-gradient`, plus insert-hint `gradient`) so load → save does not flatten or drop them. Supported properties: `from`, `to`, optional `angle`, `relative-to` (`window` | `workspace-view`), and `in` (`srgb` | `srgb-linear` | `oklab` | `oklch` with optional oklch hue interpolation).
+
+Window-rule and per-output layout override colors follow the same path (including urgent). The UI may still show a solid swatch for some rule fields; Config itself keeps the gradient until the user edits that field.
+
+**Unsupported shapes are kept as raw KDL** (never stripped): extra/unknown properties, child color-stops, missing `from`/`to`, unknown `in` / `relative-to`, or CSS `linear-gradient(...)` (niri does not use that syntax). Layer rules have no color-or-gradient children in niri.
+
 ## Development
 
 ```bash

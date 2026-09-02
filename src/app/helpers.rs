@@ -541,12 +541,14 @@ pub fn apply_gradient_message(target: &mut ColorOrGradient, msg: GradientPickerM
                         ..Default::default()
                     }),
                     ColorOrGradient::Gradient(_) => target.clone(),
+                    ColorOrGradient::Raw(_) => ColorOrGradient::Gradient(Gradient::default()),
                 }
             } else {
                 // Convert to solid color
                 match target {
                     ColorOrGradient::Color(_) => target.clone(),
                     ColorOrGradient::Gradient(gradient) => ColorOrGradient::Color(gradient.from),
+                    ColorOrGradient::Raw(_) => ColorOrGradient::Color(Color::default()),
                 }
             };
         }
@@ -555,6 +557,7 @@ pub fn apply_gradient_message(target: &mut ColorOrGradient, msg: GradientPickerM
                 match target {
                     ColorOrGradient::Color(c) => *c = color,
                     ColorOrGradient::Gradient(g) => g.from = color,
+                    ColorOrGradient::Raw(_) => *target = ColorOrGradient::Color(color),
                 }
             }
         }

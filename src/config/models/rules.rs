@@ -100,6 +100,7 @@ impl PopupsSettings {
 ///
 /// niri's `TabIndicatorRule` only accepts colour/gradient children — NOT the
 /// on/off/width/length/etc. that the global tab-indicator config accepts.
+/// Gradients use the same [`ColorOrGradient`] model as focus-ring/border.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TabIndicatorOverride {
     pub active: Option<ColorOrGradient>,

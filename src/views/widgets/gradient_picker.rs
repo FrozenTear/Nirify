@@ -72,6 +72,11 @@ pub fn gradient_picker<'a, Message: Clone + 'a>(
             // Full gradient controls
             content = content.push(gradient_controls(gradient, on_change));
         }
+        ColorOrGradient::Raw(_) => {
+            content = content.push(info_text(
+                "Custom gradient preserved from KDL (edit via config, or toggle to convert)",
+            ));
+        }
     }
 
     container(content)

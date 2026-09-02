@@ -269,3 +269,121 @@ include "nirify/main.kdl"
     assert!(rules.contains("clip-to-geometry true"), "{rules}");
     assert!(rules.contains("open-fullscreen true"), "{rules}");
 }
+
+#[test]
+fn wizard_imports_window_rule_gradients() {
+    let dir = tempdir().unwrap();
+    let paths = paths_under(dir.path());
+
+    fs::write(
+        &paths.niri_config,
+        r##"
+window-rule {
+    match app-id="kitty"
+    focus-ring {
+        active-gradient from="#80c8ff" to="#bbddff"
+        inactive-color "#333333"
+        urgent-gradient from="#ff0000" to="#9b0000"
+    }
+    border {
+        inactive-gradient from="#202020" to="#101010"
+        urgent-color "#ff8800"
+    }
+}
+"##,
+    )
+    .unwrap();
+
+    if paths.managed_dir.exists() {
+        fs::remove_dir_all(&paths.managed_dir).unwrap();
+    }
+
+    first_run_setup(&paths, FeatureCompat::all_enabled()).unwrap();
+
+    let loaded = load_settings(&paths);
+    let rule = loaded
+        .window_rules
+        .rules
+        .iter()
+        .find(|r| {
+            r.matches
+                .iter()
+                .any(|m| m.app_id.as_deref() == Some("kitty"))
+        })
+        .expect("imported rule");
+    assert!(
+        matches!(
+            rule.focus_ring_active,
+            Some(nirify::types::ColorOrGradient::Gradient(_))
+        ),
+        "{:?}",
+        rule.focus_ring_active
+    );
+    assert!(
+        matches!(
+            rule.focus_ring_urgent,
+            Some(nirify::types::ColorOrGradient::Gradient(_))
+        ),
+        "{:?}",
+        rule.focus_ring_urgent
+    );
+
+    let rules = fs::read_to_string(&paths.window_rules_kdl).unwrap();
+    assert!(rules.contains("active-gradient"), "{rules}");
+    assert!(rules.contains("urgent-gradient"), "{rules}");
+    assert!(rules.contains("inactive-gradient"), "{rules}");
+    assert!(rules.contains("urgent-color"), "{rules}");
+}
+
+#[test]
+fn launch_absorb_adopts_window_rule_gradients() {
+    let dir = tempdir().unwrap();
+    let paths = paths_under(dir.path());
+    paths.ensure_directories().unwrap();
+
+    let existing = nirify::config::Settings::default();
+    nirify::config::save_settings(&paths, &existing, FeatureCompat::all_enabled()).unwrap();
+
+    fs::write(
+        &paths.niri_config,
+        r##"
+window-rule {
+    match app-id="absorb-grad"
+    focus-ring {
+        active-gradient from="#112233" to="#445566" angle=90
+        urgent-gradient from="#ff0000" to="#990000"
+    }
+}
+include "nirify/main.kdl"
+"##,
+    )
+    .unwrap();
+
+    let result = absorb_stripped_nodes(&paths, FeatureCompat::all_enabled()).unwrap();
+    assert!(result.adopted.contains(&SettingsCategory::WindowRules));
+
+    let loaded = load_settings(&paths);
+    let rule = loaded
+        .window_rules
+        .rules
+        .iter()
+        .find(|r| {
+            r.matches
+                .iter()
+                .any(|m| m.app_id.as_deref() == Some("absorb-grad"))
+        })
+        .expect("absorb must adopt the gradient rule, not strip it");
+    assert!(
+        matches!(
+            rule.focus_ring_active,
+            Some(nirify::types::ColorOrGradient::Gradient(_))
+        ),
+        "{:?}",
+        rule.focus_ring_active
+    );
+
+    let rules = fs::read_to_string(&paths.window_rules_kdl).unwrap();
+    assert!(rules.contains("active-gradient"), "{rules}");
+    assert!(rules.contains("urgent-gradient"), "{rules}");
+    assert!(rules.contains("absorb-grad"), "{rules}");
+}

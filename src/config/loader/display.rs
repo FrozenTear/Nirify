@@ -3,6 +3,7 @@
 //! Loads settings for animations, cursor, overview, and outputs.
 
 use super::super::parser::{get_f64, get_i64, get_string, has_flag};
+use super::gradient::load_color_or_gradient;
 use super::helpers::{parse_color, read_kdl_file};
 use crate::config::models::{
     AnimationType, EasingCurve, LayoutOverride, OutputConfig, OutputHotCorners, Settings,
@@ -134,7 +135,6 @@ pub fn parse_single_animation(children: &KdlDocument) -> SingleAnimationConfig {
 /// Parse a layout override block from KDL children
 pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOverride> {
     use crate::config::models::{DefaultColumnDisplay, PresetHeight, PresetWidth};
-    use crate::types::ColorOrGradient;
 
     let mut layout = LayoutOverride::default();
 
@@ -305,21 +305,9 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
             if let Some(v) = get_i64(fr_children, &["width"]) {
                 layout.focus_ring_width = Some(v as i32);
             }
-            if let Some(s) = get_string(fr_children, &["active-color"]) {
-                if let Some(c) = parse_color(&s) {
-                    layout.focus_ring_active = Some(ColorOrGradient::Color(c));
-                }
-            }
-            if let Some(s) = get_string(fr_children, &["inactive-color"]) {
-                if let Some(c) = parse_color(&s) {
-                    layout.focus_ring_inactive = Some(ColorOrGradient::Color(c));
-                }
-            }
-            if let Some(s) = get_string(fr_children, &["urgent-color"]) {
-                if let Some(c) = parse_color(&s) {
-                    layout.focus_ring_urgent = Some(ColorOrGradient::Color(c));
-                }
-            }
+            layout.focus_ring_active = load_color_or_gradient(fr_children, "active");
+            layout.focus_ring_inactive = load_color_or_gradient(fr_children, "inactive");
+            layout.focus_ring_urgent = load_color_or_gradient(fr_children, "urgent");
         }
     }
 
@@ -334,21 +322,9 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
             if let Some(v) = get_i64(b_children, &["width"]) {
                 layout.border_width = Some(v as i32);
             }
-            if let Some(s) = get_string(b_children, &["active-color"]) {
-                if let Some(c) = parse_color(&s) {
-                    layout.border_active = Some(ColorOrGradient::Color(c));
-                }
-            }
-            if let Some(s) = get_string(b_children, &["inactive-color"]) {
-                if let Some(c) = parse_color(&s) {
-                    layout.border_inactive = Some(ColorOrGradient::Color(c));
-                }
-            }
-            if let Some(s) = get_string(b_children, &["urgent-color"]) {
-                if let Some(c) = parse_color(&s) {
-                    layout.border_urgent = Some(ColorOrGradient::Color(c));
-                }
-            }
+            layout.border_active = load_color_or_gradient(b_children, "active");
+            layout.border_inactive = load_color_or_gradient(b_children, "inactive");
+            layout.border_urgent = load_color_or_gradient(b_children, "urgent");
         }
     }
 

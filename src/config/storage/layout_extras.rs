@@ -108,6 +108,9 @@ pub fn generate_layout_extras_kdl(settings: &LayoutExtrasSettings) -> String {
                 ColorOrGradient::Gradient(g) => {
                     ih.raw(&gradient_node_to_kdl(g, "gradient"));
                 }
+                ColorOrGradient::Raw(raw) => {
+                    ih.raw(raw);
+                }
             }
         });
 
