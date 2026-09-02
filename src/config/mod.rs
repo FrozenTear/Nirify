@@ -4,6 +4,7 @@ pub mod dirty;
 pub mod error;
 pub mod loader;
 pub mod models;
+pub mod outputs_layout;
 pub mod parser;
 pub mod paths;
 pub mod registry;
@@ -26,6 +27,10 @@ pub use loader::{
 pub use models::{
     ColumnWidthType, LayoutOverride, OutputConfig, OutputHotCorners, OutputSettings, Settings,
     WorkspaceShadow,
+};
+pub use outputs_layout::{
+    apply_live_outputs_to_settings, estimated_logical_size, logical_size_from_mode,
+    pack_to_the_right, parse_mode_resolution, seed_manual_position, LiveOutputsApplyResult,
 };
 pub use paths::ConfigPaths;
 pub use registry::ConfigFile;

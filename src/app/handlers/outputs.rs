@@ -85,26 +85,86 @@ impl super::super::App {
             }
 
             M::SetPositionX(idx, value) => {
+                let mut position = crate::config::seed_manual_position(
+                    idx,
+                    &self.settings.outputs.outputs,
+                    &self.ui.tools_state.outputs,
+                );
+                position.0 = value;
                 if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
-                    output.position.get_or_insert((0, 0)).0 = value;
+                    output.position = Some(position);
                 }
             }
 
             M::SetPositionY(idx, value) => {
+                let mut position = crate::config::seed_manual_position(
+                    idx,
+                    &self.settings.outputs.outputs,
+                    &self.ui.tools_state.outputs,
+                );
+                position.1 = value;
                 if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
-                    output.position.get_or_insert((0, 0)).1 = value;
+                    output.position = Some(position);
                 }
             }
 
             M::SetPositionAuto(idx, auto) => {
-                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
-                    output.position = if auto {
-                        None
-                    } else {
-                        Some(output.position.unwrap_or((0, 0)))
-                    };
+                if auto {
+                    if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
+                        output.position = None;
+                    }
+                } else {
+                    let position = crate::config::seed_manual_position(
+                        idx,
+                        &self.settings.outputs.outputs,
+                        &self.ui.tools_state.outputs,
+                    );
+                    if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
+                        output.position = Some(position);
+                    }
                 }
             }
+
+            M::ImportConnectedLayout => {
+                let is_connected = matches!(
+                    self.ui.niri_status,
+                    crate::views::status_bar::NiriStatus::Connected
+                );
+                if !is_connected {
+                    self.ui.toast =
+                        Some("Connect to niri to import the live display layout".to_string());
+                    self.ui.toast_shown_at = Some(std::time::Instant::now());
+                    return Task::none();
+                }
+                return crate::ipc::tasks::get_full_outputs_async(|result| {
+                    Message::Outputs(M::LiveOutputsSnapshotLoaded(
+                        result.map_err(|e| e.to_string()),
+                    ))
+                });
+            }
+
+            M::LiveOutputsSnapshotLoaded(result) => match result {
+                Ok(live) => {
+                    self.ui.tools_state.outputs = live;
+                    let applied = crate::config::apply_live_outputs_to_settings(
+                        &mut self.settings.outputs,
+                        &self.ui.tools_state.outputs,
+                    );
+                    log::info!("{}", applied.summary());
+                    self.ui.toast = Some(applied.summary());
+                    self.ui.toast_shown_at = Some(std::time::Instant::now());
+                    if self.ui.selected_output_index.is_none()
+                        && !self.settings.outputs.outputs.is_empty()
+                    {
+                        self.ui.selected_output_index = Some(0);
+                    }
+                }
+                Err(error) => {
+                    self.ui.toast = Some(format!("Could not read live outputs: {error}"));
+                    self.ui.toast_shown_at = Some(std::time::Instant::now());
+                    return Task::none();
+                }
+            },
 
             M::SetTransform(idx, value) => {
                 if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {

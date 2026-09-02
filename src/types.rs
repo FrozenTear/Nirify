@@ -467,6 +467,42 @@ impl Transform {
             Self::Flipped270,
         ]
     }
+
+    /// Whether this transform swaps the physical width/height axes.
+    #[must_use]
+    pub fn swaps_axes(self) -> bool {
+        matches!(
+            self,
+            Self::Rotate90 | Self::Rotate270 | Self::Flipped90 | Self::Flipped270
+        )
+    }
+}
+
+/// Logical size after applying scale and a 90°/270° axis swap.
+///
+/// `physical_width`/`physical_height` are the current mode in physical pixels.
+/// Scale is clamped to a small positive value so a 0 / NaN scale cannot divide
+/// by zero. Result is rounded to the nearest logical pixel.
+#[must_use]
+pub fn logical_size_after_scale_transform(
+    physical_width: i32,
+    physical_height: i32,
+    scale: f64,
+    transform: Transform,
+) -> (u32, u32) {
+    let (width, height) = if transform.swaps_axes() {
+        (physical_height, physical_width)
+    } else {
+        (physical_width, physical_height)
+    };
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    let logical_w = (width as f64 / scale).round().max(1.0) as u32;
+    let logical_h = (height as f64 / scale).round().max(1.0) as u32;
+    (logical_w, logical_h)
 }
 
 /// Variable Refresh Rate (VRR/FreeSync/G-Sync) mode for monitors.
@@ -960,5 +996,23 @@ mod tests {
             let parsed = CenterFocusedColumn::parse_kdl(kdl).unwrap();
             assert_eq!(mode, parsed);
         }
+    }
+
+    #[test]
+    fn test_logical_size_after_scale_transform() {
+        assert_eq!(
+            logical_size_after_scale_transform(3840, 2160, 2.0, Transform::Normal),
+            (1920, 1080)
+        );
+        assert_eq!(
+            logical_size_after_scale_transform(1920, 1080, 1.0, Transform::Rotate90),
+            (1080, 1920)
+        );
+        assert_eq!(
+            logical_size_after_scale_transform(1920, 1080, 0.0, Transform::Normal),
+            (1920, 1080)
+        );
+        assert!(Transform::Rotate270.swaps_axes());
+        assert!(!Transform::Flipped.swaps_axes());
     }
 }

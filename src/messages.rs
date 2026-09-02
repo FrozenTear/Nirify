@@ -1103,6 +1103,14 @@ pub enum OutputsMessage {
     SetPositionY(usize, i32),
     /// true = automatic placement (position None); false = explicit (Some)
     SetPositionAuto(usize, bool),
+    /// Snapshot the live niri output layout into managed settings.
+    ///
+    /// Fetches `Outputs` over IPC, then applies
+    /// [`crate::config::apply_live_outputs_to_settings`]. UI (Tools / Displays)
+    /// can fire this without implementing the merge policy.
+    ImportConnectedLayout,
+    /// Result of the live-layout IPC fetch started by [`Self::ImportConnectedLayout`].
+    LiveOutputsSnapshotLoaded(Result<Vec<crate::ipc::FullOutputInfo>, String>),
     SetTransform(usize, crate::types::Transform),
     SetVrr(usize, crate::types::VrrMode),
     SetFocusAtStartup(usize, bool),

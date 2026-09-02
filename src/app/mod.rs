@@ -81,7 +81,15 @@ fn output_msg_is_risky(m: &crate::messages::OutputsMessage) -> bool {
     use crate::messages::OutputsMessage as O;
     matches!(
         m,
-        O::SetEnabled(_, false) | O::SetMode(_, _) | O::SetModeCustom(_, _) | O::SetModeline(_, _)
+        O::SetEnabled(_, false)
+            | O::SetMode(_, _)
+            | O::SetModeCustom(_, _)
+            | O::SetModeline(_, _)
+            // Bulk layout import can move every monitor; arm the same 15s
+            // apply-then-confirm used for mode / disable. Per-output
+            // SetPositionX/Y stay unarmed so a future drag canvas does not
+            // pop the countdown on every snap.
+            | O::LiveOutputsSnapshotLoaded(Ok(_))
     )
 }
 
@@ -2604,6 +2612,13 @@ mod tests {
         assert!(output_msg_is_risky(&O::SetModeCustom(0, true)));
         assert!(!output_msg_is_risky(&O::SetScale(0, 1.5)));
         assert!(!output_msg_is_risky(&O::SetPositionX(0, 100)));
+        assert!(!output_msg_is_risky(&O::ImportConnectedLayout));
+        assert!(output_msg_is_risky(&O::LiveOutputsSnapshotLoaded(Ok(
+            vec![]
+        ))));
+        assert!(!output_msg_is_risky(&O::LiveOutputsSnapshotLoaded(Err(
+            "offline".into()
+        ))));
     }
 
     #[test]

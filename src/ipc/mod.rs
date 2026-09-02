@@ -669,11 +669,21 @@ pub struct OutputInfo {
     pub model: String,
 }
 
-/// Logical output info from niri (position, scale, transform)
+/// Logical output info from niri (position, size, scale, transform).
+///
+/// Niri's `LogicalOutput` includes `width`/`height` in logical pixels (already
+/// after scale and transform). Those fields are optional here so older niri
+/// versions and partial fixtures still parse.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct OutputLogical {
     pub x: i32,
     pub y: i32,
+    /// Width in logical pixels. `None` / `0` means the field was missing.
+    #[serde(default)]
+    pub width: Option<u32>,
+    /// Height in logical pixels. `None` / `0` means the field was missing.
+    #[serde(default)]
+    pub height: Option<u32>,
     pub scale: f64,
     #[serde(default)]
     pub transform: String,
@@ -700,15 +710,21 @@ pub struct FullOutputInfo {
     pub make: String,
     #[serde(default)]
     pub model: String,
+    /// Monitor serial, if niri knows it
+    #[serde(default)]
+    pub serial: Option<String>,
     /// Index into the modes array for current mode
     #[serde(default)]
     pub current_mode: Option<usize>,
     /// Available display modes
     #[serde(default)]
     pub modes: Vec<OutputMode>,
-    /// Logical output settings (position, scale, transform)
+    /// Logical output settings (position, size, scale, transform)
     #[serde(default)]
     pub logical: Option<OutputLogical>,
+    /// Whether the output supports variable refresh rate
+    #[serde(default)]
+    pub vrr_supported: bool,
     /// VRR (variable refresh rate) enabled
     #[serde(default)]
     pub vrr_enabled: bool,
@@ -774,6 +790,50 @@ impl FullOutputInfo {
             }
         }
     }
+
+    /// Logical size in compositor pixels, preferring niri's reported
+    /// `logical.width`/`height` and falling back to mode ÷ scale with axis swap.
+    #[must_use]
+    pub fn logical_size(&self) -> (u32, u32) {
+        if let Some(logical) = &self.logical {
+            if let (Some(width), Some(height)) =
+                (nonzero_dim(logical.width), nonzero_dim(logical.height))
+            {
+                return (width, height);
+            }
+        }
+        self.computed_logical_size()
+    }
+
+    /// Logical width in compositor pixels.
+    #[must_use]
+    pub fn logical_width(&self) -> u32 {
+        self.logical_size().0
+    }
+
+    /// Logical height in compositor pixels.
+    #[must_use]
+    pub fn logical_height(&self) -> u32 {
+        self.logical_size().1
+    }
+
+    fn computed_logical_size(&self) -> (u32, u32) {
+        let (physical_w, physical_h) = self
+            .current_mode
+            .and_then(|mode_idx| self.modes.get(mode_idx))
+            .map(|mode| (mode.width, mode.height))
+            .unwrap_or((1920, 1080));
+        crate::types::logical_size_after_scale_transform(
+            physical_w,
+            physical_h,
+            self.scale(),
+            self.transform(),
+        )
+    }
+}
+
+fn nonzero_dim(value: Option<u32>) -> Option<u32> {
+    value.filter(|&dim| dim > 0)
 }
 
 /// Get list of outputs/displays from niri
@@ -830,9 +890,12 @@ pub fn get_output_names() -> IpcResult<Vec<String>> {
 /// This function parses the complete output data from niri IPC, which includes:
 /// - Current mode (resolution and refresh rate)
 /// - Scale factor
-/// - Position (x, y)
+/// - Logical position (x, y) and size (width, height) when reported
 /// - Transform (rotation)
-/// - VRR enabled status
+/// - Serial (when known)
+/// - VRR supported / enabled status
+///
+/// Unknown fields are ignored so parsing stays resilient across niri versions.
 ///
 /// Returns `Err(IpcError)` if the query fails.
 pub fn get_full_outputs() -> IpcResult<Vec<FullOutputInfo>> {
@@ -1144,6 +1207,7 @@ mod tests {
                     y: 0,
                     scale: 1.0,
                     transform: input.to_string(),
+                    ..Default::default()
                 }),
                 ..Default::default()
             };
@@ -1292,6 +1356,103 @@ mod tests {
         assert_eq!(logical.y, 0);
         assert_eq!(logical.scale, 1.5);
         assert_eq!(logical.transform, "90");
+        assert_eq!(logical.width, None);
+        assert_eq!(logical.height, None);
+    }
+
+    #[test]
+    fn test_output_logical_parsing_with_size() {
+        let json =
+            r#"{"x":1920,"y":1080,"width":1280,"height":720,"scale":1.5,"transform":"Normal"}"#;
+        let logical: OutputLogical = serde_json::from_str(json).unwrap();
+        assert_eq!(logical.x, 1920);
+        assert_eq!(logical.y, 1080);
+        assert_eq!(logical.width, Some(1280));
+        assert_eq!(logical.height, Some(720));
+        assert_eq!(logical.scale, 1.5);
+        assert_eq!(logical.transform, "Normal");
+    }
+
+    #[test]
+    fn test_full_output_parses_logical_geometry_serial_and_vrr_supported() {
+        let json = r#"{
+            "name": "DP-1",
+            "make": "Dell",
+            "model": "U2720Q",
+            "serial": "ABC123",
+            "physical_size": [600, 340],
+            "current_mode": 0,
+            "is_custom_mode": false,
+            "modes": [
+                {"width": 3840, "height": 2160, "refresh_rate": 60000, "is_preferred": true}
+            ],
+            "logical": {
+                "x": 1920,
+                "y": 0,
+                "width": 1920,
+                "height": 1080,
+                "scale": 2.0,
+                "transform": "Normal"
+            },
+            "vrr_supported": true,
+            "vrr_enabled": false
+        }"#;
+        let info: FullOutputInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.serial.as_deref(), Some("ABC123"));
+        assert!(info.vrr_supported);
+        assert!(!info.vrr_enabled);
+        assert_eq!(info.position_x(), 1920);
+        assert_eq!(info.position_y(), 0);
+        assert_eq!(info.logical_size(), (1920, 1080));
+        assert_eq!(info.logical_width(), 1920);
+        assert_eq!(info.logical_height(), 1080);
+    }
+
+    #[test]
+    fn test_full_output_logical_size_falls_back_when_width_height_missing() {
+        let json = r#"{
+            "make": "Unknown",
+            "model": "Panel",
+            "current_mode": 0,
+            "modes": [
+                {"width": 2560, "height": 1440, "refresh_rate": 144000}
+            ],
+            "logical": {
+                "x": 0,
+                "y": 0,
+                "scale": 2.0,
+                "transform": "90"
+            }
+        }"#;
+        let info: FullOutputInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.serial, None);
+        assert!(!info.vrr_supported);
+        // 90° swaps 2560x1440, then ÷ 2 → 720x1280
+        assert_eq!(info.logical_size(), (720, 1280));
+    }
+
+    #[test]
+    fn test_full_output_ignores_unknown_fields() {
+        let json = r#"{
+            "make": "LG",
+            "model": "27GL850",
+            "future_field": {"nested": true},
+            "vrr_supported": true,
+            "vrr_enabled": true,
+            "logical": {
+                "x": 0,
+                "y": 0,
+                "width": 2560,
+                "height": 1440,
+                "scale": 1.0,
+                "transform": "Normal",
+                "extra": 1
+            }
+        }"#;
+        let info: FullOutputInfo = serde_json::from_str(json).unwrap();
+        assert!(info.vrr_supported);
+        assert!(info.vrr_enabled);
+        assert_eq!(info.logical_size(), (2560, 1440));
     }
 
     // ========== ActionResponse parsing tests ==========
