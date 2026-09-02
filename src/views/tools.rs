@@ -7,7 +7,7 @@ use iced::widget::{button, column, container, row, scrollable, text, Column, Spa
 use iced::{Alignment, Element, Length};
 
 use crate::ipc::{FullOutputInfo, WindowInfo, WorkspaceInfo};
-use crate::messages::{DialogState, Message, ToolsMessage, WizardStep};
+use crate::messages::{DialogState, Message, OutputsMessage, ToolsMessage, WizardStep};
 use crate::theme::{fonts, neon};
 
 /// State for the tools page (cached IPC data)
@@ -137,6 +137,17 @@ pub fn view(state: &ToolsState, niri_connected: bool) -> Element<'_, Message> {
     .on_press(Message::ShowDialog(DialogState::FirstRunWizard {
         step: WizardStep::Welcome,
     }));
+    let mut import_layout_btn = button(
+        text("Import Connected Layout")
+            .size(12)
+            .font(fonts::UI_FONT_MEDIUM),
+    )
+    .padding([8, 14])
+    .style(neon_btn);
+    if niri_connected {
+        import_layout_btn =
+            import_layout_btn.on_press(Message::Outputs(OutputsMessage::ImportConnectedLayout));
+    }
 
     if niri_connected && !state.reloading {
         reload_btn = reload_btn.on_press(Message::Tools(ToolsMessage::ReloadConfig));
@@ -286,6 +297,8 @@ pub fn view(state: &ToolsState, niri_connected: bool) -> Element<'_, Message> {
                         row![reload_btn, validate_btn].spacing(8),
                         Space::new().height(6),
                         row![consolidate_btn, setup_btn].spacing(8),
+                        Space::new().height(6),
+                        row![import_layout_btn].spacing(8),
                     ]
                     .spacing(0)
                 )

@@ -68,26 +68,43 @@ pub fn view<'a>(
                         ..Default::default()
                     }),
             ].spacing(8).width(Length::Fill),
-            button(
-                row![
-                    text("+").size(16),
-                    text("Add Output").size(14).font(fonts::UI_FONT_MEDIUM),
-                ].spacing(6).align_y(Alignment::Center),
-            )
-            .on_press(Message::Outputs(OutputsMessage::AddOutput))
-            .padding([10, 20])
-            .style(|_: &iced::Theme, status| {
-                let bg = match status {
-                    iced::widget::button::Status::Hovered => neon::SECONDARY,
-                    _ => iced::Color { a: 0.8, ..neon::SECONDARY },
-                };
-                iced::widget::button::Style {
-                    background: Some(iced::Background::Color(bg)),
-                    text_color: neon::SURFACE_LOW,
-                    border: iced::Border { radius: 12.0.into(), ..Default::default() },
-                    ..Default::default()
-                }
-            }),
+            row![
+                button(text("Import connected layout").size(13).font(fonts::UI_FONT_MEDIUM))
+                    .on_press(Message::Outputs(OutputsMessage::ImportConnectedLayout))
+                    .padding([10, 16])
+                    .style(|_: &iced::Theme, status| {
+                        let bg = match status {
+                            iced::widget::button::Status::Hovered => iced::Color { a: 0.16, ..neon::SECONDARY },
+                            _ => iced::Color { a: 0.08, ..neon::SECONDARY },
+                        };
+                        iced::widget::button::Style {
+                            background: Some(iced::Background::Color(bg)),
+                            text_color: neon::SECONDARY,
+                            border: iced::Border { radius: 12.0.into(), ..Default::default() },
+                            ..Default::default()
+                        }
+                    }),
+                button(
+                    row![
+                        text("+").size(16),
+                        text("Add Output").size(14).font(fonts::UI_FONT_MEDIUM),
+                    ].spacing(6).align_y(Alignment::Center),
+                )
+                .on_press(Message::Outputs(OutputsMessage::AddOutput))
+                .padding([10, 20])
+                .style(|_: &iced::Theme, status| {
+                    let bg = match status {
+                        iced::widget::button::Status::Hovered => neon::SECONDARY,
+                        _ => iced::Color { a: 0.8, ..neon::SECONDARY },
+                    };
+                    iced::widget::button::Style {
+                        background: Some(iced::Background::Color(bg)),
+                        text_color: neon::SURFACE_LOW,
+                        border: iced::Border { radius: 12.0.into(), ..Default::default() },
+                        ..Default::default()
+                    }
+                }),
+            ].spacing(8).align_y(Alignment::Center),
         ].align_y(Alignment::End),
 
         Space::new().height(16),
