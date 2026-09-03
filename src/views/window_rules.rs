@@ -15,7 +15,7 @@ use crate::config::models::{
 };
 use crate::messages::{Message, RulesFilter, WindowRulesMessage};
 use crate::theme::{fonts, neon};
-use crate::types::{Color as NiriColor, ColorOrGradient};
+use crate::types::Color as NiriColor;
 
 /// Display wrapper for a tri-state (Default / Force on / Force off) picker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1028,43 +1028,41 @@ pub fn editor_modal<'a>(
                     rule.border_width.unwrap_or(0),
                     move |v| Message::WindowRules(WindowRulesMessage::SetBorderWidth(id, Some(v))),
                 ),
-                // Focus ring colors
-                color_picker_row(
+                optional_gradient_picker(
                     "Focus ring active",
-                    "Active color override",
-                    &color_or_gradient_to_niri(rule.focus_ring_active.as_ref()),
-                    move |hex| Message::WindowRules(WindowRulesMessage::SetFocusRingActive(
-                        id,
-                        Some(ColorOrGradient::Color(hex_to_niri_color(&hex)))
-                    )),
+                    "Color or gradient for the active focus ring",
+                    rule.focus_ring_active.as_ref(),
+                    move |v| Message::WindowRules(WindowRulesMessage::SetFocusRingActive(id, v)),
                 ),
-                color_picker_row(
+                optional_gradient_picker(
                     "Focus ring inactive",
-                    "Inactive color override",
-                    &color_or_gradient_to_niri(rule.focus_ring_inactive.as_ref()),
-                    move |hex| Message::WindowRules(WindowRulesMessage::SetFocusRingInactive(
-                        id,
-                        Some(ColorOrGradient::Color(hex_to_niri_color(&hex)))
-                    )),
+                    "Color or gradient for the inactive focus ring",
+                    rule.focus_ring_inactive.as_ref(),
+                    move |v| Message::WindowRules(WindowRulesMessage::SetFocusRingInactive(id, v)),
                 ),
-                // Border colors
-                color_picker_row(
+                optional_gradient_picker(
+                    "Focus ring urgent",
+                    "Color or gradient for the urgent focus ring",
+                    rule.focus_ring_urgent.as_ref(),
+                    move |v| Message::WindowRules(WindowRulesMessage::SetFocusRingUrgent(id, v)),
+                ),
+                optional_gradient_picker(
                     "Border active",
-                    "Active color override",
-                    &color_or_gradient_to_niri(rule.border_active.as_ref()),
-                    move |hex| Message::WindowRules(WindowRulesMessage::SetBorderActive(
-                        id,
-                        Some(ColorOrGradient::Color(hex_to_niri_color(&hex)))
-                    )),
+                    "Color or gradient for the active border",
+                    rule.border_active.as_ref(),
+                    move |v| Message::WindowRules(WindowRulesMessage::SetBorderActive(id, v)),
                 ),
-                color_picker_row(
+                optional_gradient_picker(
                     "Border inactive",
-                    "Inactive color override",
-                    &color_or_gradient_to_niri(rule.border_inactive.as_ref()),
-                    move |hex| Message::WindowRules(WindowRulesMessage::SetBorderInactive(
-                        id,
-                        Some(ColorOrGradient::Color(hex_to_niri_color(&hex)))
-                    )),
+                    "Color or gradient for the inactive border",
+                    rule.border_inactive.as_ref(),
+                    move |v| Message::WindowRules(WindowRulesMessage::SetBorderInactive(id, v)),
+                ),
+                optional_gradient_picker(
+                    "Border urgent",
+                    "Color or gradient for the urgent border",
+                    rule.border_urgent.as_ref(),
+                    move |v| Message::WindowRules(WindowRulesMessage::SetBorderUrgent(id, v)),
                 ),
             ]
             .spacing(4)
@@ -1292,34 +1290,43 @@ pub fn editor_modal<'a>(
         editor = editor.push(
             container(
                 column![
-                    color_picker_row(
+                    optional_gradient_picker(
                         "Active",
-                        "Active tab colour",
-                        &color_or_gradient_to_niri(ti.active.as_ref()),
-                        move |hex| {
+                        "Color or gradient for the active tab indicator",
+                        ti.active.as_ref(),
+                        move |v| {
                             let mut new = ti_a.clone();
-                            new.active = Some(ColorOrGradient::Color(hex_to_niri_color(&hex)));
-                            Message::WindowRules(WindowRulesMessage::SetTabIndicator(id, Some(new)))
+                            new.active = v;
+                            Message::WindowRules(WindowRulesMessage::SetTabIndicator(
+                                id,
+                                if new.is_empty() { None } else { Some(new) },
+                            ))
                         },
                     ),
-                    color_picker_row(
+                    optional_gradient_picker(
                         "Inactive",
-                        "Inactive tab colour",
-                        &color_or_gradient_to_niri(ti.inactive.as_ref()),
-                        move |hex| {
+                        "Color or gradient for the inactive tab indicator",
+                        ti.inactive.as_ref(),
+                        move |v| {
                             let mut new = ti_i.clone();
-                            new.inactive = Some(ColorOrGradient::Color(hex_to_niri_color(&hex)));
-                            Message::WindowRules(WindowRulesMessage::SetTabIndicator(id, Some(new)))
+                            new.inactive = v;
+                            Message::WindowRules(WindowRulesMessage::SetTabIndicator(
+                                id,
+                                if new.is_empty() { None } else { Some(new) },
+                            ))
                         },
                     ),
-                    color_picker_row(
+                    optional_gradient_picker(
                         "Urgent",
-                        "Urgent tab colour",
-                        &color_or_gradient_to_niri(ti.urgent.as_ref()),
-                        move |hex| {
+                        "Color or gradient for the urgent tab indicator",
+                        ti.urgent.as_ref(),
+                        move |v| {
                             let mut new = ti_u.clone();
-                            new.urgent = Some(ColorOrGradient::Color(hex_to_niri_color(&hex)));
-                            Message::WindowRules(WindowRulesMessage::SetTabIndicator(id, Some(new)))
+                            new.urgent = v;
+                            Message::WindowRules(WindowRulesMessage::SetTabIndicator(
+                                id,
+                                if new.is_empty() { None } else { Some(new) },
+                            ))
                         },
                     ),
                 ]
@@ -2058,20 +2065,6 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         s.to_string()
     } else {
         format!("{}…", &s[..max_len - 1])
-    }
-}
-
-/// Extract NiriColor from ColorOrGradient (uses first color of gradient)
-fn color_or_gradient_to_niri(cog: Option<&ColorOrGradient>) -> NiriColor {
-    match cog {
-        Some(ColorOrGradient::Color(c)) => *c,
-        Some(ColorOrGradient::Gradient(g)) => g.from,
-        None => NiriColor {
-            r: 128,
-            g: 128,
-            b: 128,
-            a: 255,
-        },
     }
 }
 

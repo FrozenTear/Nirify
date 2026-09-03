@@ -25,7 +25,7 @@ pub fn view<'a>(
         super::hero_header(
             "WORKSPACE ENGINE",
             "Infinite Ribbon",
-            "Spatial layout defines how windows occupy your virtual canvas. The ribbon extends infinitely across the horizontal axis, prioritizing focus through precision column management.",
+            "Spatial layout defines how windows occupy your virtual canvas. The ribbon extends infinitely across the horizontal axis, prioritizing focus through precision column management and preset sizes.",
             SECONDARY,
         ),
         Space::new().height(16),
@@ -60,7 +60,7 @@ pub fn view<'a>(
             ]),
             summary_card(EditableSection::InsertHint, vec![
                 ("Enabled", if layout_extras.insert_hint.enabled { "On" } else { "Off" }.to_string()),
-                ("Color", layout_extras.insert_hint.color.to_hex()),
+                ("Color", layout_extras.insert_hint.color.display_label()),
             ]),
         ].spacing(12).align_y(Alignment::Start),
         Space::new().height(12),
@@ -69,6 +69,10 @@ pub fn view<'a>(
             summary_card(EditableSection::NamedWorkspaces, vec![
                 ("Count", format!("{}", workspaces.workspaces.len())),
                 ("Status", if workspaces.workspaces.is_empty() { "None" } else { "Active" }.to_string()),
+            ]),
+            summary_card(EditableSection::PresetSizes, vec![
+                ("Widths", format!("{}", layout_extras.preset_column_widths.len())),
+                ("Heights", format!("{}", layout_extras.preset_window_heights.len())),
             ]),
         ].spacing(12).align_y(Alignment::Start),
     ]

@@ -776,6 +776,16 @@ impl ColorOrGradient {
     pub fn is_gradient(&self) -> bool {
         matches!(self, ColorOrGradient::Gradient(_))
     }
+
+    /// Human-readable label that does not hide a gradient behind a single hex.
+    pub fn display_label(&self) -> String {
+        match self {
+            ColorOrGradient::Color(c) => c.to_hex(),
+            ColorOrGradient::Gradient(g) => {
+                format!("Gradient {} → {}", g.from.to_hex(), g.to.to_hex())
+            }
+        }
+    }
 }
 
 // ============================================================================
@@ -983,6 +993,20 @@ mod tests {
         assert_eq!(parse_hex_digit(b'F'), Some(15));
         assert_eq!(parse_hex_digit(b'g'), None);
         assert_eq!(parse_hex_digit(b'!'), None);
+    }
+
+    #[test]
+    fn display_label_does_not_hide_gradient() {
+        let solid = ColorOrGradient::Color(Color::from_hex("#7fc8ff").unwrap());
+        assert_eq!(solid.display_label(), "#7fc8ff");
+
+        let gradient = ColorOrGradient::Gradient(Gradient {
+            from: Color::from_hex("#ff0000").unwrap(),
+            to: Color::from_hex("#0000ff").unwrap(),
+            ..Default::default()
+        });
+        assert_eq!(gradient.display_label(), "Gradient #ff0000 → #0000ff");
+        assert_ne!(gradient.display_label(), gradient.to_hex());
     }
 
     #[test]

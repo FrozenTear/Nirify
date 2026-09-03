@@ -2,8 +2,7 @@
 //!
 //! Contains utility functions used across multiple handlers.
 
-use crate::types::{Color, ColorOrGradient, Gradient};
-use crate::views::widgets::GradientPickerMessage;
+pub use crate::views::widgets::apply_gradient_message;
 
 /// Result of parsing a spawn command
 #[derive(Debug, Clone)]
@@ -525,67 +524,6 @@ pub fn format_key_combo(
 
     parts.push(key_name);
     parts.join("+")
-}
-
-/// Helper to apply GradientPickerMessage to a ColorOrGradient field
-pub fn apply_gradient_message(target: &mut ColorOrGradient, msg: GradientPickerMessage) {
-    match msg {
-        GradientPickerMessage::ToggleSolidGradient(is_gradient) => {
-            *target = if is_gradient {
-                // Convert to gradient
-                match target {
-                    ColorOrGradient::Color(color) => ColorOrGradient::Gradient(Gradient {
-                        from: *color,
-                        to: *color,
-                        angle: 0,
-                        ..Default::default()
-                    }),
-                    ColorOrGradient::Gradient(_) => target.clone(),
-                }
-            } else {
-                // Convert to solid color
-                match target {
-                    ColorOrGradient::Color(_) => target.clone(),
-                    ColorOrGradient::Gradient(gradient) => ColorOrGradient::Color(gradient.from),
-                }
-            };
-        }
-        GradientPickerMessage::SetFromColor(hex) => {
-            if let Some(color) = Color::from_hex(&hex) {
-                match target {
-                    ColorOrGradient::Color(c) => *c = color,
-                    ColorOrGradient::Gradient(g) => g.from = color,
-                }
-            }
-        }
-        GradientPickerMessage::SetToColor(hex) => {
-            if let ColorOrGradient::Gradient(gradient) = target {
-                if let Some(color) = Color::from_hex(&hex) {
-                    gradient.to = color;
-                }
-            }
-        }
-        GradientPickerMessage::SetAngle(angle) => {
-            if let ColorOrGradient::Gradient(gradient) = target {
-                gradient.angle = angle;
-            }
-        }
-        GradientPickerMessage::SetColorSpace(color_space) => {
-            if let ColorOrGradient::Gradient(gradient) = target {
-                gradient.color_space = color_space;
-            }
-        }
-        GradientPickerMessage::SetRelativeTo(relative_to) => {
-            if let ColorOrGradient::Gradient(gradient) = target {
-                gradient.relative_to = relative_to;
-            }
-        }
-        GradientPickerMessage::SetHueInterpolation(hue_interp) => {
-            if let ColorOrGradient::Gradient(gradient) = target {
-                gradient.hue_interpolation = Some(hue_interp);
-            }
-        }
-    }
 }
 
 #[cfg(test)]

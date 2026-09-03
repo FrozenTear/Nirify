@@ -1,13 +1,17 @@
 //! Layout extras settings view — neon modal style
 //!
 //! Configure shadows, tab indicators, insert hints, and preset sizes.
+//!
+//! These sections bind `LayoutExtrasMessage` for the global Layout page and
+//! cannot be remounted on per-output / per-workspace overrides. The shared
+//! layout-override editor reuses the same widget primitives and `preset_entry_row`.
 
 use iced::widget::{
     button, column, container, pick_list, row, scrollable, text, text_input, Space,
 };
 use iced::{Alignment, Element, Length};
 
-use super::widgets::{info_text, toggle_row};
+use super::widgets::{gradient_picker, info_text, preset_entry_row, toggle_row};
 use crate::config::models::{
     DefaultColumnDisplay, LayoutExtrasSettings, PresetHeight, PresetWidth, TabIndicatorPosition,
 };
@@ -15,7 +19,7 @@ use crate::messages::{LayoutExtrasMessage, Message};
 use crate::theme::{fonts, neon};
 
 /// Creates the full layout extras view
-pub fn view(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
+pub fn view(settings: &LayoutExtrasSettings) -> Element<'_, Message> {
     let content = column![
         // ── ROW 1: SHADOWS | TAB INDICATOR (top) ──
         row![
@@ -63,8 +67,6 @@ pub fn view(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
         .into()
 }
 
-const PRESET_KINDS: [&str; 2] = ["Proportion", "Fixed"];
-
 /// Preset column widths editor (switch-preset-column-width cycles through these).
 pub fn preset_widths_section(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
     let mut col = column![
@@ -88,7 +90,7 @@ pub fn preset_widths_section(settings: &LayoutExtrasSettings) -> Element<'static
             }
         };
         let value_for_kind = value_str.clone();
-        col = col.push(preset_row(
+        col = col.push(preset_entry_row(
             kind,
             &value_str,
             is_prop,
@@ -136,7 +138,7 @@ pub fn preset_heights_section(settings: &LayoutExtrasSettings) -> Element<'stati
             }
         };
         let value_for_kind = value_str.clone();
-        col = col.push(preset_row(
+        col = col.push(preset_entry_row(
             kind,
             &value_str,
             is_prop,
@@ -159,45 +161,6 @@ pub fn preset_heights_section(settings: &LayoutExtrasSettings) -> Element<'stati
             .padding([6, 12]),
     );
     col.into()
-}
-
-/// A single preset entry row: kind pick_list + numeric value + remove button.
-#[allow(clippy::too_many_arguments)]
-fn preset_row<'a>(
-    kind: &'a str,
-    value: &str,
-    is_proportion: bool,
-    on_kind: impl Fn(&str) -> Message + 'a,
-    on_value: impl Fn(String, String) -> Message + 'a,
-    on_remove: Message,
-) -> Element<'a, Message> {
-    let value_owned = value.to_string();
-    let kind_owned = kind.to_string();
-    let hint = if is_proportion { "0.0 - 1.0" } else { "pixels" };
-    let selected = if is_proportion { "Proportion" } else { "Fixed" };
-
-    container(
-        row![
-            pick_list(PRESET_KINDS.to_vec(), Some(selected), move |k: &str| {
-                on_kind(k)
-            })
-            .width(Length::Fixed(120.0)),
-            text_input(hint, &value_owned)
-                .on_input(move |v| on_value(kind_owned.clone(), v))
-                .padding(6)
-                .font(fonts::MONO_FONT)
-                .size(12)
-                .width(Length::Fill),
-            button(text("×").size(14))
-                .on_press(on_remove)
-                .padding([4, 10]),
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center),
-    )
-    .padding(8)
-    .style(crate::theme::card_style)
-    .into()
 }
 
 /// Window shadow settings
@@ -280,12 +243,9 @@ pub fn shadow_section(settings: &LayoutExtrasSettings) -> Element<'static, Messa
 }
 
 /// Tab indicator settings
-pub fn tab_indicator_section(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
+pub fn tab_indicator_section(settings: &LayoutExtrasSettings) -> Element<'_, Message> {
     let tab = &settings.tab_indicator;
     let tab_length = (tab.length_proportion * 100.0) as i32;
-    let tab_active_color = tab.active.to_hex();
-    let tab_inactive_color = tab.inactive.to_hex();
-    let tab_urgent_color = tab.urgent.to_hex();
 
     column![
         modal_section("\u{25A4}", "TAB INDICATOR", neon::SECONDARY),
@@ -403,23 +363,32 @@ pub fn tab_indicator_section(settings: &LayoutExtrasSettings) -> Element<'static
         .style(crate::theme::card_style),
         Space::new().height(4),
         if tab.use_active_color {
-            color_input("ACTIVE COLOR", &tab_active_color, |s| {
-                Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorActiveColor(s))
-            })
+            gradient_picker(
+                "Active color",
+                "Color or gradient for the active tab indicator",
+                &tab.active,
+                |msg| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorActiveColor(msg)),
+            )
         } else {
             info_text("Active follows focus ring colors when off.")
         },
         if tab.use_inactive_color {
-            color_input("INACTIVE COLOR", &tab_inactive_color, |s| {
-                Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorInactiveColor(s))
-            })
+            gradient_picker(
+                "Inactive color",
+                "Color or gradient for the inactive tab indicator",
+                &tab.inactive,
+                |msg| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorInactiveColor(msg)),
+            )
         } else {
             info_text("Inactive follows focus ring colors when off.")
         },
         if tab.use_urgent_color {
-            color_input("URGENT COLOR", &tab_urgent_color, |s| {
-                Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorUrgentColor(s))
-            })
+            gradient_picker(
+                "Urgent color",
+                "Color or gradient for urgent tab indicators",
+                &tab.urgent,
+                |msg| Message::LayoutExtras(LayoutExtrasMessage::SetTabIndicatorUrgentColor(msg)),
+            )
         } else {
             info_text("niri default #9b0000 when off.")
         },
@@ -429,9 +398,8 @@ pub fn tab_indicator_section(settings: &LayoutExtrasSettings) -> Element<'static
 }
 
 /// Insert hint settings
-pub fn insert_hint_section(settings: &LayoutExtrasSettings) -> Element<'static, Message> {
+pub fn insert_hint_section(settings: &LayoutExtrasSettings) -> Element<'_, Message> {
     let hint = &settings.insert_hint;
-    let hint_color = hint.color.to_hex();
 
     column![
         modal_section("\u{25C7}", "INSERT HINT", neon::TERTIARY),
@@ -448,9 +416,12 @@ pub fn insert_hint_section(settings: &LayoutExtrasSettings) -> Element<'static, 
         .padding(8)
         .style(crate::theme::card_style),
         Space::new().height(4),
-        color_input("HINT COLOR", &hint_color, |s| Message::LayoutExtras(
-            LayoutExtrasMessage::SetInsertHintColor(s)
-        ),),
+        gradient_picker(
+            "Hint color",
+            "Color or gradient shown when inserting a window",
+            &hint.color,
+            |msg| Message::LayoutExtras(LayoutExtrasMessage::SetInsertHintColor(msg)),
+        ),
     ]
     .spacing(6)
     .into()

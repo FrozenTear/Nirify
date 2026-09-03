@@ -631,6 +631,11 @@ pub fn editor_modal<'a>(
         .style(crate::theme::card_style),
     );
 
+    // Slice 3 (gradient + urgent color honesty) skips a color/urgent surface
+    // here: `LayerRule` has no `ColorOrGradient` focus-ring/border/tab fields
+    // and `LayerRulesMessage` has no SetFocusRingUrgent / SetBorderUrgent
+    // equivalents. Shadow colors stay solid `Color` pickers.
+
     editor = editor.push(Space::new().height(16));
     editor = editor.push(modal_section_header("◌", "SHADOW", neon::TERTIARY));
     editor = editor.push(super::window_rules::shadow_editor(
