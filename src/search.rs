@@ -794,6 +794,20 @@ fn screen_entries() -> Vec<SettingEntry> {
         ),
         e(
             SearchDestination::Displays,
+            "Monitor Identity",
+            "Match a display by connector or make, model, and serial",
+            &[
+                "identity",
+                "make",
+                "model",
+                "serial",
+                "connector",
+                "mms",
+                "edid",
+            ],
+        ),
+        e(
+            SearchDestination::Displays,
             "Display Scale",
             "HiDPI scaling factor for monitors",
             &["scale", "hidpi", "dpi", "display"],
@@ -995,6 +1009,12 @@ mod tests {
             "backup",
             SearchDestination::Gear(GearSubTab::Backups)
         ));
+    }
+
+    #[test]
+    fn test_search_monitor_identity() {
+        assert!(search_targets("serial", SearchDestination::Displays));
+        assert!(search_targets("make model", SearchDestination::Displays));
     }
 
     #[test]

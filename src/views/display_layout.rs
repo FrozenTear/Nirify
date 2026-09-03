@@ -13,6 +13,102 @@ use crate::config::{
 use crate::ipc::FullOutputInfo;
 use crate::types::VrrMode;
 
+/// Card / IDENTITY labels for a configured output, preferring live IPC.
+///
+/// niri stores identity as the `output "name"` (connector **or**
+/// `"Make Model Serial"`). `OutputConfig` has no separate make/model/serial
+/// fields to write — the picker / custom name still edit `name`.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct OutputIdentityLabels {
+    /// Card / modal title: make + model, else stored name.
+    pub title: String,
+    /// Connector as niri reports it (`DP-1`), when known.
+    pub connector: String,
+    pub make: String,
+    pub model: String,
+    pub serial: String,
+}
+
+impl OutputIdentityLabels {
+    /// True when at least one of make / model / serial is known.
+    #[must_use]
+    pub fn has_identity_fields(&self) -> bool {
+        !self.make.is_empty() || !self.model.is_empty() || !self.serial.is_empty()
+    }
+
+    /// `"Make Model"` when either is known; empty otherwise.
+    #[must_use]
+    pub fn make_model(&self) -> String {
+        [self.make.as_str(), self.model.as_str()]
+            .into_iter()
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+}
+
+fn known_identity_part(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("unknown") {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+/// Live IPC row for this config, using Config connector-then-MMS matching.
+#[must_use]
+pub fn live_for_output<'a>(
+    output: &OutputConfig,
+    available: &'a [FullOutputInfo],
+) -> Option<&'a FullOutputInfo> {
+    find_live_output(&output.name, available)
+}
+
+/// Human-readable identity for Displays cards and the IDENTITY section.
+#[must_use]
+pub fn output_identity_labels(
+    output: &OutputConfig,
+    live: Option<&FullOutputInfo>,
+) -> OutputIdentityLabels {
+    let make = live
+        .and_then(|info| known_identity_part(&info.make))
+        .unwrap_or_default();
+    let model = live
+        .and_then(|info| known_identity_part(&info.model))
+        .unwrap_or_default();
+    let serial = live
+        .and_then(|info| info.serial.as_deref().and_then(known_identity_part))
+        .unwrap_or_default();
+    let connector = live
+        .map(|info| info.name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_default();
+
+    let make_model = [make.as_str(), model.as_str()]
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let stored = output.name.trim();
+    let title = if !make_model.is_empty() {
+        make_model
+    } else if !stored.is_empty() {
+        stored.to_string()
+    } else {
+        String::new()
+    };
+
+    OutputIdentityLabels {
+        title,
+        connector,
+        make,
+        model,
+        serial,
+    }
+}
+
 /// Max preview height used by the Displays canvas (shared with hit-testing).
 pub const PREVIEW_MAX_HEIGHT: f32 = 200.0;
 /// Max preview width used by the Displays canvas (shared with hit-testing).
@@ -615,5 +711,60 @@ mod tests {
 
         assert_eq!(top_monitor.left, bottom_monitor.left);
         assert!(bottom_monitor.top > top_monitor.top);
+    }
+
+    #[test]
+    fn identity_labels_use_live_make_model_serial_for_mms_named_config() {
+        let output = OutputConfig {
+            name: "Dell Inc. U2720Q ABC123".into(),
+            ..Default::default()
+        };
+        let mut info = ipc_output("DP-1", 0, 0, 1.0, "Normal", 2560, 1440);
+        info.make = "Dell Inc.".into();
+        info.model = "U2720Q".into();
+        info.serial = Some("ABC123".into());
+
+        assert!(live_for_output(&output, &[info.clone()]).is_some());
+        let labels = output_identity_labels(&output, live_for_output(&output, &[info]));
+        assert_eq!(labels.title, "Dell Inc. U2720Q");
+        assert_eq!(labels.connector, "DP-1");
+        assert_eq!(labels.make, "Dell Inc.");
+        assert_eq!(labels.model, "U2720Q");
+        assert_eq!(labels.serial, "ABC123");
+        assert!(labels.has_identity_fields());
+    }
+
+    #[test]
+    fn identity_labels_hide_unknown_fillers_and_fall_back_to_name() {
+        let output = OutputConfig {
+            name: "eDP-1".into(),
+            ..Default::default()
+        };
+        let labels = output_identity_labels(&output, None);
+        assert_eq!(labels.title, "eDP-1");
+        assert!(!labels.has_identity_fields());
+
+        let mut unknown = ipc_output("eDP-1", 0, 0, 1.0, "Normal", 1920, 1080);
+        unknown.make = "Unknown".into();
+        unknown.model.clear();
+        unknown.serial = None;
+        let labels = output_identity_labels(&output, Some(&unknown));
+        assert_eq!(labels.title, "eDP-1");
+        assert_eq!(labels.connector, "eDP-1");
+        assert!(!labels.has_identity_fields());
+    }
+
+    #[test]
+    fn name_only_match_misses_mms_named_row() {
+        let output = OutputConfig {
+            name: "Dell Inc. U2720Q ABC123".into(),
+            ..Default::default()
+        };
+        let mut info = ipc_output("DP-1", 0, 0, 1.0, "Normal", 2560, 1440);
+        info.make = "Dell Inc.".into();
+        info.model = "U2720Q".into();
+        info.serial = Some("ABC123".into());
+        assert!(info.name != output.name);
+        assert!(live_for_output(&output, &[info]).is_some());
     }
 }

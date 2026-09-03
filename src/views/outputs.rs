@@ -4,6 +4,7 @@ use iced::widget::{button, column, container, pick_list, row, scrollable, text};
 use iced::{Alignment, Element, Length};
 use std::collections::HashMap;
 
+use super::display_layout::{live_for_output, output_identity_labels};
 use super::widgets::*;
 use crate::config::models::{OutputConfig, OutputSettings};
 use crate::ipc::FullOutputInfo;
@@ -62,7 +63,11 @@ fn connector_options(current: &str, available: &[FullOutputInfo]) -> Vec<Connect
             }
         }
     }
-    if !current.is_empty() && !opts.iter().any(|opt| opt.name == current) {
+    if !current.is_empty()
+        && !opts
+            .iter()
+            .any(|opt| opt.name.eq_ignore_ascii_case(current.trim()))
+    {
         opts.insert(
             0,
             ConnectorOption {
@@ -240,6 +245,23 @@ fn empty_detail_view() -> Element<'static, Message> {
         .into()
 }
 
+fn identity_field<'a>(label: &'a str, value: String) -> Element<'a, Message> {
+    let shown = if value.is_empty() {
+        "—".to_string()
+    } else {
+        value
+    };
+    column![
+        text(label)
+            .size(11)
+            .color(crate::theme::neon::OUTLINE_VARIANT),
+        text(shown).size(14),
+    ]
+    .spacing(2)
+    .width(Length::Fill)
+    .into()
+}
+
 /// Get available modes for an output by matching its name with IPC data
 fn get_available_modes(output_name: &str, available_outputs: &[FullOutputInfo]) -> Vec<ModeOption> {
     let ipc_output = crate::config::find_live_output(output_name, available_outputs);
@@ -356,51 +378,94 @@ pub fn output_detail_view<'a>(
         .into()
     };
 
+    let live = live_for_output(output, available_outputs);
+    let identity = output_identity_labels(output, live);
+    let matched_connector = if !identity.connector.is_empty()
+        && !identity.connector.eq_ignore_ascii_case(output.name.trim())
+    {
+        Some(format!("Matched connected display: {}", identity.connector))
+    } else {
+        None
+    };
     let connector_choices = connector_options(&output.name, available_outputs);
     let selected_connector = connector_choices
         .iter()
-        .find(|opt| opt.name == output.name)
+        .find(|opt| opt.name.eq_ignore_ascii_case(output.name.trim()))
         .cloned();
+
+    let mut identity_rows = column![
+        row![
+            column![
+                text("Output name").size(14).width(Length::FillPortion(1)),
+                container(text("Connector, or Make Model Serial (required to save)").size(12),)
+                    .style(muted_text_container),
+            ]
+            .spacing(2)
+            .width(Length::FillPortion(1)),
+            pick_list(
+                connector_choices,
+                selected_connector,
+                move |opt: ConnectorOption| {
+                    Message::Outputs(OutputsMessage::SetOutputName(idx, opt.name))
+                },
+            )
+            .placeholder("Select connector or identity…")
+            .width(Length::FillPortion(2))
+            .padding(8),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Center),
+        text_input_row(
+            "Custom name",
+            "Connector (DP-1) or Make Model Serial if the display is disconnected",
+            output.name.as_str(),
+            move |value| Message::Outputs(OutputsMessage::SetOutputName(idx, value)),
+        ),
+    ]
+    .spacing(4);
+
+    if identity.has_identity_fields() || !identity.connector.is_empty() {
+        identity_rows = identity_rows.push(spacer(8.0));
+        if let Some(matched) = matched_connector {
+            identity_rows = identity_rows.push(
+                container(
+                    row![text("ℹ").size(13), text(matched).size(12)]
+                        .spacing(8)
+                        .align_y(Alignment::Start),
+                )
+                .padding(12)
+                .style(crate::theme::info_block_style),
+            );
+        }
+        if identity.has_identity_fields() {
+            identity_rows = identity_rows.push(
+                row![
+                    identity_field("Make", identity.make.clone()),
+                    identity_field("Model", identity.model.clone()),
+                    identity_field("Serial", identity.serial.clone()),
+                ]
+                .spacing(12),
+            );
+            identity_rows = identity_rows.push(
+                container(
+                    text(
+                        "These come from the connected display. Choose the make/model/serial \
+                         option above to keep this monitor’s settings if it plugs into a \
+                         different port.",
+                    )
+                    .size(12),
+                )
+                .style(muted_text_container),
+            );
+        }
+    }
 
     let mut content = column![
         // ── IDENTITY ──
         modal_section("◎", "IDENTITY", neon::PRIMARY),
-        container(
-            column![
-                row![
-                    column![
-                        text("Output name").size(14).width(Length::FillPortion(1)),
-                        container(
-                            text("Connector, or Make Model Serial (required to save)").size(12),
-                        )
-                        .style(muted_text_container),
-                    ]
-                    .spacing(2)
-                    .width(Length::FillPortion(1)),
-                    pick_list(
-                        connector_choices,
-                        selected_connector,
-                        move |opt: ConnectorOption| {
-                            Message::Outputs(OutputsMessage::SetOutputName(idx, opt.name))
-                        },
-                    )
-                    .placeholder("Select connector or identity…")
-                    .width(Length::FillPortion(2))
-                    .padding(8),
-                ]
-                .spacing(12)
-                .align_y(Alignment::Center),
-                text_input_row(
-                    "Custom name",
-                    "Connector (DP-1) or Make Model Serial if the display is disconnected",
-                    output.name.as_str(),
-                    move |value| Message::Outputs(OutputsMessage::SetOutputName(idx, value)),
-                ),
-            ]
-            .spacing(4),
-        )
-        .padding(8)
-        .style(crate::theme::card_style),
+        container(identity_rows)
+            .padding(8)
+            .style(crate::theme::card_style),
         if output.name.trim().is_empty() {
             Element::from(
                 container(
