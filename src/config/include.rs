@@ -56,7 +56,7 @@ pub fn parse_include_node(node: &KdlNode) -> Option<IncludeDirective> {
     let mut optional = false;
     for entry in node.entries() {
         if let Some(name) = entry.name() {
-            if name.value() == "optional" && entry.value().as_bool() == Some(true) {
+            if name.value() == "optional" && kdl_truthy(entry.value()) {
                 optional = true;
             }
         } else if path.is_none() {
@@ -67,6 +67,58 @@ pub fn parse_include_node(node: &KdlNode) -> Option<IncludeDirective> {
     }
 
     path.map(|path| IncludeDirective { path, optional })
+}
+
+fn kdl_truthy(value: &kdl::KdlValue) -> bool {
+    if value.as_bool() == Some(true) {
+        return true;
+    }
+    if value.as_string() == Some("true") {
+        return true;
+    }
+    false
+}
+
+/// Rewrite niri/knuffel `optional=true` to KDL 2 `optional=#true`.
+///
+/// niri's wiki form is `include optional=true "file.kdl"`. The kdl 6 v2
+/// parser accepts that on a lone include line, but rejects `true` as a
+/// property value once the document also has `{ … }` children (it is then
+/// parsed as v2, where booleans are `#true`). Without this rewrite, a normal
+/// `config.kdl` that uses the wiki spelling fails to parse and import falls
+/// back to defaults.
+#[must_use]
+pub fn normalize_include_optional_syntax(content: &str) -> String {
+    let mut out = String::with_capacity(content.len() + 8);
+    for (i, line) in content.lines().enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        out.push_str(&rewrite_include_optional_line(line));
+    }
+    if content.ends_with('\n') {
+        out.push('\n');
+    }
+    out
+}
+
+fn rewrite_include_optional_line(line: &str) -> String {
+    let trimmed = line.trim_start();
+    if !trimmed.starts_with("include") {
+        return line.to_string();
+    }
+    // Avoid turning already-valid `#true` into `##true`.
+    line.replace("optional=#true", "\u{1}OPTIONAL_TRUE")
+        .replace("optional=#false", "\u{1}OPTIONAL_FALSE")
+        .replace("optional=true", "optional=#true")
+        .replace("optional=false", "optional=#false")
+        .replace("\u{1}OPTIONAL_TRUE", "optional=#true")
+        .replace("\u{1}OPTIONAL_FALSE", "optional=#false")
+}
+
+/// Parse KDL after normalizing niri include `optional=` flags.
+pub fn parse_kdl_with_niri_includes(content: &str) -> Result<kdl::KdlDocument, kdl::KdlError> {
+    normalize_include_optional_syntax(content).parse()
 }
 
 /// Expand `~/` and join relative paths against `base_dir` (the current file's parent).
@@ -216,7 +268,7 @@ mod tests {
     use std::str::FromStr;
 
     fn parse_one(src: &str) -> IncludeDirective {
-        let doc = KdlDocument::from_str(src).expect("kdl");
+        let doc = parse_kdl_with_niri_includes(src).expect("kdl");
         parse_include_node(doc.nodes().first().expect("node")).expect("include")
     }
 
@@ -229,10 +281,18 @@ mod tests {
 
     #[test]
     fn parse_optional_before_path() {
-        // niri wiki form: include optional=true "optional-config.kdl"
-        let d = parse_one(r#"include optional=true "optional-config.kdl""#);
+        // After normalize, niri wiki form becomes KDL 2 `#true`.
+        let normalized = normalize_include_optional_syntax(
+            r#"include optional=true "optional-config.kdl"
+layout { gaps 9 }
+"#,
+        );
+        assert!(normalized.contains("optional=#true"));
+        let doc = KdlDocument::from_str(&normalized).expect("kdl");
+        let d = parse_include_node(doc.nodes().first().expect("node")).expect("include");
         assert_eq!(d.path, "optional-config.kdl");
         assert!(d.optional);
+        assert!(doc.get("layout").is_some());
     }
 
     #[test]

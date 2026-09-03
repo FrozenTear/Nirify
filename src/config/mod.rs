@@ -20,8 +20,9 @@ pub use consolidation::{analyze_rules, ConsolidationAnalysis, ConsolidationSugge
 pub use dirty::{DirtyTracker, SettingsCategory};
 pub use error::ConfigError;
 pub use include::{
-    expand_include_path, open_include_for_import, open_include_for_scan, parse_include_node,
-    IncludeDirective, IncludeOpen,
+    expand_include_path, normalize_include_optional_syntax, open_include_for_import,
+    open_include_for_scan, parse_include_node, parse_kdl_with_niri_includes, IncludeDirective,
+    IncludeOpen,
 };
 pub use loader::{
     check_config_health, ensure_required_files_exist, import_from_kdl_str, import_from_niri_config,

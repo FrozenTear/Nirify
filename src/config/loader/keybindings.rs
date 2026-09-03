@@ -44,7 +44,7 @@ pub fn load_keybindings(niri_config_path: &Path, settings: &mut KeybindingsSetti
         }
     };
 
-    let doc = match parse_document(&config_content) {
+    let doc = match crate::config::include::parse_kdl_with_niri_includes(&config_content) {
         Ok(doc) => doc,
         Err(e) => {
             debug!("Could not parse keybindings config: {}", e);

@@ -14,7 +14,7 @@
 use super::super::models::{LayerRule, NamedWorkspace, OutputConfig, Settings, WindowRule};
 use super::super::parser::get_i64;
 use super::{
-    helpers, load_keybindings, load_keybindings_from_doc, parse_animations_from_children,
+    load_keybindings, load_keybindings_from_doc, parse_animations_from_children,
     parse_appearance_from_doc, parse_behavior_from_doc, parse_blur_from_doc,
     parse_cursor_from_children, parse_debug_from_doc, parse_environment_from_doc,
     parse_gestures_from_doc, parse_keyboard_from_children, parse_layer_rule_node_children,
@@ -26,15 +26,27 @@ use super::{
 };
 use crate::config::include::{
     default_niri_config_dir, import_skip_warning, open_include_for_import, parse_include_node,
-    IncludeOpen,
+    parse_kdl_with_niri_includes, IncludeOpen,
 };
 use crate::config::replace::is_nirify_include_path;
 use kdl::KdlDocument;
 use log::{debug, info, warn};
+use std::fs;
 use std::path::Path;
 
 /// Maximum depth for include file traversal to prevent circular includes
 const MAX_INCLUDE_DEPTH: usize = 10;
+
+fn read_user_kdl(path: &Path) -> Option<KdlDocument> {
+    let content = fs::read_to_string(path).ok()?;
+    match parse_kdl_with_niri_includes(&content) {
+        Ok(doc) => Some(doc),
+        Err(e) => {
+            debug!("Could not parse {:?}: {}", path, e);
+            None
+        }
+    }
+}
 
 /// Result of importing settings from user's niri config
 ///
@@ -292,7 +304,7 @@ fn import_from_niri_config_recursive_tracked(
     let config_dir = niri_config.parent().unwrap_or(Path::new("."));
 
     // Read config file
-    let Some(doc) = helpers::read_kdl_file(niri_config) else {
+    let Some(doc) = read_user_kdl(niri_config) else {
         if depth == 0 {
             let msg = "Could not read niri config for import, using defaults".to_string();
             info!("{}", msg);
@@ -711,7 +723,11 @@ layout { gaps 9 }
         .unwrap();
 
         let result = import_in(home, &config);
-        assert_eq!(result.includes_processed, 0);
+        assert_eq!(
+            result.includes_processed, 0,
+            "warnings: {:?}",
+            result.warnings
+        );
         assert!(
             result
                 .warnings
@@ -720,7 +736,11 @@ layout { gaps 9 }
             "optional missing must not warn: {:?}",
             result.warnings
         );
-        assert_eq!(result.settings.appearance.gaps, 9.0);
+        assert_eq!(
+            result.settings.appearance.gaps, 9.0,
+            "warnings: {:?}",
+            result.warnings
+        );
     }
 
     #[test]

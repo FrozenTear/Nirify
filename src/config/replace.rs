@@ -292,9 +292,9 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
     let original_content = fs::read_to_string(config_path)
         .with_context(|| format!("Failed to read {:?}", config_path))?;
 
-    let document: KdlDocument = original_content
-        .parse()
-        .with_context(|| format!("Failed to parse {:?} as KDL", config_path))?;
+    let document: KdlDocument =
+        crate::config::include::parse_kdl_with_niri_includes(&original_content)
+            .with_context(|| format!("Failed to parse {:?} as KDL", config_path))?;
 
     let config_parent = config_path
         .parent()
