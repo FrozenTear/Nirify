@@ -62,7 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh
 curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --prefix=/usr
 
 # Install a specific version
-curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --version=0.4.0
+curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --version=0.4.1
 ```
 
 ### Using Make

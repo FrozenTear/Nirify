@@ -174,8 +174,8 @@ get_latest_version() {
     fi
 
     if [[ -z "$version" ]]; then
-        warn "Could not fetch latest version from GitHub. Using v0.4.0"
-        version="v0.4.0"
+        warn "Could not fetch latest version from GitHub. Using v0.4.1"
+        version="v0.4.1"
     fi
 
     echo "$version"
@@ -389,7 +389,7 @@ parse_args() {
                 echo "  curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash"
                 echo ""
                 echo "  # Install specific version from source to /usr"
-                echo "  curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --source --prefix=/usr --version=0.4.0"
+                echo "  curl -fsSL https://raw.githubusercontent.com/FrozenTear/nirify/master/install.sh | bash -s -- --source --prefix=/usr --version=0.4.1"
                 echo ""
                 exit 0
                 ;;
