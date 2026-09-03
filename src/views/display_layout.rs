@@ -7,7 +7,9 @@
 //! `logical.x/y` when available, otherwise pack with [`pack_to_the_right`].
 
 use crate::config::models::{OutputConfig, OutputSettings};
-use crate::config::{estimated_logical_size, pack_to_the_right};
+use crate::config::{
+    estimated_logical_size, find_live_output, output_name_matches_live, pack_to_the_right,
+};
 use crate::ipc::FullOutputInfo;
 use crate::types::VrrMode;
 
@@ -91,7 +93,7 @@ pub fn unconfigured_outputs<'a>(
         .filter(|info| {
             !configured
                 .iter()
-                .any(|output| output.name == info.name && !output.name.is_empty())
+                .any(|output| output_name_matches_live(&output.name, info))
         })
         .collect()
 }
@@ -113,7 +115,7 @@ pub fn collect_monitors(
     let mut pack_later: Vec<MonitorRect> = Vec::new();
 
     for (idx, output) in outputs.outputs.iter().enumerate() {
-        let ipc = available.iter().find(|info| info.name == output.name);
+        let ipc = find_live_output(&output.name, available);
         let (width, height) = configured_logical_size(output, available);
         let name = if output.name.is_empty() {
             format!("Output {}", idx + 1)
@@ -147,9 +149,11 @@ pub fn collect_monitors(
     }
 
     for info in available {
-        if monitors.iter().any(|monitor| monitor.name == info.name)
-            || pack_later.iter().any(|monitor| monitor.name == info.name)
-        {
+        let already = outputs
+            .outputs
+            .iter()
+            .any(|output| output_name_matches_live(&output.name, info));
+        if already {
             continue;
         }
         let (width, height) = info.logical_size();
@@ -521,6 +525,42 @@ mod tests {
         let leftover = unconfigured_outputs(&configured, &available);
         assert_eq!(leftover.len(), 1);
         assert_eq!(leftover[0].name, "HDMI-A-1");
+    }
+
+    #[test]
+    fn unconfigured_and_canvas_match_make_model_serial() {
+        let mut dp = ipc_output("DP-1", 1920, 0, 1.0, "Normal", 2560, 1440);
+        dp.make = "Dell Inc.".into();
+        dp.model = "U2720Q".into();
+        dp.serial = Some("ABC123".into());
+        let mut hdmi = ipc_output("HDMI-A-1", 0, 0, 1.0, "Normal", 1920, 1080);
+        hdmi.make = "Other".into();
+        hdmi.model = "Panel".into();
+        hdmi.serial = Some("ZZ".into());
+
+        let configured = vec![OutputConfig {
+            name: "Dell Inc. U2720Q ABC123".into(),
+            position: Some((1920, 0)),
+            ..Default::default()
+        }];
+        let available = [dp, hdmi];
+        let leftover = unconfigured_outputs(&configured, &available);
+        assert_eq!(leftover.len(), 1);
+        assert_eq!(leftover[0].name, "HDMI-A-1");
+
+        let monitors = collect_monitors(
+            &OutputSettings {
+                outputs: configured,
+            },
+            &available,
+        );
+        assert_eq!(monitors.len(), 2);
+        assert!(monitors
+            .iter()
+            .any(|m| m.name == "Dell Inc. U2720Q ABC123" && m.config_index == Some(0)));
+        assert!(monitors
+            .iter()
+            .any(|m| m.name == "HDMI-A-1" && m.config_index.is_none()));
     }
 
     #[test]

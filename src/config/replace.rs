@@ -17,6 +17,7 @@ use log::{debug, info, warn};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::include::{open_include_for_scan, parse_include_node, IncludeDirective, IncludeOpen};
 use super::storage::atomic_write;
 
 /// Classification of a top-level KDL node
@@ -196,42 +197,48 @@ pub fn is_nirify_include_path(path: &str) -> bool {
 
 /// Check if this is a Nirify include line
 fn is_nirify_include(node: &KdlNode) -> bool {
-    if node.name().value() != "include" {
-        return false;
-    }
-    node.entries()
-        .first()
-        .and_then(|e| e.value().as_string())
-        .map(is_nirify_include_path)
+    parse_include_node(node)
+        .map(|d| is_nirify_include_path(&d.path))
         .unwrap_or(false)
-}
-
-/// Resolve the path of an `include` directive against `config.kdl`'s parent.
-///
-/// Returns `None` for tilde-prefixed paths because niri itself does not expand
-/// tildes in includes (see paths.rs::migrate_include_line); we don't want to
-/// scan a file niri can't actually load.
-fn resolve_include_path(include_value: &str, config_parent: &Path) -> Option<PathBuf> {
-    if include_value.starts_with("~/") || include_value == "~" {
-        return None;
-    }
-    let p = Path::new(include_value);
-    if p.is_absolute() {
-        Some(p.to_path_buf())
-    } else {
-        Some(config_parent.join(p))
-    }
 }
 
 /// Read an included file and collect any top-level managed nodes it declares.
 ///
-/// Returns `None` if the file can't be read/parsed or contains no managed
-/// nodes — only files that actually conflict are surfaced.
+/// Returns `None` if the file can't be read/parsed, is optional-and-missing,
+/// or contains no managed nodes — only files that actually conflict are surfaced.
+/// `~/` is expanded (niri 26.04). Conflict scan is not jailed.
 fn scan_include_for_conflicts(
-    include_value: &str,
+    directive: &IncludeDirective,
     config_parent: &Path,
 ) -> Option<ConflictingInclude> {
-    let resolved = resolve_include_path(include_value, config_parent)?;
+    let resolved =
+        match open_include_for_scan(directive, config_parent, dirs::home_dir().as_deref()) {
+            IncludeOpen::Ready(path) => path,
+            IncludeOpen::Missing {
+                optional: true,
+                resolved,
+            } => {
+                debug!(
+                    "Optional include {:?} is missing ({:?}); not a conflict",
+                    directive.path, resolved
+                );
+                return None;
+            }
+            IncludeOpen::Missing { resolved, .. } => {
+                debug!(
+                    "Could not read included file {:?} for conflict scan (missing)",
+                    resolved
+                );
+                return None;
+            }
+            other => {
+                debug!(
+                    "Could not resolve include {:?} for conflict scan: {:?}",
+                    directive.path, other
+                );
+                return None;
+            }
+        };
     let content = match fs::read_to_string(&resolved) {
         Ok(c) => c,
         Err(e) => {
@@ -271,7 +278,7 @@ fn scan_include_for_conflicts(
         None
     } else {
         Some(ConflictingInclude {
-            include_path: include_value.to_string(),
+            include_path: directive.path.clone(),
             resolved_path: resolved,
             conflicting_nodes,
         })
@@ -285,9 +292,9 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
     let original_content = fs::read_to_string(config_path)
         .with_context(|| format!("Failed to read {:?}", config_path))?;
 
-    let document: KdlDocument = original_content
-        .parse()
-        .with_context(|| format!("Failed to parse {:?} as KDL", config_path))?;
+    let document: KdlDocument =
+        crate::config::include::parse_kdl_with_niri_includes(&original_content)
+            .with_context(|| format!("Failed to parse {:?} as KDL", config_path))?;
 
     let config_parent = config_path
         .parent()
@@ -314,11 +321,11 @@ pub fn analyze_config(config_path: &Path) -> Result<ConfigAnalysis> {
         } else if name == "include" {
             unmanaged_count += 1;
             debug!("Found other include at index {}: preserving", idx);
-            if let Some(value) = node.entries().first().and_then(|e| e.value().as_string()) {
-                if let Some(conflict) = scan_include_for_conflicts(value, &config_parent) {
+            if let Some(directive) = parse_include_node(node) {
+                if let Some(conflict) = scan_include_for_conflicts(&directive, &config_parent) {
                     debug!(
                         "Include {:?} declares managed nodes: {:?}",
-                        value, conflict.conflicting_nodes
+                        directive.path, conflict.conflicting_nodes
                     );
                     conflicting_includes.push(conflict);
                 }
@@ -813,6 +820,21 @@ include "./cfg/layout.kdl"
     }
 
     #[test]
+    fn analyze_optional_missing_include_is_not_an_error() {
+        let original = r#"
+include optional=true "maybe-layout.kdl"
+include "nirify/main.kdl"
+"#;
+        let (_t, _config_path, result) = run_smart_replace(original, &[]);
+        assert!(
+            result.conflicting_includes.is_empty(),
+            "missing optional include must not be a conflict: {:?}",
+            result.conflicting_includes
+        );
+        assert_eq!(result.preserved_count, 1);
+    }
+
+    #[test]
     fn test_no_conflict_for_unmanaged_other_include() {
         // Other include exists but only defines a custom (non-managed) node.
         let original = r#"
@@ -832,16 +854,72 @@ include "nirify/main.kdl"
     }
 
     #[test]
-    fn test_resolve_include_path_skips_tilde() {
-        let parent = Path::new("/some/dir");
-        assert!(resolve_include_path("~/foo.kdl", parent).is_none());
-        assert_eq!(
-            resolve_include_path("./cfg/x.kdl", parent),
-            Some(PathBuf::from("/some/dir/./cfg/x.kdl"))
+    fn conflict_scan_expands_tilde_include() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let home = temp_dir.path();
+        let niri_dir = home.join(".config/niri");
+        std::fs::create_dir_all(&niri_dir).unwrap();
+        let extra = home.join("user-layout.kdl");
+        std::fs::write(&extra, "layout { gaps 16 }\n").unwrap();
+
+        let directive = IncludeDirective {
+            path: "~/user-layout.kdl".into(),
+            optional: false,
+        };
+        let conflict = scan_include_for_conflicts_with_home(&directive, &niri_dir, Some(home))
+            .expect("tilde include should be scanned");
+        assert_eq!(conflict.include_path, "~/user-layout.kdl");
+        assert!(conflict.conflicting_nodes.iter().any(|n| n == "layout"));
+    }
+
+    #[test]
+    fn conflict_scan_optional_missing_is_not_a_conflict() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let niri_dir = temp_dir.path().join("niri");
+        std::fs::create_dir_all(&niri_dir).unwrap();
+        let directive = IncludeDirective {
+            path: "maybe-layout.kdl".into(),
+            optional: true,
+        };
+        assert!(
+            scan_include_for_conflicts_with_home(&directive, &niri_dir, Some(temp_dir.path()))
+                .is_none()
         );
-        assert_eq!(
-            resolve_include_path("/abs/x.kdl", parent),
-            Some(PathBuf::from("/abs/x.kdl"))
-        );
+    }
+
+    fn scan_include_for_conflicts_with_home(
+        directive: &IncludeDirective,
+        config_parent: &Path,
+        home: Option<&Path>,
+    ) -> Option<ConflictingInclude> {
+        let resolved =
+            match crate::config::include::open_include_for_scan(directive, config_parent, home) {
+                IncludeOpen::Ready(path) => path,
+                _ => return None,
+            };
+        let content = std::fs::read_to_string(&resolved).ok()?;
+        let doc: KdlDocument = content.parse().ok()?;
+        let mut seen = std::collections::HashSet::new();
+        let conflicting_nodes: Vec<String> = doc
+            .nodes()
+            .iter()
+            .filter_map(|n| {
+                let name = n.name().value();
+                if is_managed_node(name) && seen.insert(name.to_string()) {
+                    Some(name.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if conflicting_nodes.is_empty() {
+            None
+        } else {
+            Some(ConflictingInclude {
+                include_path: directive.path.clone(),
+                resolved_path: resolved,
+                conflicting_nodes,
+            })
+        }
     }
 }

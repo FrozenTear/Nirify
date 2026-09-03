@@ -155,16 +155,16 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
     // Parse struts block
     if let Some(struts_node) = layout_children.get("struts") {
         if let Some(struts_children) = struts_node.children() {
-            if let Some(v) = get_i64(struts_children, &["left"]) {
+            if let Some(v) = get_f64(struts_children, &["left"]) {
                 layout.strut_left = Some(v as f32);
             }
-            if let Some(v) = get_i64(struts_children, &["right"]) {
+            if let Some(v) = get_f64(struts_children, &["right"]) {
                 layout.strut_right = Some(v as f32);
             }
-            if let Some(v) = get_i64(struts_children, &["top"]) {
+            if let Some(v) = get_f64(struts_children, &["top"]) {
                 layout.strut_top = Some(v as f32);
             }
-            if let Some(v) = get_i64(struts_children, &["bottom"]) {
+            if let Some(v) = get_f64(struts_children, &["bottom"]) {
                 layout.strut_bottom = Some(v as f32);
             }
         }
@@ -224,11 +224,8 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
             }
             // `fixed` is FloatOrInt in niri; accept a float (e.g. `fixed 500.5`)
             // via fallback so it isn't dropped and misclassified as auto.
-            if let Some(v) = get_i64(dcw_children, &["fixed"]) {
-                layout.default_column_width_fixed = Some(v as i32);
-                set = true;
-            } else if let Some(v) = get_f64(dcw_children, &["fixed"]) {
-                layout.default_column_width_fixed = Some(v.round() as i32);
+            if let Some(v) = get_f64(dcw_children, &["fixed"]) {
+                layout.default_column_width_fixed = Some(v as f32);
                 set = true;
             }
             // Empty `default-column-width {}` means "auto": windows pick their own

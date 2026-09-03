@@ -44,13 +44,24 @@ impl std::fmt::Display for ConnectorOption {
 }
 
 fn connector_options(current: &str, available: &[FullOutputInfo]) -> Vec<ConnectorOption> {
-    let mut opts: Vec<ConnectorOption> = available
-        .iter()
-        .map(|info| ConnectorOption {
+    let mut opts: Vec<ConnectorOption> = Vec::new();
+    for info in available {
+        opts.push(ConnectorOption {
             name: info.name.clone(),
             label: info.display_label(),
-        })
-        .collect();
+        });
+        if info.has_monitor_identity() {
+            let mms = info.make_model_serial();
+            if !mms.eq_ignore_ascii_case(&info.name)
+                && !opts.iter().any(|opt| opt.name.eq_ignore_ascii_case(&mms))
+            {
+                opts.push(ConnectorOption {
+                    name: mms.clone(),
+                    label: format!("{mms} (make/model/serial)"),
+                });
+            }
+        }
+    }
     if !current.is_empty() && !opts.iter().any(|opt| opt.name == current) {
         opts.insert(
             0,
@@ -231,8 +242,7 @@ fn empty_detail_view() -> Element<'static, Message> {
 
 /// Get available modes for an output by matching its name with IPC data
 fn get_available_modes(output_name: &str, available_outputs: &[FullOutputInfo]) -> Vec<ModeOption> {
-    // Find matching output from IPC data
-    let ipc_output = available_outputs.iter().find(|o| o.name == output_name);
+    let ipc_output = crate::config::find_live_output(output_name, available_outputs);
 
     if let Some(ipc_out) = ipc_output {
         ipc_out
@@ -359,9 +369,11 @@ pub fn output_detail_view<'a>(
             column![
                 row![
                     column![
-                        text("Connector").size(14).width(Length::FillPortion(1)),
-                        container(text("niri output name (required to save)").size(12))
-                            .style(muted_text_container),
+                        text("Output name").size(14).width(Length::FillPortion(1)),
+                        container(
+                            text("Connector, or Make Model Serial (required to save)").size(12),
+                        )
+                        .style(muted_text_container),
                     ]
                     .spacing(2)
                     .width(Length::FillPortion(1)),
@@ -372,7 +384,7 @@ pub fn output_detail_view<'a>(
                             Message::Outputs(OutputsMessage::SetOutputName(idx, opt.name))
                         },
                     )
-                    .placeholder("Select connector…")
+                    .placeholder("Select connector or identity…")
                     .width(Length::FillPortion(2))
                     .padding(8),
                 ]
@@ -380,7 +392,7 @@ pub fn output_detail_view<'a>(
                 .align_y(Alignment::Center),
                 text_input_row(
                     "Custom name",
-                    "Type a connector name if the display is disconnected",
+                    "Connector (DP-1) or Make Model Serial if the display is disconnected",
                     output.name.as_str(),
                     move |value| Message::Outputs(OutputsMessage::SetOutputName(idx, value)),
                 ),

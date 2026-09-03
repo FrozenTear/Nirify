@@ -12,7 +12,10 @@
 //!
 //! # Match / merge policy (`apply_live_outputs_to_settings`)
 //!
-//! - **Match by connector name** (`FullOutputInfo.name` == `OutputConfig.name`).
+//! - **Match by connector first**, then by niri `"Make Model Serial"`
+//!   (`FullOutputInfo.make_model_serial()`). A config named
+//!   `"Dell Inc. U2720Q ABC"` updates the matching live connector instead of
+//!   creating a duplicate row. New rows still default to the connector name.
 //! - **Connected outputs**: create a row if missing; update `position`, `scale`,
 //!   `transform`, and `mode` from live info when present. `enabled` is `true`
 //!   when niri reports a logical mapping, `false` when `logical` is `None`
@@ -73,12 +76,8 @@ pub fn apply_live_outputs_to_settings(
             continue;
         }
 
-        if let Some(existing) = settings
-            .outputs
-            .iter_mut()
-            .find(|output| output.name == info.name)
-        {
-            update_output_from_live(existing, info);
+        if let Some(idx) = find_config_index_for_live(&settings.outputs, info) {
+            update_output_from_live(&mut settings.outputs[idx], info);
             result.updated += 1;
             result.unmatched_left_alone = result.unmatched_left_alone.saturating_sub(1);
         } else {
@@ -145,7 +144,7 @@ pub fn seed_manual_position(
         return position;
     }
 
-    if let Some(info) = live.iter().find(|info| info.name == output.name) {
+    if let Some(info) = find_live_output(&output.name, live) {
         if let Some(logical) = &info.logical {
             return (logical.x, logical.y);
         }
@@ -184,7 +183,7 @@ pub fn pack_to_the_right(occupied: &[(i32, i32, u32, u32)]) -> (i32, i32) {
 /// Estimated logical size for a configured output, preferring live geometry.
 #[must_use]
 pub fn estimated_logical_size(output: &OutputConfig, live: &[FullOutputInfo]) -> (u32, u32) {
-    if let Some(info) = live.iter().find(|info| info.name == output.name) {
+    if let Some(info) = find_live_output(&output.name, live) {
         return info.logical_size();
     }
     logical_size_from_mode(
@@ -199,6 +198,54 @@ pub fn estimated_logical_size(output: &OutputConfig, live: &[FullOutputInfo]) ->
 pub fn logical_size_from_mode(mode: &str, scale: f64, transform: Transform) -> (u32, u32) {
     let (physical_w, physical_h) = parse_mode_resolution(mode).unwrap_or((1920, 1080));
     logical_size_after_scale_transform(physical_w, physical_h, scale, transform)
+}
+
+/// Whether a configured `output "name"` matches this live connector.
+///
+/// Connector is tried first (case-insensitive, niri 0.1.6+), then
+/// `"Make Model Serial"`.
+#[must_use]
+pub fn output_name_matches_live(config_name: &str, info: &FullOutputInfo) -> bool {
+    let name = config_name.trim();
+    if name.is_empty() {
+        return false;
+    }
+    if name.eq_ignore_ascii_case(info.name.trim()) {
+        return true;
+    }
+    name.eq_ignore_ascii_case(&info.make_model_serial())
+}
+
+/// Live IPC row for a configured output name (connector or make/model/serial).
+#[must_use]
+pub fn find_live_output<'a>(
+    config_name: &str,
+    live: &'a [FullOutputInfo],
+) -> Option<&'a FullOutputInfo> {
+    live.iter()
+        .find(|info| info.name.eq_ignore_ascii_case(config_name.trim()))
+        .or_else(|| {
+            live.iter()
+                .find(|info| output_name_matches_live(config_name, info))
+        })
+}
+
+/// Config index matching a live output: connector first, then make/model/serial.
+#[must_use]
+pub fn find_config_index_for_live(
+    outputs: &[OutputConfig],
+    info: &FullOutputInfo,
+) -> Option<usize> {
+    outputs
+        .iter()
+        .position(|output| {
+            !output.name.is_empty() && output.name.eq_ignore_ascii_case(info.name.trim())
+        })
+        .or_else(|| {
+            outputs.iter().position(|output| {
+                !output.name.is_empty() && output_name_matches_live(&output.name, info)
+            })
+        })
 }
 
 /// Parse `WxH` or `WxH@refresh` into physical pixels.
@@ -449,6 +496,97 @@ mod tests {
     #[test]
     fn pack_to_the_right_empty_is_origin() {
         assert_eq!(pack_to_the_right(&[]), (0, 0));
+    }
+
+    fn identified(
+        connector: &str,
+        make: &str,
+        model: &str,
+        serial: &str,
+        x: i32,
+        y: i32,
+    ) -> FullOutputInfo {
+        let mut info = live(connector, x, y, 2560, 1440, 1.0, 2560, 1440);
+        info.make = make.to_string();
+        info.model = model.to_string();
+        info.serial = Some(serial.to_string());
+        info
+    }
+
+    #[test]
+    fn match_prefers_connector_then_make_model_serial() {
+        let info = identified("DP-1", "Dell Inc.", "U2720Q", "ABC123", 1920, 0);
+        assert_eq!(info.make_model_serial(), "Dell Inc. U2720Q ABC123");
+        assert!(output_name_matches_live("DP-1", &info));
+        assert!(output_name_matches_live("dp-1", &info));
+        assert!(output_name_matches_live("Dell Inc. U2720Q ABC123", &info));
+        assert!(output_name_matches_live("dell inc. u2720q abc123", &info));
+        assert!(!output_name_matches_live("HDMI-A-1", &info));
+        assert!(!output_name_matches_live("Dell Inc. U2720Q OTHER", &info));
+        assert!(!output_name_matches_live("", &info));
+    }
+
+    #[test]
+    fn find_helpers_connector_wins_over_mms_duplicate() {
+        let info = identified("DP-1", "Dell Inc.", "U2720Q", "ABC123", 1920, 0);
+        let outputs = vec![named("Dell Inc. U2720Q ABC123"), named("DP-1")];
+        // Connector match is preferred when both exist.
+        assert_eq!(find_config_index_for_live(&outputs, &info), Some(1));
+        assert_eq!(
+            find_live_output("Dell Inc. U2720Q ABC123", &[info.clone()]).map(|i| i.name.as_str()),
+            Some("DP-1")
+        );
+    }
+
+    #[test]
+    fn snapshot_matches_make_model_serial_without_duplicate() {
+        let mut existing = named("Dell Inc. U2720Q ABC123");
+        existing.position = Some((10, 20));
+        existing.background_color = Some(crate::types::Color::from_hex("#112233").unwrap());
+        let mut settings = OutputSettings {
+            outputs: vec![existing],
+        };
+        let result = apply_live_outputs_to_settings(
+            &mut settings,
+            &[identified(
+                "DP-1",
+                "Dell Inc.",
+                "U2720Q",
+                "ABC123",
+                1920,
+                240,
+            )],
+        );
+
+        assert_eq!(result.created, 0);
+        assert_eq!(result.updated, 1);
+        assert_eq!(result.unmatched_left_alone, 0);
+        assert_eq!(settings.outputs.len(), 1);
+        assert_eq!(settings.outputs[0].name, "Dell Inc. U2720Q ABC123");
+        assert_eq!(settings.outputs[0].position, Some((1920, 240)));
+        assert_eq!(settings.outputs[0].scale, Some(1.0));
+        assert_eq!(
+            settings.outputs[0].background_color,
+            Some(crate::types::Color::from_hex("#112233").unwrap())
+        );
+    }
+
+    #[test]
+    fn seed_and_size_use_mms_identity() {
+        let output = named("Dell Inc. U2720Q ABC123");
+        let live_outputs = [identified(
+            "HDMI-A-1",
+            "Dell Inc.",
+            "U2720Q",
+            "ABC123",
+            2560,
+            80,
+        )];
+        assert_eq!(
+            seed_manual_position(0, &[output.clone()], &live_outputs),
+            (2560, 80)
+        );
+        assert_eq!(estimated_logical_size(&output, &live_outputs), (2560, 1440));
     }
 
     #[test]

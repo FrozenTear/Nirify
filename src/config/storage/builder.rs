@@ -139,25 +139,32 @@ impl KdlBuilder {
         self
     }
 
-    /// Add a float field (with sufficient precision to round-trip)
-    pub fn field_f32(&mut self, name: &str, value: f32) -> &mut Self {
-        self.content.push_str(&self.indent());
-        self.content.push_str(name);
-        self.content.push(' ');
-        // Use integer if it's a whole number within i32 range, otherwise float format
-        // Check is_finite() to handle NaN and Infinity safely
+    /// Format a layout/geometry `FloatOrInt` (whole numbers stay unadorned).
+    #[must_use]
+    pub fn format_f32(value: f32) -> String {
         if value.is_finite()
             && value.fract() == 0.0
             && value >= i32::MIN as f32
             && value <= i32::MAX as f32
         {
-            self.content.push_str(&(value as i32).to_string());
-        } else {
-            // Use 6 decimal places (enough for f32 precision), trim trailing zeros
+            (value as i32).to_string()
+        } else if value.is_finite() {
             let formatted = format!("{:.6}", value);
-            let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
-            self.content.push_str(trimmed);
+            formatted
+                .trim_end_matches('0')
+                .trim_end_matches('.')
+                .to_string()
+        } else {
+            "0".to_string()
         }
+    }
+
+    /// Add a float field (with sufficient precision to round-trip)
+    pub fn field_f32(&mut self, name: &str, value: f32) -> &mut Self {
+        self.content.push_str(&self.indent());
+        self.content.push_str(name);
+        self.content.push(' ');
+        self.content.push_str(&Self::format_f32(value));
         self.content.push('\n');
         self
     }

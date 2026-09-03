@@ -5,15 +5,19 @@
 //! Supports following include directives within the niri config directory.
 
 use super::helpers::read_kdl_file;
+use crate::config::include::{
+    default_niri_config_dir, open_include_for_import, parse_include_node, IncludeOpen,
+};
 use crate::config::models::{
     last_wins_keybindings, ActionNode, ActionValue, HotkeyOverlayTitle, KeybindAction, Keybinding,
     KeybindingsSettings,
 };
 use crate::config::parser::parse_document;
+use crate::config::replace::is_nirify_include_path;
 use kdl::{KdlDocument, KdlNode};
 use log::debug;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Maximum include depth (same as settings import) to prevent circular includes.
 const MAX_INCLUDE_DEPTH: usize = 10;
@@ -40,7 +44,7 @@ pub fn load_keybindings(niri_config_path: &Path, settings: &mut KeybindingsSetti
         }
     };
 
-    let doc = match parse_document(&config_content) {
+    let doc = match crate::config::include::parse_kdl_with_niri_includes(&config_content) {
         Ok(doc) => doc,
         Err(e) => {
             debug!("Could not parse keybindings config: {}", e);
@@ -104,21 +108,25 @@ fn load_keybindings_walk(
                 }
             }
             "include" => {
-                let Some(include_path) = node.entries().first().and_then(|e| e.value().as_string())
-                else {
+                let Some(directive) = parse_include_node(node) else {
                     continue;
                 };
-                if crate::config::replace::is_nirify_include_path(include_path) {
+                if is_nirify_include_path(&directive.path) {
                     debug!(
                         "Skipping Nirify include while loading keybindings: {}",
-                        include_path
+                        directive.path
                     );
                     continue;
                 }
-                let Some(resolved_path) = resolve_include_path(include_path, config_dir) else {
+                let IncludeOpen::Ready(resolved_path) = open_include_for_import(
+                    &directive,
+                    config_dir,
+                    dirs::home_dir().as_deref(),
+                    default_niri_config_dir().as_deref(),
+                ) else {
                     continue;
                 };
-                debug!("Found include: {} -> {:?}", include_path, resolved_path);
+                debug!("Found include: {} -> {:?}", directive.path, resolved_path);
                 if let Some(included_doc) = read_kdl_file(&resolved_path) {
                     let included_dir = resolved_path.parent().unwrap_or(config_dir);
                     load_keybindings_walk(
@@ -135,49 +143,6 @@ fn load_keybindings_walk(
             }
             _ => {}
         }
-    }
-}
-
-/// Resolve an include path relative to the config directory
-///
-/// Returns None if the path escapes the allowed config directories for security.
-/// Only paths under the XDG-compliant niri config dir are allowed.
-fn resolve_include_path(include_path: &str, config_dir: &Path) -> Option<PathBuf> {
-    let path = include_path.trim_matches('"');
-
-    let resolved = if let Some(stripped) = path.strip_prefix("~/") {
-        // Expand ~ to home directory
-        dirs::home_dir()?.join(stripped)
-    } else if path.starts_with('/') {
-        // Absolute path
-        PathBuf::from(path)
-    } else {
-        // Relative to config directory
-        config_dir.join(path)
-    };
-
-    // Canonicalize to resolve .. and symlinks, verify within allowed directories
-    let canonical = match resolved.canonicalize() {
-        Ok(p) => p,
-        Err(e) => {
-            log::debug!("Include path {:?} cannot be resolved: {}", path, e);
-            return None;
-        }
-    };
-
-    // Get allowed base directories - respect $XDG_CONFIG_HOME
-    let config_base = dirs::config_dir()?;
-    let niri_config_dir = config_base.join("niri");
-
-    // Only allow paths under the XDG-compliant niri config dir
-    if canonical.starts_with(&niri_config_dir) {
-        Some(canonical)
-    } else {
-        log::warn!(
-            "Include path {:?} escapes allowed config directory, ignoring for security",
-            path
-        );
-        None
     }
 }
 

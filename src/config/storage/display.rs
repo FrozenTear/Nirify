@@ -182,9 +182,13 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
 
     content.push_str(&format!("{}layout {{\n", indent));
 
-    // Gaps - niri uses a single value
+    // Gaps - niri `FloatOrInt` (do not coerce 0.5 to 0/1)
     if let Some(gaps) = layout.gaps {
-        content.push_str(&format!("{}gaps {}\n", inner_indent, gaps as i32));
+        content.push_str(&format!(
+            "{}gaps {}\n",
+            inner_indent,
+            crate::config::storage::builder::KdlBuilder::format_f32(gaps)
+        ));
     }
 
     // Struts block
@@ -195,16 +199,32 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
     if has_struts {
         content.push_str(&format!("{}struts {{\n", inner_indent));
         if let Some(left) = layout.strut_left {
-            content.push_str(&format!("{}left {}\n", deep_indent, left as i32));
+            content.push_str(&format!(
+                "{}left {}\n",
+                deep_indent,
+                crate::config::storage::builder::KdlBuilder::format_f32(left)
+            ));
         }
         if let Some(right) = layout.strut_right {
-            content.push_str(&format!("{}right {}\n", deep_indent, right as i32));
+            content.push_str(&format!(
+                "{}right {}\n",
+                deep_indent,
+                crate::config::storage::builder::KdlBuilder::format_f32(right)
+            ));
         }
         if let Some(top) = layout.strut_top {
-            content.push_str(&format!("{}top {}\n", deep_indent, top as i32));
+            content.push_str(&format!(
+                "{}top {}\n",
+                deep_indent,
+                crate::config::storage::builder::KdlBuilder::format_f32(top)
+            ));
         }
         if let Some(bottom) = layout.strut_bottom {
-            content.push_str(&format!("{}bottom {}\n", deep_indent, bottom as i32));
+            content.push_str(&format!(
+                "{}bottom {}\n",
+                deep_indent,
+                crate::config::storage::builder::KdlBuilder::format_f32(bottom)
+            ));
         }
         content.push_str(&format!("{}}}\n", inner_indent));
     }
@@ -279,7 +299,11 @@ pub fn generate_layout_override_kdl(layout: &LayoutOverride, indent: &str) -> St
             content.push_str(&format!("{}proportion {:.5}\n", deep_indent, p));
         }
         if let Some(f) = layout.default_column_width_fixed {
-            content.push_str(&format!("{}fixed {}\n", deep_indent, f));
+            content.push_str(&format!(
+                "{}fixed {}\n",
+                deep_indent,
+                crate::config::storage::builder::KdlBuilder::format_f32(f)
+            ));
         }
         content.push_str(&format!("{}}}\n", inner_indent));
     }
@@ -1074,9 +1098,22 @@ mod tests {
         let doc: kdl::KdlDocument = kdl.parse().unwrap();
         let children = doc.get("layout").and_then(|n| n.children()).unwrap();
         let got = crate::config::loader::parse_layout_override(children).expect("survives");
-        // Override stores fixed width as i32, so 500.5 rounds to 501 (not dropped/auto).
-        assert_eq!(got.default_column_width_fixed, Some(501));
+        assert_eq!(got.default_column_width_fixed, Some(500.5));
         assert_eq!(got.default_column_width_auto, None);
+
+        // Writer must keep the fraction too.
+        let written = generate_layout_override_kdl(
+            &LayoutOverride {
+                gaps: Some(0.5),
+                strut_left: Some(1.25),
+                default_column_width_fixed: Some(500.5),
+                ..Default::default()
+            },
+            "",
+        );
+        assert!(written.contains("gaps 0.5"), "{written}");
+        assert!(written.contains("left 1.25"), "{written}");
+        assert!(written.contains("fixed 500.5"), "{written}");
     }
 
     #[test]

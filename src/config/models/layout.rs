@@ -273,8 +273,8 @@ pub struct LayoutOverride {
     // === Default Sizing ===
     /// Default column width as proportion (0.0-1.0)
     pub default_column_width_proportion: Option<f32>,
-    /// Default column width as fixed pixels
-    pub default_column_width_fixed: Option<i32>,
+    /// Default column width as fixed pixels (niri `FloatOrInt`)
+    pub default_column_width_fixed: Option<f32>,
     /// Preset column widths for switch-preset-column-width
     pub preset_column_widths: Option<Vec<PresetWidth>>,
     /// Preset window heights for switch-preset-window-height

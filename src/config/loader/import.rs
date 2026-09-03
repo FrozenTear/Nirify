@@ -5,7 +5,8 @@
 //!
 //! Includes are walked **in document order**, interleaved with same-file nodes,
 //! matching niri include positionality (content after an include overrides that
-//! include). `~/` expansion + the import jail are unchanged (sweep follow-up).
+//! include). `~/` expansion, `optional=true`, and the import jail live in
+//! [`crate::config::include`].
 //!
 //! This module uses shared parsing functions from the loader modules to avoid
 //! code duplication. The import functions primarily delegate to these shared
@@ -14,7 +15,7 @@
 use super::super::models::{LayerRule, NamedWorkspace, OutputConfig, Settings, WindowRule};
 use super::super::parser::get_i64;
 use super::{
-    helpers, load_keybindings, load_keybindings_from_doc, parse_animations_from_children,
+    load_keybindings, load_keybindings_from_doc, parse_animations_from_children,
     parse_appearance_from_doc, parse_behavior_from_doc, parse_blur_from_doc,
     parse_cursor_from_children, parse_debug_from_doc, parse_environment_from_doc,
     parse_gestures_from_doc, parse_keyboard_from_children, parse_layer_rule_node_children,
@@ -24,13 +25,29 @@ use super::{
     parse_touch_from_children, parse_touchpad_from_children, parse_trackball_from_children,
     parse_trackpoint_from_children, parse_window_rule_node_children, parse_workspace_node_children,
 };
+use crate::config::include::{
+    default_niri_config_dir, import_skip_warning, open_include_for_import, parse_include_node,
+    parse_kdl_with_niri_includes, IncludeOpen,
+};
 use crate::config::replace::is_nirify_include_path;
 use kdl::KdlDocument;
 use log::{debug, info, warn};
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::path::Path;
 
 /// Maximum depth for include file traversal to prevent circular includes
 const MAX_INCLUDE_DEPTH: usize = 10;
+
+fn read_user_kdl(path: &Path) -> Option<KdlDocument> {
+    let content = fs::read_to_string(path).ok()?;
+    match parse_kdl_with_niri_includes(&content) {
+        Ok(doc) => Some(doc),
+        Err(e) => {
+            debug!("Could not parse {:?}: {}", path, e);
+            None
+        }
+    }
+}
 
 /// Result of importing settings from user's niri config
 ///
@@ -102,6 +119,8 @@ pub fn import_from_niri_config_with_result(niri_config: &Path) -> ImportResult {
         0,
         &mut warnings,
         &mut includes_processed,
+        dirs::home_dir().as_deref(),
+        default_niri_config_dir().as_deref(),
     );
 
     // Always load keybindings (already has its own include traversal)
@@ -270,6 +289,8 @@ fn import_from_niri_config_recursive_tracked(
     depth: usize,
     warnings: &mut Vec<String>,
     includes_processed: &mut usize,
+    home: Option<&Path>,
+    niri_config_dir: Option<&Path>,
 ) {
     if depth > MAX_INCLUDE_DEPTH {
         let msg = format!(
@@ -284,7 +305,7 @@ fn import_from_niri_config_recursive_tracked(
     let config_dir = niri_config.parent().unwrap_or(Path::new("."));
 
     // Read config file
-    let Some(doc) = helpers::read_kdl_file(niri_config) else {
+    let Some(doc) = read_user_kdl(niri_config) else {
         if depth == 0 {
             let msg = "Could not read niri config for import, using defaults".to_string();
             info!("{}", msg);
@@ -301,33 +322,46 @@ fn import_from_niri_config_recursive_tracked(
     // same-file nodes (niri include positionality). Importing the whole
     // file first, then includes, inverted later same-file overrides.
     for node in doc.nodes() {
-        if node.name().value() == "include" {
-            if let Some(path_str) = node.entries().first().and_then(|e| e.value().as_string()) {
-                if is_nirify_include_path(path_str) {
-                    debug!("Skipping Nirify include during import: {}", path_str);
-                    continue;
-                }
-                if let Some(resolved) = resolve_include_path(path_str, config_dir) {
-                    debug!(
-                        "Following include (depth {}): {} -> {:?}",
-                        depth, path_str, resolved
-                    );
-                    *includes_processed += 1;
-                    import_from_niri_config_recursive_tracked(
-                        &resolved,
-                        settings,
-                        depth + 1,
-                        warnings,
-                        includes_processed,
-                    );
-                } else {
-                    let msg = format!("Skipped include (security): {}", path_str);
+        if node.name().value() != "include" {
+            import_single_node(node, settings);
+            continue;
+        }
+        let Some(directive) = parse_include_node(node) else {
+            continue;
+        };
+        if is_nirify_include_path(&directive.path) {
+            debug!("Skipping Nirify include during import: {}", directive.path);
+            continue;
+        }
+        let open = open_include_for_import(&directive, config_dir, home, niri_config_dir);
+        match open {
+            IncludeOpen::Ready(resolved) => {
+                debug!(
+                    "Following include (depth {}): {} -> {:?}",
+                    depth, directive.path, resolved
+                );
+                *includes_processed += 1;
+                import_from_niri_config_recursive_tracked(
+                    &resolved,
+                    settings,
+                    depth + 1,
+                    warnings,
+                    includes_processed,
+                    home,
+                    niri_config_dir,
+                );
+            }
+            other => {
+                if let Some(msg) = import_skip_warning(&directive, &other) {
                     debug!("{}", msg);
                     warnings.push(msg);
+                } else {
+                    debug!(
+                        "Skipping optional/missing include {}: {:?}",
+                        directive.path, other
+                    );
                 }
             }
-        } else {
-            import_single_node(node, settings);
         }
     }
 }
@@ -395,48 +429,6 @@ pub(crate) fn import_from_document(doc: &KdlDocument, settings: &mut Settings) {
     parse_debug_from_doc(doc, settings);
     parse_switch_events_from_doc(doc, settings);
     parse_recent_windows_from_doc(doc, settings);
-}
-
-/// Resolve an include path relative to the config directory
-///
-/// Returns None if the path escapes the allowed config directories for security.
-fn resolve_include_path(include_path: &str, config_dir: &Path) -> Option<PathBuf> {
-    let path = include_path.trim_matches('"');
-
-    let resolved = if let Some(stripped) = path.strip_prefix("~/") {
-        // Expand ~ to home directory
-        dirs::home_dir()?.join(stripped)
-    } else if path.starts_with('/') {
-        // Absolute path
-        PathBuf::from(path)
-    } else {
-        // Relative to config directory
-        config_dir.join(path)
-    };
-
-    // Canonicalize to resolve .. and symlinks, verify within allowed directories
-    let canonical = match resolved.canonicalize() {
-        Ok(p) => p,
-        Err(e) => {
-            debug!("Include path {:?} cannot be resolved: {}", path, e);
-            return None;
-        }
-    };
-
-    // Get allowed base directories - respect $XDG_CONFIG_HOME
-    let config_base = dirs::config_dir()?;
-    let niri_config_dir = config_base.join("niri");
-
-    // Only allow paths under the XDG-compliant niri config dir
-    if canonical.starts_with(&niri_config_dir) {
-        Some(canonical)
-    } else {
-        warn!(
-            "Include path {:?} escapes allowed config directory, ignoring for security",
-            path
-        );
-        None
-    }
 }
 
 // Import helper functions for each settings category
@@ -670,4 +662,132 @@ fn import_window_rules_from_doc(doc: &KdlDocument, settings: &mut Settings) {
         &mut settings.appearance,
         &settings.window_rules,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn import_in(home: &Path, config: &Path) -> ImportResult {
+        let niri = home.join(".config/niri");
+        let mut settings = Settings::default();
+        let mut warnings = Vec::new();
+        let mut includes_processed = 0;
+        import_from_niri_config_recursive_tracked(
+            config,
+            &mut settings,
+            0,
+            &mut warnings,
+            &mut includes_processed,
+            Some(home),
+            Some(&niri),
+        );
+        finish_import(settings, warnings, includes_processed)
+    }
+
+    #[test]
+    fn import_follows_tilde_include_inside_jail() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path();
+        let niri = home.join(".config/niri");
+        fs::create_dir_all(&niri).unwrap();
+        fs::write(niri.join("extra.kdl"), "layout { gaps 8 }\n").unwrap();
+        let config = niri.join("config.kdl");
+        fs::write(&config, r#"include "~/.config/niri/extra.kdl""#).unwrap();
+
+        let result = import_in(home, &config);
+        assert_eq!(result.includes_processed, 1);
+        assert!(
+            result.warnings.is_empty(),
+            "unexpected warnings: {:?}",
+            result.warnings
+        );
+        assert_eq!(result.settings.appearance.gaps, 8.0);
+    }
+
+    #[test]
+    fn import_optional_missing_include_is_not_an_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path();
+        let niri = home.join(".config/niri");
+        fs::create_dir_all(&niri).unwrap();
+        let config = niri.join("config.kdl");
+        fs::write(
+            &config,
+            r#"
+include optional=true "maybe.kdl"
+layout { gaps 9 }
+"#,
+        )
+        .unwrap();
+
+        let result = import_in(home, &config);
+        assert_eq!(
+            result.includes_processed, 0,
+            "warnings: {:?}",
+            result.warnings
+        );
+        assert!(
+            result
+                .warnings
+                .iter()
+                .all(|w| !w.contains("maybe.kdl") && !w.contains("Skipped include")),
+            "optional missing must not warn: {:?}",
+            result.warnings
+        );
+        assert_eq!(
+            result.settings.appearance.gaps, 9.0,
+            "warnings: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn import_required_missing_include_warns() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path();
+        let niri = home.join(".config/niri");
+        fs::create_dir_all(&niri).unwrap();
+        let config = niri.join("config.kdl");
+        fs::write(&config, r#"include "missing.kdl""#).unwrap();
+
+        let result = import_in(home, &config);
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.contains("Could not read included file")),
+            "required missing include should warn: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn import_jails_tilde_outside_niri_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path();
+        let niri = home.join(".config/niri");
+        fs::create_dir_all(&niri).unwrap();
+        fs::create_dir_all(home.join("dotfiles")).unwrap();
+        fs::write(home.join("dotfiles/layout.kdl"), "layout { gaps 3 }\n").unwrap();
+        let config = niri.join("config.kdl");
+        fs::write(&config, r#"include "~/dotfiles/layout.kdl""#).unwrap();
+
+        let result = import_in(home, &config);
+        assert_eq!(result.includes_processed, 0);
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.contains("outside ~/.config/niri")),
+            "jail warning missing: {:?}",
+            result.warnings
+        );
+        // Settings stay default; niri still loads the include, Nirify does not copy it.
+        assert_eq!(
+            result.settings.appearance.gaps,
+            Settings::default().appearance.gaps
+        );
+    }
 }

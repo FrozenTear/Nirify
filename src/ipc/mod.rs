@@ -784,6 +784,26 @@ impl FullOutputInfo {
         }
     }
 
+    /// niri `output "Make Model Serial"` form (missing fields become `Unknown`).
+    #[must_use]
+    pub fn make_model_serial(&self) -> String {
+        format!(
+            "{} {} {}",
+            nonempty_or_unknown(&self.make),
+            nonempty_or_unknown(&self.model),
+            self.serial
+                .as_deref()
+                .map(nonempty_or_unknown)
+                .unwrap_or("Unknown")
+        )
+    }
+
+    /// True when at least one of make / model / serial is known.
+    #[must_use]
+    pub fn has_monitor_identity(&self) -> bool {
+        self.make_model_serial() != "Unknown Unknown Unknown"
+    }
+
     /// Get the transform as our Transform enum
     #[must_use]
     pub fn transform(&self) -> crate::types::Transform {
@@ -848,6 +868,15 @@ impl FullOutputInfo {
 
 fn nonzero_dim(value: Option<u32>) -> Option<u32> {
     value.filter(|&dim| dim > 0)
+}
+
+fn nonempty_or_unknown(value: &str) -> &str {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        "Unknown"
+    } else {
+        trimmed
+    }
 }
 
 /// Get list of outputs/displays from niri
@@ -1173,6 +1202,23 @@ mod tests {
         assert_eq!(info.position_x(), 0);
         assert_eq!(info.position_y(), 0);
         assert!(!info.vrr_enabled);
+        assert_eq!(info.make_model_serial(), "Dell U2720Q Unknown");
+        assert!(info.has_monitor_identity());
+    }
+
+    #[test]
+    fn make_model_serial_uses_unknown_fillers() {
+        let empty = FullOutputInfo::default();
+        assert_eq!(empty.make_model_serial(), "Unknown Unknown Unknown");
+        assert!(!empty.has_monitor_identity());
+
+        let info = FullOutputInfo {
+            make: "Dell Inc.".into(),
+            model: "U2720Q".into(),
+            serial: Some("ABC123".into()),
+            ..Default::default()
+        };
+        assert_eq!(info.make_model_serial(), "Dell Inc. U2720Q ABC123");
     }
 
     #[test]
