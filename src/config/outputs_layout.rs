@@ -17,7 +17,8 @@
 //!   `transform`, and `mode` from live info when present. `enabled` is `true`
 //!   when niri reports a logical mapping, `false` when `logical` is `None`
 //!   (disabled / unmapped). `vrr` is set from `vrr_enabled` (`On` / `Off`);
-//!   `OnDemand` cannot be observed over IPC and is overwritten on snapshot.
+//!   `OnDemand` cannot be observed over IPC; an existing `OnDemand` setting is
+//!   preserved so snapshot / rearrange does not clobber `on-demand=true`.
 //!   Identity fields (background, hot corners, layout override, modeline,
 //!   focus-at-startup) are preserved on existing rows.
 //! - **Unmatched managed outputs** (configured but not currently connected)
@@ -109,11 +110,16 @@ fn update_output_from_live(output: &mut OutputConfig, info: &FullOutputInfo) {
     if !mode.is_empty() {
         output.mode = mode;
     }
-    output.vrr = if info.vrr_enabled {
-        VrrMode::On
-    } else {
-        VrrMode::Off
-    };
+    // IPC reports only whether VRR is currently active. OnDemand means
+    // "sometimes on" and cannot be distinguished from On/Off. Keep it so
+    // #22 snapshot / rearrange does not rewrite `on-demand=true` to On/Off.
+    if output.vrr != VrrMode::OnDemand {
+        output.vrr = if info.vrr_enabled {
+            VrrMode::On
+        } else {
+            VrrMode::Off
+        };
+    }
 }
 
 /// Seed an explicit position when switching an output off automatic placement.
@@ -341,6 +347,28 @@ mod tests {
         assert!(!settings.outputs[0].enabled);
         assert_eq!(settings.outputs[0].position, Some((1920, 0)));
         assert_eq!(settings.outputs[0].scale, Some(1.25));
+    }
+
+    #[test]
+    fn snapshot_preserves_vrr_on_demand() {
+        let mut existing = named("DP-1");
+        existing.vrr = VrrMode::OnDemand;
+        let mut settings = OutputSettings {
+            outputs: vec![existing],
+        };
+
+        let mut live_on = live("DP-1", 0, 0, 1920, 1080, 1.0, 1920, 1080);
+        live_on.vrr_enabled = true;
+        apply_live_outputs_to_settings(&mut settings, &[live_on]);
+        assert_eq!(settings.outputs[0].vrr, VrrMode::OnDemand);
+
+        let live_off = live("DP-1", 0, 0, 1920, 1080, 1.0, 1920, 1080);
+        apply_live_outputs_to_settings(&mut settings, &[live_off]);
+        assert_eq!(
+            settings.outputs[0].vrr,
+            VrrMode::OnDemand,
+            "IPC cannot observe on-demand; must not clobber to On/Off"
+        );
     }
 
     #[test]

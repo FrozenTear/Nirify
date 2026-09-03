@@ -39,11 +39,13 @@ pub fn apply_gradient_message(target: &mut ColorOrGradient, msg: GradientPickerM
                         ..Default::default()
                     }),
                     ColorOrGradient::Gradient(_) => target.clone(),
+                    ColorOrGradient::Raw(_) => ColorOrGradient::Gradient(Gradient::default()),
                 }
             } else {
                 match target {
                     ColorOrGradient::Color(_) => target.clone(),
                     ColorOrGradient::Gradient(gradient) => ColorOrGradient::Color(gradient.from),
+                    ColorOrGradient::Raw(_) => ColorOrGradient::Color(Color::default()),
                 }
             };
         }
@@ -52,6 +54,7 @@ pub fn apply_gradient_message(target: &mut ColorOrGradient, msg: GradientPickerM
                 match target {
                     ColorOrGradient::Color(c) => *c = color,
                     ColorOrGradient::Gradient(g) => g.from = color,
+                    ColorOrGradient::Raw(_) => *target = ColorOrGradient::Color(color),
                 }
             }
         }
@@ -200,6 +203,11 @@ fn gradient_editor<'a, Message: Clone + 'a>(
         }
         ColorOrGradient::Gradient(gradient) => {
             content = content.push(gradient_controls(gradient, on_change));
+        }
+        ColorOrGradient::Raw(_) => {
+            content = content.push(info_text(
+                "Custom gradient preserved from KDL (edit via config, or toggle to convert)",
+            ));
         }
     }
 
@@ -387,6 +395,7 @@ mod tests {
                 assert_eq!(g.angle, 90);
             }
             ColorOrGradient::Color(_) => panic!("gradient flattened to solid color"),
+            ColorOrGradient::Raw(_) => panic!("gradient converted to raw"),
         }
     }
 
@@ -420,6 +429,7 @@ mod tests {
                 assert_eq!(g.to, color("#7fc8ff"));
             }
             ColorOrGradient::Color(_) => panic!("expected gradient"),
+            ColorOrGradient::Raw(_) => panic!("expected modeled gradient"),
         }
     }
 
@@ -447,5 +457,22 @@ mod tests {
             GradientPickerMessage::SetFromColor("#aabbcc".into()),
         );
         assert_eq!(value, Some(ColorOrGradient::Color(color("#aabbcc"))));
+    }
+
+    #[test]
+    fn toggle_raw_to_modeled_gradient() {
+        let mut value = ColorOrGradient::Raw("active-gradient extra=1".into());
+        apply_gradient_message(&mut value, GradientPickerMessage::ToggleSolidGradient(true));
+        assert!(matches!(value, ColorOrGradient::Gradient(_)));
+    }
+
+    #[test]
+    fn editing_raw_from_color_converts_to_solid() {
+        let mut value = ColorOrGradient::Raw("active-gradient extra=1".into());
+        apply_gradient_message(
+            &mut value,
+            GradientPickerMessage::SetFromColor("#ff0000".into()),
+        );
+        assert_eq!(value, ColorOrGradient::Color(color("#ff0000")));
     }
 }

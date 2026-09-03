@@ -685,10 +685,12 @@ impl GradientRelativeTo {
     }
 }
 
-/// A gradient color definition for niri visual elements
+/// A niri 2-stop linear gradient (`from` / `to` plus optional attrs).
 ///
-/// Supports CSS-style linear gradients with color space interpolation options.
-/// Used for focus-ring, border, tab-indicator, and insert-hint.
+/// This is the shape niri accepts on `*-gradient` nodes (focus-ring, border,
+/// tab-indicator, insert-hint). Unsupported forms are not forced into this
+/// struct — they stay as [`ColorOrGradient::Raw`] so a save cannot strip them.
+/// See `config/loader/gradient.rs` for the supported / raw policy.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Gradient {
     /// Starting color
@@ -718,11 +720,27 @@ impl Default for Gradient {
     }
 }
 
-/// Either a solid color or a gradient
+/// Fallback swatch for [`ColorOrGradient::Raw`] (UI only; never written).
+const RAW_GRADIENT_FALLBACK: Color = Color {
+    r: 128,
+    g: 128,
+    b: 128,
+    a: 255,
+};
+
+/// Either a solid color, a modeled niri gradient, or an unmodeled raw node.
+///
+/// `Raw` is a lossless hold for a `*-gradient` (or insert-hint `gradient`)
+/// node that is not the supported 2-stop form. Writers emit the stored KDL
+/// verbatim. UI should treat it as a gradient and not flatten it to a solid
+/// unless the user explicitly edits the field.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColorOrGradient {
     Color(Color),
     Gradient(Gradient),
+    /// Unsupported / unparsed gradient node, including the node name.
+    /// Example: `active-gradient from="#80c8ff" extra=1`
+    Raw(String),
 }
 
 impl Default for ColorOrGradient {
@@ -745,24 +763,31 @@ impl From<Gradient> for ColorOrGradient {
 
 impl ColorOrGradient {
     /// Returns the primary color for UI display.
-    /// For gradients, returns the "from" color.
+    /// For modeled gradients, returns the "from" color. Raw nodes use a
+    /// placeholder so the UI does not invent a writable solid.
     pub fn primary_color(&self) -> &Color {
         match self {
             ColorOrGradient::Color(c) => c,
             ColorOrGradient::Gradient(g) => &g.from,
+            ColorOrGradient::Raw(_) => &RAW_GRADIENT_FALLBACK,
         }
     }
 
     /// Returns a mutable reference to the primary color.
-    /// For gradients, returns a mutable reference to the "from" color.
+    /// For modeled gradients, returns a mutable reference to the "from" color.
+    /// Mutating a raw node converts it to a solid (explicit UI edit).
     pub fn primary_color_mut(&mut self) -> &mut Color {
+        if matches!(self, ColorOrGradient::Raw(_)) {
+            *self = ColorOrGradient::Color(RAW_GRADIENT_FALLBACK);
+        }
         match self {
             ColorOrGradient::Color(c) => c,
             ColorOrGradient::Gradient(g) => &mut g.from,
+            ColorOrGradient::Raw(_) => unreachable!("raw converted to color above"),
         }
     }
 
-    /// Sets this to a solid color (converts gradient to color).
+    /// Sets this to a solid color (converts gradient/raw to color).
     pub fn set_color(&mut self, color: Color) {
         *self = ColorOrGradient::Color(color);
     }
@@ -772,9 +797,14 @@ impl ColorOrGradient {
         self.primary_color().to_hex()
     }
 
-    /// Returns true if this is a gradient, false if solid color.
+    /// True for modeled or raw gradients (anything that must not be flattened).
     pub fn is_gradient(&self) -> bool {
-        matches!(self, ColorOrGradient::Gradient(_))
+        matches!(self, ColorOrGradient::Gradient(_) | ColorOrGradient::Raw(_))
+    }
+
+    /// True when this is an unmodeled raw KDL gradient node.
+    pub fn is_raw(&self) -> bool {
+        matches!(self, ColorOrGradient::Raw(_))
     }
 
     /// Human-readable label that does not hide a gradient behind a single hex.
@@ -784,6 +814,7 @@ impl ColorOrGradient {
             ColorOrGradient::Gradient(g) => {
                 format!("Gradient {} → {}", g.from.to_hex(), g.to.to_hex())
             }
+            ColorOrGradient::Raw(_) => "Custom gradient (preserved)".to_string(),
         }
     }
 }
@@ -1007,6 +1038,11 @@ mod tests {
         });
         assert_eq!(gradient.display_label(), "Gradient #ff0000 → #0000ff");
         assert_ne!(gradient.display_label(), gradient.to_hex());
+
+        let raw = ColorOrGradient::Raw("active-gradient extra=1".into());
+        assert_eq!(raw.display_label(), "Custom gradient (preserved)");
+        assert!(raw.is_gradient());
+        assert!(raw.is_raw());
     }
 
     #[test]

@@ -2,7 +2,12 @@
 //!
 //! Tests for importing settings from user's existing niri config.kdl
 
+use nirify::config::models::{normalized_key_combo, KeybindAction};
+use nirify::config::storage::generate_window_rules_kdl;
 use nirify::config::{import_from_niri_config, import_from_niri_config_with_result};
+use nirify::types::ColorOrGradient;
+use nirify::version::FeatureCompat;
+use serial_test::serial;
 use std::fs;
 use tempfile::tempdir;
 
@@ -599,6 +604,176 @@ window-rule {
         .imported_sections
         .iter()
         .any(|s| s.contains("window-rules") && s.contains("2")));
+}
+
+#[test]
+fn test_import_duplicate_mod_q_last_wins() {
+    let dir = tempdir().unwrap();
+    let config = dir.path().join("config.kdl");
+
+    fs::write(
+        &config,
+        r#"
+binds {
+    Mod+Q { close-window; }
+    Mod+Q { spawn "kitty"; }
+}
+"#,
+    )
+    .unwrap();
+
+    let settings = import_from_niri_config(&config);
+    assert_eq!(settings.keybindings.bindings.len(), 1);
+    assert_eq!(
+        normalized_key_combo(&settings.keybindings.bindings[0].key_combo),
+        normalized_key_combo("Mod+Q")
+    );
+    assert!(
+        matches!(
+            &settings.keybindings.bindings[0].action,
+            KeybindAction::Spawn(args) if args == &["kitty"]
+        ),
+        "first-run import must keep the last Mod+Q action, got {:?}",
+        settings.keybindings.bindings[0].action
+    );
+}
+
+fn with_xdg_niri_home<F>(f: F)
+where
+    F: FnOnce(&std::path::Path),
+{
+    let tmp = tempdir().unwrap();
+    let niri_dir = tmp.path().join("niri");
+    fs::create_dir_all(&niri_dir).unwrap();
+    let old = std::env::var_os("XDG_CONFIG_HOME");
+    std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+    f(&niri_dir);
+    match old {
+        Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+        None => std::env::remove_var("XDG_CONFIG_HOME"),
+    }
+}
+
+#[test]
+#[serial]
+fn test_import_includes_are_positional_later_same_file_wins() {
+    with_xdg_niri_home(|niri_dir| {
+        fs::write(niri_dir.join("early.kdl"), "layout { gaps 8 }\n").unwrap();
+        let config = niri_dir.join("config.kdl");
+        fs::write(
+            &config,
+            r#"
+include "early.kdl"
+layout { gaps 24 }
+"#,
+        )
+        .unwrap();
+
+        let settings = import_from_niri_config(&config);
+        assert_eq!(
+            settings.appearance.gaps, 24.0,
+            "content after include must override the include (niri positionality)"
+        );
+    });
+}
+
+#[test]
+#[serial]
+fn test_import_includes_are_positional_later_include_wins() {
+    with_xdg_niri_home(|niri_dir| {
+        fs::write(niri_dir.join("late.kdl"), "layout { gaps 8 }\n").unwrap();
+        let config = niri_dir.join("config.kdl");
+        fs::write(
+            &config,
+            r#"
+layout { gaps 24 }
+include "late.kdl"
+"#,
+        )
+        .unwrap();
+
+        let settings = import_from_niri_config(&config);
+        assert_eq!(
+            settings.appearance.gaps, 8.0,
+            "include after same-file nodes must override (niri positionality)"
+        );
+    });
+}
+
+#[test]
+fn test_import_window_rule_gradients_survive_save() {
+    let dir = tempdir().unwrap();
+    let config = dir.path().join("config.kdl");
+
+    fs::write(
+        &config,
+        r##"
+window-rule {
+    match app-id="firefox"
+    focus-ring {
+        active-gradient from="#80c8ff" to="#bbddff" angle=45
+        inactive-gradient from="#404040" to="#202020"
+        urgent-gradient from="#ff0000" to="#9b0000"
+    }
+    border {
+        active-color "#ff0000"
+        urgent-gradient from="#ff8800" to="#884400"
+    }
+    tab-indicator {
+        active-gradient from="#ffffff" to="#aaaaaa"
+        urgent-color "#0000ff"
+    }
+}
+"##,
+    )
+    .unwrap();
+
+    let settings = import_from_niri_config(&config);
+    assert_eq!(settings.window_rules.rules.len(), 1);
+    let rule = &settings.window_rules.rules[0];
+    assert!(
+        matches!(rule.focus_ring_active, Some(ColorOrGradient::Gradient(_))),
+        "{:?}",
+        rule.focus_ring_active
+    );
+    assert!(
+        matches!(rule.focus_ring_inactive, Some(ColorOrGradient::Gradient(_))),
+        "{:?}",
+        rule.focus_ring_inactive
+    );
+    assert!(
+        matches!(rule.focus_ring_urgent, Some(ColorOrGradient::Gradient(_))),
+        "{:?}",
+        rule.focus_ring_urgent
+    );
+    assert!(
+        matches!(rule.border_urgent, Some(ColorOrGradient::Gradient(_))),
+        "{:?}",
+        rule.border_urgent
+    );
+    assert!(
+        matches!(
+            rule.tab_indicator.as_ref().and_then(|t| t.active.as_ref()),
+            Some(ColorOrGradient::Gradient(_))
+        ),
+        "{:?}",
+        rule.tab_indicator
+    );
+    assert!(
+        matches!(
+            rule.tab_indicator.as_ref().and_then(|t| t.urgent.as_ref()),
+            Some(ColorOrGradient::Color(_))
+        ),
+        "urgent solid on tab-indicator must also round-trip: {:?}",
+        rule.tab_indicator
+    );
+
+    let saved =
+        generate_window_rules_kdl(&settings.window_rules, false, FeatureCompat::all_enabled());
+    assert!(saved.contains("active-gradient"), "{saved}");
+    assert!(saved.contains("inactive-gradient"), "{saved}");
+    assert!(saved.contains("urgent-gradient"), "{saved}");
+    assert!(saved.contains("urgent-color"), "{saved}");
 }
 
 #[test]

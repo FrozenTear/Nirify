@@ -44,7 +44,7 @@ pub use display::{
     generate_animations_kdl, generate_cursor_kdl, generate_outputs_kdl, generate_overview_kdl,
 };
 pub use gestures::generate_gestures_kdl;
-pub use gradient::{color_or_gradient_to_kdl, gradient_to_kdl};
+pub use gradient::{color_or_gradient_to_kdl, gradient_to_kdl, push_color_or_gradient};
 pub use input::{
     generate_keyboard_kdl, generate_mouse_kdl, generate_tablet_kdl, generate_touch_kdl,
     generate_touchpad_kdl, generate_trackball_kdl, generate_trackpoint_kdl,
@@ -725,9 +725,11 @@ mod tests {
         let behavior = BehaviorSettings::default();
         let content = generate_behavior_kdl(&behavior);
 
-        // Default settings shouldn't include these
+        // Presence-only Option structs still omit Off (niri has no disable form).
         assert!(!content.contains("focus-follows-mouse"));
         assert!(!content.contains("warp-mouse-to-focus"));
+        // Owned Flag default is written so later include last-wins.
+        assert!(content.contains("workspace-auto-back-and-forth false"));
     }
 
     #[test]

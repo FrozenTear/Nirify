@@ -3,13 +3,16 @@
 //! Generates KDL configuration for keybindings managed by Nirify.
 
 use crate::config::models::{
-    lookup_action, normalized_key_combo, ActionNode, ActionValue, ArgKind, HotkeyOverlayTitle,
+    last_wins_keybindings, lookup_action, ActionNode, ActionValue, ArgKind, HotkeyOverlayTitle,
     KeybindAction, Keybinding, KeybindingsSettings,
 };
 use crate::config::parser::parse_document;
-use std::collections::HashSet;
 
 /// Generate keybindings.kdl content from settings.
+///
+/// Duplicate combos are **last-wins**, matching niri's `binds` merge
+/// (later entry overrides the same key). Earlier first-wins disagreed with
+/// niri and could persist the wrong action after first-run / absorb.
 pub fn generate_keybindings_kdl(settings: &KeybindingsSettings) -> String {
     let mut content = String::with_capacity(2048);
     content.push_str("// Keybindings - managed by Nirify-rust\n");
@@ -23,22 +26,34 @@ pub fn generate_keybindings_kdl(settings: &KeybindingsSettings) -> String {
 
     content.push_str("binds {\n");
 
-    // Safety net: niri rejects duplicate keys, so skip any binding whose
-    // normalized combo has already been emitted.
-    let mut seen: HashSet<String> = HashSet::new();
+    // niri last-wins: keep the last valid binding for each normalized combo.
+    let last_wins: Vec<Keybinding> = last_wins_keybindings(
+        settings
+            .bindings
+            .iter()
+            .filter(|b| is_valid_keybinding(b))
+            .cloned()
+            .collect(),
+    );
+    if last_wins.len()
+        < settings
+            .bindings
+            .iter()
+            .filter(|b| is_valid_keybinding(b))
+            .count()
+    {
+        log::warn!(
+            "Dropped {} earlier duplicate keybinding(s) (niri last-wins)",
+            settings
+                .bindings
+                .iter()
+                .filter(|b| is_valid_keybinding(b))
+                .count()
+                - last_wins.len()
+        );
+    }
 
-    for binding in &settings.bindings {
-        if !is_valid_keybinding(binding) {
-            continue;
-        }
-        let norm = normalized_key_combo(&binding.key_combo);
-        if !seen.insert(norm) {
-            log::warn!(
-                "Skipping duplicate keybinding '{}' (already bound)",
-                binding.key_combo
-            );
-            continue;
-        }
+    for binding in &last_wins {
         content.push_str(&generate_keybinding(binding));
     }
 
@@ -549,7 +564,7 @@ mod tests {
     }
 
     #[test]
-    fn test_duplicate_binds_deduped() {
+    fn test_duplicate_binds_last_wins() {
         let s = KeybindingsSettings {
             bindings: vec![
                 binding("Mod+Q", niri("close-window")),
@@ -558,8 +573,15 @@ mod tests {
             ..Default::default()
         };
         let kdl = generate_keybindings_kdl(&s);
-        assert_eq!(kdl.matches("close-window").count(), 1);
-        assert!(!kdl.contains("fullscreen-window"));
+        assert!(
+            kdl.contains("fullscreen-window"),
+            "niri last-wins must keep the later Mod+Q action:\n{kdl}"
+        );
+        assert!(!kdl.contains("close-window"));
+        assert_eq!(
+            kdl.matches("Mod+Q").count() + kdl.matches("mod+q").count(),
+            1
+        );
     }
 
     #[test]

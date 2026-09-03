@@ -3,3 +3,7 @@ source: tests/snapshot_tests.rs
 expression: kdl
 ---
 // Behavior settings - managed by Nirify
+
+input {
+    workspace-auto-back-and-forth false
+}

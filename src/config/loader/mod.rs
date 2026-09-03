@@ -62,7 +62,10 @@ pub use display::{
     parse_overview_from_children, parse_single_animation,
 };
 pub use gestures::{load_gestures, parse_gestures_from_doc};
-pub use gradient::{load_color_or_gradient, load_gradient, parse_gradient_from_entries};
+pub use gradient::{
+    load_color_or_gradient, load_gradient, load_gradient_node, parse_gradient_from_entries,
+    parse_supported_gradient, raw_kdl_node,
+};
 pub use input::{
     load_keyboard, load_mouse, load_tablet, load_touch, load_touchpad, load_trackball,
     load_trackpoint, parse_keyboard_from_children, parse_mouse_from_children,

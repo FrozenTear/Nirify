@@ -6,6 +6,7 @@
 //! properties niri (knuffel) does not accept are never written, because a single
 //! unknown node makes niri reject the user's whole config.
 
+use super::gradient::push_color_or_gradient;
 use super::helpers::escape_kdl_string;
 use crate::config::models::{
     BackgroundEffectSettings, BlockOutFrom, CornerRadiusValue, LayerRuleMatch, LayerRulesSettings,
@@ -138,13 +139,13 @@ fn emit_tab_indicator(content: &mut String, ti: &TabIndicatorOverride) {
     }
     content.push_str("    tab-indicator {\n");
     if let Some(ref c) = ti.active {
-        content.push_str(&format!("        active-color \"{}\"\n", c.to_hex()));
+        push_color_or_gradient(content, "        ", "active", c);
     }
     if let Some(ref c) = ti.inactive {
-        content.push_str(&format!("        inactive-color \"{}\"\n", c.to_hex()));
+        push_color_or_gradient(content, "        ", "inactive", c);
     }
     if let Some(ref c) = ti.urgent {
-        content.push_str(&format!("        urgent-color \"{}\"\n", c.to_hex()));
+        push_color_or_gradient(content, "        ", "urgent", c);
     }
     content.push_str("    }\n");
 }
@@ -428,13 +429,13 @@ pub fn generate_window_rules_kdl(
                 content.push_str(&format!("        width {}\n", width));
             }
             if let Some(ref color) = rule.focus_ring_active {
-                content.push_str(&format!("        active-color \"{}\"\n", color.to_hex()));
+                push_color_or_gradient(&mut content, "        ", "active", color);
             }
             if let Some(ref color) = rule.focus_ring_inactive {
-                content.push_str(&format!("        inactive-color \"{}\"\n", color.to_hex()));
+                push_color_or_gradient(&mut content, "        ", "inactive", color);
             }
             if let Some(ref color) = rule.focus_ring_urgent {
-                content.push_str(&format!("        urgent-color \"{}\"\n", color.to_hex()));
+                push_color_or_gradient(&mut content, "        ", "urgent", color);
             }
             content.push_str("    }\n");
         }
@@ -456,13 +457,13 @@ pub fn generate_window_rules_kdl(
                 content.push_str(&format!("        width {}\n", width));
             }
             if let Some(ref color) = rule.border_active {
-                content.push_str(&format!("        active-color \"{}\"\n", color.to_hex()));
+                push_color_or_gradient(&mut content, "        ", "active", color);
             }
             if let Some(ref color) = rule.border_inactive {
-                content.push_str(&format!("        inactive-color \"{}\"\n", color.to_hex()));
+                push_color_or_gradient(&mut content, "        ", "inactive", color);
             }
             if let Some(ref color) = rule.border_urgent {
-                content.push_str(&format!("        urgent-color \"{}\"\n", color.to_hex()));
+                push_color_or_gradient(&mut content, "        ", "urgent", color);
             }
             content.push_str("    }\n");
         }
@@ -471,10 +472,10 @@ pub fn generate_window_rules_kdl(
             content.push_str(&format!("    variable-refresh-rate {}\n", vrr));
         }
         if let Some(ref display) = rule.default_column_display {
-            use crate::config::models::DefaultColumnDisplay;
-            if matches!(display, DefaultColumnDisplay::Tabbed) {
-                content.push_str("    default-column-display \"tabbed\"\n");
-            }
+            content.push_str(&format!(
+                "    default-column-display \"{}\"\n",
+                display.to_kdl()
+            ));
         }
         if let Some(tiled) = rule.tiled_state {
             content.push_str(&format!("    tiled-state {}\n", tiled));
@@ -562,7 +563,9 @@ mod tests {
     use crate::config::loader::{load_layer_rules, load_window_rules};
     use crate::config::models::*;
     use crate::config::Settings;
-    use crate::types::{Color, ColorOrGradient};
+    use crate::types::{
+        Color, ColorOrGradient, ColorSpace, Gradient, GradientRelativeTo, HueInterpolation,
+    };
     use std::io::Write;
 
     fn parse_ok(content: &str) {
@@ -581,6 +584,17 @@ mod tests {
 
     fn color(hex: &str) -> ColorOrGradient {
         ColorOrGradient::Color(Color::from_hex(hex).unwrap())
+    }
+
+    fn gradient(from: &str, to: &str) -> ColorOrGradient {
+        ColorOrGradient::Gradient(Gradient {
+            from: Color::from_hex(from).unwrap(),
+            to: Color::from_hex(to).unwrap(),
+            angle: 45,
+            relative_to: GradientRelativeTo::WorkspaceView,
+            color_space: ColorSpace::Oklch,
+            hue_interpolation: Some(HueInterpolation::Shorter),
+        })
     }
 
     #[test]
@@ -723,6 +737,124 @@ mod tests {
         assert_eq!(got.default_column_display, expected.default_column_display);
         assert_eq!(got.tiled_state, expected.tiled_state);
         assert_eq!(got.baba_is_float, expected.baba_is_float);
+    }
+
+    #[test]
+    fn window_rule_gradients_roundtrip_including_urgent() {
+        let rule = WindowRule {
+            name: "Gradients".to_string(),
+            matches: vec![WindowRuleMatch {
+                app_id: Some("^term$".to_string()),
+                ..Default::default()
+            }],
+            focus_ring_active: Some(gradient("#80c8ff", "#bbddff")),
+            focus_ring_inactive: Some(gradient("#404040", "#202020")),
+            focus_ring_urgent: Some(gradient("#ff0000", "#9b0000")),
+            border_active: Some(gradient("#00ff00", "#006600")),
+            border_inactive: Some(color("#333333")),
+            border_urgent: Some(gradient("#ff8800", "#884400")),
+            tab_indicator: Some(TabIndicatorOverride {
+                active: Some(gradient("#ffffff", "#aaaaaa")),
+                inactive: Some(color("#808080")),
+                urgent: Some(gradient("#0000ff", "#000080")),
+            }),
+            ..Default::default()
+        };
+        let settings = WindowRulesSettings {
+            rules: vec![rule.clone()],
+            next_id: 1,
+        };
+
+        let content = generate_window_rules_kdl(&settings, false, FeatureCompat::all_enabled());
+        parse_ok(&content);
+        assert!(content.contains("active-gradient"), "{content}");
+        assert!(content.contains("inactive-gradient"), "{content}");
+        assert!(content.contains("urgent-gradient"), "{content}");
+        assert!(
+            !content.contains("will be dropped"),
+            "must not warn-and-drop: {content}"
+        );
+
+        let path = write_temp(&content, "window_gradients");
+        let mut loaded = Settings::default();
+        load_window_rules(&path, &mut loaded);
+        std::fs::remove_file(&path).ok();
+
+        let got = &loaded.window_rules.rules[0];
+        assert_eq!(got.focus_ring_active, rule.focus_ring_active);
+        assert_eq!(got.focus_ring_inactive, rule.focus_ring_inactive);
+        assert_eq!(got.focus_ring_urgent, rule.focus_ring_urgent);
+        assert_eq!(got.border_active, rule.border_active);
+        assert_eq!(got.border_inactive, rule.border_inactive);
+        assert_eq!(got.border_urgent, rule.border_urgent);
+        assert_eq!(got.tab_indicator, rule.tab_indicator);
+    }
+
+    #[test]
+    fn window_rule_unsupported_gradient_kept_raw() {
+        let kdl = r##"
+window-rule {
+    match app-id="raw"
+    focus-ring {
+        active-gradient from="#80c8ff" to="#bbddff" via="#ffffff"
+    }
+    border {
+        urgent-gradient to="#ff0000"
+    }
+}
+"##;
+        let path = write_temp(kdl, "window_raw_gradient");
+        let mut loaded = Settings::default();
+        load_window_rules(&path, &mut loaded);
+        std::fs::remove_file(&path).ok();
+
+        let got = &loaded.window_rules.rules[0];
+        assert!(
+            got.focus_ring_active.as_ref().is_some_and(|c| c.is_raw()),
+            "{:?}",
+            got.focus_ring_active
+        );
+        assert!(
+            got.border_urgent.as_ref().is_some_and(|c| c.is_raw()),
+            "{:?}",
+            got.border_urgent
+        );
+
+        let settings = WindowRulesSettings {
+            rules: loaded.window_rules.rules.clone(),
+            next_id: 1,
+        };
+        let content = generate_window_rules_kdl(&settings, false, FeatureCompat::all_enabled());
+        parse_ok(&content);
+        assert!(
+            content.contains("via="),
+            "raw extra property lost:\n{content}"
+        );
+        assert!(
+            content.contains("urgent-gradient"),
+            "raw urgent-gradient stripped:\n{content}"
+        );
+    }
+
+    #[test]
+    fn window_rule_emits_default_column_display_normal() {
+        let rule = WindowRule {
+            default_column_display: Some(DefaultColumnDisplay::Normal),
+            matches: vec![WindowRuleMatch {
+                app_id: Some("kitty".to_string()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let settings = WindowRulesSettings {
+            rules: vec![rule],
+            next_id: 1,
+        };
+        let content = generate_window_rules_kdl(&settings, false, FeatureCompat::all_enabled());
+        assert!(
+            content.contains("default-column-display \"normal\""),
+            "owned \"normal\" must override an earlier include's \"tabbed\":\n{content}"
+        );
     }
 
     #[test]

@@ -2,7 +2,7 @@
 //!
 //! Handles shadow, tab indicator, insert hint, preset heights, and default column display.
 
-use super::gradient::{load_color_or_gradient, parse_gradient_from_entries};
+use super::gradient::{load_color_or_gradient, load_gradient_node};
 use super::helpers::{load_color, parse_color, read_kdl_file};
 use crate::config::models::{DefaultColumnDisplay, PresetHeight, Settings, TabIndicatorPosition};
 use crate::config::parser::{get_f64, get_i64, get_string, has_flag};
@@ -143,12 +143,9 @@ pub fn parse_layout_extras_from_children(l_children: &KdlDocument, settings: &mu
         if let Some(ih_children) = ih.children() {
             settings.layout_extras.insert_hint.enabled = !has_flag(ih_children, &["off"]);
 
-            // Try gradient first, then fall back to color
+            // Try gradient first (modeled or raw), then fall back to color
             if let Some(gradient_node) = ih_children.get("gradient") {
-                if let Some(gradient) = parse_gradient_from_entries(gradient_node.entries().iter())
-                {
-                    settings.layout_extras.insert_hint.color = ColorOrGradient::Gradient(gradient);
-                }
+                settings.layout_extras.insert_hint.color = load_gradient_node(gradient_node);
             } else if let Some(hex) = get_string(ih_children, &["color"]) {
                 if let Some(color) = parse_color(&hex) {
                     settings.layout_extras.insert_hint.color = ColorOrGradient::Color(color);
