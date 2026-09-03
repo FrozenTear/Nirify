@@ -5,7 +5,8 @@
 //!
 //! Includes are walked **in document order**, interleaved with same-file nodes,
 //! matching niri include positionality (content after an include overrides that
-//! include). `~/` expansion + the import jail are unchanged (sweep follow-up).
+//! include). `~/` expansion, `optional=true`, and the import jail live in
+//! [`crate::config::include`].
 //!
 //! This module uses shared parsing functions from the loader modules to avoid
 //! code duplication. The import functions primarily delegate to these shared
@@ -322,6 +323,7 @@ fn import_from_niri_config_recursive_tracked(
     // file first, then includes, inverted later same-file overrides.
     for node in doc.nodes() {
         if node.name().value() != "include" {
+            import_single_node(node, settings);
             continue;
         }
         let Some(directive) = parse_include_node(node) else {
@@ -360,8 +362,6 @@ fn import_from_niri_config_recursive_tracked(
                     );
                 }
             }
-        } else {
-            import_single_node(node, settings);
         }
     }
 }
