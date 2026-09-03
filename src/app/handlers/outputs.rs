@@ -1,6 +1,6 @@
 //! Outputs (displays) settings message handler
 
-use crate::config::SettingsCategory;
+use crate::config::{find_config_index_for_live, find_live_output, SettingsCategory};
 use crate::messages::{Message, OutputsMessage as M, ToolsMessage};
 use crate::views::display_layout::{
     collect_monitors, compute_preview_layout, hit_test, output_from_ipc, snap_position,
@@ -384,37 +384,12 @@ impl super::super::App {
             return false;
         };
 
-        let adopted = if hit.rect.config_index.is_none() {
-            let name = hit.rect.name.clone();
-            if self
-                .settings
-                .outputs
-                .outputs
-                .iter()
-                .any(|output| output.name == name)
-            {
-                false
-            } else if let Some(info) = self
-                .ui
-                .tools_state
-                .outputs
-                .iter()
-                .find(|info| info.name == name)
-                .cloned()
-            {
-                self.settings.outputs.outputs.push(output_from_ipc(&info));
-                true
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        let idx = hit
-            .rect
-            .config_index
-            .unwrap_or_else(|| self.settings.outputs.outputs.len().saturating_sub(1));
+        let (idx, adopted) = resolve_canvas_hit(
+            &mut self.settings.outputs.outputs,
+            &self.ui.tools_state.outputs,
+            hit.rect.config_index,
+            &hit.rect.name,
+        );
         self.ui.selected_output_index = Some(idx);
         self.ui.monitor_drag = Some(crate::app::ui_state::MonitorDrag {
             index: idx,
@@ -511,6 +486,29 @@ impl super::super::App {
     }
 }
 
+/// Map a canvas hit to a config index, adopting the live connector when needed.
+///
+/// Matching uses Config helpers (connector first, then make/model/serial) so a
+/// dock replug does not create a duplicate row.
+fn resolve_canvas_hit(
+    outputs: &mut Vec<crate::config::models::OutputConfig>,
+    live: &[crate::ipc::FullOutputInfo],
+    config_index: Option<usize>,
+    hit_name: &str,
+) -> (usize, bool) {
+    if let Some(idx) = config_index {
+        return (idx, false);
+    }
+    if let Some(info) = find_live_output(hit_name, live) {
+        if let Some(idx) = find_config_index_for_live(outputs, info) {
+            return (idx, false);
+        }
+        outputs.push(output_from_ipc(info));
+        return (outputs.len() - 1, true);
+    }
+    (outputs.len().saturating_sub(1), false)
+}
+
 fn adjust_index_after_remove(current: Option<usize>, removed: usize) -> Option<usize> {
     match current {
         None => None,
@@ -522,7 +520,9 @@ fn adjust_index_after_remove(current: Option<usize>, removed: usize) -> Option<u
 
 #[cfg(test)]
 mod tests {
-    use super::adjust_index_after_remove;
+    use super::{adjust_index_after_remove, resolve_canvas_hit};
+    use crate::config::models::OutputConfig;
+    use crate::ipc::FullOutputInfo;
 
     #[test]
     fn remove_clears_matching_selection_and_shifts_later() {
@@ -530,5 +530,65 @@ mod tests {
         assert_eq!(adjust_index_after_remove(Some(3), 1), Some(2));
         assert_eq!(adjust_index_after_remove(Some(0), 1), Some(0));
         assert_eq!(adjust_index_after_remove(None, 0), None);
+    }
+
+    fn identified(connector: &str, make: &str, model: &str, serial: &str) -> FullOutputInfo {
+        FullOutputInfo {
+            name: connector.to_string(),
+            make: make.to_string(),
+            model: model.to_string(),
+            serial: Some(serial.to_string()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn canvas_hit_does_not_duplicate_mms_named_row() {
+        let mut outputs = vec![OutputConfig {
+            name: "Dell Inc. U2720Q ABC123".into(),
+            ..Default::default()
+        }];
+        let live = [identified("DP-1", "Dell Inc.", "U2720Q", "ABC123")];
+        let (idx, adopted) = resolve_canvas_hit(&mut outputs, &live, None, "DP-1");
+        assert!(!adopted);
+        assert_eq!(idx, 0);
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0].name, "Dell Inc. U2720Q ABC123");
+    }
+
+    #[test]
+    fn canvas_hit_adopts_unknown_connector() {
+        let mut outputs = vec![OutputConfig {
+            name: "eDP-1".into(),
+            ..Default::default()
+        }];
+        let live = [
+            identified("eDP-1", "Chimei", "Panel", "1"),
+            identified("HDMI-A-1", "Other", "TV", "ZZ"),
+        ];
+        let (idx, adopted) = resolve_canvas_hit(&mut outputs, &live, None, "HDMI-A-1");
+        assert!(adopted);
+        assert_eq!(idx, 1);
+        assert_eq!(outputs.len(), 2);
+        assert_eq!(outputs[1].name, "HDMI-A-1");
+    }
+
+    #[test]
+    fn canvas_hit_keeps_existing_config_index() {
+        let mut outputs = vec![
+            OutputConfig {
+                name: "eDP-1".into(),
+                ..Default::default()
+            },
+            OutputConfig {
+                name: "DP-1".into(),
+                ..Default::default()
+            },
+        ];
+        let live = [identified("DP-1", "Dell Inc.", "U2720Q", "ABC123")];
+        let (idx, adopted) = resolve_canvas_hit(&mut outputs, &live, Some(1), "DP-1");
+        assert!(!adopted);
+        assert_eq!(idx, 1);
+        assert_eq!(outputs.len(), 2);
     }
 }

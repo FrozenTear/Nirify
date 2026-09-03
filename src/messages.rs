@@ -1207,7 +1207,8 @@ pub enum LayerRulesMessage {
 pub enum OutputsMessage {
     // List management
     AddOutput,
-    /// Create configs for every connected IPC output that is not already named.
+    /// Create configs for every connected IPC output that is not already matched
+    /// (connector or make/model/serial via Config helpers).
     AdoptConnected,
     RemoveOutput(usize),
     SelectOutput(usize),

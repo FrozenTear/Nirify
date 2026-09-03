@@ -13,8 +13,8 @@ use crate::messages::{DialogState, Message, OutputsMessage};
 use crate::theme::{fonts, neon};
 use crate::views;
 use crate::views::display_layout::{
-    calculate_canvas_size, collect_monitors, compute_preview_layout, unconfigured_outputs,
-    PREVIEW_MAX_HEIGHT, PREVIEW_MAX_WIDTH,
+    calculate_canvas_size, collect_monitors, compute_preview_layout, live_for_output,
+    output_identity_labels, unconfigured_outputs, PREVIEW_MAX_HEIGHT, PREVIEW_MAX_WIDTH,
 };
 
 /// Displays screen with monitor preview + output cards
@@ -414,7 +414,7 @@ fn output_cards_grid<'a>(
     let mut col2: Vec<Element<'a, Message>> = Vec::new();
 
     for (idx, output) in outputs.outputs.iter().enumerate() {
-        let ipc = available.iter().find(|a| a.name == output.name);
+        let ipc = live_for_output(output, available);
         let card = output_card(idx, output, ipc);
         if idx % 2 == 0 {
             col1.push(card);
@@ -443,25 +443,38 @@ fn output_card<'a>(
         _ => neon::TERTIARY,
     };
 
-    let model_name = ipc
-        .map(|i| {
-            if i.model.is_empty() {
-                output.name.clone()
-            } else {
-                format!("{} {}", i.make, i.model)
-            }
-        })
-        .unwrap_or_else(|| output.name.clone());
+    let identity = output_identity_labels(output, ipc);
 
     let resolution = ipc
         .map(|i| i.current_mode_string())
+        .filter(|mode| !mode.is_empty())
         .unwrap_or_else(|| output.mode.clone());
 
     let unnamed = output.name.trim().is_empty();
+    let title = if unnamed {
+        "Unnamed output".to_string()
+    } else if identity.title.is_empty() {
+        output.name.clone()
+    } else {
+        identity.title.clone()
+    };
+
     let connector_label = if unnamed {
         "unnamed — set a connector to save".to_string()
     } else {
-        format!("{} • {}", output.name, resolution)
+        let connector = if identity.connector.is_empty() {
+            output.name.as_str()
+        } else {
+            identity.connector.as_str()
+        };
+        let mut parts = vec![connector.to_string()];
+        if !identity.serial.is_empty() {
+            parts.push(format!("SN {}", identity.serial));
+        }
+        if !resolution.is_empty() {
+            parts.push(resolution);
+        }
+        parts.join(" • ")
     };
 
     let card = column![
@@ -483,13 +496,7 @@ fn output_card<'a>(
             Space::new().width(12),
             column![
                 row![
-                    text(if unnamed {
-                        "Unnamed output".to_string()
-                    } else {
-                        model_name.clone()
-                    })
-                    .size(15)
-                    .font(fonts::UI_FONT_SEMIBOLD),
+                    text(title).size(15).font(fonts::UI_FONT_SEMIBOLD),
                     if output.focus_at_startup {
                         badge_chip("Startup", neon::PRIMARY)
                     } else {
@@ -514,6 +521,22 @@ fn output_card<'a>(
         ]
         .align_y(Alignment::Center),
         Space::new().height(12),
+        if identity.has_identity_fields() {
+            Element::from(
+                column![
+                    row![
+                        summary_field("MAKE", identity_or_dash(&identity.make)),
+                        summary_field("MODEL", identity_or_dash(&identity.model)),
+                        summary_field("SERIAL", identity_or_dash(&identity.serial)),
+                    ]
+                    .spacing(12),
+                    Space::new().height(12),
+                ]
+                .spacing(0),
+            )
+        } else {
+            Space::new().into()
+        },
         // Summary rows
         row![
             summary_field(
@@ -643,6 +666,14 @@ fn output_card<'a>(
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+fn identity_or_dash(value: &str) -> &str {
+    if value.is_empty() {
+        "—"
+    } else {
+        value
+    }
+}
+
 fn badge_chip<'a>(label: &'a str, color: iced::Color) -> Element<'a, Message> {
     container(
         text(label)
@@ -709,6 +740,32 @@ pub fn output_editor_modal<'a>(
 ) -> Element<'a, Message> {
     let output = &outputs.outputs[idx];
     let accent = neon::SECONDARY;
+    let identity = output_identity_labels(output, live_for_output(output, available_outputs));
+    let header_title = if output.name.is_empty() {
+        "Unnamed output".to_string()
+    } else if !identity.title.is_empty() {
+        identity.title.clone()
+    } else {
+        output.name.clone()
+    };
+    let header_subtitle = if identity.has_identity_fields() {
+        let mut parts = Vec::new();
+        if !identity.connector.is_empty() {
+            parts.push(identity.connector.clone());
+        }
+        if !identity.serial.is_empty() {
+            parts.push(format!("SN {}", identity.serial));
+        }
+        if parts.is_empty() {
+            output.name.clone()
+        } else {
+            parts.join(" • ")
+        }
+    } else if output.name.is_empty() {
+        String::new()
+    } else {
+        output.name.clone()
+    };
 
     // Wrap the existing outputs detail view
     let detail_content =
@@ -736,13 +793,18 @@ pub fn output_editor_modal<'a>(
                     .size(10)
                     .font(fonts::UI_FONT_SEMIBOLD)
                     .color(accent),
-                text(if output.name.is_empty() {
-                    "Unnamed output"
+                text(header_title).size(22).font(fonts::UI_FONT_SEMIBOLD),
+                if header_subtitle.is_empty()
+                    || (header_subtitle == output.name && !identity.has_identity_fields())
+                {
+                    Space::new().into()
                 } else {
-                    output.name.as_str()
-                })
-                .size(22)
-                .font(fonts::UI_FONT_SEMIBOLD),
+                    Element::from(
+                        text(header_subtitle)
+                            .size(12)
+                            .color(neon::ON_SURFACE_VARIANT),
+                    )
+                },
             ]
             .spacing(4)
             .width(Length::Fill),
