@@ -107,7 +107,9 @@ On first launch, a setup wizard will guide you through connecting the app to you
    ```kdl
    include "nirify/main.kdl"
    ```
-   This path is relative to `~/.config/niri/`. Do not use a `~/...` include: tilde expansion only works on niri 26.04+, and Nirify's documented minimum remains 25.11.
+   This path is relative to `~/.config/niri/`. Do not use a `~/...` include for Nirify itself: tilde expansion only works on niri 26.04+, and Nirify's documented minimum remains 25.11.
+
+   **User includes:** niri 26.04 expands `~/` and accepts `optional=true` (a missing optional file is not an error). Nirify's conflict scan and first-run import follow that. Import and keybindings load still **jail** includes to `$XDG_CONFIG_HOME/niri` (usually `~/.config/niri`): a `~/dotfiles/…` include is left in `config.kdl` for niri to load, but its settings are not copied into `nirify/`.
 
 ## Configuration Structure
 

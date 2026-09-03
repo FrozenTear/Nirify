@@ -298,14 +298,12 @@ fn sizing_card<'a, Message: Clone + 'a>(
             optional_slider_row(
                 "Column Width (Fixed)",
                 "Default column width in pixels",
-                lo.default_column_width_fixed.map(|v| v as f32),
+                lo.default_column_width_fixed,
                 200.0,
                 4000.0,
                 "px",
                 move |v| {
-                    edit(&lo_c, on.clone(), |o| {
-                        set_default_column_width_fixed(o, v.map(|f| f as i32))
-                    })
+                    edit(&lo_c, on.clone(), |o| set_default_column_width_fixed(o, v))
                 },
             )
         },
@@ -1137,7 +1135,7 @@ pub fn set_default_column_width_proportion(lo: &mut LayoutOverride, value: Optio
 }
 
 /// Setting a fixed width clears auto and proportion.
-pub fn set_default_column_width_fixed(lo: &mut LayoutOverride, value: Option<i32>) {
+pub fn set_default_column_width_fixed(lo: &mut LayoutOverride, value: Option<f32>) {
     lo.default_column_width_fixed = value;
     if value.is_some() {
         lo.default_column_width_auto = None;
@@ -1282,7 +1280,7 @@ mod tests {
     #[test]
     fn auto_width_clears_proportion_and_fixed() {
         let mut lo = sample_override();
-        lo.default_column_width_fixed = Some(800);
+        lo.default_column_width_fixed = Some(800.0);
         set_default_column_width_auto(&mut lo, Some(true));
         assert_eq!(lo.default_column_width_auto, Some(true));
         assert_eq!(lo.default_column_width_proportion, None);
@@ -1293,7 +1291,7 @@ mod tests {
     fn proportion_width_clears_auto_and_fixed() {
         let mut lo = LayoutOverride {
             default_column_width_auto: Some(true),
-            default_column_width_fixed: Some(640),
+            default_column_width_fixed: Some(640.0),
             ..LayoutOverride::default()
         };
         set_default_column_width_proportion(&mut lo, Some(0.4));
@@ -1309,8 +1307,8 @@ mod tests {
             default_column_width_proportion: Some(0.3),
             ..LayoutOverride::default()
         };
-        set_default_column_width_fixed(&mut lo, Some(720));
-        assert_eq!(lo.default_column_width_fixed, Some(720));
+        set_default_column_width_fixed(&mut lo, Some(720.0));
+        assert_eq!(lo.default_column_width_fixed, Some(720.0));
         assert_eq!(lo.default_column_width_auto, None);
         assert_eq!(lo.default_column_width_proportion, None);
     }

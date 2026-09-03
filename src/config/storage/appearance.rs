@@ -60,9 +60,8 @@ fn generate_appearance_kdl_ex(
     let mut kdl = KdlBuilder::with_header("Appearance settings - managed by Nirify");
 
     kdl.block("layout", |b| {
-        // Gaps - single value (niri only supports one gaps value)
-        let gaps = settings.gaps.round() as i32;
-        b.raw(&format!("gaps {}", gaps));
+        // Gaps — niri `FloatOrInt` since 0.1.7. Do not coerce 0.5 → 0/1.
+        b.field_f32("gaps", settings.gaps);
 
         // Focus ring - always emitted with an explicit on/off flag so the
         // enabled state (and styling) round-trips and overrides the user's
@@ -74,7 +73,7 @@ fn generate_appearance_kdl_ex(
             } else {
                 "off"
             });
-            fr.field_f32_as_int("width", settings.focus_ring_width);
+            fr.field_f32("width", settings.focus_ring_width);
             fr.field_color_or_gradient("active", &settings.focus_ring_active);
             fr.field_color_or_gradient("inactive", &settings.focus_ring_inactive);
             fr.field_color_or_gradient("urgent", &settings.focus_ring_urgent);
@@ -84,7 +83,7 @@ fn generate_appearance_kdl_ex(
         b.newline();
         b.block("border", |br| {
             br.flag(if settings.border_enabled { "on" } else { "off" });
-            br.field_f32_as_int("width", settings.border_thickness);
+            br.field_f32("width", settings.border_thickness);
             br.field_color_or_gradient("active", &settings.border_active);
             br.field_color_or_gradient("inactive", &settings.border_inactive);
             br.field_color_or_gradient("urgent", &settings.border_urgent);
@@ -104,10 +103,10 @@ fn generate_appearance_kdl_ex(
         if has_struts {
             b.newline();
             b.block("struts", |s| {
-                s.field_f32_as_int("left", behavior.strut_left);
-                s.field_f32_as_int("right", behavior.strut_right);
-                s.field_f32_as_int("top", behavior.strut_top);
-                s.field_f32_as_int("bottom", behavior.strut_bottom);
+                s.field_f32("left", behavior.strut_left);
+                s.field_f32("right", behavior.strut_right);
+                s.field_f32("top", behavior.strut_top);
+                s.field_f32("bottom", behavior.strut_bottom);
             });
         }
 
@@ -145,7 +144,7 @@ fn generate_appearance_kdl_ex(
             ColumnWidthType::Fixed => {
                 b.raw(&format!(
                     "default-column-width {{ fixed {}; }}",
-                    behavior.default_column_width_fixed.round() as i32
+                    KdlBuilder::format_f32(behavior.default_column_width_fixed)
                 ));
             }
             // Empty block: niri lets each new window choose its own initial width.
@@ -161,7 +160,7 @@ fn generate_appearance_kdl_ex(
     if emit_corner_radius_rule && settings.corner_radius > 0.0 {
         kdl.newline();
         kdl.block("window-rule", |wr| {
-            wr.field_f32_as_int("geometry-corner-radius", settings.corner_radius);
+            wr.field_f32("geometry-corner-radius", settings.corner_radius);
         });
     }
 
@@ -301,6 +300,40 @@ mod tests {
             &variant.behavior
         ))
         .is_ok());
+    }
+
+    #[test]
+    fn fractional_gaps_struts_widths_round_trip() {
+        let mut src = Settings::default();
+        src.appearance.gaps = 0.5;
+        src.appearance.focus_ring_width = 2.5;
+        src.appearance.border_thickness = 1.5;
+        src.appearance.corner_radius = 4.5;
+        src.behavior.strut_left = 0.5;
+        src.behavior.strut_right = 1.25;
+        src.behavior.default_column_width_type = ColumnWidthType::Fixed;
+        src.behavior.default_column_width_fixed = 500.5;
+
+        let kdl = generate_appearance_kdl(&src.appearance, &src.behavior);
+        assert!(kdl.contains("gaps 0.5"), "{kdl}");
+        assert!(kdl.contains("width 2.5"), "{kdl}");
+        assert!(kdl.contains("width 1.5"), "{kdl}");
+        assert!(kdl.contains("left 0.5"), "{kdl}");
+        assert!(kdl.contains("right 1.25"), "{kdl}");
+        assert!(kdl.contains("fixed 500.5"), "{kdl}");
+        assert!(kdl.contains("geometry-corner-radius 4.5"), "{kdl}");
+
+        let dst = reparse_layout(&kdl);
+        assert!((dst.appearance.gaps - 0.5).abs() < 1e-3);
+        assert!((dst.appearance.focus_ring_width - 2.5).abs() < 1e-3);
+        assert!((dst.appearance.border_thickness - 1.5).abs() < 1e-3);
+        assert!((dst.behavior.strut_left - 0.5).abs() < 1e-3);
+        assert!((dst.behavior.strut_right - 1.25).abs() < 1e-3);
+        assert_eq!(
+            dst.behavior.default_column_width_type,
+            ColumnWidthType::Fixed
+        );
+        assert!((dst.behavior.default_column_width_fixed - 500.5).abs() < 1e-3);
     }
 
     #[test]

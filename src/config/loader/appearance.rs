@@ -103,7 +103,7 @@ pub fn parse_appearance_from_doc(doc: &KdlDocument, settings: &mut Settings) {
 ///
 /// Shared between loader and importer for DRY parsing of layout settings.
 pub fn parse_layout_children(layout_children: &KdlDocument, settings: &mut Settings) {
-    // Gaps - niri uses a single value: `gaps 16`
+    // Gaps - niri uses a single `FloatOrInt` value: `gaps 16` or `gaps 0.5`
     // For backwards compatibility, we also handle `gaps inner=X outer=Y` by taking the inner value
     if let Some(gaps_node) = layout_children.get("gaps") {
         let mut found_value = false;
@@ -111,9 +111,12 @@ pub fn parse_layout_children(layout_children: &KdlDocument, settings: &mut Setti
         // Check for named entries (backwards compatibility with old configs)
         for entry in gaps_node.entries() {
             if let Some(name) = entry.name() {
-                if let Some(val) = entry.value().as_integer() {
-                    // Use inner value if present (for backwards compatibility)
-                    if name.value() == "inner" {
+                if name.value() == "inner" {
+                    if let Some(val) = entry.value().as_float() {
+                        settings.appearance.gaps = val as f32;
+                        found_value = true;
+                        break;
+                    } else if let Some(val) = entry.value().as_integer() {
                         settings.appearance.gaps = val as f32;
                         found_value = true;
                         break;
@@ -126,7 +129,9 @@ pub fn parse_layout_children(layout_children: &KdlDocument, settings: &mut Setti
         if !found_value {
             if let Some(first_entry) = gaps_node.entries().iter().next() {
                 if first_entry.name().is_none() {
-                    if let Some(val) = first_entry.value().as_integer() {
+                    if let Some(val) = first_entry.value().as_float() {
+                        settings.appearance.gaps = val as f32;
+                    } else if let Some(val) = first_entry.value().as_integer() {
                         settings.appearance.gaps = val as f32;
                     }
                 }
@@ -289,5 +294,24 @@ mod tests {
     fn default_column_width_empty_is_auto() {
         let s = parse("layout {\n    default-column-width {\n    }\n}");
         assert_eq!(s.behavior.default_column_width_type, ColumnWidthType::Auto);
+    }
+
+    #[test]
+    fn fractional_gaps_are_not_dropped() {
+        let s = parse("layout {\n    gaps 0.5\n}");
+        assert!((s.appearance.gaps - 0.5).abs() < 1e-3);
+    }
+
+    #[test]
+    fn fractional_named_inner_gaps() {
+        let s = parse("layout {\n    gaps inner=1.5 outer=2\n}");
+        assert!((s.appearance.gaps - 1.5).abs() < 1e-3);
+    }
+
+    #[test]
+    fn fractional_struts_load() {
+        let s = parse("layout {\n    struts {\n        left 0.5\n        top 12.25\n    }\n}");
+        assert!((s.behavior.strut_left - 0.5).abs() < 1e-3);
+        assert!((s.behavior.strut_top - 12.25).abs() < 1e-3);
     }
 }

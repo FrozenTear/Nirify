@@ -85,7 +85,7 @@ The app **does** rewrite `~/.config/niri/config.kdl` through `smart_replace_conf
    - First run (wizard): `import_from_niri_config_with_result` reads the current `config.kdl` and user includes (Nirify includes are skipped), then those settings are written to `nirify/*.kdl`.
    - Later launches: if `config.kdl` still has top-level managed nodes (hand-edits), they are merged into existing managed settings — adopt items/sections not already represented in `nirify/`; do **not** clobber intentional Nirify state with stale duplicates.
 3. **Strip** managed top-level nodes from `config.kdl` and preserve unmanaged / custom content.
-4. **Ensure** `include "nirify/main.kdl"` is the last top-level node (relative path; niri 25.11 does not expand `~`).
+4. **Ensure** `include "nirify/main.kdl"` is the last top-level node (relative path; niri 25.11 does not expand `~`). Conflict scan and import expand `~/` (niri 26.04) and treat `optional=true` missing files as non-errors. Import still jails paths outside `~/.config/niri` — those includes stay unmanaged.
 5. Each settings category = one `.kdl` file under `~/.config/niri/nirify/` (`appearance.kdl`, `behavior.kdl`, `input/keyboard.kdl`, …).
 
 ### Code Structure
