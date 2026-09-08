@@ -1,22 +1,28 @@
-//! Dashboard screen — compositor status, workspace overview, session actions
+//! Dashboard screen — command center chrome matching Layout / Visuals
 //!
-//! Designed to match the Tokyo Neon "Command Center" aesthetic.
+//! Same page shell as the redesigned screens: category label, large title,
+//! descriptive subtitle, hero visual band, then summary cards.
 
-use iced::widget::{button, column, container, row, scrollable, text, Space};
+use iced::widget::{column, container, row, scrollable, text, Space};
 use iced::{Alignment, Element, Length};
 
 use crate::config::Settings;
 use crate::ipc::WorkspaceInfo;
-use crate::messages::Message;
-use crate::theme::{fonts, neon, PillVariant};
+use crate::messages::{EditableSection, Message, ToolsMessage};
+use crate::theme::{fonts, neon};
 use crate::version::NiriVersion;
 use crate::views::status_bar::NiriStatus;
 use crate::views::tools::ToolsState;
 
 use neon::{
-    ON_SURFACE_VARIANT, OUTLINE_VARIANT, PRIMARY, SECONDARY, SURFACE_CONTAINER,
-    SURFACE_CONTAINER_HIGH, SURFACE_CONTAINER_HIGHEST,
+    ERROR, ON_SURFACE_VARIANT, OUTLINE_VARIANT, PRIMARY, SECONDARY, SURFACE_CONTAINER,
+    SURFACE_CONTAINER_HIGHEST, TERTIARY,
 };
+
+const CATEGORY: &str = "COMMAND CENTER";
+const TITLE: &str = "Live Session";
+const DESCRIPTION: &str = "Session health, workspace occupancy, and the features currently shaping your ribbon. Status updates live from niri; changes save automatically.";
+const CONFIG_PATH: &str = "~/.config/niri/config.kdl";
 
 /// Dashboard screen
 pub fn view<'a>(
@@ -25,221 +31,296 @@ pub fn view<'a>(
     tools_state: &'a ToolsState,
     settings: &'a Settings,
 ) -> Element<'a, Message> {
+    let status = session_status(niri_status, niri_version);
+    let reload = reload_action(niri_status, tools_state.reloading);
+
     let content = column![
-        // ── Hero: Compositor Status ─────────────────────────────────────
-        compositor_status_card(niri_status, niri_version),
-        Space::new().height(8),
-        // ── Main grid: two columns ──────────────────────────────────────
-        row![
-            // Left column
-            column![
-                label_text("ACTIVE FEATURES"),
-                feature_toggle_card("Window Gaps", settings.appearance.gaps > 0.0),
-                feature_toggle_card("Animations", settings.animations.enabled),
-                feature_toggle_card("Focus Ring", settings.appearance.focus_ring_enabled),
-                Space::new().height(8),
-                label_text("SESSION ACTIONS"),
-                session_action_card(
-                    "Reload Config",
-                    Message::Tools(crate::messages::ToolsMessage::ReloadConfig),
-                ),
-            ]
-            .spacing(8)
-            .width(Length::FillPortion(4)),
-            Space::new().width(16),
-            // Right column
-            column![
-                workspace_status_section(&tools_state.workspaces),
-                Space::new().height(16),
-                column_preview_placeholder(),
-            ]
-            .spacing(8)
-            .width(Length::FillPortion(8)),
-        ],
+        super::hero_header(CATEGORY, TITLE, DESCRIPTION, SECONDARY),
         Space::new().height(16),
-        // ── Bottom stats row ────────────────────────────────────────────
-        stats_row(tools_state.windows.len(), tools_state.workspaces.len(),),
+        session_preview(&status, &tools_state.workspaces),
+        Space::new().height(24),
+        row![
+            super::summary_card(
+                "◈",
+                "Session",
+                SECONDARY,
+                vec![
+                    ("Status", status.headline.to_string()),
+                    ("Version", status.version.clone()),
+                    (
+                        "Occupancy",
+                        occupancy_pair_label(
+                            tools_state.windows.len(),
+                            tools_state.workspaces.len(),
+                            niri_status,
+                        ),
+                    ),
+                ],
+                reload.label,
+                reload.message,
+            ),
+            super::section_summary_card(
+                EditableSection::SpatialGaps,
+                vec![
+                    ("Gaps", format!("{:.0}px", settings.appearance.gaps)),
+                    (
+                        "Radius",
+                        format!("{:.0}px", settings.appearance.corner_radius)
+                    ),
+                ],
+            ),
+            super::section_summary_card(
+                EditableSection::Animations,
+                vec![
+                    (
+                        "Enabled",
+                        if settings.animations.enabled {
+                            "On"
+                        } else {
+                            "Off"
+                        }
+                        .to_string()
+                    ),
+                    ("Slowdown", format!("{:.1}x", settings.animations.slowdown)),
+                ],
+            ),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Start),
+        Space::new().height(12),
+        row![
+            super::section_summary_card(
+                EditableSection::FocusRing,
+                vec![
+                    (
+                        "Enabled",
+                        if settings.appearance.focus_ring_enabled {
+                            "On"
+                        } else {
+                            "Off"
+                        }
+                        .to_string()
+                    ),
+                    (
+                        "Width",
+                        format!("{}px", settings.appearance.focus_ring_width)
+                    ),
+                ],
+            ),
+            super::section_summary_card(
+                EditableSection::NamedWorkspaces,
+                vec![
+                    (
+                        "Active",
+                        occupancy_count_label(tools_state.workspaces.len(), niri_status)
+                    ),
+                    ("Named", format!("{}", settings.workspaces.workspaces.len())),
+                ],
+            ),
+            super::section_summary_card(
+                EditableSection::Overview,
+                vec![
+                    ("Zoom", format!("{:.2}x", settings.overview.zoom)),
+                    (
+                        "Shadow",
+                        if settings
+                            .overview
+                            .workspace_shadow
+                            .as_ref()
+                            .is_some_and(|s| s.enabled)
+                        {
+                            "On"
+                        } else {
+                            "Off"
+                        }
+                        .to_string(),
+                    ),
+                ],
+            ),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Start),
     ]
-    .spacing(8)
+    .spacing(0)
     .padding(32)
     .width(Length::Fill);
 
     scrollable(content).height(Length::Fill).into()
 }
 
-// ── Compositor Status Card ──────────────────────────────────────────────────
+// ── Status copy ─────────────────────────────────────────────────────────────
 
-fn compositor_status_card<'a>(
-    status: NiriStatus,
-    version: Option<NiriVersion>,
-) -> Element<'a, Message> {
-    let (pill_label, pill_variant) = match status {
-        NiriStatus::Connected => ("RUNNING", PillVariant::Active),
-        NiriStatus::Disconnected => ("DISCONNECTED", PillVariant::Error),
-        NiriStatus::Unknown => ("CHECKING", PillVariant::Muted),
-    };
-
-    let version_text = version
-        .map(|v| format!("niri v{}.{:02}", v.major, v.minor))
-        .unwrap_or_else(|| "niri".to_string());
-
-    let status_headline = match status {
-        NiriStatus::Connected => "Compositor Running",
-        NiriStatus::Disconnected => "Compositor Offline",
-        NiriStatus::Unknown => "Checking Status...",
-    };
-
-    let config_path = "~/.config/niri/config.kdl";
-
-    neon_card(
-        column![row![
-            column![
-                text(status_headline).size(28).font(fonts::UI_FONT_SEMIBOLD),
-                row![
-                    text(version_text)
-                        .size(13)
-                        .font(fonts::MONO_FONT)
-                        .color(ON_SURFACE_VARIANT),
-                    text(" | ").size(13).color(OUTLINE_VARIANT),
-                    text(config_path)
-                        .size(13)
-                        .font(fonts::MONO_FONT)
-                        .color(OUTLINE_VARIANT),
-                ]
-                .spacing(4),
-            ]
-            .spacing(6)
-            .width(Length::Fill),
-            status_pill(pill_label, pill_variant),
-        ]
-        .align_y(Alignment::Start),]
-        .spacing(8),
-    )
+#[derive(Debug, Clone, PartialEq)]
+struct SessionStatus {
+    pill: &'static str,
+    headline: &'static str,
+    version: String,
+    accent: iced::Color,
 }
 
-// ── Workspace Status ────────────────────────────────────────────────────────
+#[derive(Debug, Clone)]
+struct ReloadAction {
+    label: &'static str,
+    message: Option<Message>,
+}
 
-fn workspace_status_section<'a>(workspaces: &'a [WorkspaceInfo]) -> Element<'a, Message> {
-    let mut ws_row = row![].spacing(8);
+fn session_status(status: NiriStatus, version: Option<NiriVersion>) -> SessionStatus {
+    let (pill, headline, accent) = match status {
+        NiriStatus::Connected => ("RUNNING", "Running", SECONDARY),
+        NiriStatus::Disconnected => ("OFFLINE", "Offline", ERROR),
+        NiriStatus::Unknown => ("CHECKING", "Checking", OUTLINE_VARIANT),
+    };
 
-    if workspaces.is_empty() {
-        ws_row = ws_row.push(
-            container(
-                text("No workspaces detected")
-                    .size(13)
-                    .color(OUTLINE_VARIANT),
-            )
-            .padding(24)
-            .center(Length::Fill),
-        );
-    } else {
-        for ws in workspaces.iter().take(6) {
-            ws_row = ws_row.push(workspace_card(ws));
-        }
-        if workspaces.len() > 6 {
-            ws_row = ws_row.push(
-                container(
-                    text(format!("+{}", workspaces.len() - 6))
-                        .size(14)
-                        .color(OUTLINE_VARIANT),
-                )
-                .padding([16, 12])
-                .center(Length::Fixed(60.0)),
-            );
-        }
+    SessionStatus {
+        pill,
+        headline,
+        version: version_label(version),
+        accent,
     }
-
-    column![
-        row![
-            label_text("WORKSPACE STATUS"),
-            Space::new().width(Length::Fill),
-            text(format!("{} Active", workspaces.len()))
-                .size(11)
-                .font(fonts::MONO_FONT)
-                .color(SECONDARY),
-        ]
-        .align_y(Alignment::Center),
-        scrollable(ws_row).direction(scrollable::Direction::Horizontal(
-            scrollable::Scrollbar::default().width(0).scroller_width(0),
-        )),
-    ]
-    .spacing(8)
-    .into()
 }
 
-fn workspace_card<'a>(ws: &'a WorkspaceInfo) -> Element<'a, Message> {
-    let default_name = format!("{:02}", ws.idx);
-    let name = ws.name.as_deref().unwrap_or(&default_name);
-    let border_color = if ws.is_active {
-        PRIMARY
-    } else {
-        OUTLINE_VARIANT
-    };
+fn version_label(version: Option<NiriVersion>) -> String {
+    version
+        .map(|v| format!("niri v{v}"))
+        .unwrap_or_else(|| "niri".to_string())
+}
 
-    container(
-        column![
-            text(format!("{:02}", ws.idx))
-                .size(22)
-                .font(fonts::UI_FONT_SEMIBOLD)
-                .color(if ws.is_active {
-                    PRIMARY
-                } else {
-                    ON_SURFACE_VARIANT
-                }),
-            text(name.to_uppercase())
-                .size(9)
-                .font(fonts::UI_FONT_MEDIUM)
-                .color(OUTLINE_VARIANT),
-        ]
-        .spacing(4)
-        .align_x(Alignment::Center),
-    )
-    .padding([16, 20])
-    .width(Length::Fixed(90.0))
-    .style(move |_theme: &iced::Theme| container::Style {
-        background: Some(iced::Background::Color(SURFACE_CONTAINER_HIGH)),
-        border: iced::Border {
-            color: border_color,
-            width: if ws.is_active { 1.5 } else { 0.0 },
-            radius: 12.0.into(),
+fn reload_action(status: NiriStatus, reloading: bool) -> ReloadAction {
+    let can_reload = matches!(status, NiriStatus::Connected) && !reloading;
+    ReloadAction {
+        label: if reloading {
+            "RELOADING..."
+        } else {
+            "RELOAD CONFIG"
         },
-        ..Default::default()
-    })
-    .into()
+        message: can_reload.then_some(Message::Tools(ToolsMessage::ReloadConfig)),
+    }
 }
 
-// ── Column Preview Placeholder ──────────────────────────────────────────────
+fn occupancy_count_label(count: usize, status: NiriStatus) -> String {
+    if matches!(status, NiriStatus::Connected) {
+        count.to_string()
+    } else {
+        "—".to_string()
+    }
+}
 
-fn column_preview_placeholder<'a>() -> Element<'a, Message> {
-    container(
-        column![
-            label_text("DYNAMIC COLUMN PREVIEW"),
-            Space::new().height(8),
+fn occupancy_pair_label(windows: usize, workspaces: usize, status: NiriStatus) -> String {
+    if matches!(status, NiriStatus::Connected) {
+        format!("{windows} win / {workspaces} ws")
+    } else {
+        "—".to_string()
+    }
+}
+
+// ── Hero visual band ────────────────────────────────────────────────────────
+
+fn session_preview<'a>(
+    status: &SessionStatus,
+    workspaces: &'a [WorkspaceInfo],
+) -> Element<'a, Message> {
+    let (left, right) = flanking_workspaces(workspaces);
+
+    super::hero_visual_band(
+        row![
+            workspace_column(left),
+            focused_session_column(status, focused_workspace(workspaces)),
+            workspace_column(right),
+        ]
+        .spacing(12)
+        .padding(24)
+        .height(Length::Fixed(220.0)),
+    )
+}
+
+fn focused_workspace(workspaces: &[WorkspaceInfo]) -> Option<&WorkspaceInfo> {
+    workspaces
+        .iter()
+        .find(|ws| ws.is_focused || ws.is_active)
+        .or_else(|| workspaces.first())
+}
+
+fn flanking_workspaces(
+    workspaces: &[WorkspaceInfo],
+) -> (Option<&WorkspaceInfo>, Option<&WorkspaceInfo>) {
+    let focused_id = focused_workspace(workspaces).map(|ws| ws.id);
+    let mut others = workspaces.iter().filter(|ws| Some(ws.id) != focused_id);
+    (others.next(), others.next())
+}
+
+fn workspace_column<'a>(ws: Option<&'a WorkspaceInfo>) -> Element<'a, Message> {
+    match ws {
+        Some(ws) => {
+            let default_name = format!("{:02}", ws.idx);
+            let name = ws.name.as_deref().unwrap_or(&default_name);
             container(
-                text("Canvas visualizer coming soon")
-                    .size(13)
-                    .color(OUTLINE_VARIANT),
+                column![
+                    text(format!("{:02}", ws.idx))
+                        .size(18)
+                        .font(fonts::UI_FONT_SEMIBOLD)
+                        .color(ON_SURFACE_VARIANT),
+                    text(name.to_uppercase())
+                        .size(9)
+                        .font(fonts::MONO_FONT)
+                        .color(OUTLINE_VARIANT),
+                    Space::new().height(Length::Fill),
+                    container(Space::new().width(Length::Fill).height(6)).style(
+                        |_: &iced::Theme| {
+                            container::Style {
+                                background: Some(iced::Background::Color(OUTLINE_VARIANT)),
+                                border: iced::Border {
+                                    radius: 2.0.into(),
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            }
+                        }
+                    ),
+                ]
+                .spacing(8)
+                .padding(12),
             )
-            .padding(40)
-            .center(Length::Fill)
-            .style(|_theme: &iced::Theme| container::Style {
-                background: Some(iced::Background::Color(SURFACE_CONTAINER_HIGHEST)),
+            .width(Length::FillPortion(1))
+            .height(Length::Fill)
+            .style(|_: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(SURFACE_CONTAINER)),
                 border: iced::Border {
                     color: OUTLINE_VARIANT,
                     width: 0.0,
-                    radius: 12.0.into(),
+                    radius: 16.0.into(),
                 },
                 ..Default::default()
+            })
+            .into()
+        }
+        None => inactive_skeleton(),
+    }
+}
+
+fn inactive_skeleton<'a>() -> Element<'a, Message> {
+    container(
+        column![
+            container(Space::new().width(40).height(3)).style(|_: &iced::Theme| {
+                container::Style {
+                    background: Some(iced::Background::Color(OUTLINE_VARIANT)),
+                    border: iced::Border {
+                        radius: 2.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
             }),
+            Space::new().height(Length::Fill),
         ]
-        .spacing(4),
+        .spacing(8)
+        .padding(12),
     )
-    .padding(20)
-    .width(Length::Fill)
-    .style(|_theme: &iced::Theme| container::Style {
+    .width(Length::FillPortion(1))
+    .height(Length::Fill)
+    .style(|_: &iced::Theme| container::Style {
         background: Some(iced::Background::Color(SURFACE_CONTAINER)),
         border: iced::Border {
-            color: iced::Color::TRANSPARENT,
+            color: OUTLINE_VARIANT,
             width: 0.0,
             radius: 16.0.into(),
         },
@@ -248,208 +329,240 @@ fn column_preview_placeholder<'a>() -> Element<'a, Message> {
     .into()
 }
 
-// ── Feature Toggle Cards ────────────────────────────────────────────────────
-
-fn feature_toggle_card<'a>(name: &'a str, enabled: bool) -> Element<'a, Message> {
-    let (pill_text, pill_color) = if enabled {
-        ("ON", SECONDARY)
-    } else {
-        ("OFF", OUTLINE_VARIANT)
-    };
+fn focused_session_column<'a>(
+    status: &SessionStatus,
+    workspace: Option<&'a WorkspaceInfo>,
+) -> Element<'a, Message> {
+    let pill = status.pill;
+    let accent = status.accent;
+    let version = status.version.clone();
+    let workspace_tag = workspace
+        .map(|ws| {
+            ws.name
+                .as_deref()
+                .map(|n| n.to_uppercase())
+                .unwrap_or_else(|| format!("WS {:02}", ws.idx))
+        })
+        .unwrap_or_else(|| "LIVE_SESSION".to_string());
 
     container(
-        row![
-            text(name)
-                .size(14)
-                .font(fonts::UI_FONT_MEDIUM)
-                .width(Length::Fill),
-            container(
-                text(pill_text)
-                    .size(10)
+        column![
+            row![
+                traffic_light(ERROR),
+                traffic_light(TERTIARY),
+                traffic_light(SECONDARY),
+                Space::new().width(Length::Fill),
+                status_tag(pill, accent),
+            ]
+            .spacing(6)
+            .align_y(Alignment::Center),
+            Space::new().height(8),
+            row![
+                text(workspace_tag)
+                    .size(13)
                     .font(fonts::UI_FONT_SEMIBOLD)
-                    .color(pill_color),
-            )
-            .padding([4, 10])
-            .style(move |_theme: &iced::Theme| container::Style {
-                background: Some(iced::Background::Color(iced::Color {
-                    a: if enabled { 0.15 } else { 0.08 },
-                    ..pill_color
-                })),
-                border: iced::Border {
-                    radius: 999.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }),
-        ]
-        .align_y(Alignment::Center),
-    )
-    .padding([14, 16])
-    .width(Length::Fill)
-    .style(|_theme: &iced::Theme| container::Style {
-        background: Some(iced::Background::Color(SURFACE_CONTAINER)),
-        border: iced::Border {
-            color: iced::Color::TRANSPARENT,
-            width: 0.0,
-            radius: 12.0.into(),
-        },
-        ..Default::default()
-    })
-    .into()
-}
-
-// ── Session Action Card ─────────────────────────────────────────────────────
-
-fn session_action_card<'a>(label: &'a str, on_press: Message) -> Element<'a, Message> {
-    button(
-        container(text(label).size(14).font(fonts::UI_FONT_MEDIUM))
-            .padding([14, 20])
-            .width(Length::Fill)
-            .center_x(Length::Fill),
-    )
-    .on_press(on_press)
-    .width(Length::Fill)
-    .style(|_theme: &iced::Theme, status: button::Status| {
-        let bg = match status {
-            button::Status::Hovered => SURFACE_CONTAINER_HIGHEST,
-            button::Status::Pressed => SURFACE_CONTAINER_HIGH,
-            _ => SURFACE_CONTAINER,
-        };
-        button::Style {
-            background: Some(iced::Background::Color(bg)),
-            text_color: PRIMARY,
-            border: iced::Border {
-                radius: 12.0.into(),
-                ..Default::default()
-            },
-            ..Default::default()
-        }
-    })
-    .into()
-}
-
-// ── Bottom Stats Row ────────────────────────────────────────────────────────
-
-fn stats_row<'a>(window_count: usize, workspace_count: usize) -> Element<'a, Message> {
-    row![
-        stat_card("WINDOWS", &window_count.to_string(), PRIMARY),
-        stat_card("WORKSPACES", &workspace_count.to_string(), SECONDARY),
-    ]
-    .spacing(12)
-    .into()
-}
-
-fn stat_card<'a>(label: &'a str, value: &str, accent: iced::Color) -> Element<'a, Message> {
-    let value_owned = value.to_string();
-
-    container(
-        row![column![
-            text(label)
+                    .color(PRIMARY),
+                Space::new().width(Length::Fill),
+                text(version)
+                    .size(10)
+                    .font(fonts::MONO_FONT)
+                    .color(ON_SURFACE_VARIANT),
+            ]
+            .align_y(Alignment::Center),
+            text(CONFIG_PATH)
                 .size(10)
-                .font(fonts::UI_FONT_MEDIUM)
+                .font(fonts::MONO_FONT)
                 .color(OUTLINE_VARIANT),
-            text(value_owned).size(24).font(fonts::UI_FONT_SEMIBOLD),
-        ]
-        .spacing(4)
-        .width(Length::Fill),]
-        .align_y(Alignment::Center),
-    )
-    .padding([16, 20])
-    .width(Length::FillPortion(1))
-    .style(move |_theme: &iced::Theme| container::Style {
-        background: Some(iced::Background::Color(SURFACE_CONTAINER)),
-        border: iced::Border {
-            color: iced::Color { a: 0.3, ..accent },
-            width: 0.0,
-            radius: 12.0.into(),
-        },
-        ..Default::default()
-    })
-    .into()
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-fn label_text<'a>(s: &'a str) -> Element<'a, Message> {
-    text(s)
-        .size(10)
-        .font(fonts::UI_FONT_SEMIBOLD)
-        .color(OUTLINE_VARIANT)
-        .into()
-}
-
-fn status_pill<'a>(label: &'a str, variant: PillVariant) -> Element<'a, Message> {
-    let (bg, fg) = match variant {
-        PillVariant::Active => (
-            iced::Color {
-                a: 0.12,
-                ..SECONDARY
-            },
-            SECONDARY,
-        ),
-        PillVariant::Error => (
-            iced::Color {
-                a: 0.12,
-                ..iced::Color::from_rgb(1.0, 0.44, 0.42)
-            },
-            iced::Color::from_rgb(1.0, 0.44, 0.42),
-        ),
-        PillVariant::Warning => (
-            iced::Color {
-                a: 0.12,
-                ..iced::Color::from_rgb(0.96, 0.62, 0.04)
-            },
-            iced::Color::from_rgb(0.96, 0.62, 0.04),
-        ),
-        PillVariant::Muted => (SURFACE_CONTAINER_HIGHEST, OUTLINE_VARIANT),
-    };
-
-    container(
-        row![
-            container(Space::new().width(6).height(6)).style(move |_theme: &iced::Theme| {
+            Space::new().height(4),
+            container(Space::new().width(Length::Fill).height(6)).style(|_: &iced::Theme| {
                 container::Style {
-                    background: Some(iced::Background::Color(fg)),
+                    background: Some(iced::Background::Color(iced::Color { a: 0.10, ..PRIMARY })),
                     border: iced::Border {
-                        radius: 999.0.into(),
+                        radius: 3.0.into(),
                         ..Default::default()
                     },
                     ..Default::default()
                 }
             }),
-            text(label).size(10).font(fonts::UI_FONT_SEMIBOLD).color(fg),
+            container(Space::new().width(Length::Fixed(180.0)).height(6)).style(
+                |_: &iced::Theme| {
+                    container::Style {
+                        background: Some(iced::Background::Color(iced::Color {
+                            a: 0.06,
+                            ..PRIMARY
+                        })),
+                        border: iced::Border {
+                            radius: 3.0.into(),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }
+                }
+            ),
+            Space::new().height(4),
+            container(Space::new().width(Length::Fill).height(Length::Fill)).style(
+                |_: &iced::Theme| container::Style {
+                    background: Some(iced::Background::Color(iced::Color { a: 0.04, ..PRIMARY })),
+                    border: iced::Border {
+                        color: iced::Color { a: 0.10, ..PRIMARY },
+                        width: 1.0,
+                        radius: 12.0.into(),
+                    },
+                    ..Default::default()
+                },
+            ),
         ]
-        .spacing(6)
-        .align_y(Alignment::Center),
+        .spacing(4)
+        .padding(16),
     )
-    .padding([6, 12])
-    .style(move |_theme: &iced::Theme| container::Style {
-        background: Some(iced::Background::Color(bg)),
+    .width(Length::FillPortion(2))
+    .height(Length::Fill)
+    .style(|_: &iced::Theme| container::Style {
+        background: Some(iced::Background::Color(SURFACE_CONTAINER_HIGHEST)),
         border: iced::Border {
-            radius: 999.0.into(),
-            ..Default::default()
+            color: iced::Color { a: 0.4, ..PRIMARY },
+            width: 2.0,
+            radius: 16.0.into(),
+        },
+        shadow: iced::Shadow {
+            color: iced::Color { a: 0.15, ..PRIMARY },
+            offset: iced::Vector::new(0.0, 0.0),
+            blur_radius: 40.0,
         },
         ..Default::default()
     })
     .into()
 }
 
-fn neon_card<'a>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
-    container(content)
-        .padding(24)
-        .width(Length::Fill)
-        .style(|_theme: &iced::Theme| container::Style {
-            background: Some(iced::Background::Color(SURFACE_CONTAINER)),
+fn traffic_light<'a>(color: iced::Color) -> Element<'a, Message> {
+    container(Space::new().width(8).height(8))
+        .style(move |_: &iced::Theme| container::Style {
+            background: Some(iced::Background::Color(color)),
             border: iced::Border {
-                color: iced::Color::TRANSPARENT,
-                width: 0.0,
-                radius: 16.0.into(),
-            },
-            shadow: iced::Shadow {
-                color: iced::Color::from_rgba(0.0, 0.0, 0.0, 0.15),
-                offset: iced::Vector::new(0.0, 4.0),
-                blur_radius: 16.0,
+                radius: 999.0.into(),
+                ..Default::default()
             },
             ..Default::default()
         })
         .into()
+}
+
+fn status_tag<'a>(label: &'static str, accent: iced::Color) -> Element<'a, Message> {
+    container(text(label).size(9).font(fonts::MONO_FONT).color(accent))
+        .padding([4, 8])
+        .style(move |_: &iced::Theme| container::Style {
+            background: Some(iced::Background::Color(iced::Color { a: 0.10, ..accent })),
+            border: iced::Border {
+                color: iced::Color { a: 0.20, ..accent },
+                width: 1.0,
+                radius: 999.0.into(),
+            },
+            ..Default::default()
+        })
+        .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn connected_status_uses_running_copy() {
+        let status = session_status(
+            NiriStatus::Connected,
+            Some(NiriVersion {
+                major: 26,
+                minor: 4,
+            }),
+        );
+        assert_eq!(status.pill, "RUNNING");
+        assert_eq!(status.headline, "Running");
+        assert_eq!(status.version, "niri v26.04");
+        assert_eq!(status.accent, SECONDARY);
+    }
+
+    #[test]
+    fn disconnected_status_uses_offline_copy() {
+        let status = session_status(NiriStatus::Disconnected, None);
+        assert_eq!(status.pill, "OFFLINE");
+        assert_eq!(status.headline, "Offline");
+        assert_eq!(status.version, "niri");
+        assert_eq!(status.accent, ERROR);
+    }
+
+    #[test]
+    fn unknown_status_uses_checking_copy() {
+        let status = session_status(NiriStatus::Unknown, None);
+        assert_eq!(status.pill, "CHECKING");
+        assert_eq!(status.headline, "Checking");
+    }
+
+    #[test]
+    fn reload_enabled_only_when_connected_and_idle() {
+        assert!(reload_action(NiriStatus::Connected, false)
+            .message
+            .is_some());
+        assert!(reload_action(NiriStatus::Connected, true).message.is_none());
+        assert!(reload_action(NiriStatus::Disconnected, false)
+            .message
+            .is_none());
+        assert_eq!(
+            reload_action(NiriStatus::Connected, true).label,
+            "RELOADING..."
+        );
+        assert_eq!(
+            reload_action(NiriStatus::Connected, false).label,
+            "RELOAD CONFIG"
+        );
+    }
+
+    #[test]
+    fn occupancy_hides_counts_when_offline() {
+        assert_eq!(occupancy_count_label(13, NiriStatus::Connected), "13");
+        assert_eq!(occupancy_count_label(13, NiriStatus::Disconnected), "—");
+        assert_eq!(occupancy_count_label(13, NiriStatus::Unknown), "—");
+        assert_eq!(
+            occupancy_pair_label(13, 9, NiriStatus::Connected),
+            "13 win / 9 ws"
+        );
+        assert_eq!(occupancy_pair_label(13, 9, NiriStatus::Disconnected), "—");
+    }
+
+    #[test]
+    fn flanking_workspaces_skip_focused() {
+        let workspaces = vec![
+            WorkspaceInfo {
+                id: 1,
+                idx: 1,
+                name: Some("one".into()),
+                output: None,
+                is_active: false,
+                is_focused: false,
+                active_window_id: None,
+            },
+            WorkspaceInfo {
+                id: 2,
+                idx: 2,
+                name: Some("two".into()),
+                output: None,
+                is_active: true,
+                is_focused: true,
+                active_window_id: None,
+            },
+            WorkspaceInfo {
+                id: 3,
+                idx: 3,
+                name: Some("three".into()),
+                output: None,
+                is_active: false,
+                is_focused: false,
+                active_window_id: None,
+            },
+        ];
+        let focused = focused_workspace(&workspaces).unwrap();
+        assert_eq!(focused.id, 2);
+        let (left, right) = flanking_workspaces(&workspaces);
+        assert_eq!(left.map(|ws| ws.id), Some(1));
+        assert_eq!(right.map(|ws| ws.id), Some(3));
+    }
 }
