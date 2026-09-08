@@ -485,6 +485,54 @@ pub struct WindowRule {
     pub tiled_state: Option<bool>,
     /// Animated floating effect (v25.05+)
     pub baba_is_float: Option<bool>,
+    /// Unmodeled `window-rule { }` children, re-emitted on save.
+    ///
+    /// Covers spicy / community keys such as `block-minimize true` and any
+    /// future props Nirify does not model. No minimize UI — passthrough only.
+    pub unknown_children: Vec<crate::config::unknown::UnknownKdlChild>,
+}
+
+/// Child names Nirify models on `window-rule { }`. Anything else is preserved.
+pub const MODELED_WINDOW_RULE_CHILD_NAMES: &[&str] = &[
+    "off",
+    "match",
+    "exclude",
+    "open-maximized",
+    "open-maximized-to-edges",
+    "open-fullscreen",
+    "open-floating",
+    "open-focused",
+    "default-floating-position",
+    "opacity",
+    "geometry-corner-radius",
+    "clip-to-geometry",
+    "block-out-from",
+    "open-on-output",
+    "open-on-workspace",
+    "default-column-width",
+    "default-window-height",
+    "scroll-factor",
+    "draw-border-with-background",
+    "min-width",
+    "max-width",
+    "min-height",
+    "max-height",
+    "focus-ring",
+    "border",
+    "variable-refresh-rate",
+    "default-column-display",
+    "tiled-state",
+    "baba-is-float",
+    "shadow",
+    "tab-indicator",
+    "background-effect",
+    "popups",
+];
+
+/// Returns true if `name` is a `window-rule { }` child Nirify already models.
+#[must_use]
+pub fn is_modeled_window_rule_child(name: &str) -> bool {
+    MODELED_WINDOW_RULE_CHILD_NAMES.contains(&name)
 }
 
 impl Default for WindowRule {
@@ -533,6 +581,7 @@ impl Default for WindowRule {
             popups: None,
             tiled_state: None,
             baba_is_float: None,
+            unknown_children: Vec::new(),
         }
     }
 }
@@ -545,6 +594,14 @@ impl WindowRule {
     #[must_use]
     pub fn is_catch_all(&self) -> bool {
         self.matches.iter().all(WindowRuleMatch::is_empty)
+    }
+
+    /// Adopt unmodeled children whose node name is not already present.
+    pub fn adopt_unknown_children(
+        &mut self,
+        incoming: &[crate::config::unknown::UnknownKdlChild],
+    ) -> bool {
+        crate::config::unknown::adopt_unknown_children(&mut self.unknown_children, incoming)
     }
 }
 

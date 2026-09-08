@@ -729,34 +729,16 @@ pub fn generate_outputs_kdl(settings: &OutputSettings) -> String {
                 }
 
                 // Spicy / community / future keys Nirify does not model.
-                emit_unknown_output_children(&mut content, &output.unknown_children);
+                crate::config::unknown::emit_unknown_children(
+                    &mut content,
+                    &output.unknown_children,
+                );
             }
             content.push_str("}\n\n");
         }
     }
 
     content
-}
-
-/// Re-emit preserved unmodeled `output { }` children after modeled fields.
-fn emit_unknown_output_children(
-    content: &mut String,
-    children: &[crate::config::models::UnknownOutputChild],
-) {
-    for child in children {
-        if child.kdl.trim().is_empty() {
-            continue;
-        }
-        for line in child.kdl.lines() {
-            if line.is_empty() {
-                content.push('\n');
-            } else {
-                content.push_str("    ");
-                content.push_str(line);
-                content.push('\n');
-            }
-        }
-    }
 }
 
 #[cfg(test)]

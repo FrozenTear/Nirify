@@ -498,6 +498,8 @@ pub fn generate_window_rules_kdl(
             rule.popups.as_ref(),
         );
 
+        crate::config::unknown::emit_unknown_children(&mut content, &rule.unknown_children);
+
         content.push_str("}\n\n");
     }
 
@@ -688,6 +690,7 @@ mod tests {
             focus_ring_urgent: None,
             border_inactive: None,
             border_urgent: None,
+            unknown_children: Vec::new(),
         };
         let settings = WindowRulesSettings {
             rules: vec![rule.clone()],
@@ -1321,5 +1324,82 @@ window-rule {
         let got = &loaded.window_rules.rules[0];
         assert_eq!(got.background_effect, rule.background_effect);
         assert_eq!(got.popups, rule.popups);
+    }
+
+    /// Robert's spicy `block-minimize true` on a game window-rule (Soot).
+    const SPICY_BLOCK_MINIMIZE_RULE: &str = r#"
+window-rule {
+    match app-id="^steam_app_"
+    open-fullscreen true
+    block-minimize true
+    focus-ring {
+        off
+    }
+}
+"#;
+
+    #[test]
+    fn block_minimize_and_unknown_children_survive_save() {
+        let doc: kdl::KdlDocument = SPICY_BLOCK_MINIMIZE_RULE.parse().unwrap();
+        let children = doc
+            .get("window-rule")
+            .and_then(|n| n.children())
+            .expect("window-rule children");
+        let mut rule = WindowRule::default();
+        crate::config::loader::parse_window_rule_node_children(children, &mut rule);
+
+        assert_eq!(rule.matches[0].app_id.as_deref(), Some("^steam_app_"));
+        assert_eq!(rule.open_fullscreen, Some(true));
+        assert_eq!(rule.focus_ring_enabled, Some(false));
+        assert!(
+            rule.unknown_children
+                .iter()
+                .any(|c| c.name == "block-minimize"),
+            "block-minimize must be collected as unknown: {:?}",
+            rule.unknown_children
+        );
+        assert!(
+            !rule
+                .unknown_children
+                .iter()
+                .any(|c| crate::config::models::is_modeled_window_rule_child(&c.name)),
+            "modeled children must not be stored as unknown: {:?}",
+            rule.unknown_children
+        );
+
+        let settings = WindowRulesSettings {
+            rules: vec![rule],
+            next_id: 1,
+        };
+        let kdl = generate_window_rules_kdl(&settings, false, FeatureCompat::all_enabled());
+        parse_ok(&kdl);
+        let compact = kdl.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            compact.contains("block-minimize true"),
+            "block-minimize must survive generate, got:\n{kdl}"
+        );
+        assert!(compact.contains("open-fullscreen true"), "{kdl}");
+        assert!(kdl.contains("focus-ring"), "{kdl}");
+
+        let path = write_temp(&kdl, "block_minimize");
+        let mut loaded = Settings::default();
+        load_window_rules(&path, &mut loaded);
+        std::fs::remove_file(&path).ok();
+
+        let got = &loaded.window_rules.rules[0];
+        assert_eq!(got.open_fullscreen, Some(true));
+        assert_eq!(got.focus_ring_enabled, Some(false));
+        assert!(got
+            .unknown_children
+            .iter()
+            .any(|c| c.name == "block-minimize"));
+
+        let again =
+            generate_window_rules_kdl(&loaded.window_rules, false, FeatureCompat::all_enabled());
+        let again_compact = again.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            again_compact.contains("block-minimize true"),
+            "second save must keep block-minimize, got:\n{again}"
+        );
     }
 }
