@@ -6,15 +6,16 @@ use super::super::parser::{get_f64, get_i64, get_string, has_flag};
 use super::gradient::load_color_or_gradient;
 use super::helpers::{parse_color, read_kdl_file};
 use crate::config::models::{
-    AnimationType, EasingCurve, LayoutOverride, OutputConfig, OutputHotCorners, Settings,
-    SingleAnimationConfig, SpringParams, WorkspaceShadow,
+    is_modeled_output_child, AnimationType, EasingCurve, LayoutOverride, OutputConfig,
+    OutputHotCorners, Settings, SingleAnimationConfig, SpringParams, UnknownOutputChild,
+    WorkspaceShadow,
 };
 use crate::constants::{
     DAMPING_RATIO_MAX, DAMPING_RATIO_MIN, EASING_DURATION_MAX, EASING_DURATION_MIN, EPSILON_MAX,
     EPSILON_MIN, STIFFNESS_MAX, STIFFNESS_MIN,
 };
 use crate::types::{CenterFocusedColumn, Transform, VrrMode};
-use kdl::KdlDocument;
+use kdl::{KdlDocument, KdlNode};
 use log::debug;
 use std::path::Path;
 
@@ -733,30 +734,36 @@ pub fn parse_output_node_children(o_children: &KdlDocument, output: &mut OutputC
         };
     }
 
-    // VRR: can be a flag (variable-refresh-rate) or have on-demand=true
-    if has_flag(o_children, &["variable-refresh-rate"]) {
-        output.vrr = VrrMode::On;
-    } else if let Some(v) = get_string(o_children, &["variable-refresh-rate"]) {
-        output.vrr = match v.as_str() {
-            "on" => VrrMode::On,
-            "on-demand" => VrrMode::OnDemand,
-            _ => VrrMode::Off,
-        };
-    } else if let Some(vrr_node) = o_children.get("variable-refresh-rate") {
-        // Check for on-demand=true attribute syntax
+    // VRR: flag (`variable-refresh-rate`), attribute (`on-demand=true`),
+    // or string (`"on"` / `"on-demand"`). Check attributes first — `has_flag`
+    // treats a node with only properties as present/true and would collapse
+    // on-demand to On (rewriting `on-demand=true` on save).
+    if let Some(vrr_node) = o_children.get("variable-refresh-rate") {
+        let mut on_demand = false;
         for entry in vrr_node.entries() {
             if let Some(name) = entry.name() {
                 if name.value() == "on-demand" {
                     if let Some(val) = entry.value().as_bool() {
-                        if val {
-                            output.vrr = VrrMode::OnDemand;
-                        }
+                        on_demand = val;
                     }
                 }
             }
         }
-        // If no on-demand attribute but node exists, it's On
-        if output.vrr == VrrMode::Off {
+        if on_demand {
+            output.vrr = VrrMode::OnDemand;
+        } else if let Some(arg) = vrr_node.entries().iter().find(|e| e.name().is_none()) {
+            if let Some(s) = arg.value().as_string() {
+                output.vrr = match s {
+                    "on" => VrrMode::On,
+                    "on-demand" => VrrMode::OnDemand,
+                    _ => VrrMode::Off,
+                };
+            } else if let Some(b) = arg.value().as_bool() {
+                output.vrr = if b { VrrMode::On } else { VrrMode::Off };
+            } else {
+                output.vrr = VrrMode::On;
+            }
+        } else {
             output.vrr = VrrMode::On;
         }
     }
@@ -786,6 +793,63 @@ pub fn parse_output_node_children(o_children: &KdlDocument, output: &mut OutputC
             output.layout_override = parse_layout_override(layout_children);
         }
     }
+
+    output.unknown_children = collect_unknown_output_children(o_children);
+}
+
+/// Keep `output { }` children Nirify does not model (spicy `hdr`, `max-bpc`, …).
+fn collect_unknown_output_children(o_children: &KdlDocument) -> Vec<UnknownOutputChild> {
+    o_children
+        .nodes()
+        .iter()
+        .filter(|node| !is_modeled_output_child(node.name().value()))
+        .map(|node| UnknownOutputChild {
+            name: node.name().value().to_string(),
+            kdl: format_unknown_output_node(node),
+        })
+        .collect()
+}
+
+/// Pretty-print an unknown output child (no output-block indent).
+fn format_unknown_output_node(node: &KdlNode) -> String {
+    format_kdl_node_pretty(node, 0)
+        .trim_end_matches('\n')
+        .to_string()
+}
+
+fn format_kdl_node_pretty(node: &KdlNode, indent: usize) -> String {
+    let pad = "    ".repeat(indent);
+    let mut out = String::new();
+    out.push_str(&pad);
+    if let Some(ty) = node.ty() {
+        out.push('(');
+        out.push_str(ty.value());
+        out.push(')');
+    }
+    out.push_str(node.name().value());
+    for entry in node.entries() {
+        // KdlEntry Display often includes leading whitespace from the source.
+        let rendered = entry.to_string();
+        let rendered = rendered.trim();
+        if rendered.is_empty() {
+            continue;
+        }
+        out.push(' ');
+        out.push_str(rendered);
+    }
+    if let Some(children) = node.children() {
+        if !children.nodes().is_empty() {
+            out.push_str(" {\n");
+            for child in children.nodes() {
+                out.push_str(&format_kdl_node_pretty(child, indent + 1));
+            }
+            out.push_str(&pad);
+            out.push_str("}\n");
+            return out;
+        }
+    }
+    out.push('\n');
+    out
 }
 
 /// Load output settings from KDL file

@@ -23,7 +23,8 @@
 //!   `OnDemand` cannot be observed over IPC; an existing `OnDemand` setting is
 //!   preserved so snapshot / rearrange does not clobber `on-demand=true`.
 //!   Identity fields (background, hot corners, layout override, modeline,
-//!   focus-at-startup) are preserved on existing rows.
+//!   focus-at-startup) and unmodeled children (`hdr`, `max-bpc`, …) are
+//!   preserved on existing rows.
 //! - **Unmatched managed outputs** (configured but not currently connected)
 //!   are **left unchanged**. They are not deleted and not auto-disabled, so
 //!   dock / TV profiles survive unplug. niri ignores missing connectors.
@@ -394,6 +395,38 @@ mod tests {
         assert!(!settings.outputs[0].enabled);
         assert_eq!(settings.outputs[0].position, Some((1920, 0)));
         assert_eq!(settings.outputs[0].scale, Some(1.25));
+    }
+
+    #[test]
+    fn snapshot_preserves_unknown_hdr_when_updating_known_fields() {
+        use crate::config::models::UnknownOutputChild;
+        let mut existing = named("DP-3");
+        existing.unknown_children = vec![UnknownOutputChild {
+            name: "hdr".into(),
+            kdl: "hdr mode=\"on\" {\n    reference-luminance 300\n}".into(),
+        }];
+        existing.vrr = VrrMode::OnDemand;
+        let mut settings = OutputSettings {
+            outputs: vec![existing],
+        };
+
+        apply_live_outputs_to_settings(
+            &mut settings,
+            &[live("DP-3", 1920, 0, 2560, 1440, 1.5, 2560, 1440)],
+        );
+
+        assert_eq!(settings.outputs[0].position, Some((1920, 0)));
+        assert_eq!(settings.outputs[0].scale, Some(1.5));
+        assert_eq!(settings.outputs[0].vrr, VrrMode::OnDemand);
+        assert_eq!(settings.outputs[0].unknown_children.len(), 1);
+        assert_eq!(settings.outputs[0].unknown_children[0].name, "hdr");
+        assert!(settings.outputs[0].unknown_children[0]
+            .kdl
+            .contains("reference-luminance 300"));
+
+        let kdl = crate::config::storage::generate_outputs_kdl(&settings);
+        assert!(kdl.contains("hdr mode=\"on\""), "{kdl}");
+        assert!(kdl.contains("reference-luminance 300"), "{kdl}");
     }
 
     #[test]

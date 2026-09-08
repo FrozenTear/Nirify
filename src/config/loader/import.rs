@@ -687,6 +687,45 @@ mod tests {
     }
 
     #[test]
+    fn import_preserves_output_hdr_and_unknown_children() {
+        let result = import_from_kdl_str(
+            r#"
+output "DP-3" {
+    mode "2560x1440@144.000"
+    scale 1.5
+    variable-refresh-rate on-demand=true
+    hdr mode="on" {
+        reference-luminance 300
+    }
+    max-bpc 10
+}
+"#,
+        );
+        assert!(result.warnings.is_empty(), "{:?}", result.warnings);
+        let output = result
+            .settings
+            .outputs
+            .outputs
+            .iter()
+            .find(|o| o.name == "DP-3")
+            .expect("DP-3 imported");
+        assert_eq!(output.mode, "2560x1440@144.000");
+        assert_eq!(output.scale, Some(1.5));
+        assert_eq!(output.vrr, crate::types::VrrMode::OnDemand);
+        assert!(output.unknown_children.iter().any(|c| c.name == "hdr"));
+        assert!(output.unknown_children.iter().any(|c| c.name == "max-bpc"));
+
+        let kdl = crate::config::storage::generate_outputs_kdl(&result.settings.outputs);
+        assert!(kdl.contains("hdr mode=\"on\""), "{kdl}");
+        assert!(kdl.contains("reference-luminance 300"), "{kdl}");
+        assert!(kdl.contains("max-bpc 10"), "{kdl}");
+        assert!(
+            kdl.contains("variable-refresh-rate on-demand=true"),
+            "{kdl}"
+        );
+    }
+
+    #[test]
     fn import_follows_tilde_include_inside_jail() {
         let tmp = tempfile::tempdir().unwrap();
         let home = tmp.path();

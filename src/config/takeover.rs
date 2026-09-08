@@ -23,7 +23,9 @@
 //!   managed items are never replaced.
 //!
 //! Identity keys:
-//! - output / workspace: `name`
+//! - output / workspace: `name` (unknown `output { }` children such as `hdr`
+//!   are adopted onto an existing row when that node name is not already
+//!   present; modeled fields on the managed row are never replaced)
 //! - keybinding: [`normalized_key_combo`]
 //! - window-rule / layer-rule: `matches` + `excludes`
 //! - startup command: command argv
@@ -386,7 +388,13 @@ fn merge_outputs(
         if output.name.is_empty() {
             continue;
         }
-        if !managed.iter().any(|o| o.name == output.name) {
+        if let Some(existing) = managed.iter_mut().find(|o| o.name == output.name) {
+            // Keep modeled fields on the managed row. Adopt spicy / unknown
+            // children (hdr, max-bpc, …) that Nirify does not yet represent.
+            if existing.adopt_unknown_children(&output.unknown_children) {
+                added = true;
+            }
+        } else {
             managed.push(output.clone());
             added = true;
         }
@@ -793,6 +801,137 @@ include "nirify/main.kdl"
         assert_eq!(loaded.outputs.outputs.len(), 1);
         assert_eq!(loaded.outputs.outputs[0].position, Some((10, 10)));
         assert_eq!(loaded.keybindings.bindings.len(), 1);
+    }
+
+    #[test]
+    fn absorb_adopts_hdr_on_new_output_and_missing_keys_on_existing() {
+        let dir = tempdir().unwrap();
+        let paths = test_paths(dir.path());
+        paths.ensure_directories().unwrap();
+
+        let mut existing = Settings::default();
+        existing.outputs.outputs.push(OutputConfig {
+            name: "DP-3".to_string(),
+            position: Some((10, 10)),
+            scale: Some(1.5),
+            ..Default::default()
+        });
+        save_settings(&paths, &existing, FeatureCompat::all_enabled()).unwrap();
+
+        fs::write(
+            &paths.niri_config,
+            r#"
+output "DP-3" {
+    position x=0 y=0
+    scale 2.0
+    hdr mode="on" {
+        reference-luminance 300
+    }
+    max-bpc 10
+}
+output "HDMI-A-1" {
+    position x=1920 y=0
+    hdr mode="on" {
+        reference-luminance 300
+    }
+}
+include "nirify/main.kdl"
+"#,
+        )
+        .unwrap();
+
+        let result = absorb_stripped_nodes(&paths, FeatureCompat::all_enabled()).expect("absorb");
+        assert!(
+            result.adopted.contains(&SettingsCategory::Outputs),
+            "expected Outputs adopted, got {:?}",
+            result.adopted
+        );
+
+        let loaded = load_settings_with_result(&paths).settings;
+        let dp3 = loaded
+            .outputs
+            .outputs
+            .iter()
+            .find(|o| o.name == "DP-3")
+            .expect("managed DP-3 kept");
+        assert_eq!(
+            dp3.position,
+            Some((10, 10)),
+            "modeled fields on the managed row must not be clobbered"
+        );
+        assert_eq!(dp3.scale, Some(1.5));
+        assert!(
+            dp3.unknown_children.iter().any(|c| c.name == "hdr"),
+            "missing hdr must be adopted onto existing output: {:?}",
+            dp3.unknown_children
+        );
+        assert!(dp3.unknown_children.iter().any(|c| c.name == "max-bpc"));
+
+        let hdmi = loaded
+            .outputs
+            .outputs
+            .iter()
+            .find(|o| o.name == "HDMI-A-1")
+            .expect("new output adopted");
+        assert_eq!(hdmi.position, Some((1920, 0)));
+        assert!(hdmi.unknown_children.iter().any(|c| c.name == "hdr"));
+
+        let written = fs::read_to_string(&paths.outputs_kdl).unwrap();
+        let compact = written.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            compact.contains("hdr mode=\"on\"") || compact.contains("hdr mode=on"),
+            "{written}"
+        );
+        assert!(compact.contains("reference-luminance 300"), "{written}");
+        assert!(compact.contains("max-bpc 10"), "{written}");
+        assert!(written.contains("position x=10 y=10"), "{written}");
+    }
+
+    #[test]
+    fn absorb_does_not_clobber_existing_hdr() {
+        use crate::config::models::UnknownOutputChild;
+        let dir = tempdir().unwrap();
+        let paths = test_paths(dir.path());
+        paths.ensure_directories().unwrap();
+
+        let mut existing = Settings::default();
+        existing.outputs.outputs.push(OutputConfig {
+            name: "DP-3".to_string(),
+            unknown_children: vec![UnknownOutputChild {
+                name: "hdr".into(),
+                kdl: "hdr mode=\"on\" {\n    reference-luminance 300\n}".into(),
+            }],
+            ..Default::default()
+        });
+        save_settings(&paths, &existing, FeatureCompat::all_enabled()).unwrap();
+
+        fs::write(
+            &paths.niri_config,
+            r#"
+output "DP-3" {
+    hdr mode="off"
+}
+include "nirify/main.kdl"
+"#,
+        )
+        .unwrap();
+
+        let result = absorb_stripped_nodes(&paths, FeatureCompat::all_enabled()).expect("absorb");
+        assert!(
+            !result.adopted.contains(&SettingsCategory::Outputs),
+            "must not replace existing hdr: {:?}",
+            result.adopted
+        );
+
+        let loaded = load_settings_with_result(&paths).settings;
+        let hdr = &loaded.outputs.outputs[0].unknown_children[0];
+        let compact = hdr.kdl.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            compact.contains("reference-luminance 300"),
+            "managed hdr must win: {}",
+            hdr.kdl
+        );
+        assert!(!compact.contains("mode=\"off\"") && !compact.contains("mode=off"));
     }
 
     #[test]

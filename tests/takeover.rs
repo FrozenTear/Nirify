@@ -107,6 +107,68 @@ binds {
 }
 
 #[test]
+fn wizard_imports_spicy_hdr_and_unknown_output_children() {
+    let dir = tempdir().unwrap();
+    let paths = paths_under(dir.path());
+
+    fs::write(
+        &paths.niri_config,
+        r#"
+output "DP-3" {
+    mode "2560x1440@144.000"
+    scale 1.5
+    variable-refresh-rate on-demand=true
+    hdr mode="on" {
+        reference-luminance 300
+    }
+    max-bpc 10
+}
+"#,
+    )
+    .unwrap();
+
+    if paths.managed_dir.exists() {
+        fs::remove_dir_all(&paths.managed_dir).unwrap();
+    }
+
+    let result = first_run_setup(&paths, FeatureCompat::all_enabled()).unwrap();
+    assert!(
+        result.import.has_imports(),
+        "wizard must import existing settings, got {:?}",
+        result.import.imported_sections
+    );
+
+    let loaded = load_settings(&paths);
+    let output = loaded
+        .outputs
+        .outputs
+        .iter()
+        .find(|o| o.name == "DP-3")
+        .expect("DP-3 imported");
+    assert_eq!(output.mode, "2560x1440@144.000");
+    assert_eq!(output.scale, Some(1.5));
+    assert!(output.unknown_children.iter().any(|c| c.name == "hdr"));
+    assert!(output.unknown_children.iter().any(|c| c.name == "max-bpc"));
+
+    let written = fs::read_to_string(&paths.outputs_kdl).unwrap();
+    let compact = written.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        compact.contains("hdr mode=\"on\"") || compact.contains("hdr mode=on"),
+        "{written}"
+    );
+    assert!(compact.contains("reference-luminance 300"), "{written}");
+    assert!(compact.contains("max-bpc 10"), "{written}");
+    assert!(
+        written.contains("variable-refresh-rate on-demand=true"),
+        "{written}"
+    );
+
+    let rewritten = fs::read_to_string(&paths.niri_config).unwrap();
+    assert!(rewritten.contains("include \"nirify/main.kdl\""));
+    assert!(!rewritten.contains("output \"DP-3\""));
+}
+
+#[test]
 fn launch_absorb_merges_stripped_output_and_bind() {
     let dir = tempdir().unwrap();
     let paths = paths_under(dir.path());

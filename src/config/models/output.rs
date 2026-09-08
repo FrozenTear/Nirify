@@ -57,6 +57,48 @@ pub struct OutputConfig {
     pub hot_corners: Option<OutputHotCorners>,
     /// Per-output layout override (v25.11+)
     pub layout_override: Option<LayoutOverride>,
+    /// Unmodeled `output { }` children, re-emitted on save.
+    ///
+    /// Covers spicy / community keys such as `hdr` (`mode`, nested
+    /// `reference-luminance`) and future props like `max-bpc`. Nirify does
+    /// not expose an HDR UI; these fragments survive Displays saves so
+    /// hand-edits are not stripped.
+    pub unknown_children: Vec<UnknownOutputChild>,
+}
+
+/// A child of `output { }` that Nirify does not model.
+///
+/// `kdl` is a pretty-printed fragment **without** the output-block indent
+/// (the writer adds four spaces per line).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownOutputChild {
+    /// Node name (`hdr`, `max-bpc`, …) used to avoid duplicate absorb.
+    pub name: String,
+    /// Pretty KDL for this node and its descendants.
+    pub kdl: String,
+}
+
+/// Child names Nirify models and writes itself. Anything else is preserved
+/// in [`OutputConfig::unknown_children`].
+pub const MODELED_OUTPUT_CHILD_NAMES: &[&str] = &[
+    "off",
+    "scale",
+    "mode",
+    "modeline",
+    "position",
+    "transform",
+    "variable-refresh-rate",
+    "focus-at-startup",
+    "background-color",
+    "backdrop-color",
+    "hot-corners",
+    "layout",
+];
+
+/// Returns true if `name` is an `output { }` child Nirify already models.
+#[must_use]
+pub fn is_modeled_output_child(name: &str) -> bool {
+    MODELED_OUTPUT_CHILD_NAMES.contains(&name)
 }
 
 impl Default for OutputConfig {
@@ -76,6 +118,7 @@ impl Default for OutputConfig {
             backdrop_color: None,
             hot_corners: None,
             layout_override: None,
+            unknown_children: Vec::new(),
         }
     }
 }
@@ -89,6 +132,24 @@ impl OutputConfig {
     #[must_use]
     pub fn display_scale(&self) -> f64 {
         self.scale.unwrap_or(1.0)
+    }
+
+    /// Adopt unmodeled children whose node name is not already present.
+    ///
+    /// Used by launch-time absorb so spicy keys in a leftover `output`
+    /// block are kept without replacing modeled fields on the managed row.
+    pub fn adopt_unknown_children(&mut self, incoming: &[UnknownOutputChild]) -> bool {
+        let mut added = false;
+        for child in incoming {
+            if child.name.is_empty() {
+                continue;
+            }
+            if !self.unknown_children.iter().any(|c| c.name == child.name) {
+                self.unknown_children.push(child.clone());
+                added = true;
+            }
+        }
+        added
     }
 }
 
