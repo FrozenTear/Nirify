@@ -55,6 +55,134 @@ pub fn hero_header<'a, Message: 'a>(
     .into()
 }
 
+/// Outer chrome for the hero visual band used by Layout and Dashboard
+pub fn hero_visual_band<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message>>,
+) -> Element<'a, Message> {
+    container(content.into())
+        .width(Length::Fill)
+        .style(|_: &iced::Theme| container::Style {
+            background: Some(iced::Background::Color(neon::SURFACE_LOW)),
+            border: iced::Border {
+                radius: 24.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .into()
+}
+
+/// Summary card matching Layout / Visuals / System chrome
+pub fn summary_card<'a>(
+    icon: &'static str,
+    name: &'static str,
+    accent: iced::Color,
+    summary: Vec<(&'static str, String)>,
+    action_label: &'static str,
+    on_press: Option<crate::messages::Message>,
+) -> Element<'a, crate::messages::Message> {
+    let mut summary_items = column![].spacing(4);
+    for (label, value) in summary {
+        summary_items = summary_items.push(
+            row![
+                text(label)
+                    .size(10)
+                    .font(fonts::UI_FONT_SEMIBOLD)
+                    .color(neon::OUTLINE_VARIANT),
+                Space::new().width(Length::Fill),
+                text(value).size(11).font(fonts::MONO_FONT).color(accent),
+            ]
+            .align_y(Alignment::Center),
+        );
+    }
+
+    let mut action = iced::widget::button(
+        text(action_label)
+            .size(10)
+            .font(fonts::UI_FONT_SEMIBOLD)
+            .color(accent),
+    )
+    .padding([6, 12])
+    .width(Length::Fill)
+    .style(move |_: &iced::Theme, status| {
+        let bg = match status {
+            iced::widget::button::Status::Hovered => iced::Color { a: 0.15, ..accent },
+            iced::widget::button::Status::Disabled => iced::Color { a: 0.04, ..accent },
+            _ => iced::Color { a: 0.08, ..accent },
+        };
+        iced::widget::button::Style {
+            background: Some(iced::Background::Color(bg)),
+            text_color: accent,
+            border: iced::Border {
+                radius: 8.0.into(),
+                color: iced::Color { a: 0.2, ..accent },
+                width: 1.0,
+            },
+            ..Default::default()
+        }
+    });
+    if let Some(message) = on_press {
+        action = action.on_press(message);
+    }
+
+    container(column![
+        row![
+            container(text(icon).size(16).color(accent))
+                .width(36)
+                .height(36)
+                .center(Length::Shrink)
+                .style(move |_: &iced::Theme| container::Style {
+                    background: Some(iced::Background::Color(iced::Color { a: 0.12, ..accent })),
+                    border: iced::Border {
+                        radius: 10.0.into(),
+                        color: iced::Color { a: 0.2, ..accent },
+                        width: 1.0
+                    },
+                    ..Default::default()
+                }),
+            Space::new().width(10),
+            text(name).size(14).font(fonts::UI_FONT_SEMIBOLD),
+        ]
+        .align_y(Alignment::Center),
+        Space::new().height(10),
+        summary_items,
+        Space::new().height(10),
+        action,
+    ])
+    .padding(16)
+    .width(Length::FillPortion(1))
+    .style(move |_: &iced::Theme| container::Style {
+        background: Some(iced::Background::Color(neon::SURFACE_CONTAINER)),
+        border: iced::Border {
+            color: iced::Color { a: 0.12, ..accent },
+            width: 1.0,
+            radius: 16.0.into(),
+        },
+        shadow: iced::Shadow {
+            color: iced::Color { a: 0.08, ..accent },
+            offset: iced::Vector::new(0.0, 4.0),
+            blur_radius: 20.0,
+        },
+        ..Default::default()
+    })
+    .into()
+}
+
+/// Section summary card that opens the matching editor modal
+pub fn section_summary_card<'a>(
+    section: crate::messages::EditableSection,
+    summary: Vec<(&'static str, String)>,
+) -> Element<'a, crate::messages::Message> {
+    summary_card(
+        section.icon(),
+        section.name(),
+        section.accent(),
+        summary,
+        "CONFIGURE",
+        Some(crate::messages::Message::OpenSectionEditor(section)),
+    )
+}
+
 /// Neon section card for masonry grids
 pub fn neon_section<'a, Message: 'a>(
     title: &'a str,

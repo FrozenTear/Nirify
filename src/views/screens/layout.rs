@@ -9,9 +9,7 @@ use crate::config::models::{
 use crate::messages::{EditableSection, Message};
 use crate::theme::{fonts, neon};
 
-use neon::{
-    OUTLINE_VARIANT, PRIMARY, SECONDARY, SURFACE_CONTAINER, SURFACE_CONTAINER_HIGHEST, SURFACE_LOW,
-};
+use neon::{OUTLINE_VARIANT, PRIMARY, SECONDARY, SURFACE_CONTAINER, SURFACE_CONTAINER_HIGHEST};
 
 /// Layout screen
 pub fn view<'a>(
@@ -318,20 +316,10 @@ fn ribbon_preview<'a>() -> Element<'a, Message> {
         ..Default::default()
     });
 
-    container(
+    super::hero_visual_band(
         row![inactive_win(), focused_window, inactive_win()]
             .spacing(12)
             .padding(24)
             .height(Length::Fixed(220.0)),
     )
-    .width(Length::Fill)
-    .style(|_: &iced::Theme| container::Style {
-        background: Some(iced::Background::Color(SURFACE_LOW)),
-        border: iced::Border {
-            radius: 24.0.into(),
-            ..Default::default()
-        },
-        ..Default::default()
-    })
-    .into()
 }
