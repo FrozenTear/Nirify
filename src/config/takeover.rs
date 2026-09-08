@@ -270,6 +270,14 @@ pub fn merge_stripped_into_managed(
         gestures
     );
     adopt_scalar!(SettingsCategory::Debug, "advanced/debug.kdl", debug);
+    if !file_failed(load, "advanced/debug.kdl")
+        && crate::config::unknown::adopt_unknown_children(
+            &mut managed.preserved_top_level,
+            &stripped.preserved_top_level,
+        )
+    {
+        adopted.insert(SettingsCategory::Debug);
+    }
     adopt_scalar!(
         SettingsCategory::SwitchEvents,
         "advanced/switch-events.kdl",

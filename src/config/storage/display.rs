@@ -1178,6 +1178,10 @@ mod tests {
             compact.contains("max-bpc 10"),
             "unknown sibling prop must survive, got:\n{kdl}"
         );
+        assert!(
+            compact.contains("allow-tearing"),
+            "spicy allow-tearing must survive, got:\n{kdl}"
+        );
     }
 
     fn load_single_output_from_kdl(kdl: &str) -> OutputConfig {
@@ -1207,6 +1211,7 @@ output "DP-3" {
     mode "2560x1440@144.000"
     scale 1.5
     variable-refresh-rate on-demand=true
+    allow-tearing
     hdr mode="on" {
         reference-luminance 300
     }
@@ -1229,6 +1234,14 @@ output "DP-3" {
         assert!(
             output.unknown_children.iter().any(|c| c.name == "max-bpc"),
             "max-bpc must be collected as unknown: {:?}",
+            output.unknown_children
+        );
+        assert!(
+            output
+                .unknown_children
+                .iter()
+                .any(|c| c.name == "allow-tearing"),
+            "allow-tearing must be collected as unknown: {:?}",
             output.unknown_children
         );
         assert!(
@@ -1291,6 +1304,32 @@ output "DP-3" {
         assert_eq!(loaded.scale, Some(2.0));
         assert!(loaded.unknown_children.iter().any(|c| c.name == "hdr"));
         assert!(loaded.unknown_children.iter().any(|c| c.name == "max-bpc"));
+        assert!(loaded
+            .unknown_children
+            .iter()
+            .any(|c| c.name == "allow-tearing"));
+    }
+
+    #[test]
+    fn hdr_mode_auto_round_trips() {
+        let output = load_single_output_from_kdl(
+            r#"
+output "DP-3" {
+    scale 1.5
+    hdr mode="auto" {
+        reference-luminance 203
+    }
+}
+"#,
+        );
+        let (kdl, loaded) = roundtrip_output(&output);
+        let compact = kdl.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            compact.contains("hdr mode=\"auto\"") || compact.contains("hdr mode=auto"),
+            "{kdl}"
+        );
+        assert!(compact.contains("reference-luminance 203"), "{kdl}");
+        assert!(loaded.unknown_children.iter().any(|c| c.name == "hdr"));
     }
 
     #[test]

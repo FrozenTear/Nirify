@@ -140,7 +140,8 @@ pub fn generate_debug_kdl(settings: &DebugSettings) -> String {
         || settings.strict_new_window_focus_policy
         || settings.honor_xdg_activation_with_invalid_serial
         || settings.deactivate_unfocused_windows
-        || settings.force_pipewire_invalid_modifier;
+        || settings.force_pipewire_invalid_modifier
+        || !settings.unknown_children.is_empty();
 
     if !has_any {
         kdl.comment("No debug options enabled.");
@@ -214,9 +215,28 @@ pub fn generate_debug_kdl(settings: &DebugSettings) -> String {
             "force-pipewire-invalid-modifier",
             settings.force_pipewire_invalid_modifier,
         );
+        for child in &settings.unknown_children {
+            for line in child.kdl.lines() {
+                if line.is_empty() {
+                    b.newline();
+                } else {
+                    b.raw(line);
+                }
+            }
+        }
     });
 
     kdl.build()
+}
+
+/// Generate debug.kdl plus any preserved spicy top-level nodes.
+pub fn generate_debug_kdl_with_top_level(
+    settings: &DebugSettings,
+    top_level: &[crate::config::unknown::UnknownKdlChild],
+) -> String {
+    let mut content = generate_debug_kdl(settings);
+    crate::config::unknown::emit_top_level_nodes(&mut content, top_level);
+    content
 }
 
 /// Generate switch-events.kdl from switch events settings
@@ -437,5 +457,90 @@ mod environment_tests {
                 ("EMPTY", Some("")),
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod debug_spicy_tests {
+    use super::*;
+    use crate::config::models::Settings;
+
+    const SPICY_DEBUG: &str = r#"
+debug {
+    disable-cursor-plane
+    vulkan-renderer
+    force-tearing
+    disable-cursor-plane-on-hdr
+}
+minimized-windows {
+    off
+}
+"#;
+
+    #[test]
+    fn spicy_debug_children_and_minimized_windows_round_trip() {
+        let doc: kdl::KdlDocument = SPICY_DEBUG.parse().unwrap();
+        let mut settings = Settings::default();
+        crate::config::loader::parse_debug_from_doc(&doc, &mut settings);
+
+        assert!(settings.debug.disable_cursor_plane);
+        for name in [
+            "vulkan-renderer",
+            "force-tearing",
+            "disable-cursor-plane-on-hdr",
+        ] {
+            assert!(
+                settings
+                    .debug
+                    .unknown_children
+                    .iter()
+                    .any(|c| c.name == name),
+                "{name} missing: {:?}",
+                settings.debug.unknown_children
+            );
+        }
+        assert!(
+            !settings
+                .debug
+                .unknown_children
+                .iter()
+                .any(|c| crate::config::models::is_modeled_debug_child(&c.name)),
+            "{:?}",
+            settings.debug.unknown_children
+        );
+        assert_eq!(settings.preserved_top_level.len(), 1);
+        assert_eq!(settings.preserved_top_level[0].name, "minimized-windows");
+
+        let kdl = generate_debug_kdl_with_top_level(&settings.debug, &settings.preserved_top_level);
+        let compact = kdl.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(kdl.contains("disable-cursor-plane"), "{kdl}");
+        assert!(compact.contains("vulkan-renderer"), "{kdl}");
+        assert!(compact.contains("force-tearing"), "{kdl}");
+        assert!(compact.contains("disable-cursor-plane-on-hdr"), "{kdl}");
+        assert!(compact.contains("minimized-windows"), "{kdl}");
+
+        let doc2: kdl::KdlDocument = kdl.parse().expect("re-parse");
+        let mut loaded = Settings::default();
+        crate::config::loader::parse_debug_from_doc(&doc2, &mut loaded);
+        assert!(loaded.debug.disable_cursor_plane);
+        assert!(loaded
+            .debug
+            .unknown_children
+            .iter()
+            .any(|c| c.name == "vulkan-renderer"));
+        assert_eq!(loaded.preserved_top_level[0].name, "minimized-windows");
+    }
+
+    #[test]
+    fn spicy_debug_alone_still_emits_debug_block() {
+        let mut settings = DebugSettings::default();
+        settings.unknown_children = vec![crate::config::unknown::UnknownKdlChild {
+            name: "vulkan-renderer".into(),
+            kdl: "vulkan-renderer".into(),
+        }];
+        let kdl = generate_debug_kdl(&settings);
+        assert!(kdl.contains("debug {"), "{kdl}");
+        assert!(kdl.contains("vulkan-renderer"), "{kdl}");
+        assert!(!kdl.contains("No debug options enabled"), "{kdl}");
     }
 }

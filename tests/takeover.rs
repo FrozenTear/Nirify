@@ -169,6 +169,65 @@ output "DP-3" {
 }
 
 #[test]
+fn wizard_imports_spicy_debug_and_minimized_windows() {
+    let dir = tempdir().unwrap();
+    let paths = paths_under(dir.path());
+
+    fs::write(
+        &paths.niri_config,
+        r#"
+debug {
+    vulkan-renderer
+    force-tearing
+    disable-cursor-plane-on-hdr
+}
+minimized-windows {
+    off
+}
+"#,
+    )
+    .unwrap();
+
+    if paths.managed_dir.exists() {
+        fs::remove_dir_all(&paths.managed_dir).unwrap();
+    }
+
+    first_run_setup(&paths, FeatureCompat::all_enabled()).unwrap();
+
+    let loaded = load_settings(&paths);
+    for name in [
+        "vulkan-renderer",
+        "force-tearing",
+        "disable-cursor-plane-on-hdr",
+    ] {
+        assert!(
+            loaded.debug.unknown_children.iter().any(|c| c.name == name),
+            "{name} missing: {:?}",
+            loaded.debug.unknown_children
+        );
+    }
+    assert!(loaded
+        .preserved_top_level
+        .iter()
+        .any(|c| c.name == "minimized-windows"));
+
+    let written = fs::read_to_string(&paths.debug_kdl).unwrap();
+    let compact = written.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(compact.contains("vulkan-renderer"), "{written}");
+    assert!(compact.contains("force-tearing"), "{written}");
+    assert!(compact.contains("disable-cursor-plane-on-hdr"), "{written}");
+    assert!(compact.contains("minimized-windows"), "{written}");
+
+    let rewritten = fs::read_to_string(&paths.niri_config).unwrap();
+    assert!(rewritten.contains("include \"nirify/main.kdl\""));
+    assert!(
+        !rewritten.contains("minimized-windows"),
+        "minimized-windows must be stripped from config.kdl after import: {rewritten}"
+    );
+    assert!(!rewritten.contains("vulkan-renderer"));
+}
+
+#[test]
 fn launch_absorb_merges_stripped_output_and_bind() {
     let dir = tempdir().unwrap();
     let paths = paths_under(dir.path());

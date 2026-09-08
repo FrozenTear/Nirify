@@ -90,6 +90,10 @@ pub struct Settings {
     pub recent_windows: RecentWindowsSettings,
     /// Application preferences (not niri config)
     pub preferences: PreferencesSettings,
+    /// Whitelisted top-level niri nodes Nirify does not model
+    /// (`minimized-windows { … }`). Written as siblings after `debug { }`
+    /// in `advanced/debug.kdl` and stripped from `config.kdl`.
+    pub preserved_top_level: Vec<crate::config::unknown::UnknownKdlChild>,
 }
 
 impl Settings {
