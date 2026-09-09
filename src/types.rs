@@ -536,6 +536,58 @@ impl VrrMode {
     }
 }
 
+/// Spicy / niri-spicy-git output HDR mode.
+///
+/// Upstream niri 26.04 does **not** ship `output { hdr { } }`. Absent `hdr`
+/// (or `mode="off"`) is Off. `auto` and `on` are the spicy knobs Robert uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HdrMode {
+    /// Omit `hdr { }` (or parse `mode="off"`).
+    #[default]
+    Off,
+    /// `hdr mode="auto"`
+    Auto,
+    /// `hdr mode="on"`
+    On,
+}
+
+impl std::fmt::Display for HdrMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Off => write!(f, "Off"),
+            Self::Auto => write!(f, "Auto"),
+            Self::On => write!(f, "On"),
+        }
+    }
+}
+
+impl HdrMode {
+    pub fn all() -> &'static [Self] {
+        &[Self::Off, Self::Auto, Self::On]
+    }
+
+    /// KDL `mode` string, or `None` when the `hdr` node should be omitted.
+    #[must_use]
+    pub fn to_kdl(self) -> Option<&'static str> {
+        match self {
+            Self::Off => None,
+            Self::Auto => Some("auto"),
+            Self::On => Some("on"),
+        }
+    }
+
+    /// Parse spicy `hdr` mode tokens (`on`, `auto`, `off`, bool-ish).
+    #[must_use]
+    pub fn from_kdl(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "auto" => Self::Auto,
+            "on" | "true" => Self::On,
+            "off" | "false" => Self::Off,
+            _ => Self::Off,
+        }
+    }
+}
+
 // ============================================================================
 // GRADIENT TYPES
 // ============================================================================
@@ -1074,5 +1126,17 @@ mod tests {
         );
         assert!(Transform::Rotate270.swaps_axes());
         assert!(!Transform::Flipped.swaps_axes());
+    }
+
+    #[test]
+    fn hdr_mode_kdl_roundtrip() {
+        assert_eq!(HdrMode::from_kdl("on"), HdrMode::On);
+        assert_eq!(HdrMode::from_kdl("auto"), HdrMode::Auto);
+        assert_eq!(HdrMode::from_kdl("off"), HdrMode::Off);
+        assert_eq!(HdrMode::from_kdl("true"), HdrMode::On);
+        assert_eq!(HdrMode::On.to_kdl(), Some("on"));
+        assert_eq!(HdrMode::Auto.to_kdl(), Some("auto"));
+        assert_eq!(HdrMode::Off.to_kdl(), None);
+        assert_eq!(HdrMode::from_kdl("nope"), HdrMode::Off);
     }
 }

@@ -1,6 +1,7 @@
 //! Preserve-unknown KDL children for blocks Nirify models only in part.
 //!
-//! Used by `output { }` (spicy `hdr`, `allow-tearing`, …), `window-rule { }`
+//! Used by `output { }` (spicy leftovers such as `allow-tearing`; `hdr` is
+//! modeled), `window-rule { }`
 //! (`block-minimize`, `allow-tearing`), `debug { }` (`vulkan-renderer`, …),
 //! and whitelisted top-level nodes (`minimized-windows`). Modeled siblings
 //! are written by the usual generators; everything else is stored as a pretty

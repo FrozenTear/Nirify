@@ -1239,6 +1239,10 @@ pub enum OutputsMessage {
     LiveOutputsSnapshotLoaded(Result<Vec<crate::ipc::FullOutputInfo>, String>),
     SetTransform(usize, crate::types::Transform),
     SetVrr(usize, crate::types::VrrMode),
+    /// Spicy / niri-spicy-git HDR mode (`off` omits `hdr { }`).
+    SetHdrMode(usize, crate::types::HdrMode),
+    /// SDR reference white in nits; ignored unless HDR is on/auto.
+    SetHdrReferenceLuminance(usize, u32),
     SetFocusAtStartup(usize, bool),
     SetBackgroundColor(usize, Option<crate::types::Color>),
     SetBackdropColor(usize, Option<crate::types::Color>),

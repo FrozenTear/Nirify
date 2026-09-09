@@ -32,8 +32,8 @@ pub use loader::{
     LoadResult,
 };
 pub use models::{
-    ColumnWidthType, LayoutOverride, OutputConfig, OutputHotCorners, OutputSettings, Settings,
-    UnknownKdlChild, UnknownOutputChild, WorkspaceShadow,
+    ColumnWidthType, LayoutOverride, OutputConfig, OutputHdr, OutputHotCorners, OutputSettings,
+    Settings, UnknownKdlChild, UnknownOutputChild, WorkspaceShadow,
 };
 pub use outputs_layout::{
     apply_live_outputs_to_settings, estimated_logical_size, find_config_index_for_live,

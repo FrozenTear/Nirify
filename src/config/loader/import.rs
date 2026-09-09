@@ -800,7 +800,10 @@ output "DP-3" {
         assert_eq!(output.mode, "2560x1440@144.000");
         assert_eq!(output.scale, Some(1.5));
         assert_eq!(output.vrr, crate::types::VrrMode::OnDemand);
-        assert!(output.unknown_children.iter().any(|c| c.name == "hdr"));
+        let hdr = output.hdr.as_ref().expect("hdr imported as modeled");
+        assert_eq!(hdr.mode, crate::types::HdrMode::On);
+        assert_eq!(hdr.reference_luminance, Some(300));
+        assert!(!output.unknown_children.iter().any(|c| c.name == "hdr"));
         assert!(output.unknown_children.iter().any(|c| c.name == "max-bpc"));
 
         let kdl = crate::config::storage::generate_outputs_kdl(&result.settings.outputs);

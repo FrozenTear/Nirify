@@ -247,6 +247,38 @@ impl super::super::App {
                 }
             }
 
+            M::SetHdrMode(idx, value) => {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
+                    match value {
+                        crate::types::HdrMode::Off => output.hdr = None,
+                        crate::types::HdrMode::Auto | crate::types::HdrMode::On => {
+                            if let Some(ref mut hdr) = output.hdr {
+                                hdr.mode = value;
+                            } else {
+                                output.hdr = crate::config::models::OutputHdr::with_mode(value);
+                            }
+                        }
+                    }
+                }
+            }
+
+            M::SetHdrReferenceLuminance(idx, value) => {
+                if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
+                    let nits = (value as i32).clamp(
+                        crate::constants::HDR_REFERENCE_LUMINANCE_MIN,
+                        crate::constants::HDR_REFERENCE_LUMINANCE_MAX,
+                    ) as u32;
+                    if let Some(ref mut hdr) = output.hdr {
+                        hdr.reference_luminance = Some(nits);
+                    } else {
+                        output.hdr = Some(crate::config::models::OutputHdr {
+                            mode: crate::types::HdrMode::On,
+                            reference_luminance: Some(nits),
+                        });
+                    }
+                }
+            }
+
             M::SetFocusAtStartup(idx, value) => {
                 if let Some(output) = self.settings.outputs.outputs.get_mut(idx) {
                     output.focus_at_startup = value;

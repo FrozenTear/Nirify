@@ -507,6 +507,11 @@ fn output_card<'a>(
                     } else {
                         Space::new().into()
                     },
+                    if output.hdr_mode() != crate::types::HdrMode::Off {
+                        badge_chip("HDR", neon::SECONDARY)
+                    } else {
+                        Space::new().into()
+                    },
                 ]
                 .spacing(8)
                 .align_y(Alignment::Center),
@@ -547,6 +552,7 @@ fn output_card<'a>(
                     .unwrap_or_else(|| "auto".to_string()),
             ),
             summary_field("VRR", &format!("{}", output.vrr)),
+            summary_field("HDR", &format!("{}", output.hdr_mode())),
             summary_field(
                 "POSITION",
                 &output

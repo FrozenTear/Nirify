@@ -7,10 +7,11 @@ use std::collections::HashMap;
 use super::display_layout::{live_for_output, output_identity_labels};
 use super::widgets::*;
 use crate::config::models::{OutputConfig, OutputSettings};
+use crate::constants::{HDR_REFERENCE_LUMINANCE_MAX, HDR_REFERENCE_LUMINANCE_MIN};
 use crate::ipc::FullOutputInfo;
 use crate::messages::{Message, OutputsMessage};
 use crate::theme::muted_text_container;
-use crate::types::{Transform, VrrMode};
+use crate::types::{HdrMode, Transform, VrrMode};
 
 /// Represents an available display mode for dropdown selection
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -528,6 +529,30 @@ pub fn output_detail_view<'a>(
                             Some(output.vrr),
                             move |v| Message::Outputs(OutputsMessage::SetVrr(idx, v))
                         ),
+                        picker_row(
+                            "HDR (spicy)",
+                            "niri-spicy-git only — not upstream 26.04. Off omits hdr { }.",
+                            HdrMode::all(),
+                            Some(output.hdr_mode()),
+                            move |v| Message::Outputs(OutputsMessage::SetHdrMode(idx, v))
+                        ),
+                        if output.hdr_mode() != HdrMode::Off {
+                            slider_row_int(
+                                "Reference luminance",
+                                "SDR white in nits (hdr { reference-luminance })",
+                                output.hdr_reference_luminance() as i32,
+                                HDR_REFERENCE_LUMINANCE_MIN,
+                                HDR_REFERENCE_LUMINANCE_MAX,
+                                " nits",
+                                move |v| {
+                                    Message::Outputs(OutputsMessage::SetHdrReferenceLuminance(
+                                        idx, v as u32,
+                                    ))
+                                },
+                            )
+                        } else {
+                            spacer(0.0)
+                        },
                         toggle_row(
                             "Focus at startup",
                             "Focus this output on niri start",

@@ -201,3 +201,15 @@ pub const MAX_ENVIRONMENT_VARS: usize = 100;
 
 /// Maximum number of startup commands
 pub const MAX_STARTUP_COMMANDS: usize = 50;
+
+// ============================================================================
+// SPICY OUTPUT HDR (niri-spicy-git — not upstream 26.04)
+// ============================================================================
+
+/// SDR reference white in nits when the user first turns HDR on/auto.
+/// ITU-R BT.2408 / discussion #1128 default; Robert’s Soot DP-3 uses 300.
+pub const DEFAULT_HDR_REFERENCE_LUMINANCE: u32 = 203;
+
+/// Reference-luminance slider range (nits).
+pub const HDR_REFERENCE_LUMINANCE_MIN: i32 = 50;
+pub const HDR_REFERENCE_LUMINANCE_MAX: i32 = 2000;

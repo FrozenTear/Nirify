@@ -826,6 +826,19 @@ fn screen_entries() -> Vec<SettingEntry> {
         ),
         e(
             SearchDestination::Displays,
+            "HDR (spicy)",
+            "niri-spicy-git output HDR mode and reference luminance — not upstream 26.04",
+            &[
+                "hdr",
+                "spicy",
+                "reference-luminance",
+                "nits",
+                "pq",
+                "display",
+            ],
+        ),
+        e(
+            SearchDestination::Displays,
             "Monitor Rotation",
             "Rotate display orientation",
             &["rotate", "rotation", "orientation", "portrait", "landscape"],

@@ -6,16 +6,17 @@ use super::super::parser::{get_f64, get_i64, get_string, has_flag};
 use super::gradient::load_color_or_gradient;
 use super::helpers::{parse_color, read_kdl_file};
 use crate::config::models::{
-    is_modeled_output_child, AnimationType, EasingCurve, LayoutOverride, OutputConfig,
+    is_modeled_output_child, AnimationType, EasingCurve, LayoutOverride, OutputConfig, OutputHdr,
     OutputHotCorners, Settings, SingleAnimationConfig, SpringParams, WorkspaceShadow,
 };
 use crate::config::unknown::collect_unknown_children;
 use crate::constants::{
     DAMPING_RATIO_MAX, DAMPING_RATIO_MIN, EASING_DURATION_MAX, EASING_DURATION_MIN, EPSILON_MAX,
-    EPSILON_MIN, STIFFNESS_MAX, STIFFNESS_MIN,
+    EPSILON_MIN, HDR_REFERENCE_LUMINANCE_MAX, HDR_REFERENCE_LUMINANCE_MIN, STIFFNESS_MAX,
+    STIFFNESS_MIN,
 };
-use crate::types::{CenterFocusedColumn, Transform, VrrMode};
-use kdl::KdlDocument;
+use crate::types::{CenterFocusedColumn, HdrMode, Transform, VrrMode};
+use kdl::{KdlDocument, KdlNode};
 use log::debug;
 use std::path::Path;
 
@@ -410,6 +411,59 @@ pub fn parse_layout_override(layout_children: &KdlDocument) -> Option<LayoutOver
     }
 }
 
+/// Parse spicy `hdr mode="on" { reference-luminance 300 }`.
+///
+/// `mode="off"` / unknown mode → `None` (omit on write). Bare `hdr` → On.
+fn parse_output_hdr(hdr_node: &KdlNode) -> Option<OutputHdr> {
+    let mut mode = HdrMode::On;
+    let mut saw_mode = false;
+    for entry in hdr_node.entries() {
+        if let Some(name) = entry.name() {
+            if name.value() == "mode" {
+                saw_mode = true;
+                if let Some(s) = entry.value().as_string() {
+                    mode = HdrMode::from_kdl(s);
+                } else if let Some(b) = entry.value().as_bool() {
+                    mode = if b { HdrMode::On } else { HdrMode::Off };
+                }
+            }
+            continue;
+        }
+        if let Some(s) = entry.value().as_string() {
+            saw_mode = true;
+            mode = HdrMode::from_kdl(s);
+        } else if let Some(b) = entry.value().as_bool() {
+            saw_mode = true;
+            mode = if b { HdrMode::On } else { HdrMode::Off };
+        }
+    }
+    if saw_mode && mode == HdrMode::Off {
+        return None;
+    }
+
+    let mut reference_luminance = None;
+    if let Some(children) = hdr_node.children() {
+        if let Some(v) = get_i64(children, &["reference-luminance"]) {
+            reference_luminance = Some(
+                (v as i32).clamp(HDR_REFERENCE_LUMINANCE_MIN, HDR_REFERENCE_LUMINANCE_MAX) as u32,
+            );
+        } else if let Some(v) = get_f64(children, &["reference-luminance"]) {
+            reference_luminance = Some(
+                (v.round() as i32).clamp(HDR_REFERENCE_LUMINANCE_MIN, HDR_REFERENCE_LUMINANCE_MAX)
+                    as u32,
+            );
+        }
+    }
+
+    if mode == HdrMode::Off {
+        return None;
+    }
+    Some(OutputHdr {
+        mode,
+        reference_luminance,
+    })
+}
+
 /// Parse output hot corners from KDL children (v25.11+)
 fn parse_output_hot_corners(hc_children: &KdlDocument) -> OutputHotCorners {
     let mut hc = OutputHotCorners::default();
@@ -770,6 +824,11 @@ pub fn parse_output_node_children(o_children: &KdlDocument, output: &mut OutputC
 
     if has_flag(o_children, &["focus-at-startup"]) {
         output.focus_at_startup = true;
+    }
+
+    // Spicy / niri-spicy-git HDR. Absent or mode="off" → None (omit on write).
+    if let Some(hdr_node) = o_children.get("hdr") {
+        output.hdr = parse_output_hdr(hdr_node);
     }
 
     if let Some(v) = get_string(o_children, &["background-color"]) {
