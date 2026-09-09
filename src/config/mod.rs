@@ -12,6 +12,7 @@ pub mod registry;
 pub mod replace;
 pub mod storage;
 pub mod takeover;
+pub mod unknown;
 pub mod validation;
 
 pub use crate::types::CenterFocusedColumn;
@@ -32,7 +33,7 @@ pub use loader::{
 };
 pub use models::{
     ColumnWidthType, LayoutOverride, OutputConfig, OutputHotCorners, OutputSettings, Settings,
-    UnknownOutputChild, WorkspaceShadow,
+    UnknownKdlChild, UnknownOutputChild, WorkspaceShadow,
 };
 pub use outputs_layout::{
     apply_live_outputs_to_settings, estimated_logical_size, find_config_index_for_live,

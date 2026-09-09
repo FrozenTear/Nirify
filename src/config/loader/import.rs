@@ -687,6 +687,49 @@ mod tests {
     }
 
     #[test]
+    fn import_preserves_window_rule_block_minimize() {
+        let result = import_from_kdl_str(
+            r#"
+window-rule {
+    match app-id="^steam_app_"
+    open-fullscreen true
+    block-minimize true
+    focus-ring {
+        off
+    }
+}
+"#,
+        );
+        assert!(result.warnings.is_empty(), "{:?}", result.warnings);
+        let rule = result
+            .settings
+            .window_rules
+            .rules
+            .iter()
+            .find(|r| {
+                r.matches
+                    .iter()
+                    .any(|m| m.app_id.as_deref() == Some("^steam_app_"))
+            })
+            .expect("steam rule imported");
+        assert_eq!(rule.open_fullscreen, Some(true));
+        assert!(
+            rule.unknown_children
+                .iter()
+                .any(|c| c.name == "block-minimize"),
+            "{:?}",
+            rule.unknown_children
+        );
+        let kdl = crate::config::storage::generate_window_rules_kdl(
+            &result.settings.window_rules,
+            false,
+            crate::version::FeatureCompat::all_enabled(),
+        );
+        let compact = kdl.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(compact.contains("block-minimize true"), "{kdl}");
+    }
+
+    #[test]
     fn import_preserves_output_hdr_and_unknown_children() {
         let result = import_from_kdl_str(
             r#"

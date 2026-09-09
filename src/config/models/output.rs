@@ -67,16 +67,8 @@ pub struct OutputConfig {
 }
 
 /// A child of `output { }` that Nirify does not model.
-///
-/// `kdl` is a pretty-printed fragment **without** the output-block indent
-/// (the writer adds four spaces per line).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UnknownOutputChild {
-    /// Node name (`hdr`, `max-bpc`, …) used to avoid duplicate absorb.
-    pub name: String,
-    /// Pretty KDL for this node and its descendants.
-    pub kdl: String,
-}
+pub type UnknownOutputChild = crate::config::unknown::UnknownKdlChild;
+pub use crate::config::unknown::UnknownKdlChild;
 
 /// Child names Nirify models and writes itself. Anything else is preserved
 /// in [`OutputConfig::unknown_children`].
@@ -139,17 +131,7 @@ impl OutputConfig {
     /// Used by launch-time absorb so spicy keys in a leftover `output`
     /// block are kept without replacing modeled fields on the managed row.
     pub fn adopt_unknown_children(&mut self, incoming: &[UnknownOutputChild]) -> bool {
-        let mut added = false;
-        for child in incoming {
-            if child.name.is_empty() {
-                continue;
-            }
-            if !self.unknown_children.iter().any(|c| c.name == child.name) {
-                self.unknown_children.push(child.clone());
-                added = true;
-            }
-        }
-        added
+        crate::config::unknown::adopt_unknown_children(&mut self.unknown_children, incoming)
     }
 }
 

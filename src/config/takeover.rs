@@ -27,7 +27,9 @@
 //!   are adopted onto an existing row when that node name is not already
 //!   present; modeled fields on the managed row are never replaced)
 //! - keybinding: [`normalized_key_combo`]
-//! - window-rule / layer-rule: `matches` + `excludes`
+//! - window-rule / layer-rule: `matches` + `excludes` (unknown window-rule
+//!   children such as `block-minimize` are adopted onto an existing rule
+//!   when that node name is not already present)
 //! - startup command: command argv
 //! - environment variable: name
 //! - spawn-sh: command string
@@ -438,11 +440,15 @@ fn merge_window_rules(
     let mut added = false;
     for rule in stripped {
         let ident = window_rule_identity(rule);
-        if !managed
+        if let Some(existing) = managed
             .rules
-            .iter()
-            .any(|r| window_rule_identity(r) == ident)
+            .iter_mut()
+            .find(|r| window_rule_identity(r) == ident)
         {
+            if existing.adopt_unknown_children(&rule.unknown_children) {
+                added = true;
+            }
+        } else {
             let mut owned = rule.clone();
             owned.id = managed.next_id;
             managed.next_id += 1;
@@ -974,6 +980,55 @@ include "nirify/main.kdl"
             .matches
             .iter()
             .any(|m| m.app_id.as_deref() == Some("alacritty"))));
+    }
+
+    #[test]
+    fn merge_adopts_missing_block_minimize_on_existing_window_rule() {
+        use crate::config::unknown::UnknownKdlChild;
+        let mut managed = Settings::default();
+        managed.window_rules.rules.push(WindowRule {
+            id: 0,
+            matches: vec![WindowRuleMatch {
+                app_id: Some("^steam_app_".into()),
+                ..Default::default()
+            }],
+            open_fullscreen: Some(true),
+            ..Default::default()
+        });
+        managed.window_rules.next_id = 1;
+
+        let mut stripped = Settings::default();
+        stripped.window_rules.rules.push(WindowRule {
+            id: 0,
+            matches: vec![WindowRuleMatch {
+                app_id: Some("^steam_app_".into()),
+                ..Default::default()
+            }],
+            open_fullscreen: Some(false),
+            unknown_children: vec![UnknownKdlChild {
+                name: "block-minimize".into(),
+                kdl: "block-minimize true".into(),
+            }],
+            ..Default::default()
+        });
+
+        let load = LoadResult::default();
+        let (merged, adopted) = merge_stripped_into_managed(managed, &stripped, &load);
+        assert!(adopted.contains(&SettingsCategory::WindowRules));
+        assert_eq!(merged.window_rules.rules.len(), 1);
+        let rule = &merged.window_rules.rules[0];
+        assert_eq!(
+            rule.open_fullscreen,
+            Some(true),
+            "modeled fields on the managed rule must not be clobbered"
+        );
+        assert!(
+            rule.unknown_children
+                .iter()
+                .any(|c| c.name == "block-minimize"),
+            "{:?}",
+            rule.unknown_children
+        );
     }
 
     #[test]

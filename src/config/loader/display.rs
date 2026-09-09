@@ -7,15 +7,15 @@ use super::gradient::load_color_or_gradient;
 use super::helpers::{parse_color, read_kdl_file};
 use crate::config::models::{
     is_modeled_output_child, AnimationType, EasingCurve, LayoutOverride, OutputConfig,
-    OutputHotCorners, Settings, SingleAnimationConfig, SpringParams, UnknownOutputChild,
-    WorkspaceShadow,
+    OutputHotCorners, Settings, SingleAnimationConfig, SpringParams, WorkspaceShadow,
 };
+use crate::config::unknown::collect_unknown_children;
 use crate::constants::{
     DAMPING_RATIO_MAX, DAMPING_RATIO_MIN, EASING_DURATION_MAX, EASING_DURATION_MIN, EPSILON_MAX,
     EPSILON_MIN, STIFFNESS_MAX, STIFFNESS_MIN,
 };
 use crate::types::{CenterFocusedColumn, Transform, VrrMode};
-use kdl::{KdlDocument, KdlNode};
+use kdl::KdlDocument;
 use log::debug;
 use std::path::Path;
 
@@ -794,62 +794,7 @@ pub fn parse_output_node_children(o_children: &KdlDocument, output: &mut OutputC
         }
     }
 
-    output.unknown_children = collect_unknown_output_children(o_children);
-}
-
-/// Keep `output { }` children Nirify does not model (spicy `hdr`, `max-bpc`, …).
-fn collect_unknown_output_children(o_children: &KdlDocument) -> Vec<UnknownOutputChild> {
-    o_children
-        .nodes()
-        .iter()
-        .filter(|node| !is_modeled_output_child(node.name().value()))
-        .map(|node| UnknownOutputChild {
-            name: node.name().value().to_string(),
-            kdl: format_unknown_output_node(node),
-        })
-        .collect()
-}
-
-/// Pretty-print an unknown output child (no output-block indent).
-fn format_unknown_output_node(node: &KdlNode) -> String {
-    format_kdl_node_pretty(node, 0)
-        .trim_end_matches('\n')
-        .to_string()
-}
-
-fn format_kdl_node_pretty(node: &KdlNode, indent: usize) -> String {
-    let pad = "    ".repeat(indent);
-    let mut out = String::new();
-    out.push_str(&pad);
-    if let Some(ty) = node.ty() {
-        out.push('(');
-        out.push_str(ty.value());
-        out.push(')');
-    }
-    out.push_str(node.name().value());
-    for entry in node.entries() {
-        // KdlEntry Display often includes leading whitespace from the source.
-        let rendered = entry.to_string();
-        let rendered = rendered.trim();
-        if rendered.is_empty() {
-            continue;
-        }
-        out.push(' ');
-        out.push_str(rendered);
-    }
-    if let Some(children) = node.children() {
-        if !children.nodes().is_empty() {
-            out.push_str(" {\n");
-            for child in children.nodes() {
-                out.push_str(&format_kdl_node_pretty(child, indent + 1));
-            }
-            out.push_str(&pad);
-            out.push_str("}\n");
-            return out;
-        }
-    }
-    out.push('\n');
-    out
+    output.unknown_children = collect_unknown_children(o_children, is_modeled_output_child);
 }
 
 /// Load output settings from KDL file

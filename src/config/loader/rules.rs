@@ -10,11 +10,12 @@ use super::helpers::{
     parse_color, preprocess_disabled_rules, read_raw_file, unslashdash_gated_content,
 };
 use crate::config::models::{
-    BackgroundEffectSettings, BlockOutFrom, CornerRadiusValue, FloatingPosition, LayerKind,
-    LayerRule, LayerRuleMatch, PopupsSettings, PositionRelativeTo, RuleDefaultSize, Settings,
-    ShadowSettings, TabIndicatorOverride, WindowRule, WindowRuleMatch,
+    is_modeled_window_rule_child, BackgroundEffectSettings, BlockOutFrom, CornerRadiusValue,
+    FloatingPosition, LayerKind, LayerRule, LayerRuleMatch, PopupsSettings, PositionRelativeTo,
+    RuleDefaultSize, Settings, ShadowSettings, TabIndicatorOverride, WindowRule, WindowRuleMatch,
 };
 use crate::config::parser::{get_f64, get_i64, get_string, has_flag, parse_document};
+use crate::config::unknown::collect_unknown_children;
 use crate::config::validation::validate_regex_pattern;
 use kdl::{KdlDocument, KdlNode};
 use log::{debug, warn};
@@ -690,6 +691,8 @@ pub fn parse_window_rule_node_children(children: &KdlDocument, rule: &mut Window
     if let Some(popups) = children.get("popups") {
         rule.popups = parse_popups(popups);
     }
+
+    rule.unknown_children = collect_unknown_children(children, is_modeled_window_rule_child);
 }
 
 /// Load window rules from KDL file.
