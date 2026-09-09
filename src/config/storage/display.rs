@@ -727,12 +727,36 @@ pub fn generate_outputs_kdl(settings: &OutputSettings) -> String {
                 if let Some(ref layout) = output.layout_override {
                     content.push_str(&generate_layout_override_kdl(layout, "    "));
                 }
+
+                // Spicy / community / future keys Nirify does not model.
+                emit_unknown_output_children(&mut content, &output.unknown_children);
             }
             content.push_str("}\n\n");
         }
     }
 
     content
+}
+
+/// Re-emit preserved unmodeled `output { }` children after modeled fields.
+fn emit_unknown_output_children(
+    content: &mut String,
+    children: &[crate::config::models::UnknownOutputChild],
+) {
+    for child in children {
+        if child.kdl.trim().is_empty() {
+            continue;
+        }
+        for line in child.kdl.lines() {
+            if line.is_empty() {
+                content.push('\n');
+            } else {
+                content.push_str("    ");
+                content.push_str(line);
+                content.push('\n');
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1156,6 +1180,135 @@ mod tests {
             "explicit 1.0 must be written, got:\n{kdl}"
         );
         assert_eq!(loaded.scale, Some(1.0), "{kdl}");
+    }
+
+    fn assert_spicy_hdr_and_siblings_present(kdl: &str) {
+        let compact = kdl.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            compact.contains("hdr mode=\"on\"") || compact.contains("hdr mode=on"),
+            "hdr mode must survive, got:\n{kdl}"
+        );
+        assert!(
+            compact.contains("reference-luminance 300"),
+            "nested hdr child must survive, got:\n{kdl}"
+        );
+        assert!(
+            compact.contains("max-bpc 10"),
+            "unknown sibling prop must survive, got:\n{kdl}"
+        );
+    }
+
+    fn load_single_output_from_kdl(kdl: &str) -> OutputConfig {
+        let doc: kdl::KdlDocument = kdl.parse().expect("input KDL must parse");
+        let node = doc.get("output").expect("output node");
+        let name = node
+            .entries()
+            .first()
+            .and_then(|e| e.value().as_string())
+            .unwrap_or("DP-3")
+            .to_string();
+        let mut output = OutputConfig {
+            name,
+            ..Default::default()
+        };
+        crate::config::loader::parse_output_node_children(
+            node.children().expect("output children"),
+            &mut output,
+        );
+        output
+    }
+
+    /// Robert's niri-spicy-git HDR shape (confirmed on Soot) plus a sibling
+    /// unknown and modeled mode/scale/VRR.
+    const SPICY_HDR_OUTPUT: &str = r#"
+output "DP-3" {
+    mode "2560x1440@144.000"
+    scale 1.5
+    variable-refresh-rate on-demand=true
+    hdr mode="on" {
+        reference-luminance 300
+    }
+    max-bpc 10
+}
+"#;
+
+    #[test]
+    fn spicy_hdr_and_unknown_siblings_survive_save() {
+        let output = load_single_output_from_kdl(SPICY_HDR_OUTPUT);
+        assert_eq!(output.name, "DP-3");
+        assert_eq!(output.mode, "2560x1440@144.000");
+        assert_eq!(output.scale, Some(1.5));
+        assert_eq!(output.vrr, crate::types::VrrMode::OnDemand);
+        assert!(
+            output.unknown_children.iter().any(|c| c.name == "hdr"),
+            "hdr must be collected as unknown: {:?}",
+            output.unknown_children
+        );
+        assert!(
+            output.unknown_children.iter().any(|c| c.name == "max-bpc"),
+            "max-bpc must be collected as unknown: {:?}",
+            output.unknown_children
+        );
+        assert!(
+            !output
+                .unknown_children
+                .iter()
+                .any(|c| crate::config::models::is_modeled_output_child(&c.name)),
+            "modeled children must not be stored as unknown: {:?}",
+            output.unknown_children
+        );
+
+        let (kdl, loaded) = roundtrip_output(&output);
+        assert_spicy_hdr_and_siblings_present(&kdl);
+        assert!(
+            kdl.contains("variable-refresh-rate on-demand=true"),
+            "modeled VRR must still be written, got:\n{kdl}"
+        );
+        assert_eq!(loaded.mode, "2560x1440@144.000");
+        assert_eq!(loaded.scale, Some(1.5));
+        assert_eq!(loaded.vrr, crate::types::VrrMode::OnDemand);
+        assert_spicy_hdr_and_siblings_present(
+            &loaded
+                .unknown_children
+                .iter()
+                .map(|c| c.kdl.as_str())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
+
+    #[test]
+    fn vrr_on_demand_attribute_round_trips() {
+        let output = load_single_output_from_kdl(
+            r#"
+output "DP-3" {
+    variable-refresh-rate on-demand=true
+}
+"#,
+        );
+        assert_eq!(output.vrr, crate::types::VrrMode::OnDemand);
+        let (kdl, loaded) = roundtrip_output(&output);
+        assert!(
+            kdl.contains("variable-refresh-rate on-demand=true"),
+            "{kdl}"
+        );
+        assert_eq!(loaded.vrr, crate::types::VrrMode::OnDemand);
+    }
+
+    #[test]
+    fn changing_position_and_scale_keeps_hdr() {
+        let mut output = load_single_output_from_kdl(SPICY_HDR_OUTPUT);
+        output.position = Some((1920, 48));
+        output.scale = Some(2.0);
+
+        let (kdl, loaded) = roundtrip_output(&output);
+        assert!(kdl.contains("position x=1920 y=48"), "{kdl}");
+        assert!(kdl.contains("scale 2"), "{kdl}");
+        assert_spicy_hdr_and_siblings_present(&kdl);
+        assert_eq!(loaded.position, Some((1920, 48)));
+        assert_eq!(loaded.scale, Some(2.0));
+        assert!(loaded.unknown_children.iter().any(|c| c.name == "hdr"));
+        assert!(loaded.unknown_children.iter().any(|c| c.name == "max-bpc"));
     }
 
     #[test]
