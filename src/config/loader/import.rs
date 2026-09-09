@@ -687,6 +687,51 @@ mod tests {
     }
 
     #[test]
+    fn import_preserves_spicy_debug_and_minimized_windows() {
+        let result = import_from_kdl_str(
+            r#"
+debug {
+    vulkan-renderer
+    force-tearing
+    disable-cursor-plane-on-hdr
+}
+minimized-windows {
+    off
+}
+"#,
+        );
+        assert!(result.warnings.is_empty(), "{:?}", result.warnings);
+        for name in [
+            "vulkan-renderer",
+            "force-tearing",
+            "disable-cursor-plane-on-hdr",
+        ] {
+            assert!(
+                result
+                    .settings
+                    .debug
+                    .unknown_children
+                    .iter()
+                    .any(|c| c.name == name),
+                "{name} missing: {:?}",
+                result.settings.debug.unknown_children
+            );
+        }
+        assert!(result
+            .settings
+            .preserved_top_level
+            .iter()
+            .any(|c| c.name == "minimized-windows"));
+        let kdl = crate::config::storage::generate_debug_kdl_with_top_level(
+            &result.settings.debug,
+            &result.settings.preserved_top_level,
+        );
+        let compact = kdl.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(compact.contains("vulkan-renderer"), "{kdl}");
+        assert!(compact.contains("minimized-windows"), "{kdl}");
+    }
+
+    #[test]
     fn import_preserves_window_rule_block_minimize() {
         let result = import_from_kdl_str(
             r#"

@@ -180,6 +180,8 @@ const MANAGED_NODES: &[&str] = &[
     "spawn-sh-at-startup",
     "config-notification",
     "recent-windows",
+    // Spicy / community top-level (preserved as raw in debug.kdl)
+    "minimized-windows",
 ];
 
 /// Check if a node name is managed by Nirify
@@ -625,6 +627,7 @@ mod tests {
         assert!(is_managed_node("spawn-sh-at-startup"));
         assert!(is_managed_node("config-notification"));
         assert!(is_managed_node("recent-windows"));
+        assert!(is_managed_node("minimized-windows"));
 
         assert!(!is_managed_node("custom-node"));
         assert!(!is_managed_node("my-setting"));

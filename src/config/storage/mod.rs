@@ -55,8 +55,8 @@ pub use misc::generate_misc_kdl;
 pub use preferences::generate_preferences_kdl;
 pub use rules::{generate_layer_rules_kdl, generate_window_rules_kdl};
 pub use system::{
-    generate_debug_kdl, generate_environment_kdl, generate_recent_windows_kdl,
-    generate_startup_kdl, generate_switch_events_kdl,
+    generate_debug_kdl, generate_debug_kdl_with_top_level, generate_environment_kdl,
+    generate_recent_windows_kdl, generate_startup_kdl, generate_switch_events_kdl,
 };
 pub use workspaces::generate_workspaces_kdl;
 
@@ -321,7 +321,7 @@ fn write_all_settings(
     )?;
     write_config(
         &paths.debug_kdl,
-        &generate_debug_kdl(&settings.debug),
+        &generate_debug_kdl_with_top_level(&settings.debug, &settings.preserved_top_level),
         strategy,
     )?;
     write_config(
@@ -510,7 +510,10 @@ pub fn save_dirty(
                 &paths.environment_kdl,
                 generate_environment_kdl(&settings.environment),
             ),
-            SettingsCategory::Debug => (&paths.debug_kdl, generate_debug_kdl(&settings.debug)),
+            SettingsCategory::Debug => (
+                &paths.debug_kdl,
+                generate_debug_kdl_with_top_level(&settings.debug, &settings.preserved_top_level),
+            ),
             SettingsCategory::SwitchEvents => (
                 &paths.switch_events_kdl,
                 generate_switch_events_kdl(&settings.switch_events),
