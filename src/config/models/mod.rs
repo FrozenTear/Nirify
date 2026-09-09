@@ -46,10 +46,10 @@ use crate::constants::{
     COLUMN_PROPORTION_MAX, COLUMN_PROPORTION_MIN, CORNER_RADIUS_MAX, CORNER_RADIUS_MIN,
     CURSOR_SIZE_MAX, CURSOR_SIZE_MIN, DAMPING_RATIO_MAX, DAMPING_RATIO_MIN, EASING_DURATION_MAX,
     EASING_DURATION_MIN, EPSILON_MAX, EPSILON_MIN, FOCUS_RING_WIDTH_MAX, FOCUS_RING_WIDTH_MIN,
-    GAP_SIZE_MAX, GAP_SIZE_MIN, HIDE_INACTIVE_MAX, HIDE_INACTIVE_MIN, OVERVIEW_ZOOM_MAX,
-    OVERVIEW_ZOOM_MIN, REPEAT_DELAY_MAX, REPEAT_DELAY_MIN, REPEAT_RATE_MAX, REPEAT_RATE_MIN,
-    SCROLL_FACTOR_MAX, SCROLL_FACTOR_MIN, STIFFNESS_MAX, STIFFNESS_MIN, STRUT_SIZE_MAX,
-    STRUT_SIZE_MIN,
+    GAP_SIZE_MAX, GAP_SIZE_MIN, HDR_REFERENCE_LUMINANCE_MAX, HDR_REFERENCE_LUMINANCE_MIN,
+    HIDE_INACTIVE_MAX, HIDE_INACTIVE_MIN, OVERVIEW_ZOOM_MAX, OVERVIEW_ZOOM_MIN, REPEAT_DELAY_MAX,
+    REPEAT_DELAY_MIN, REPEAT_RATE_MAX, REPEAT_RATE_MIN, SCROLL_FACTOR_MAX, SCROLL_FACTOR_MIN,
+    STIFFNESS_MAX, STIFFNESS_MIN, STRUT_SIZE_MAX, STRUT_SIZE_MIN,
 };
 
 /// Root settings structure containing all configuration
@@ -274,6 +274,33 @@ impl Settings {
             OVERVIEW_ZOOM_MAX,
             "overview.zoom"
         );
+
+        // Spicy output HDR reference luminance (nits)
+        for (i, output) in self.outputs.outputs.iter_mut().enumerate() {
+            if let Some(hdr) = output.hdr.as_mut() {
+                if let Some(nits) = hdr.reference_luminance {
+                    let clamped = (nits as i32)
+                        .clamp(HDR_REFERENCE_LUMINANCE_MIN, HDR_REFERENCE_LUMINANCE_MAX)
+                        as u32;
+                    if nits != clamped {
+                        log::debug!(
+                            "Clamped output[{}].hdr.reference_luminance from {} to {}",
+                            i,
+                            nits,
+                            clamped
+                        );
+                    }
+                    hdr.reference_luminance = Some(clamped);
+                }
+            }
+            if output
+                .hdr
+                .as_ref()
+                .is_some_and(|h| h.mode.to_kdl().is_none())
+            {
+                output.hdr = None;
+            }
+        }
 
         // Window rules - validate opacity and corner radius
         for (i, rule) in self.window_rules.rules.iter_mut().enumerate() {

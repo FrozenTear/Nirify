@@ -691,6 +691,18 @@ pub fn generate_outputs_kdl(settings: &OutputSettings) -> String {
                         content.push_str("    variable-refresh-rate on-demand=true\n");
                     }
                 }
+                // Spicy / niri-spicy-git HDR — not upstream 26.04.
+                if let Some(ref hdr) = output.hdr {
+                    if let Some(mode) = hdr.mode.to_kdl() {
+                        if let Some(nits) = hdr.reference_luminance {
+                            content.push_str(&format!(
+                                "    hdr mode=\"{mode}\" {{\n        reference-luminance {nits}\n    }}\n"
+                            ));
+                        } else {
+                            content.push_str(&format!("    hdr mode=\"{mode}\"\n"));
+                        }
+                    }
+                }
                 if output.focus_at_startup {
                     content.push_str("    focus-at-startup\n");
                 }
@@ -729,10 +741,14 @@ pub fn generate_outputs_kdl(settings: &OutputSettings) -> String {
                 }
 
                 // Spicy / community / future keys Nirify does not model.
-                crate::config::unknown::emit_unknown_children(
-                    &mut content,
-                    &output.unknown_children,
-                );
+                // Skip names we now write ourselves (e.g. leftover `hdr`).
+                let leftover: Vec<_> = output
+                    .unknown_children
+                    .iter()
+                    .filter(|c| !crate::config::models::is_modeled_output_child(&c.name))
+                    .cloned()
+                    .collect();
+                crate::config::unknown::emit_unknown_children(&mut content, &leftover);
             }
             content.push_str("}\n\n");
         }
@@ -1226,9 +1242,12 @@ output "DP-3" {
         assert_eq!(output.mode, "2560x1440@144.000");
         assert_eq!(output.scale, Some(1.5));
         assert_eq!(output.vrr, crate::types::VrrMode::OnDemand);
+        let hdr = output.hdr.as_ref().expect("hdr must be modeled");
+        assert_eq!(hdr.mode, crate::types::HdrMode::On);
+        assert_eq!(hdr.reference_luminance, Some(300));
         assert!(
-            output.unknown_children.iter().any(|c| c.name == "hdr"),
-            "hdr must be collected as unknown: {:?}",
+            !output.unknown_children.iter().any(|c| c.name == "hdr"),
+            "hdr must not stay in unknown once modeled: {:?}",
             output.unknown_children
         );
         assert!(
@@ -1262,13 +1281,24 @@ output "DP-3" {
         assert_eq!(loaded.mode, "2560x1440@144.000");
         assert_eq!(loaded.scale, Some(1.5));
         assert_eq!(loaded.vrr, crate::types::VrrMode::OnDemand);
-        assert_spicy_hdr_and_siblings_present(
-            &loaded
-                .unknown_children
-                .iter()
-                .map(|c| c.kdl.as_str())
-                .collect::<Vec<_>>()
-                .join("\n"),
+        let loaded_hdr = loaded.hdr.as_ref().expect("hdr survives round-trip");
+        assert_eq!(loaded_hdr.mode, crate::types::HdrMode::On);
+        assert_eq!(loaded_hdr.reference_luminance, Some(300));
+        let leftover = loaded
+            .unknown_children
+            .iter()
+            .map(|c| c.kdl.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            leftover.contains("max-bpc 10") || leftover.contains("max-bpc"),
+            "{leftover}"
+        );
+        assert!(leftover.contains("allow-tearing"), "{leftover}");
+        assert!(
+            !loaded.unknown_children.iter().any(|c| c.name == "hdr"),
+            "modeled hdr must not remain unknown: {:?}",
+            loaded.unknown_children
         );
     }
 
@@ -1302,7 +1332,9 @@ output "DP-3" {
         assert_spicy_hdr_and_siblings_present(&kdl);
         assert_eq!(loaded.position, Some((1920, 48)));
         assert_eq!(loaded.scale, Some(2.0));
-        assert!(loaded.unknown_children.iter().any(|c| c.name == "hdr"));
+        let loaded_hdr = loaded.hdr.as_ref().expect("hdr kept after position/scale");
+        assert_eq!(loaded_hdr.mode, crate::types::HdrMode::On);
+        assert_eq!(loaded_hdr.reference_luminance, Some(300));
         assert!(loaded.unknown_children.iter().any(|c| c.name == "max-bpc"));
         assert!(loaded
             .unknown_children
@@ -1329,7 +1361,52 @@ output "DP-3" {
             "{kdl}"
         );
         assert!(compact.contains("reference-luminance 203"), "{kdl}");
-        assert!(loaded.unknown_children.iter().any(|c| c.name == "hdr"));
+        let loaded_hdr = loaded.hdr.as_ref().expect("auto hdr modeled");
+        assert_eq!(loaded_hdr.mode, crate::types::HdrMode::Auto);
+        assert_eq!(loaded_hdr.reference_luminance, Some(203));
+        assert!(!loaded.unknown_children.iter().any(|c| c.name == "hdr"));
+    }
+
+    #[test]
+    fn hdr_mode_off_is_omitted() {
+        let output = load_single_output_from_kdl(
+            r#"
+output "DP-3" {
+    scale 1.5
+    hdr mode="off"
+}
+"#,
+        );
+        assert!(output.hdr.is_none(), "off must be absent: {:?}", output.hdr);
+        let (kdl, loaded) = roundtrip_output(&output);
+        assert!(
+            !kdl.contains("hdr"),
+            "off/absent hdr must not be written:\n{kdl}"
+        );
+        assert!(loaded.hdr.is_none());
+    }
+
+    #[test]
+    fn modeled_hdr_round_trips_without_unknown_child() {
+        let output = OutputConfig {
+            name: "DP-3".into(),
+            scale: Some(1.5),
+            hdr: Some(crate::config::models::OutputHdr {
+                mode: crate::types::HdrMode::On,
+                reference_luminance: Some(300),
+            }),
+            ..Default::default()
+        };
+        let (kdl, loaded) = roundtrip_output(&output);
+        let compact = kdl.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            compact.contains("hdr mode=\"on\"") || compact.contains("hdr mode=on"),
+            "{kdl}"
+        );
+        assert!(compact.contains("reference-luminance 300"), "{kdl}");
+        let got = loaded.hdr.expect("modeled hdr");
+        assert_eq!(got.mode, crate::types::HdrMode::On);
+        assert_eq!(got.reference_luminance, Some(300));
     }
 
     #[test]

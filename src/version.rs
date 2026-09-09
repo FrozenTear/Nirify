@@ -127,7 +127,11 @@ pub fn get_unsupported_features(version: NiriVersion) -> Vec<NiriFeature> {
         .collect()
 }
 
-/// Feature compatibility context for config generation
+/// Feature compatibility context for config generation.
+///
+/// Output HDR (`hdr mode="on"|"auto"`) is **niri-spicy-git**, not an upstream
+/// 26.04 feature, so it is not gated here. Displays labels that chrome
+/// "HDR (spicy)" instead of claiming a niri version.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FeatureCompat {
     pub recent_windows: bool,

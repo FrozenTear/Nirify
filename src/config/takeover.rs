@@ -23,9 +23,10 @@
 //!   managed items are never replaced.
 //!
 //! Identity keys:
-//! - output / workspace: `name` (unknown `output { }` children such as `hdr`
-//!   are adopted onto an existing row when that node name is not already
-//!   present; modeled fields on the managed row are never replaced)
+//! - output / workspace: `name` (modeled spicy `hdr` is adopted when the
+//!   managed row has none; remaining unknown children such as `max-bpc`
+//!   are adopted by node name; modeled fields on the managed row are never
+//!   replaced)
 //! - keybinding: [`normalized_key_combo`]
 //! - window-rule / layer-rule: `matches` + `excludes` (unknown window-rule
 //!   children such as `block-minimize` are adopted onto an existing rule
@@ -407,8 +408,12 @@ fn merge_outputs(
             continue;
         }
         if let Some(existing) = managed.iter_mut().find(|o| o.name == output.name) {
-            // Keep modeled fields on the managed row. Adopt spicy / unknown
-            // children (hdr, max-bpc, …) that Nirify does not yet represent.
+            // Keep modeled fields on the managed row. Adopt spicy HDR when
+            // the managed row has none, plus remaining unknown children
+            // (max-bpc, allow-tearing, …).
+            if existing.adopt_hdr(output.hdr.as_ref()) {
+                added = true;
+            }
             if existing.adopt_unknown_children(&output.unknown_children) {
                 added = true;
             }
@@ -882,11 +887,9 @@ include "nirify/main.kdl"
             "modeled fields on the managed row must not be clobbered"
         );
         assert_eq!(dp3.scale, Some(1.5));
-        assert!(
-            dp3.unknown_children.iter().any(|c| c.name == "hdr"),
-            "missing hdr must be adopted onto existing output: {:?}",
-            dp3.unknown_children
-        );
+        let dp3_hdr = dp3.hdr.as_ref().expect("missing hdr must be adopted");
+        assert_eq!(dp3_hdr.mode, crate::types::HdrMode::On);
+        assert_eq!(dp3_hdr.reference_luminance, Some(300));
         assert!(dp3.unknown_children.iter().any(|c| c.name == "max-bpc"));
 
         let hdmi = loaded
@@ -896,7 +899,9 @@ include "nirify/main.kdl"
             .find(|o| o.name == "HDMI-A-1")
             .expect("new output adopted");
         assert_eq!(hdmi.position, Some((1920, 0)));
-        assert!(hdmi.unknown_children.iter().any(|c| c.name == "hdr"));
+        let hdmi_hdr = hdmi.hdr.as_ref().expect("new output keeps hdr");
+        assert_eq!(hdmi_hdr.mode, crate::types::HdrMode::On);
+        assert_eq!(hdmi_hdr.reference_luminance, Some(300));
 
         let written = fs::read_to_string(&paths.outputs_kdl).unwrap();
         let compact = written.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -911,7 +916,7 @@ include "nirify/main.kdl"
 
     #[test]
     fn absorb_does_not_clobber_existing_hdr() {
-        use crate::config::models::UnknownOutputChild;
+        use crate::config::models::OutputHdr;
         let dir = tempdir().unwrap();
         let paths = test_paths(dir.path());
         paths.ensure_directories().unwrap();
@@ -919,10 +924,10 @@ include "nirify/main.kdl"
         let mut existing = Settings::default();
         existing.outputs.outputs.push(OutputConfig {
             name: "DP-3".to_string(),
-            unknown_children: vec![UnknownOutputChild {
-                name: "hdr".into(),
-                kdl: "hdr mode=\"on\" {\n    reference-luminance 300\n}".into(),
-            }],
+            hdr: Some(OutputHdr {
+                mode: crate::types::HdrMode::On,
+                reference_luminance: Some(300),
+            }),
             ..Default::default()
         });
         save_settings(&paths, &existing, FeatureCompat::all_enabled()).unwrap();
@@ -946,14 +951,12 @@ include "nirify/main.kdl"
         );
 
         let loaded = load_settings_with_result(&paths).settings;
-        let hdr = &loaded.outputs.outputs[0].unknown_children[0];
-        let compact = hdr.kdl.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert!(
-            compact.contains("reference-luminance 300"),
-            "managed hdr must win: {}",
-            hdr.kdl
-        );
-        assert!(!compact.contains("mode=\"off\"") && !compact.contains("mode=off"));
+        let hdr = loaded.outputs.outputs[0]
+            .hdr
+            .as_ref()
+            .expect("managed hdr must win");
+        assert_eq!(hdr.mode, crate::types::HdrMode::On);
+        assert_eq!(hdr.reference_luminance, Some(300));
     }
 
     #[test]

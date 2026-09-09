@@ -2374,6 +2374,11 @@ mod tests {
         assert!(output_msg_is_risky(&O::SetModeline(0, None)));
         assert!(output_msg_is_risky(&O::SetModeCustom(0, true)));
         assert!(!output_msg_is_risky(&O::SetScale(0, 1.5)));
+        assert!(!output_msg_is_risky(&O::SetHdrMode(
+            0,
+            crate::types::HdrMode::On
+        )));
+        assert!(!output_msg_is_risky(&O::SetHdrReferenceLuminance(0, 300)));
         assert!(!output_msg_is_risky(&O::SetPositionX(0, 100)));
         assert!(!output_msg_is_risky(&O::ImportConnectedLayout));
         assert!(output_msg_is_risky(&O::LiveOutputsSnapshotLoaded(Ok(

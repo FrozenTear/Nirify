@@ -23,8 +23,8 @@
 //!   `OnDemand` cannot be observed over IPC; an existing `OnDemand` setting is
 //!   preserved so snapshot / rearrange does not clobber `on-demand=true`.
 //!   Identity fields (background, hot corners, layout override, modeline,
-//!   focus-at-startup) and unmodeled children (`hdr`, `max-bpc`, …) are
-//!   preserved on existing rows.
+//!   focus-at-startup, spicy `hdr`) and unmodeled children (`max-bpc`, …)
+//!   are preserved on existing rows.
 //! - **Unmatched managed outputs** (configured but not currently connected)
 //!   are **left unchanged**. They are not deleted and not auto-disabled, so
 //!   dock / TV profiles survive unplug. niri ignores missing connectors.
@@ -398,13 +398,13 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_preserves_unknown_hdr_when_updating_known_fields() {
-        use crate::config::models::UnknownOutputChild;
+    fn snapshot_preserves_modeled_hdr_when_updating_known_fields() {
+        use crate::config::models::OutputHdr;
         let mut existing = named("DP-3");
-        existing.unknown_children = vec![UnknownOutputChild {
-            name: "hdr".into(),
-            kdl: "hdr mode=\"on\" {\n    reference-luminance 300\n}".into(),
-        }];
+        existing.hdr = Some(OutputHdr {
+            mode: crate::types::HdrMode::On,
+            reference_luminance: Some(300),
+        });
         existing.vrr = VrrMode::OnDemand;
         let mut settings = OutputSettings {
             outputs: vec![existing],
@@ -418,11 +418,9 @@ mod tests {
         assert_eq!(settings.outputs[0].position, Some((1920, 0)));
         assert_eq!(settings.outputs[0].scale, Some(1.5));
         assert_eq!(settings.outputs[0].vrr, VrrMode::OnDemand);
-        assert_eq!(settings.outputs[0].unknown_children.len(), 1);
-        assert_eq!(settings.outputs[0].unknown_children[0].name, "hdr");
-        assert!(settings.outputs[0].unknown_children[0]
-            .kdl
-            .contains("reference-luminance 300"));
+        let hdr = settings.outputs[0].hdr.as_ref().expect("hdr preserved");
+        assert_eq!(hdr.mode, crate::types::HdrMode::On);
+        assert_eq!(hdr.reference_luminance, Some(300));
 
         let kdl = crate::config::storage::generate_outputs_kdl(&settings);
         assert!(kdl.contains("hdr mode=\"on\""), "{kdl}");

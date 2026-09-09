@@ -147,7 +147,10 @@ output "DP-3" {
         .expect("DP-3 imported");
     assert_eq!(output.mode, "2560x1440@144.000");
     assert_eq!(output.scale, Some(1.5));
-    assert!(output.unknown_children.iter().any(|c| c.name == "hdr"));
+    let hdr = output.hdr.as_ref().expect("hdr imported as modeled");
+    assert_eq!(hdr.mode, nirify::types::HdrMode::On);
+    assert_eq!(hdr.reference_luminance, Some(300));
+    assert!(!output.unknown_children.iter().any(|c| c.name == "hdr"));
     assert!(output.unknown_children.iter().any(|c| c.name == "max-bpc"));
 
     let written = fs::read_to_string(&paths.outputs_kdl).unwrap();
