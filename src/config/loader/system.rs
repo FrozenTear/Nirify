@@ -6,9 +6,13 @@
 use super::helpers::{load_color, read_kdl_file};
 use super::rules::has_flag_in_node;
 use crate::config::models::{
-    EnvironmentVariable, RecentWindowsBind, RecentWindowsScope, Settings, StartupCommand,
+    is_modeled_debug_child, EnvironmentVariable, RecentWindowsBind, RecentWindowsScope, Settings,
+    StartupCommand,
 };
 use crate::config::parser::{get_f64, get_i64, get_string, has_flag};
+use crate::config::unknown::{
+    adopt_unknown_children, collect_preserved_top_level, collect_unknown_children,
+};
 use kdl::KdlDocument;
 use log::debug;
 use std::path::Path;
@@ -219,8 +223,18 @@ pub fn parse_debug_from_doc(doc: &KdlDocument, settings: &mut Settings) {
                     }
                 }
             }
+
+            settings.debug.unknown_children =
+                collect_unknown_children(debug_children, is_modeled_debug_child);
         }
     }
+
+    // Whitelisted spicy top-level nodes live in the same document as `debug`
+    // after save (`advanced/debug.kdl`) and in `config.kdl` on import.
+    adopt_unknown_children(
+        &mut settings.preserved_top_level,
+        &collect_preserved_top_level(doc),
+    );
 }
 
 /// Load debug settings from KDL file

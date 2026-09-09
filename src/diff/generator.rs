@@ -156,7 +156,7 @@ fn generate_category_diff(
         SettingsCategory::Debug => (
             "Debug",
             paths.debug_kdl.clone(),
-            generate_debug_kdl(&settings.debug),
+            generate_debug_kdl_with_top_level(&settings.debug, &settings.preserved_top_level),
         ),
         SettingsCategory::Miscellaneous => (
             "Miscellaneous",

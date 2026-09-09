@@ -270,6 +270,22 @@ pub fn merge_stripped_into_managed(
         gestures
     );
     adopt_scalar!(SettingsCategory::Debug, "advanced/debug.kdl", debug);
+    if !file_failed(load, "advanced/debug.kdl") {
+        // File already managed: keep modeled debug flags, adopt spicy
+        // children and top-level siblings that Nirify does not represent.
+        if crate::config::unknown::adopt_unknown_children(
+            &mut managed.debug.unknown_children,
+            &stripped.debug.unknown_children,
+        ) {
+            adopted.insert(SettingsCategory::Debug);
+        }
+        if crate::config::unknown::adopt_unknown_children(
+            &mut managed.preserved_top_level,
+            &stripped.preserved_top_level,
+        ) {
+            adopted.insert(SettingsCategory::Debug);
+        }
+    }
     adopt_scalar!(
         SettingsCategory::SwitchEvents,
         "advanced/switch-events.kdl",
@@ -1056,6 +1072,64 @@ include "nirify/main.kdl"
         assert_eq!(catch_all.opacity, Some(0.9));
         assert_eq!(catch_all.clip_to_geometry, Some(true));
         assert_eq!(catch_all.open_maximized, Some(true));
+    }
+
+    #[test]
+    fn merge_adopts_missing_spicy_debug_and_minimized_windows() {
+        use crate::config::unknown::UnknownKdlChild;
+
+        let mut managed = Settings::default();
+        managed.debug.disable_cursor_plane = true;
+
+        let mut stripped = Settings::default();
+        stripped.debug.disable_cursor_plane = false;
+        stripped.debug.unknown_children = vec![
+            UnknownKdlChild {
+                name: "vulkan-renderer".into(),
+                kdl: "vulkan-renderer".into(),
+            },
+            UnknownKdlChild {
+                name: "force-tearing".into(),
+                kdl: "force-tearing".into(),
+            },
+            UnknownKdlChild {
+                name: "disable-cursor-plane-on-hdr".into(),
+                kdl: "disable-cursor-plane-on-hdr".into(),
+            },
+        ];
+        stripped.preserved_top_level = vec![UnknownKdlChild {
+            name: "minimized-windows".into(),
+            kdl: "minimized-windows {\n    off\n}".into(),
+        }];
+
+        let mut load = LoadResult::default();
+        load.loaded_files.push("advanced/debug.kdl".into());
+
+        let (merged, adopted) = merge_stripped_into_managed(managed, &stripped, &load);
+        assert!(
+            adopted.contains(&SettingsCategory::Debug),
+            "expected Debug adopted, got {:?}",
+            adopted
+        );
+        assert!(
+            merged.debug.disable_cursor_plane,
+            "modeled debug flags on the managed file must not be clobbered"
+        );
+        for name in [
+            "vulkan-renderer",
+            "force-tearing",
+            "disable-cursor-plane-on-hdr",
+        ] {
+            assert!(
+                merged.debug.unknown_children.iter().any(|c| c.name == name),
+                "{name} missing: {:?}",
+                merged.debug.unknown_children
+            );
+        }
+        assert!(merged
+            .preserved_top_level
+            .iter()
+            .any(|c| c.name == "minimized-windows"));
     }
 
     #[test]
