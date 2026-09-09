@@ -1332,6 +1332,7 @@ window-rule {
     match app-id="^steam_app_"
     open-fullscreen true
     block-minimize true
+    allow-tearing
     focus-ring {
         off
     }
@@ -1359,6 +1360,13 @@ window-rule {
             rule.unknown_children
         );
         assert!(
+            rule.unknown_children
+                .iter()
+                .any(|c| c.name == "allow-tearing"),
+            "allow-tearing must be collected as unknown: {:?}",
+            rule.unknown_children
+        );
+        assert!(
             !rule
                 .unknown_children
                 .iter()
@@ -1378,6 +1386,7 @@ window-rule {
             compact.contains("block-minimize true"),
             "block-minimize must survive generate, got:\n{kdl}"
         );
+        assert!(compact.contains("allow-tearing"), "{kdl}");
         assert!(compact.contains("open-fullscreen true"), "{kdl}");
         assert!(kdl.contains("focus-ring"), "{kdl}");
 
@@ -1393,6 +1402,10 @@ window-rule {
             .unknown_children
             .iter()
             .any(|c| c.name == "block-minimize"));
+        assert!(got
+            .unknown_children
+            .iter()
+            .any(|c| c.name == "allow-tearing"));
 
         let again =
             generate_window_rules_kdl(&loaded.window_rules, false, FeatureCompat::all_enabled());

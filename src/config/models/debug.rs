@@ -108,4 +108,37 @@ pub struct DebugSettings {
     // Screencasting
     /// Force invalid DRM modifier for PipeWire
     pub force_pipewire_invalid_modifier: bool,
+    /// Unmodeled `debug { }` children (spicy `vulkan-renderer`, `force-tearing`,
+    /// `disable-cursor-plane-on-hdr`, …). Re-emitted on save; no debug UI.
+    pub unknown_children: Vec<crate::config::unknown::UnknownKdlChild>,
+}
+
+/// Child names Nirify models inside `debug { }`.
+pub const MODELED_DEBUG_CHILD_NAMES: &[&str] = &[
+    "preview-render",
+    "enable-overlay-planes",
+    "disable-cursor-plane",
+    "disable-direct-scanout",
+    "restrict-primary-scanout-to-matching-format",
+    "render-drm-device",
+    "ignore-drm-device",
+    "wait-for-frame-completion-before-queueing",
+    "disable-resize-throttling",
+    "disable-transactions",
+    "emulate-zero-presentation-time",
+    "skip-cursor-only-updates-during-vrr",
+    "dbus-interfaces-in-non-session-instances",
+    "keep-laptop-panel-on-when-lid-is-closed",
+    "disable-monitor-names",
+    "force-disable-connectors-on-resume",
+    "strict-new-window-focus-policy",
+    "honor-xdg-activation-with-invalid-serial",
+    "deactivate-unfocused-windows",
+    "force-pipewire-invalid-modifier",
+];
+
+/// Returns true if `name` is a `debug { }` child Nirify already models.
+#[must_use]
+pub fn is_modeled_debug_child(name: &str) -> bool {
+    MODELED_DEBUG_CHILD_NAMES.contains(&name)
 }
