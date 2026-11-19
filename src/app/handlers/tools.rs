@@ -77,6 +77,10 @@ impl super::super::App {
                 self.ui.tools_state.loading_outputs = false;
                 match result {
                     Ok(outputs) => {
+                        // Display only. Loading outputs (startup, opening
+                        // Displays) must never change the saved config or mark
+                        // Outputs dirty. A saved mode niri is not running
+                        // exactly is shown as a note on the Displays page.
                         self.ui.tools_state.outputs = outputs;
                     }
                     Err(e) => {
@@ -178,5 +182,77 @@ impl super::super::App {
                 Task::none()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::models::OutputConfig;
+    use crate::config::SettingsCategory;
+    use crate::ipc::{FullOutputInfo, OutputMode};
+    use crate::messages::ToolsMessage;
+
+    fn dp3_live() -> FullOutputInfo {
+        FullOutputInfo {
+            name: "DP-3".to_string(),
+            current_mode: Some(1),
+            modes: [60_000, 143_981]
+                .iter()
+                .map(|&refresh_rate| OutputMode {
+                    width: 1920,
+                    height: 1080,
+                    refresh_rate,
+                    is_preferred: false,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn assert_outputs_clean(app: &crate::app::App) {
+        assert!(!app
+            .save
+            .dirty_tracker
+            .peek()
+            .contains(&SettingsCategory::Outputs));
+        assert!(!app.save.dirty_tracker.is_dirty());
+        assert!(app.save.last_change_time.is_none());
+        assert!(!app.should_save());
+        assert!(!app.save.in_progress);
+    }
+
+    #[test]
+    fn outputs_loaded_leaves_legacy_mode_unchanged_and_clean() {
+        let (mut app, _) = crate::app::App::new_with_error(String::new(), None);
+        app.settings.outputs.outputs = vec![OutputConfig {
+            name: "DP-3".into(),
+            mode: "1920x1080@143.98".into(),
+            ..Default::default()
+        }];
+        let before = app.settings.outputs.clone();
+        assert_outputs_clean(&app);
+
+        let _ = app.update_tools(ToolsMessage::OutputsLoaded(Ok(vec![dp3_live()])));
+
+        // Load is display only: the legacy value stays as saved.
+        assert_eq!(app.settings.outputs.outputs[0].mode, "1920x1080@143.98");
+        assert_eq!(app.settings.outputs, before);
+        assert_eq!(app.ui.tools_state.outputs.len(), 1);
+        assert_outputs_clean(&app);
+    }
+
+    #[test]
+    fn outputs_loaded_with_exact_mode_stays_clean() {
+        let (mut app, _) = crate::app::App::new_with_error(String::new(), None);
+        app.settings.outputs.outputs = vec![OutputConfig {
+            name: "DP-3".into(),
+            mode: "1920x1080@143.981".into(),
+            ..Default::default()
+        }];
+
+        let _ = app.update_tools(ToolsMessage::OutputsLoaded(Ok(vec![dp3_live()])));
+
+        assert_eq!(app.settings.outputs.outputs[0].mode, "1920x1080@143.981");
+        assert_outputs_clean(&app);
     }
 }

@@ -16,7 +16,7 @@ use crate::types::{HdrMode, Transform, VrrMode};
 /// Represents an available display mode for dropdown selection
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModeOption {
-    /// The mode string (e.g., "1920x1080@60.00")
+    /// The mode string (e.g., "1920x1080@143.981", exact niri refresh)
     pub mode_string: String,
     /// Whether this is the preferred/native mode
     pub is_preferred: bool,
@@ -271,12 +271,10 @@ fn get_available_modes(output_name: &str, available_outputs: &[FullOutputInfo]) 
         ipc_out
             .modes
             .iter()
-            .map(|mode| {
-                let refresh_hz = mode.refresh_rate as f64 / 1000.0;
-                ModeOption {
-                    mode_string: format!("{}x{}@{:.2}", mode.width, mode.height, refresh_hz),
-                    is_preferred: mode.is_preferred,
-                }
+            .map(|mode| ModeOption {
+                // Exact refresh (3 decimals). niri needs an exact match.
+                mode_string: mode.mode_string(),
+                is_preferred: mode.is_preferred,
             })
             .collect()
     } else {
@@ -353,6 +351,24 @@ pub fn output_detail_view<'a>(
     let mode_str = output.mode.as_str();
     let modeline_str = output.modeline.as_deref().unwrap_or("");
     let available_modes = get_available_modes(&output.name, available_outputs);
+    // Saved mode is not exactly what niri is running (for example a legacy
+    // 2-decimal refresh). Show it; never rewrite the saved value on load.
+    let mode_section: Element<'a, Message> =
+        match crate::config::saved_mode_mismatch_note(output, available_outputs) {
+            Some(note) => column![
+                mode_row(idx, mode_str, &available_modes),
+                container(
+                    row![text("ℹ").size(13), text(note).size(12)]
+                        .spacing(8)
+                        .align_y(Alignment::Start),
+                )
+                .padding(12)
+                .style(crate::theme::info_block_style),
+            ]
+            .spacing(6)
+            .into(),
+            None => mode_row(idx, mode_str, &available_modes),
+        };
 
     let modal_section = |icon: &'a str,
                          label: &'a str,
@@ -497,7 +513,7 @@ pub fn output_detail_view<'a>(
                 .padding(8)
                 .style(crate::theme::card_style),
                 Space::new().height(4),
-                mode_row(idx, mode_str, &available_modes),
+                mode_section,
                 slider_row(
                     "Scale",
                     "HiDPI scaling factor",

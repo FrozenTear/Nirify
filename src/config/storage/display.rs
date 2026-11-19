@@ -887,6 +887,46 @@ mod tests {
     }
 
     #[test]
+    fn exact_refresh_mode_round_trips_unrounded() {
+        // DP-3 Samsung LC32G5xT: niri reports 143981 mHz. Writing 143.98
+        // made niri miss the mode and fall back to the preferred one.
+        let live = crate::ipc::OutputMode {
+            width: 1920,
+            height: 1080,
+            refresh_rate: 143_981,
+            is_preferred: false,
+        };
+        let output = OutputConfig {
+            name: "DP-3".into(),
+            mode: live.mode_string(),
+            ..Default::default()
+        };
+        let (kdl, loaded) = roundtrip_output(&output);
+        assert!(kdl.contains("mode \"1920x1080@143.981\""), "{kdl}");
+        assert_eq!(loaded.mode, "1920x1080@143.981");
+        assert_eq!(
+            crate::config::parse_mode_refresh_millihz(&loaded.mode),
+            Some((1920, 1080, 143_981))
+        );
+    }
+
+    #[test]
+    fn legacy_two_decimal_mode_still_loads() {
+        let output = OutputConfig {
+            name: "DP-3".into(),
+            mode: "1920x1080@143.98".into(),
+            ..Default::default()
+        };
+        let (kdl, loaded) = roundtrip_output(&output);
+        assert!(kdl.contains("mode \"1920x1080@143.98\""), "{kdl}");
+        assert_eq!(loaded.mode, "1920x1080@143.98");
+        assert_eq!(
+            crate::config::parse_mode_refresh_millihz(&loaded.mode),
+            Some((1920, 1080, 143_980))
+        );
+    }
+
+    #[test]
     fn test_modeline_round_trip() {
         let output = OutputConfig {
             name: "DP-1".into(),

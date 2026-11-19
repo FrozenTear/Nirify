@@ -38,7 +38,8 @@ pub use models::{
 pub use outputs_layout::{
     apply_live_outputs_to_settings, estimated_logical_size, find_config_index_for_live,
     find_live_output, logical_size_from_mode, output_name_matches_live, pack_to_the_right,
-    parse_mode_resolution, seed_manual_position, LiveOutputsApplyResult,
+    parse_mode_refresh_millihz, parse_mode_resolution, saved_mode_mismatch_note,
+    seed_manual_position, LiveOutputsApplyResult,
 };
 pub use paths::ConfigPaths;
 pub use registry::ConfigFile;
