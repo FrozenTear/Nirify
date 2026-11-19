@@ -288,23 +288,31 @@ pub fn parse_mode_refresh_millihz(mode: &str) -> Option<(i32, i32, i64)> {
 /// note tells the user what is saved and what is running so they can pick a
 /// mode themselves.
 ///
+/// A saved mode without a refresh (for example `1920x1080`) is compared by
+/// resolution only, since niri picks the highest refresh for that resolution.
+///
 /// Returns `None` (no note) when:
 /// - the output is not connected (no live match) or niri reports no current mode
 /// - `mode_custom` is set
-/// - the saved mode has no parseable `WxH@refresh` (for example `1920x1080`)
+/// - the saved mode is empty or does not parse (including a bad `@refresh`)
 /// - width, height, and millihertz already equal the live current mode
+/// - the saved mode has no refresh and its resolution equals the live one
 #[must_use]
 pub fn saved_mode_mismatch_note(output: &OutputConfig, live: &[FullOutputInfo]) -> Option<String> {
     if output.mode_custom {
         return None;
     }
-    let (width, height, millihz) = parse_mode_refresh_millihz(&output.mode)?;
+    let (width, height, millihz) = if output.mode.contains('@') {
+        let (w, h, mhz) = parse_mode_refresh_millihz(&output.mode)?;
+        (w, h, Some(mhz))
+    } else {
+        let (w, h) = parse_mode_resolution(&output.mode)?;
+        (w, h, None)
+    };
     let info = find_live_output(&output.name, live)?;
     let current = info.current_mode.and_then(|idx| info.modes.get(idx))?;
-    if current.width == width
-        && current.height == height
-        && i64::from(current.refresh_rate) == millihz
-    {
+    let refresh_matches = millihz.is_none_or(|mhz| i64::from(current.refresh_rate) == mhz);
+    if current.width == width && current.height == height && refresh_matches {
         return None;
     }
     Some(format!(
@@ -782,7 +790,7 @@ mod tests {
     }
 
     #[test]
-    fn mismatch_note_skips_custom_unplugged_and_no_refresh() {
+    fn mismatch_note_skips_custom_unplugged_and_empty() {
         let live = [dp3_running(2560, 1440, 144_000)];
 
         let mut custom = dp3_saved("1920x1080@143.98");
@@ -793,11 +801,38 @@ mod tests {
         unplugged.name = "HDMI-A-1".to_string();
         assert_eq!(saved_mode_mismatch_note(&unplugged, &live), None);
 
+        assert_eq!(saved_mode_mismatch_note(&dp3_saved(""), &live), None);
         assert_eq!(
-            saved_mode_mismatch_note(&dp3_saved("1920x1080"), &live),
+            saved_mode_mismatch_note(&dp3_saved("1920x1080@abc"), &live),
             None
         );
-        assert_eq!(saved_mode_mismatch_note(&dp3_saved(""), &live), None);
+    }
+
+    #[test]
+    fn mismatch_note_hidden_for_refreshless_mode_at_same_resolution() {
+        let mut info = dp3_live(&[60_000, 143_981]);
+        info.current_mode = Some(1);
+        assert_eq!(
+            saved_mode_mismatch_note(&dp3_saved("1920x1080"), &[info.clone()]),
+            None
+        );
+        info.current_mode = Some(0);
+        assert_eq!(
+            saved_mode_mismatch_note(&dp3_saved("1920x1080"), &[info]),
+            None
+        );
+    }
+
+    #[test]
+    fn mismatch_note_shown_for_refreshless_mode_at_other_resolution() {
+        let live = [dp3_running(2560, 1440, 144_000)];
+        assert_eq!(
+            saved_mode_mismatch_note(&dp3_saved("1920x1080"), &live).as_deref(),
+            Some(
+                "niri isn't using the saved mode 1920x1080. It's running \
+                 2560x1440@144.000. Pick a mode to save it exactly."
+            )
+        );
     }
 
     #[test]
