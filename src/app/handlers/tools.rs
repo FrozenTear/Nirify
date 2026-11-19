@@ -77,24 +77,11 @@ impl super::super::App {
                 self.ui.tools_state.loading_outputs = false;
                 match result {
                     Ok(outputs) => {
+                        // Display only. Loading outputs (startup, opening
+                        // Displays) must never change the saved config or mark
+                        // Outputs dirty. A saved mode niri is not running
+                        // exactly is shown as a note on the Displays page.
                         self.ui.tools_state.outputs = outputs;
-                        // Older builds stored refresh rounded to 2 decimals
-                        // (143.98), which niri cannot match against 143.981.
-                        // Snap near matches to the exact live mode in memory
-                        // only. Mark Outputs dirty so unsaved state shows, but
-                        // do not call mark_changed(): loading outputs (page
-                        // open, startup) must never start the debounced save.
-                        // niri reloads outputs.kdl on write and can blank the
-                        // screen. The exact mode is written on the next save.
-                        let snapped = crate::config::snap_output_modes_to_live(
-                            &mut self.settings.outputs,
-                            &self.ui.tools_state.outputs,
-                        );
-                        if snapped > 0 {
-                            self.save
-                                .dirty_tracker
-                                .mark(crate::config::SettingsCategory::Outputs);
-                        }
                     }
                     Err(e) => {
                         self.ui.tools_state.last_error = Some(e);
@@ -222,35 +209,40 @@ mod tests {
         }
     }
 
-    #[test]
-    fn outputs_loaded_snaps_in_memory_without_starting_save() {
-        let (mut app, _) = crate::app::App::new_with_error(String::new(), None);
-        app.settings.outputs.outputs = vec![OutputConfig {
-            name: "DP-3".into(),
-            mode: "1920x1080@143.98".into(),
-            ..Default::default()
-        }];
-        assert!(app.save.last_change_time.is_none());
-        assert!(!app.save.dirty_tracker.is_dirty());
-
-        let _ = app.update_tools(ToolsMessage::OutputsLoaded(Ok(vec![dp3_live()])));
-
-        // In-memory config shows the exact live mode.
-        assert_eq!(app.settings.outputs.outputs[0].mode, "1920x1080@143.981");
-        // Outputs shows as unsaved...
-        assert!(app
+    fn assert_outputs_clean(app: &crate::app::App) {
+        assert!(!app
             .save
             .dirty_tracker
             .peek()
             .contains(&SettingsCategory::Outputs));
-        // ...but the debounced auto-save is not armed, so nothing is written.
+        assert!(!app.save.dirty_tracker.is_dirty());
         assert!(app.save.last_change_time.is_none());
         assert!(!app.should_save());
         assert!(!app.save.in_progress);
     }
 
     #[test]
-    fn outputs_loaded_without_snap_stays_clean() {
+    fn outputs_loaded_leaves_legacy_mode_unchanged_and_clean() {
+        let (mut app, _) = crate::app::App::new_with_error(String::new(), None);
+        app.settings.outputs.outputs = vec![OutputConfig {
+            name: "DP-3".into(),
+            mode: "1920x1080@143.98".into(),
+            ..Default::default()
+        }];
+        let before = app.settings.outputs.clone();
+        assert_outputs_clean(&app);
+
+        let _ = app.update_tools(ToolsMessage::OutputsLoaded(Ok(vec![dp3_live()])));
+
+        // Load is display only: the legacy value stays as saved.
+        assert_eq!(app.settings.outputs.outputs[0].mode, "1920x1080@143.98");
+        assert_eq!(app.settings.outputs, before);
+        assert_eq!(app.ui.tools_state.outputs.len(), 1);
+        assert_outputs_clean(&app);
+    }
+
+    #[test]
+    fn outputs_loaded_with_exact_mode_stays_clean() {
         let (mut app, _) = crate::app::App::new_with_error(String::new(), None);
         app.settings.outputs.outputs = vec![OutputConfig {
             name: "DP-3".into(),
@@ -260,7 +252,7 @@ mod tests {
 
         let _ = app.update_tools(ToolsMessage::OutputsLoaded(Ok(vec![dp3_live()])));
 
-        assert!(!app.save.dirty_tracker.is_dirty());
-        assert!(app.save.last_change_time.is_none());
+        assert_eq!(app.settings.outputs.outputs[0].mode, "1920x1080@143.981");
+        assert_outputs_clean(&app);
     }
 }

@@ -351,6 +351,24 @@ pub fn output_detail_view<'a>(
     let mode_str = output.mode.as_str();
     let modeline_str = output.modeline.as_deref().unwrap_or("");
     let available_modes = get_available_modes(&output.name, available_outputs);
+    // Saved mode is not exactly what niri is running (for example a legacy
+    // 2-decimal refresh). Show it; never rewrite the saved value on load.
+    let mode_section: Element<'a, Message> =
+        match crate::config::saved_mode_mismatch_note(output, available_outputs) {
+            Some(note) => column![
+                mode_row(idx, mode_str, &available_modes),
+                container(
+                    row![text("ℹ").size(13), text(note).size(12)]
+                        .spacing(8)
+                        .align_y(Alignment::Start),
+                )
+                .padding(12)
+                .style(crate::theme::info_block_style),
+            ]
+            .spacing(6)
+            .into(),
+            None => mode_row(idx, mode_str, &available_modes),
+        };
 
     let modal_section = |icon: &'a str,
                          label: &'a str,
@@ -495,7 +513,7 @@ pub fn output_detail_view<'a>(
                 .padding(8)
                 .style(crate::theme::card_style),
                 Space::new().height(4),
-                mode_row(idx, mode_str, &available_modes),
+                mode_section,
                 slider_row(
                     "Scale",
                     "HiDPI scaling factor",
