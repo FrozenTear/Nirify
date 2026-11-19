@@ -80,7 +80,12 @@ impl super::super::App {
                         self.ui.tools_state.outputs = outputs;
                         // Older builds stored refresh rounded to 2 decimals
                         // (143.98), which niri cannot match against 143.981.
-                        // Snap near matches to the exact live mode and save.
+                        // Snap near matches to the exact live mode in memory
+                        // only. Mark Outputs dirty so unsaved state shows, but
+                        // do not call mark_changed(): loading outputs (page
+                        // open, startup) must never start the debounced save.
+                        // niri reloads outputs.kdl on write and can blank the
+                        // screen. The exact mode is written on the next save.
                         let snapped = crate::config::snap_output_modes_to_live(
                             &mut self.settings.outputs,
                             &self.ui.tools_state.outputs,
@@ -89,7 +94,6 @@ impl super::super::App {
                             self.save
                                 .dirty_tracker
                                 .mark(crate::config::SettingsCategory::Outputs);
-                            self.mark_changed();
                         }
                     }
                     Err(e) => {
@@ -191,5 +195,72 @@ impl super::super::App {
                 Task::none()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::models::OutputConfig;
+    use crate::config::SettingsCategory;
+    use crate::ipc::{FullOutputInfo, OutputMode};
+    use crate::messages::ToolsMessage;
+
+    fn dp3_live() -> FullOutputInfo {
+        FullOutputInfo {
+            name: "DP-3".to_string(),
+            current_mode: Some(1),
+            modes: [60_000, 143_981]
+                .iter()
+                .map(|&refresh_rate| OutputMode {
+                    width: 1920,
+                    height: 1080,
+                    refresh_rate,
+                    is_preferred: false,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn outputs_loaded_snaps_in_memory_without_starting_save() {
+        let (mut app, _) = crate::app::App::new_with_error(String::new(), None);
+        app.settings.outputs.outputs = vec![OutputConfig {
+            name: "DP-3".into(),
+            mode: "1920x1080@143.98".into(),
+            ..Default::default()
+        }];
+        assert!(app.save.last_change_time.is_none());
+        assert!(!app.save.dirty_tracker.is_dirty());
+
+        let _ = app.update_tools(ToolsMessage::OutputsLoaded(Ok(vec![dp3_live()])));
+
+        // In-memory config shows the exact live mode.
+        assert_eq!(app.settings.outputs.outputs[0].mode, "1920x1080@143.981");
+        // Outputs shows as unsaved...
+        assert!(app
+            .save
+            .dirty_tracker
+            .peek()
+            .contains(&SettingsCategory::Outputs));
+        // ...but the debounced auto-save is not armed, so nothing is written.
+        assert!(app.save.last_change_time.is_none());
+        assert!(!app.should_save());
+        assert!(!app.save.in_progress);
+    }
+
+    #[test]
+    fn outputs_loaded_without_snap_stays_clean() {
+        let (mut app, _) = crate::app::App::new_with_error(String::new(), None);
+        app.settings.outputs.outputs = vec![OutputConfig {
+            name: "DP-3".into(),
+            mode: "1920x1080@143.981".into(),
+            ..Default::default()
+        }];
+
+        let _ = app.update_tools(ToolsMessage::OutputsLoaded(Ok(vec![dp3_live()])));
+
+        assert!(!app.save.dirty_tracker.is_dirty());
+        assert!(app.save.last_change_time.is_none());
     }
 }
