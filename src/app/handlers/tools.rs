@@ -78,6 +78,19 @@ impl super::super::App {
                 match result {
                     Ok(outputs) => {
                         self.ui.tools_state.outputs = outputs;
+                        // Older builds stored refresh rounded to 2 decimals
+                        // (143.98), which niri cannot match against 143.981.
+                        // Snap near matches to the exact live mode and save.
+                        let snapped = crate::config::snap_output_modes_to_live(
+                            &mut self.settings.outputs,
+                            &self.ui.tools_state.outputs,
+                        );
+                        if snapped > 0 {
+                            self.save
+                                .dirty_tracker
+                                .mark(crate::config::SettingsCategory::Outputs);
+                            self.mark_changed();
+                        }
                     }
                     Err(e) => {
                         self.ui.tools_state.last_error = Some(e);

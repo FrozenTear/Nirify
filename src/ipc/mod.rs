@@ -700,6 +700,35 @@ pub struct OutputMode {
     pub is_preferred: bool,
 }
 
+/// Format a refresh rate in millihertz exactly as niri reports it: Hz with
+/// 3 decimals (143981 -> "143.981", 60000 -> "60.000").
+///
+/// niri matches a configured `mode "WxH@R"` by converting `R` back to
+/// millihertz and requiring an exact match, so rounding to 2 decimals
+/// (143.98 -> 143980) silently misses the mode and niri falls back to the
+/// preferred one. Integer math avoids any float rounding.
+#[must_use]
+pub fn format_refresh_millihz(millihz: i32) -> String {
+    let sign = if millihz < 0 { "-" } else { "" };
+    let abs = millihz.unsigned_abs();
+    format!("{sign}{}.{:03}", abs / 1000, abs % 1000)
+}
+
+impl OutputMode {
+    /// Exact niri mode string for this mode, e.g. `"1920x1080@143.981"`.
+    ///
+    /// This is the value to store and write to KDL. Do not shorten it.
+    #[must_use]
+    pub fn mode_string(&self) -> String {
+        format!(
+            "{}x{}@{}",
+            self.width,
+            self.height,
+            format_refresh_millihz(self.refresh_rate)
+        )
+    }
+}
+
 /// Full output info from niri IPC (includes all settings)
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct FullOutputInfo {
@@ -731,17 +760,13 @@ pub struct FullOutputInfo {
 }
 
 impl FullOutputInfo {
-    /// Get the current mode as a string (e.g., "1920x1080@60.00")
+    /// Get the current mode as an exact niri mode string (e.g., "1920x1080@143.981")
     #[must_use]
     pub fn current_mode_string(&self) -> String {
-        if let Some(mode_idx) = self.current_mode {
-            if let Some(mode) = self.modes.get(mode_idx) {
-                // Convert millihertz to Hz with 2 decimal places
-                let refresh_hz = mode.refresh_rate as f64 / 1000.0;
-                return format!("{}x{}@{:.2}", mode.width, mode.height, refresh_hz);
-            }
-        }
-        String::new()
+        self.current_mode
+            .and_then(|idx| self.modes.get(idx))
+            .map(OutputMode::mode_string)
+            .unwrap_or_default()
     }
 
     /// Get the scale, defaulting to 1.0 if not set
@@ -1222,6 +1247,26 @@ mod tests {
     }
 
     #[test]
+    fn refresh_millihz_formats_exactly_with_three_decimals() {
+        assert_eq!(format_refresh_millihz(143_981), "143.981");
+        assert_eq!(format_refresh_millihz(60_000), "60.000");
+        assert_eq!(format_refresh_millihz(59_940), "59.940");
+        assert_eq!(format_refresh_millihz(120_030), "120.030");
+        assert_eq!(format_refresh_millihz(1), "0.001");
+    }
+
+    #[test]
+    fn output_mode_string_is_exact() {
+        let mode = OutputMode {
+            width: 1920,
+            height: 1080,
+            refresh_rate: 143_981,
+            is_preferred: false,
+        };
+        assert_eq!(mode.mode_string(), "1920x1080@143.981");
+    }
+
+    #[test]
     fn test_full_output_current_mode_string() {
         let mut info = FullOutputInfo {
             current_mode: Some(0),
@@ -1233,7 +1278,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        assert_eq!(info.current_mode_string(), "1920x1080@60.00");
+        assert_eq!(info.current_mode_string(), "1920x1080@60.000");
 
         // Test with no current mode
         info.current_mode = None;

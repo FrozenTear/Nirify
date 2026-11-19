@@ -16,7 +16,7 @@ use crate::types::{HdrMode, Transform, VrrMode};
 /// Represents an available display mode for dropdown selection
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModeOption {
-    /// The mode string (e.g., "1920x1080@60.00")
+    /// The mode string (e.g., "1920x1080@143.981", exact niri refresh)
     pub mode_string: String,
     /// Whether this is the preferred/native mode
     pub is_preferred: bool,
@@ -271,12 +271,10 @@ fn get_available_modes(output_name: &str, available_outputs: &[FullOutputInfo]) 
         ipc_out
             .modes
             .iter()
-            .map(|mode| {
-                let refresh_hz = mode.refresh_rate as f64 / 1000.0;
-                ModeOption {
-                    mode_string: format!("{}x{}@{:.2}", mode.width, mode.height, refresh_hz),
-                    is_preferred: mode.is_preferred,
-                }
+            .map(|mode| ModeOption {
+                // Exact refresh (3 decimals). niri needs an exact match.
+                mode_string: mode.mode_string(),
+                is_preferred: mode.is_preferred,
             })
             .collect()
     } else {

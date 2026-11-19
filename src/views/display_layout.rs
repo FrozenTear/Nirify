@@ -667,7 +667,7 @@ mod tests {
         assert!(cfg.position.is_none());
         assert_eq!(cfg.scale, Some(2.0));
         assert_eq!(cfg.transform, Transform::Rotate90);
-        assert_eq!(cfg.mode, "3840x2160@60.00");
+        assert_eq!(cfg.mode, "3840x2160@60.000");
     }
 
     #[test]

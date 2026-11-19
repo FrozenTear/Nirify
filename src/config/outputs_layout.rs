@@ -263,6 +263,83 @@ pub fn parse_mode_resolution(mode: &str) -> Option<(i32, i32)> {
     Some((width, height))
 }
 
+/// Largest gap (in millihertz) between a stored refresh and a live mode that
+/// still counts as "the same mode". 10 mHz = 0.01 Hz, which covers values
+/// that older Nirify builds rounded to 2 decimals (143.981 -> 143.98).
+pub const REFRESH_SNAP_TOLERANCE_MILLIHZ: i64 = 10;
+
+/// Parse `WxH@refresh` into `(width, height, refresh_millihz)`.
+///
+/// Mirrors how niri reads a configured mode: refresh is parsed as Hz and
+/// converted with `round(hz * 1000)`. Returns `None` when there is no
+/// `@refresh` part or it does not parse. Accepts any number of decimals, so
+/// legacy 2-decimal strings (`1920x1080@143.98`) still load.
+#[must_use]
+pub fn parse_mode_refresh_millihz(mode: &str) -> Option<(i32, i32, i64)> {
+    let (width, height) = parse_mode_resolution(mode)?;
+    let (_, refresh) = mode.split_once('@')?;
+    let hz: f64 = refresh.trim().parse().ok()?;
+    if !hz.is_finite() || hz <= 0.0 {
+        return None;
+    }
+    Some((width, height, (hz * 1000.0).round() as i64))
+}
+
+/// Exact live mode string for a stored mode whose refresh is a near match.
+///
+/// Returns `Some(exact)` only when the stored refresh does not already equal
+/// a live mode of the same resolution but is within
+/// [`REFRESH_SNAP_TOLERANCE_MILLIHZ`] of one (closest wins). Returns `None`
+/// when no change is needed or nothing matches closely enough.
+#[must_use]
+pub fn snap_mode_to_live(mode: &str, info: &FullOutputInfo) -> Option<String> {
+    let (width, height, millihz) = parse_mode_refresh_millihz(mode)?;
+    let same_res = info
+        .modes
+        .iter()
+        .filter(|m| m.width == width && m.height == height);
+    if same_res
+        .clone()
+        .any(|m| i64::from(m.refresh_rate) == millihz)
+    {
+        return None;
+    }
+    same_res
+        .map(|m| ((i64::from(m.refresh_rate) - millihz).abs(), m))
+        .filter(|(diff, _)| *diff <= REFRESH_SNAP_TOLERANCE_MILLIHZ)
+        .min_by_key(|(diff, _)| *diff)
+        .map(|(_, m)| m.mode_string())
+}
+
+/// Rewrite stored modes that are near (but not exact) matches of a live mode
+/// to the exact live string, e.g. `1920x1080@143.98` -> `1920x1080@143.981`.
+///
+/// Custom modes (`mode custom=true`) and modes without a refresh are left
+/// alone. Outputs with no live match are left alone. Returns how many outputs
+/// changed so the caller can mark Outputs dirty.
+pub fn snap_output_modes_to_live(settings: &mut OutputSettings, live: &[FullOutputInfo]) -> usize {
+    let mut changed = 0;
+    for output in &mut settings.outputs {
+        if output.mode_custom || output.mode.is_empty() {
+            continue;
+        }
+        let Some(info) = find_live_output(&output.name, live) else {
+            continue;
+        };
+        if let Some(exact) = snap_mode_to_live(&output.mode, info) {
+            log::info!(
+                "Snapping {} mode {:?} to exact live mode {:?}",
+                output.name,
+                output.mode,
+                exact
+            );
+            output.mode = exact;
+            changed += 1;
+        }
+    }
+    changed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,12 +402,12 @@ mod tests {
         assert_eq!(settings.outputs[0].name, "eDP-1");
         assert_eq!(settings.outputs[0].position, Some((0, 0)));
         assert_eq!(settings.outputs[0].scale, Some(1.0));
-        assert_eq!(settings.outputs[0].mode, "1920x1080@60.00");
+        assert_eq!(settings.outputs[0].mode, "1920x1080@60.000");
         assert!(settings.outputs[0].enabled);
         assert_eq!(settings.outputs[1].name, "DP-1");
         assert_eq!(settings.outputs[1].position, Some((1920, 0)));
         assert_eq!(settings.outputs[1].scale, Some(1.0));
-        assert_eq!(settings.outputs[1].mode, "2560x1440@60.00");
+        assert_eq!(settings.outputs[1].mode, "2560x1440@60.000");
     }
 
     #[test]
@@ -373,7 +450,7 @@ mod tests {
         assert_eq!(output.scale, Some(1.5));
         assert_eq!(output.transform, Transform::Rotate90);
         assert_eq!(output.vrr, VrrMode::On);
-        assert_eq!(output.mode, "1920x1080@60.00");
+        assert_eq!(output.mode, "1920x1080@60.000");
     }
 
     #[test]
@@ -630,5 +707,93 @@ mod tests {
             logical_size_from_mode("1920x1080", 1.0, Transform::Rotate90),
             (1080, 1920)
         );
+    }
+
+    fn dp3_live(refreshes: &[i32]) -> FullOutputInfo {
+        FullOutputInfo {
+            name: "DP-3".to_string(),
+            current_mode: Some(0),
+            modes: refreshes
+                .iter()
+                .map(|&refresh_rate| OutputMode {
+                    width: 1920,
+                    height: 1080,
+                    refresh_rate,
+                    is_preferred: false,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn parse_mode_refresh_accepts_two_and_three_decimals() {
+        assert_eq!(
+            parse_mode_refresh_millihz("1920x1080@143.981"),
+            Some((1920, 1080, 143_981))
+        );
+        assert_eq!(
+            parse_mode_refresh_millihz("1920x1080@143.98"),
+            Some((1920, 1080, 143_980))
+        );
+        assert_eq!(
+            parse_mode_refresh_millihz("1920x1080@60"),
+            Some((1920, 1080, 60_000))
+        );
+        assert_eq!(parse_mode_refresh_millihz("1920x1080"), None);
+        assert_eq!(parse_mode_refresh_millihz("1920x1080@abc"), None);
+    }
+
+    #[test]
+    fn snap_legacy_two_decimal_mode_to_exact_live_mode() {
+        let info = dp3_live(&[60_000, 143_981]);
+        assert_eq!(
+            snap_mode_to_live("1920x1080@143.98", &info).as_deref(),
+            Some("1920x1080@143.981")
+        );
+    }
+
+    #[test]
+    fn snap_leaves_exact_far_and_other_resolution_modes_alone() {
+        let info = dp3_live(&[60_000, 143_981]);
+        // Already exact (any decimal count that niri maps to the same mHz).
+        assert_eq!(snap_mode_to_live("1920x1080@143.981", &info), None);
+        assert_eq!(snap_mode_to_live("1920x1080@60", &info), None);
+        // More than 0.01 Hz away.
+        assert_eq!(snap_mode_to_live("1920x1080@143.95", &info), None);
+        // No refresh given: niri picks itself, nothing to snap.
+        assert_eq!(snap_mode_to_live("1920x1080", &info), None);
+        // Resolution not offered.
+        assert_eq!(snap_mode_to_live("2560x1440@143.98", &info), None);
+    }
+
+    #[test]
+    fn snap_picks_closest_live_refresh() {
+        let info = dp3_live(&[143_975, 143_981]);
+        assert_eq!(
+            snap_mode_to_live("1920x1080@143.98", &info).as_deref(),
+            Some("1920x1080@143.981")
+        );
+    }
+
+    #[test]
+    fn snap_output_modes_updates_matching_non_custom_outputs_only() {
+        let mut legacy = named("DP-3");
+        legacy.mode = "1920x1080@143.98".to_string();
+        let mut custom = named("DP-3");
+        custom.mode = "1920x1080@143.98".to_string();
+        custom.mode_custom = true;
+        let mut unplugged = named("HDMI-A-1");
+        unplugged.mode = "1920x1080@143.98".to_string();
+        let mut settings = OutputSettings {
+            outputs: vec![legacy, custom, unplugged],
+        };
+
+        let changed = snap_output_modes_to_live(&mut settings, &[dp3_live(&[143_981])]);
+
+        assert_eq!(changed, 1);
+        assert_eq!(settings.outputs[0].mode, "1920x1080@143.981");
+        assert_eq!(settings.outputs[1].mode, "1920x1080@143.98");
+        assert_eq!(settings.outputs[2].mode, "1920x1080@143.98");
     }
 }
